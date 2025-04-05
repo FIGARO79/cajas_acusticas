@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Cajas Acústicas - Parámetros Extendidos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        .error-message {
+            color: #ef4444; /* Rojo */
+            font-size: 0.875rem; /* Pequeño */
+            min-height: 1rem; /* Para evitar saltos de layout */
+        }
+        label {
+            cursor: pointer;
+        }
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        input[type=number] {
+          -moz-appearance: textfield; /* Firefox */
+        }
+        .param-group {
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .param-group h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #4b5563;
+            margin-bottom: 0.75rem;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 0.5rem;
+        }
+        .info-box {
+             margin-top: 1.5rem;
+             padding: 1rem;
+             border-radius: 0.375rem; /* rounded-md */
+             font-size: 0.875rem; /* text-sm */
+        }
+        .info-box h4 {
+            font-weight: 600; /* font-semibold */
+            margin-bottom: 0.5rem; /* mb-2 */
+        }
+        .info-box ul {
+            list-style: disc;
+            list-style-position: inside;
+            margin-left: 0.5rem;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-4xl mx-auto bg-white p-6 md:p-8 rounded-lg shadow-lg">
+        <h1 class="text-2xl md:text-3xl font-bold text-gray-800 mb-6 text-center">Calculadora de Cajas Acústicas</h1>
+        <p class="text-center text-gray-600 mb-8 text-sm">Introduce los parámetros Thiele/Small de tu altavoz.</p>
+
+        <div class="param-group">
+             <h3>Parámetros Fundamentales (Usados en Cálculos Básicos)</h3>
+             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                    <label for="fs" class="block text-sm font-medium text-gray-700 mb-1">Fs (Hz):</label>
+                    <input type="number" id="fs" step="any" placeholder="50" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    <p class="text-xs text-gray-500 mt-1">Frec. Resonancia</p>
+                </div>
+                 <div>
+                    <label for="qts" class="block text-sm font-medium text-gray-700 mb-1">Qts:</label>
+                    <input type="number" id="qts" step="any" placeholder="0.59" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                     <p class="text-xs text-gray-500 mt-1">Q Total (o dejar vacío si usa Qms/Qes)</p>
+                </div>
+                <div>
+                    <label for="qms" class="block text-sm font-medium text-gray-700 mb-1">Qms:</label>
+                    <input type="number" id="qms" step="any" placeholder="5.21" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    <p class="text-xs text-gray-500 mt-1">Q Mecánico</p>
+                </div>
+                 <div>
+                    <label for="qes" class="block text-sm font-medium text-gray-700 mb-1">Qes:</label>
+                    <input type="number" id="qes" step="any" placeholder="0.66" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                     <p class="text-xs text-gray-500 mt-1">Q Eléctrico</p>
+                </div>
+                <div>
+                    <label for="vas" class="block text-sm font-medium text-gray-700 mb-1">Vas (Litros):</label>
+                    <input type="number" id="vas" step="any" placeholder="82.2" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                     <p class="text-xs text-gray-500 mt-1">Vol. Equivalente</p>
+                </div>
+                 <div>
+                    <label for="ebp" class="block text-sm font-medium text-gray-700 mb-1">EBP:</label>
+                    <input type="number" id="ebp" step="any" placeholder="76" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                     <p class="text-xs text-gray-500 mt-1">Fs/Qes (o dejar vacío)</p>
+                </div>
+             </div>
+        </div>
+
+         <div class="param-group">
+             <h3>Parámetros Adicionales (Para Referencia y Futuros Cálculos Avanzados)</h3>
+             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                    <label for="re" class="block text-sm font-medium text-gray-700 mb-1">Re (Ω):</label>
+                    <input type="number" id="re" step="any" placeholder="5.31" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    <p class="text-xs text-gray-500 mt-1">Resistencia DC</p>
+                </div>
+                 <div>
+                    <label for="le" class="block text-sm font-medium text-gray-700 mb-1">Le (mH):</label>
+                    <input type="number" id="le" step="any" placeholder="0.66" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                     <p class="text-xs text-gray-500 mt-1">Inductancia Bobina</p>
+                </div>
+                 <div>
+                    <label for="vd" class="block text-sm font-medium text-gray-700 mb-1">Vd (cc):</label>
+                    <input type="number" id="vd" step="any" placeholder="114" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                     <p class="text-xs text-gray-500 mt-1">Vol. Desplazamiento</p>
+                </div>
+                <div>
+                    <label for="cms" class="block text-sm font-medium text-gray-700 mb-1">Cms (mm/N):</label>
+                    <input type="number" id="cms" step="any" placeholder="0.46" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                     <p class="text-xs text-gray-500 mt-1">Compliancia Mec.</p>
+                </div>
+                <div>
+                    <label for="bl" class="block text-sm font-medium text-gray-700 mb-1">BL (T-M):</label>
+                    <input type="number" id="bl" step="any" placeholder="7.5" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                     <p class="text-xs text-gray-500 mt-1">Factor BL</p>
+                </div>
+                <div>
+                    <label for="mms" class="block text-sm font-medium text-gray-700 mb-1">Mms (gramos):</label>
+                    <input type="number" id="mms" step="any" placeholder="22" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                     <p class="text-xs text-gray-500 mt-1">Masa Diafragma+Aire</p>
+                </div>
+                <div>
+                    <label for="xmax" class="block text-sm font-medium text-gray-700 mb-1">Xmax (mm):</label>
+                    <input type="number" id="xmax" step="any" placeholder="3.2" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                     <p class="text-xs text-gray-500 mt-1">Excursión Lineal Máx.</p>
+                </div>
+                <div>
+                    <label for="sd" class="block text-sm font-medium text-gray-700 mb-1">Sd (cm²):</label>
+                    <input type="number" id="sd" step="any" placeholder="355.4" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                     <p class="text-xs text-gray-500 mt-1">Área Superficie Cono</p>
+                </div>
+                 <div>
+                    <label for="xlim" class="block text-sm font-medium text-gray-700 mb-1">Xlim (mm):</label>
+                    <input type="number" id="xlim" step="any" placeholder="9.1" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                     <p class="text-xs text-gray-500 mt-1">Límite Mecánico Máx.</p>
+                </div>
+             </div>
+         </div>
+
+         <div class="mb-6 text-center">
+             <p id="error-message" class="error-message"></p> </div>
+
+        <div class="text-center mb-8">
+            <button id="calculate-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-md shadow-lg transition duration-150 ease-in-out text-lg">
+                Calcular Cajas
+            </button>
+        </div>
+
+        <div id="results-section" class="space-y-6 hidden">
+            <hr class="my-6 border-gray-300">
+
+            <div id="param-summary" class="info-box bg-gray-100 border border-gray-200 text-gray-700">
+                 <h4 class="text-gray-800">Parámetros Clave Utilizados:</h4>
+                 </div>
+
+             <div id="ebp-suggestion" class="info-box bg-purple-50 border border-purple-200 text-purple-800 hidden">
+                 <h4 class="text-purple-900">Sugerencia de Caja (basada en EBP):</h4>
+                 </div>
+
+            <h2 class="text-xl font-semibold text-gray-800 mb-4 text-center">Resultados Sugeridos</h2>
+
+            <div class="border border-gray-200 rounded-lg p-4 shadow-sm bg-white">
+                <h3 class="text-lg font-medium text-indigo-700 mb-3">Caja Sellada (Alineación Butterworth, Qtc ≈ 0.707)</h3>
+                <div id="sealed-results" class="space-y-2 text-sm text-gray-700">
+                    </div>
+                 <p class="text-xs text-gray-500 mt-3">Busca respuesta plana hasta Fc con caída suave. Ideal para calidad de sonido y buena respuesta transitoria.</p>
+            </div>
+
+            <div class="border border-gray-200 rounded-lg p-4 shadow-sm bg-white">
+                <h3 class="text-lg font-medium text-green-700 mb-3">Caja Ventilada (Ported - Alineación Sugerida)</h3>
+                 <div class="mb-3 flex items-center gap-2">
+                     <label for="port-diameter" class="block text-xs font-medium text-gray-600 whitespace-nowrap">Diámetro Puerto (cm):</label>
+                     <input type="number" id="port-diameter" step="any" value="7.5" class="w-20 px-2 py-1 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                     <button id="recalculate-port-btn" class="bg-gray-500 hover:bg-gray-600 text-white text-xs font-bold py-1 px-3 rounded-md shadow transition duration-150 ease-in-out">
+                        Recalcular Puerto
+                    </button>
+                 </div>
+                <div id="ported-results" class="space-y-2 text-sm text-gray-700">
+                    </div>
+                 <p class="text-xs text-gray-500 mt-3">Usa un puerto para extender bajos. Mayor eficiencia en graves, pero transitoria potencialmente menos precisa que sellada.</p>
+            </div>
+
+             <div class="info-box bg-yellow-50 border border-yellow-200 text-yellow-800">
+                 <h4 class="text-yellow-900">Notas Importantes:</h4>
+                 <ul>
+                     <li>Estos cálculos son teóricos y un punto de partida. La construcción real y el entorno afectan el resultado.</li>
+                     <li>El volumen (Vb) es interno neto. Suma el volumen desplazado por altavoz, refuerzos y puerto.</li>
+                     <li>La longitud del puerto (Lv) asume un extremo libre y otro enrasado.</li>
+                     <li>El relleno acústico (damping) afecta el Qtc efectivo y la respuesta. Se recomienda experimentar.</li>
+                     <li><strong>Parámetros Adicionales:</strong> Re, Le son para diseño de crossover. Xmax, Sd, Vd son cruciales para simulaciones de excursión y potencia (ver Próximos Pasos).</li>
+                     <li>Considera software de simulación (WinISD, VituixCAD, etc.) para refinar el diseño, verificar excursión y velocidad de aire en puerto.</li>
+                 </ul>
+             </div>
+
+             <div class="info-box bg-blue-50 border border-blue-200 text-blue-800">
+                 <h4 class="text-blue-900">Próximos Pasos y Mejoras Posibles:</h4>
+                 <ul>
+                     <li>Permitir elegir diferentes valores de Qtc (sellada) y alineaciones específicas (ventilada: QB3, SBB4, etc.).</li>
+                     <li>Implementar simulaciones básicas de respuesta en frecuencia.</li>
+                     <li>Añadir cálculo de excursión del cono basado en Vb, Fb, Xmax, Sd para estimar manejo de potencia.</li>
+                     <li>Calcular velocidad del aire en el puerto para evitar ruido.</li>
+                     <li>Incluir cálculos para cajas paso-banda y puertos rectangulares.</li>
+                     <li>Incorporar más ayudas visuales y explicaciones detalladas.</li>
+                 </ul>
+             </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Elementos del DOM ---
+        const inputs = {
+            fs: document.getElementById('fs'),
+            qts: document.getElementById('qts'),
+            vas: document.getElementById('vas'),
+            qms: document.getElementById('qms'),
+            qes: document.getElementById('qes'),
+            re: document.getElementById('re'),
+            le: document.getElementById('le'),
+            vd: document.getElementById('vd'),
+            cms: document.getElementById('cms'),
+            bl: document.getElementById('bl'),
+            mms: document.getElementById('mms'),
+            ebp: document.getElementById('ebp'),
+            xmax: document.getElementById('xmax'),
+            sd: document.getElementById('sd'),
+            xlim: document.getElementById('xlim'),
+            portDiameter: document.getElementById('port-diameter')
+        };
+
+        const calculateBtn = document.getElementById('calculate-btn');
+        const recalculatePortBtn = document.getElementById('recalculate-port-btn');
+        const resultsSection = document.getElementById('results-section');
+        const sealedResultsDiv = document.getElementById('sealed-results');
+        const portedResultsDiv = document.getElementById('ported-results');
+        const errorMessageP = document.getElementById('error-message');
+        const paramSummaryDiv = document.getElementById('param-summary');
+        const ebpSuggestionDiv = document.getElementById('ebp-suggestion');
+
+        // --- Constantes ---
+        const QTC_TARGET = 0.707; // Para alineación Butterworth sellada
+
+        // --- Funciones de Utilidad ---
+        function parseInput(element, allowZero = false) {
+            const value = parseFloat(element.value);
+            if (isNaN(value) || (!allowZero && value <= 0)) {
+                return null; // Retorna null si no es un número válido o es <= 0 (a menos que se permita)
+            }
+            return value;
+        }
+
+        function litersToCubicFeet(liters) {
+            return liters / 28.3168;
+        }
+
+        // --- Funciones de Cálculo ---
+
+        /**
+         * Valida las entradas y calcula Qts/EBP si es necesario.
+         * @returns {object|null} Objeto con todos los parámetros parseados o null si hay error crítico.
+         */
+        function getParameters() {
+            let errorMsg = '';
+            const params = {};
+
+            // Parsear todos los parámetros
+            params.fs = parseInput(inputs.fs);
+            params.qts_in = parseInput(inputs.qts); // Qts ingresado
+            params.vas = parseInput(inputs.vas);
+            params.qms = parseInput(inputs.qms);
+            params.qes = parseInput(inputs.qes);
+            params.re = parseInput(inputs.re, true); // Re puede ser 0? Mejor no.
+            params.le = parseInput(inputs.le, true); // Le puede ser 0
+            params.vd = parseInput(inputs.vd);
+            params.cms = parseInput(inputs.cms);
+            params.bl = parseInput(inputs.bl);
+            params.mms = parseInput(inputs.mms);
+            params.ebp_in = parseInput(inputs.ebp); // EBP ingresado
+            params.xmax = parseInput(inputs.xmax);
+            params.sd = parseInput(inputs.sd);
+            params.xlim = parseInput(inputs.xlim);
+
+            // --- Validación y Cálculo de Qts ---
+            params.qts = null;
+            if (params.qts_in !== null) {
+                params.qts = params.qts_in;
+                if (params.qms !== null && params.qes !== null) {
+                    const qts_calc = 1 / (1 / params.qms + 1 / params.qes);
+                    if (Math.abs(params.qts - qts_calc) > 0.01) { // Tolerancia
+                        errorMsg += `Advertencia: Qts ingresado (${params.qts.toFixed(3)}) difiere del calculado con Qms/Qes (${qts_calc.toFixed(3)}). Usando Qts ingresado. `;
+                    }
+                }
+            } else if (params.qms !== null && params.qes !== null) {
+                params.qts = 1 / (1 / params.qms + 1 / params.qes);
+            } else {
+                 errorMsg += 'Error: Debes ingresar Qts, o ambos Qms y Qes. ';
+            }
+
+             // --- Validación y Cálculo de EBP ---
+             params.ebp = null;
+             if (params.ebp_in !== null) {
+                 params.ebp = params.ebp_in;
+                 if (params.fs !== null && params.qes !== null) {
+                     const ebp_calc = params.fs / params.qes;
+                     if (Math.abs(params.ebp - ebp_calc) > 1) { // Tolerancia
+                         errorMsg += `Advertencia: EBP ingresado (${params.ebp.toFixed(1)}) difiere del calculado con Fs/Qes (${ebp_calc.toFixed(1)}). Usando EBP ingresado. `;
+                     }
+                 }
+             } else if (params.fs !== null && params.qes !== null) {
+                 params.ebp = params.fs / params.qes;
+             } // No es crítico si falta EBP
+
+            // --- Validación Crítica ---
+            if (params.fs === null || params.qts === null || params.vas === null) {
+                 errorMsg += 'Error: Fs, Vas y (Qts o Qms/Qes) son obligatorios para los cálculos básicos.';
+                 errorMessageP.textContent = errorMsg;
+                 resultsSection.classList.add('hidden');
+                 return null;
+            }
+
+            errorMessageP.textContent = errorMsg.trim(); // Mostrar advertencias si las hay
+            return params;
+        }
+
+        function calculateSealed(fs, qts, vas) {
+             if (qts >= QTC_TARGET) {
+                  return { Vb: Infinity, Fc: fs, error: `Qts (${qts.toFixed(3)}) es >= ${QTC_TARGET}. No se puede alcanzar Qtc=${QTC_TARGET}. Considera un Qtc más alto o una caja ventilada.` };
+             }
+            const alpha = Math.pow(QTC_TARGET / qts, 2) - 1;
+            const Vb = vas / alpha;
+            const Fc = QTC_TARGET / qts * fs;
+            return { Vb, Fc };
+        }
+
+        function calculatePorted(fs, qts, vas) {
+            // Fórmulas aproximadas (pueden variar según alineación deseada)
+            const Vb = 15 * vas * Math.pow(qts, 2.87);
+            const Fb = (0.42 * fs) / Math.pow(qts, 0.9);
+            const F3 = (0.26 * fs) / Math.pow(qts, 1.4); // F3 aproximado
+            return { Vb, Fb, F3 };
+        }
+
+        function calculatePortLength(Vb_liters, Fb, portDiameter_cm) {
+            if (isNaN(portDiameter_cm) || portDiameter_cm <= 0 || Fb <= 0 || Vb_liters <= 0) {
+                 return null; // Entrada inválida
+             }
+            const R_cm = portDiameter_cm / 2;
+             // Fórmula empírica común: Lv = ( (2356 * R^2) / (Fb^2 * Vb_liters) ) - (k * R)
+             // k ~ 1.4 para tubo con un extremo enrasado y otro libre
+             if (Fb === 0 || Vb_liters === 0) return 0; // Evitar división por cero
+
+            const Lv_cm = ( (2356 * R_cm * R_cm) / (Fb * Fb * Vb_liters) ) - (1.4 * R_cm);
+            return Lv_cm > 0 ? Lv_cm : 0; // Longitud no puede ser negativa
+        }
+
+        // --- Funciones de Visualización ---
+
+        function displayParamSummary(params) {
+            paramSummaryDiv.innerHTML = `
+                <p><strong>Fs:</strong> ${params.fs?.toFixed(1) ?? 'N/A'} Hz</p>
+                <p><strong>Qts:</strong> ${params.qts?.toFixed(3) ?? 'N/A'} ${params.qts_in === null && params.qts !== null ? '(Calculado)' : ''}</p>
+                <p><strong>Vas:</strong> ${params.vas?.toFixed(1) ?? 'N/A'} Litros</p>
+                <p><strong>EBP:</strong> ${params.ebp?.toFixed(1) ?? 'N/A'} ${params.ebp_in === null && params.ebp !== null ? '(Calculado)' : ''}</p>
+            `;
+        }
+
+         function displayEBPSuggestion(ebp) {
+             if (ebp === null) {
+                 ebpSuggestionDiv.classList.add('hidden');
+                 return;
+             }
+             let suggestion = '';
+             if (ebp < 50) {
+                 suggestion = `Un EBP de ${ebp.toFixed(1)} sugiere que este altavoz es generalmente <strong>más adecuado para una caja sellada</strong>.`;
+             } else if (ebp > 90) {
+                 suggestion = `Un EBP de ${ebp.toFixed(1)} sugiere que este altavoz es generalmente <strong>más adecuado para una caja ventilada (ported)</strong>.`;
+             } else {
+                 suggestion = `Un EBP de ${ebp.toFixed(1)} está en un rango intermedio, lo que indica que el altavoz podría funcionar bien <strong>tanto en cajas selladas como ventiladas</strong>. La elección dependerá de tus preferencias de tamaño y respuesta en bajos.`;
+             }
+             ebpSuggestionDiv.innerHTML = `<h4 class="text-purple-900">Sugerencia de Caja (basada en EBP):</h4><p>${suggestion}</p>`;
+             ebpSuggestionDiv.classList.remove('hidden');
+         }
+
+        function displaySealedResults(sealedData) {
+            sealedResultsDiv.innerHTML = ''; // Limpiar
+            if (sealedData.error) {
+                 sealedResultsDiv.innerHTML = `<p class="text-red-600">${sealedData.error}</p>`;
+            } else if (isFinite(sealedData.Vb)) {
+                sealedResultsDiv.innerHTML = `
+                    <p><strong>Volumen Interno Neto (Vb):</strong> ${sealedData.Vb.toFixed(2)} Litros / ${litersToCubicFeet(sealedData.Vb).toFixed(3)} ft³</p>
+                    <p><strong>Frecuencia de Corte (-3dB, Fc):</strong> ${sealedData.Fc.toFixed(1)} Hz</p>
+                `;
+            } else {
+                 sealedResultsDiv.innerHTML = `<p class="text-orange-600">Cálculo de Vb resultó en infinito o no válido.</p>`;
+            }
+        }
+
+        function displayPortLength(portLength_cm) {
+             if (portLength_cm === null) {
+                return `<p class="text-red-600">Ingrese un diámetro de puerto válido.</p>`;
+            } else if (portLength_cm === 0) {
+                 return `<p class="text-orange-600"><strong>Longitud del Puerto (Lv):</strong> Calculada como 0 o negativa. Considera un diámetro diferente, un Vb mayor o verifica parámetros.</p>`;
+            } else {
+                return `<p><strong>Longitud del Puerto (Lv):</strong> ${portLength_cm.toFixed(1)} cm</p>`;
+            }
+        }
+
+        function displayPortedResults(portedData) {
+            portedResultsDiv.innerHTML = ''; // Limpiar
+            portedResultsDiv.dataset.vb = portedData.Vb; // Guardar para recálculo
+            portedResultsDiv.dataset.fb = portedData.Fb; // Guardar para recálculo
+
+            const portDiameter_cm = parseInput(inputs.portDiameter);
+            const portLength_cm = calculatePortLength(portedData.Vb, portedData.Fb, portDiameter_cm);
+
+            portedResultsDiv.innerHTML = `
+                <p><strong>Volumen Interno Neto (Vb):</strong> ${portedData.Vb.toFixed(2)} Litros / ${litersToCubicFeet(portedData.Vb).toFixed(3)} ft³</p>
+                <p><strong>Frecuencia de Sintonización (Fb):</strong> ${portedData.Fb.toFixed(1)} Hz</p>
+                <p><strong>Frecuencia de Corte Aprox. (-3dB, F3):</strong> ${portedData.F3.toFixed(1)} Hz</p>
+                <div id="port-length-result" class="mt-2">
+                    ${displayPortLength(portLength_cm)}
+                </div>
+            `;
+        }
+
+        // --- Manejadores de Eventos ---
+        function handleCalculate() {
+            const params = getParameters();
+            if (!params) return; // Detener si hay errores críticos
+
+            displayParamSummary(params);
+            displayEBPSuggestion(params.ebp);
+
+            const sealedData = calculateSealed(params.fs, params.qts, params.vas);
+            const portedData = calculatePorted(params.fs, params.qts, params.vas);
+
+            displaySealedResults(sealedData);
+            displayPortedResults(portedData);
+
+            resultsSection.classList.remove('hidden'); // Mostrar resultados
+        }
+
+        function handleRecalculatePort() {
+            const Vb_liters = parseFloat(portedResultsDiv.dataset.vb);
+            const Fb = parseFloat(portedResultsDiv.dataset.fb);
+            const portDiameter_cm = parseInput(inputs.portDiameter);
+
+            if (isNaN(Vb_liters) || isNaN(Fb)) {
+                 errorMessageP.textContent = 'Calcula primero las cajas antes de ajustar el puerto.';
+                 return;
+            }
+             errorMessageP.textContent = ''; // Limpiar error
+
+            const portLength_cm = calculatePortLength(Vb_liters, Fb, portDiameter_cm);
+            const portLengthResultDiv = document.getElementById('port-length-result');
+             if (portLengthResultDiv) {
+                 portLengthResultDiv.innerHTML = displayPortLength(portLength_cm);
+             } else {
+                 // Si el div no existe (error previo?), intentar recalcular todo
+                 handleCalculate();
+             }
+        }
+
+        // --- Event Listeners ---
+        calculateBtn.addEventListener('click', handleCalculate);
+        recalculatePortBtn.addEventListener('click', handleRecalculatePort);
+
+         // Calcular al presionar Enter en inputs clave
+         [inputs.fs, inputs.qts, inputs.vas, inputs.qms, inputs.qes].forEach(input => {
+             input?.addEventListener('keypress', function(event) { // Check if input exists
+                 if (event.key === 'Enter') {
+                     event.preventDefault();
+                     calculateBtn.click();
+                 }
+             });
+         });
+         // Recalcular puerto al presionar Enter en diámetro
+         inputs.portDiameter?.addEventListener('keypress', function(event) {
+             if (event.key === 'Enter') {
+                 event.preventDefault();
+                 recalculatePortBtn.click();
+             }
+         });
+
+         // Auto-llenar con datos de ejemplo al cargar (opcional)
+         /*
+         window.onload = () => {
+             inputs.fs.value = 50;
+             inputs.re.value = 5.31;
+             inputs.le.value = 0.66;
+             inputs.qms.value = 5.21;
+             inputs.qes.value = 0.66;
+             inputs.qts.value = 0.59; // O dejar vacío para que calcule
+             inputs.vas.value = 82.2;
+             inputs.vd.value = 114;
+             inputs.cms.value = 0.46;
+             inputs.bl.value = 7.5;
+             inputs.mms.value = 22;
+             inputs.ebp.value = 76; // O dejar vacío
+             inputs.xmax.value = 3.2;
+             inputs.sd.value = 355.4;
+             inputs.xlim.value = 9.1;
+         }
+         */
+
+    </script>
+</body>
+</html>
