@@ -3,532 +3,2816 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Calculadora de Cajas Acústicas - Parámetros Extendidos</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
-                }
-            }
-        }
-    </script>
+    <title>AcousticSim - Calculadora de Cajas Acústicas Premium</title>
+    
+    <!-- Chart.js para simulaciones gráficas -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Fuentes de Google -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+
     <style>
+        :root {
+            --bg-gradient: #f8fafc;
+            --card-bg: #ffffff;
+            --card-border: #e2e8f0;
+            --card-border-hover: #cbd5e1;
+            
+            --text-main: #0f172a;
+            --text-muted: #475569;
+            
+            --primary: #2563eb;
+            --primary-gradient: linear-gradient(135deg, #1d4ed8, #2563eb);
+            --primary-glow: rgba(37, 99, 235, 0.08);
+            
+            --sealed-color: #0284c7;
+            --sealed-glow: rgba(2, 132, 199, 0.08);
+            --ported-color: #059669;
+            --ported-glow: rgba(5, 150, 105, 0.08);
+            
+            --danger: #dc2626;
+            --danger-bg: rgba(220, 38, 38, 0.05);
+            --warning: #d97706;
+            --warning-bg: rgba(217, 119, 6, 0.05);
+            --success: #16a34a;
+            --success-bg: rgba(22, 163, 74, 0.05);
+            
+            --input-bg: #ffffff;
+            --input-border: #cbd5e1;
+            --input-focus: #2563eb;
+            
+            --font-display: 'Space Grotesk', sans-serif;
+            --font-sans: 'Outfit', sans-serif;
+        }
+
+        /* Reset & Base Styles */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        strong {
+            font-weight: 600;
+        }
+
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f8fafc;
+            font-family: var(--font-sans);
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 1.5rem;
+            line-height: 1.5;
+            overflow-x: hidden;
         }
-        .error-message {
-            color: #ef4444; /* Rojo */
-            font-size: 0.875rem; /* Pequeño */
-            min-height: 1rem; /* Para evitar saltos de layout */
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
         }
-        label {
+        ::-webkit-scrollbar-track {
+            background: rgba(3, 7, 18, 0.5);
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.4);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 163, 184, 0.6);
+        }
+
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        /* Header Style */
+        header {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            margin-bottom: 1rem;
+            position: relative;
+        }
+
+        header::after {
+            content: '';
+            position: absolute;
+            top: -20px;
+            width: 200px;
+            height: 200px;
+            background: var(--primary-glow);
+            filter: blur(80px);
+            z-index: -1;
+            border-radius: 50%;
+            opacity: 0.15;
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            color: var(--primary);
+            filter: drop-shadow(0 1px 2px var(--primary-glow));
+        }
+
+        h1 {
+            font-family: var(--font-display);
+            font-size: 2.25rem;
+            font-weight: 600;
+            background: linear-gradient(to right, #1e293b, #0f172a);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.025em;
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            max-width: 500px;
+        }
+
+        /* Selector de ejemplos */
+        .preset-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.75rem;
+            margin-top: 0.5rem;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            padding: 0.5rem 1rem;
+            border-radius: 12px;
+            width: fit-content;
+            margin: 0.5rem auto 0 auto;
+        }
+
+        .preset-label {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+
+        select.preset-select {
+            background: var(--input-bg);
+            border: 1px solid var(--input-border);
+            color: var(--text-main);
+            padding: 0.35rem 1.5rem 0.35rem 0.75rem;
+            border-radius: 8px;
+            font-family: var(--font-sans);
+            font-size: 0.875rem;
             cursor: pointer;
+            outline: none;
+            transition: all 0.2s ease;
         }
-        input[type=number]::-webkit-inner-spin-button,
-        input[type=number]::-webkit-outer-spin-button {
-          -webkit-appearance: none;
-          margin: 0;
+
+        select.preset-select:focus {
+            border-color: var(--input-focus);
+            box-shadow: 0 0 10px rgba(168, 85, 247, 0.2);
         }
-        input[type=number] {
-          -moz-appearance: textfield; /* Firefox */
+
+        /* Dashboard Grid Layout */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
         }
-        .param-group {
-            background-color: #f9fafb;
-            border: 1px solid #e5e7eb;
-            border-radius: 0.5rem;
-            padding: 1rem;
+
+        @media (min-width: 1024px) {
+            .dashboard-grid {
+                grid-template-columns: 390px 1fr;
+            }
+        }
+
+        /* Card Panels */
+        .panel {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 1.25rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .panel:hover {
+            border-color: var(--card-border-hover);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+
+        .panel-title {
+            font-family: var(--font-display);
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            border-bottom: 1px solid var(--card-border);
+            padding-bottom: 0.5rem;
+            color: var(--text-main);
+        }
+
+        .panel-title svg {
+            width: 18px;
+            height: 18px;
+            color: var(--primary);
+        }
+
+        /* Forms & Inputs styling */
+        .form-section {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .form-subsection-title {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--primary);
+            font-weight: 600;
+            margin-top: 0.5rem;
+            border-bottom: 1px solid var(--card-border);
+            padding-bottom: 0.25rem;
+        }
+
+        .input-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            position: relative;
+        }
+
+        .input-group-full {
+            grid-column: span 2;
+        }
+
+        label {
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .label-desc {
+            font-weight: 400;
+            opacity: 0.75;
+            font-size: 0.75rem;
+        }
+
+        .input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        input[type="number"], input[type="text"] {
+            width: 100%;
+            background: var(--input-bg);
+            border: 1px solid var(--input-border);
+            color: var(--text-main);
+            padding: 0.5rem 2.2rem 0.5rem 0.75rem;
+            border-radius: 8px;
+            font-family: var(--font-sans);
+            font-size: 0.9rem;
+            outline: none;
+            transition: all 0.2s ease-in-out;
+            -moz-appearance: textfield; /* Firefox */
+        }
+
+        /* Chrome, Safari, Edge, Opera */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        input[type="number"]:focus, input[type="text"]:focus, select:focus {
+            border-color: var(--input-focus);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+        }
+
+        .unit-badge {
+            position: absolute;
+            right: 0.75rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            pointer-events: none;
+            font-weight: 500;
+        }
+
+        /* Error/Warnings Area */
+        .notification-area {
+            font-size: 0.8rem;
+            border-radius: 8px;
+            padding: 0.75rem;
+            display: none;
+            align-items: flex-start;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .notification-area.active {
+            display: flex;
+        }
+
+        .notification-area.error {
+            background: var(--danger-bg);
+            border: 1px solid rgba(220, 38, 38, 0.2);
+            color: #c62828;
+        }
+
+        .notification-area.warning {
+            background: var(--warning-bg);
+            border: 1px solid rgba(217, 119, 6, 0.2);
+            color: #e65100;
+        }
+
+        /* Right Column layout */
+        .dashboard-main {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        /* Chart card */
+        .chart-card {
+            min-height: 320px;
+            position: relative;
+        }
+
+        .chart-container {
+            width: 100%;
+            height: 280px;
+            position: relative;
+        }
+
+        /* EBP Badge */
+        .ebp-badge-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 1.25rem;
+            border-radius: 8px;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+        
+        .ebp-normal {
+            background: var(--primary-glow);
+            border: 1px solid var(--primary);
+            color: #1e293b;
+        }
+
+        .ebp-sealed {
+            background: rgba(79, 163, 209, 0.08);
+            border: 1px solid var(--sealed-color);
+            color: #025a87;
+        }
+
+        .ebp-ported {
+            background: rgba(72, 169, 124, 0.08);
+            border: 1px solid var(--ported-color);
+            color: #046a3f;
+        }
+
+        .ebp-tag {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            background: #ffffff;
+            border: 1px solid currentColor;
+        }
+
+        /* Tabbed Enclosures Layout */
+        .tabs-header {
+            display: flex;
+            border-bottom: 1px solid var(--card-border);
+            gap: 0.5rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            padding: 0.5rem 1rem;
+            font-family: var(--font-display);
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-bottom: 2px solid transparent;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-main);
+        }
+
+        .tab-btn.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Result parameters grid */
+        .results-summary {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
             margin-bottom: 1.5rem;
         }
-        .param-group h3 {
-            font-size: 1rem;
+
+        @media (min-width: 640px) {
+            .results-summary {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        .result-tile {
+            background: #f8fafc;
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .result-tile-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+        }
+
+        .result-tile-value {
+            font-size: 1.35rem;
+            font-family: var(--font-display);
             font-weight: 600;
-            color: #4b5563;
-            margin-bottom: 0.75rem;
-            border-bottom: 1px solid #e5e7eb;
-            padding-bottom: 0.5rem;
+            color: var(--text-main);
         }
-        .info-box {
-             margin-top: 1.5rem;
-             padding: 1rem;
-             border-radius: 0.375rem; /* rounded-md */
-             font-size: 0.875rem; /* text-sm */
+
+        .result-tile-sub {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-top: 0.15rem;
         }
-        .info-box h4 {
-            font-weight: 600; /* font-semibold */
-            margin-bottom: 0.5rem; /* mb-2 */
+
+        /* Control Tuning Sliders */
+        .control-group {
+            background: #f8fafc;
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
         }
-        .info-box ul {
-            list-style: disc;
-            list-style-position: inside;
-            margin-left: 0.5rem;
+
+        .control-title {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .slider-container {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+        }
+
+        .slider-name {
+            color: var(--text-muted);
+        }
+
+        .slider-val {
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #cbd5e1;
+            outline: none;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--primary-gradient);
+            box-shadow: 0 0 6px var(--primary-glow);
+            transition: transform 0.1s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        /* Checkbox custom styled */
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            cursor: pointer;
+            user-select: none;
+            color: var(--text-main);
+        }
+
+        .checkbox-container input {
+            display: none;
+        }
+
+        .custom-checkbox {
+            width: 16px;
+            height: 16px;
+            border: 1px solid var(--input-border);
+            border-radius: 4px;
+            background: var(--input-bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .checkbox-container input:checked + .custom-checkbox {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .custom-checkbox::after {
+            content: '';
+            width: 5px;
+            height: 9px;
+            border: solid white;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+            display: none;
+            margin-bottom: 2px;
+        }
+
+        .checkbox-container input:checked + .custom-checkbox::after {
+            display: block;
+        }
+
+        /* Pro calculated results panel */
+        .pro-calc-panel {
+            background: rgba(92, 107, 192, 0.04);
+            border: 1px solid rgba(92, 107, 192, 0.2);
+            border-radius: 12px;
+            padding: 1rem;
+            margin-top: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .pro-calc-title {
+            font-family: var(--font-display);
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.25rem;
+            border-bottom: 1px solid var(--card-border-hover);
+            padding-bottom: 0.25rem;
+        }
+
+        .pro-calc-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.825rem;
+            line-height: 1.4;
+        }
+
+        .pro-calc-label {
+            color: var(--text-muted);
+        }
+
+        .pro-calc-value {
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        /* Alert Box */
+        .alert-box {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.6rem;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            line-height: 1.4;
+        }
+
+        .alert-box.info {
+            background: #f0f9ff;
+            border: 1px solid #b3e5fc;
+            color: #0284c7;
+        }
+        
+        .alert-box.success {
+            background: var(--success-bg);
+            border: 1px solid rgba(56, 142, 60, 0.2);
+            color: #2e7d32;
+        }
+
+        .alert-box.warn {
+            background: var(--warning-bg);
+            border: 1px solid rgba(245, 124, 0, 0.2);
+            color: #e65100;
+        }
+
+        .alert-box.danger {
+            background: var(--danger-bg);
+            border: 1px solid rgba(211, 47, 47, 0.2);
+            color: #c62828;
+        }
+
+        .alert-box svg {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        /* Wood cut layout */
+        .wood-layout {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .wood-grid-controls {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+        }
+
+        .wood-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            background: #ffffff;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid var(--card-border);
+        }
+
+        .wood-table th {
+            background: #f1f5f9;
+            color: #1e293b;
+            font-family: var(--font-display);
+            text-align: left;
+            padding: 0.6rem 0.8rem;
+            font-weight: 600;
+            border-bottom: 2px solid #cbd5e1;
+        }
+
+        .wood-table td {
+            padding: 0.6rem 0.8rem;
+            border-top: 1px solid var(--card-border);
+            color: var(--text-main);
+        }
+
+        .wood-table tr:hover {
+            background: #f8fafc;
+        }
+
+        .wood-note {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        /* Info boxes */
+        .info-footer {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            background: #f8fafc;
+            border: 1px solid var(--card-border);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1.5rem;
+            line-height: 1.5;
+        }
+
+        .info-footer h4 {
+            color: var(--text-main);
+            font-weight: 600;
+            margin-bottom: 0.4rem;
+        }
+
+        .info-footer ul {
+            list-style-type: disc;
+            margin-left: 1.25rem;
+        }
+
+        .hidden {
+            display: none !important;
         }
     </style>
 </head>
-<body class="p-4 md:p-8">
-    <div class="max-w-4xl mx-auto bg-white p-6 md:p-8 rounded-lg shadow-lg">
-        <h1 class="text-2xl md:text-3xl font-bold text-gray-800 mb-6 text-center">Calculadora de Cajas Acústicas</h1>
-        <p class="text-center text-gray-600 mb-8 text-sm">Introduce los parámetros Thiele/Small de tu altavoz.</p>
+<body>
 
-        <div class="param-group">
-             <h3>Parámetros Fundamentales (Usados en Cálculos Básicos)</h3>
-             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                    <label for="fs" class="block text-sm font-medium text-gray-700 mb-1">Fs (Hz):</label>
-                    <input type="number" id="fs" step="any" placeholder="50" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                    <p class="text-xs text-gray-500 mt-1">Frec. Resonancia</p>
-                </div>
-                 <div>
-                    <label for="qts" class="block text-sm font-medium text-gray-700 mb-1">Qts:</label>
-                    <input type="number" id="qts" step="any" placeholder="0.59" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                     <p class="text-xs text-gray-500 mt-1">Q Total (o dejar vacío si usa Qms/Qes)</p>
-                </div>
-                <div>
-                    <label for="qms" class="block text-sm font-medium text-gray-700 mb-1">Qms:</label>
-                    <input type="number" id="qms" step="any" placeholder="5.21" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                    <p class="text-xs text-gray-500 mt-1">Q Mecánico</p>
-                </div>
-                 <div>
-                    <label for="qes" class="block text-sm font-medium text-gray-700 mb-1">Qes:</label>
-                    <input type="number" id="qes" step="any" placeholder="0.66" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                     <p class="text-xs text-gray-500 mt-1">Q Eléctrico</p>
-                </div>
-                <div>
-                    <label for="vas" class="block text-sm font-medium text-gray-700 mb-1">Vas (Litros):</label>
-                    <input type="number" id="vas" step="any" placeholder="82.2" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                     <p class="text-xs text-gray-500 mt-1">Vol. Equivalente</p>
-                </div>
-                 <div>
-                    <label for="ebp" class="block text-sm font-medium text-gray-700 mb-1">EBP:</label>
-                    <input type="number" id="ebp" step="any" placeholder="76" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                     <p class="text-xs text-gray-500 mt-1">Fs/Qes (o dejar vacío)</p>
-                </div>
-             </div>
-        </div>
-
-         <div class="param-group">
-             <h3>Parámetros Adicionales (Para Referencia y Futuros Cálculos Avanzados)</h3>
-             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                    <label for="re" class="block text-sm font-medium text-gray-700 mb-1">Re (Ω):</label>
-                    <input type="number" id="re" step="any" placeholder="5.31" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                    <p class="text-xs text-gray-500 mt-1">Resistencia DC</p>
-                </div>
-                 <div>
-                    <label for="le" class="block text-sm font-medium text-gray-700 mb-1">Le (mH):</label>
-                    <input type="number" id="le" step="any" placeholder="0.66" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                     <p class="text-xs text-gray-500 mt-1">Inductancia Bobina</p>
-                </div>
-                 <div>
-                    <label for="vd" class="block text-sm font-medium text-gray-700 mb-1">Vd (cc):</label>
-                    <input type="number" id="vd" step="any" placeholder="114" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                     <p class="text-xs text-gray-500 mt-1">Vol. Desplazamiento</p>
-                </div>
-                <div>
-                    <label for="cms" class="block text-sm font-medium text-gray-700 mb-1">Cms (mm/N):</label>
-                    <input type="number" id="cms" step="any" placeholder="0.46" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                     <p class="text-xs text-gray-500 mt-1">Compliancia Mec.</p>
-                </div>
-                <div>
-                    <label for="bl" class="block text-sm font-medium text-gray-700 mb-1">BL (T-M):</label>
-                    <input type="number" id="bl" step="any" placeholder="7.5" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                     <p class="text-xs text-gray-500 mt-1">Factor BL</p>
-                </div>
-                <div>
-                    <label for="mms" class="block text-sm font-medium text-gray-700 mb-1">Mms (gramos):</label>
-                    <input type="number" id="mms" step="any" placeholder="22" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                     <p class="text-xs text-gray-500 mt-1">Masa Diafragma+Aire</p>
-                </div>
-                <div>
-                    <label for="xmax" class="block text-sm font-medium text-gray-700 mb-1">Xmax (mm):</label>
-                    <input type="number" id="xmax" step="any" placeholder="3.2" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                     <p class="text-xs text-gray-500 mt-1">Excursión Lineal Máx.</p>
-                </div>
-                <div>
-                    <label for="sd" class="block text-sm font-medium text-gray-700 mb-1">Sd (cm²):</label>
-                    <input type="number" id="sd" step="any" placeholder="355.4" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                     <p class="text-xs text-gray-500 mt-1">Área Superficie Cono</p>
-                </div>
-                 <div>
-                    <label for="xlim" class="block text-sm font-medium text-gray-700 mb-1">Xlim (mm):</label>
-                    <input type="number" id="xlim" step="any" placeholder="9.1" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                     <p class="text-xs text-gray-500 mt-1">Límite Mecánico Máx.</p>
-                </div>
-             </div>
-         </div>
-
-         <div class="mb-6 text-center">
-             <p id="error-message" class="error-message"></p> </div>
-
-        <div class="text-center mb-8">
-            <button id="calculate-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-md shadow-lg transition duration-150 ease-in-out text-lg">
-                Calcular Cajas
-            </button>
-        </div>
-
-        <div id="results-section" class="space-y-6 hidden">
-            <hr class="my-6 border-gray-300">
-
-            <div id="param-summary" class="info-box bg-gray-100 border border-gray-200 text-gray-700">
-                 <h4 class="text-gray-800">Parámetros Clave Utilizados:</h4>
-                 </div>
-
-             <div id="ebp-suggestion" class="info-box bg-purple-50 border border-purple-200 text-purple-800 hidden">
-                 <h4 class="text-purple-900">Sugerencia de Caja (basada en EBP):</h4>
-                 </div>
-
-            <h2 class="text-xl font-semibold text-gray-800 mb-4 text-center">Resultados Sugeridos</h2>
-
-            <div class="border border-gray-200 rounded-lg p-4 shadow-sm bg-white">
-                <h3 class="text-lg font-medium text-indigo-700 mb-3">Caja Sellada (Alineación Butterworth, Qtc ≈ 0.707)</h3>
-                <div id="sealed-results" class="space-y-2 text-sm text-gray-700">
-                    </div>
-                 <p class="text-xs text-gray-500 mt-3">Busca respuesta plana hasta Fc con caída suave. Ideal para calidad de sonido y buena respuesta transitoria.</p>
+    <div class="container">
+        
+        <header>
+            <div class="logo-area">
+                <svg class="logo-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                </svg>
+                <h1>AcousticSim</h1>
             </div>
-
-            <div class="border border-gray-200 rounded-lg p-4 shadow-sm bg-white">
-                <h3 class="text-lg font-medium text-green-700 mb-3">Caja Ventilada (Ported - Alineación Sugerida)</h3>
-                 <div class="mb-3 flex items-center gap-2">
-                     <label for="port-diameter" class="block text-xs font-medium text-gray-600 whitespace-nowrap">Diámetro Puerto (cm):</label>
-                     <input type="number" id="port-diameter" step="any" value="7.5" class="w-20 px-2 py-1 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                     <button id="recalculate-port-btn" class="bg-gray-500 hover:bg-gray-600 text-white text-xs font-bold py-1 px-3 rounded-md shadow transition duration-150 ease-in-out">
-                        Recalcular Puerto
-                    </button>
-                 </div>
-                <div id="ported-results" class="space-y-2 text-sm text-gray-700">
-                    </div>
-                 <p class="text-xs text-gray-500 mt-3">Usa un puerto para extender bajos. Mayor eficiencia en graves, pero transitoria potencialmente menos precisa que sellada.</p>
+            <p>Calculadora y simulador gráfico de cajas acústicas basado en parámetros Thiele/Small. Diseña recintos perfectos en tiempo real.</p>
+            
+            <div class="preset-container">
+                <span class="preset-label">Cargar Altavoz:</span>
+                <select id="presetSelect" class="preset-select">
+                    <option value="">-- Personalizado o vacío --</option>
+                    <option value="sub12">Subwoofer 12" de Coche (Excursión Larga)</option>
+                    <option value="hifi8">Woofer 8" de Alta Fidelidad (Respuesta Suave)</option>
+                    <option value="pro10">Medio-Bajo Pro 10" (Alta Sensibilidad)</option>
+                </select>
             </div>
+        </header>
 
-             <div class="info-box bg-yellow-50 border border-yellow-200 text-yellow-800">
-                 <h4 class="text-yellow-900">Notas Importantes:</h4>
-                 <ul>
-                     <li>Estos cálculos son teóricos y un punto de partida. La construcción real y el entorno afectan el resultado.</li>
-                     <li>El volumen (Vb) es interno neto. Suma el volumen desplazado por altavoz, refuerzos y puerto.</li>
-                     <li>La longitud del puerto (Lv) asume un extremo libre y otro enrasado.</li>
-                     <li>El relleno acústico (damping) afecta el Qtc efectivo y la respuesta. Se recomienda experimentar.</li>
-                     <li><strong>Parámetros Adicionales:</strong> Re, Le son para diseño de crossover. Xmax, Sd, Vd son cruciales para simulaciones de excursión y potencia (ver Próximos Pasos).</li>
-                     <li>Considera software de simulación (WinISD, VituixCAD, etc.) para refinar el diseño, verificar excursión y velocidad de aire en puerto.</li>
-                 </ul>
-             </div>
+        <div class="dashboard-grid">
+            
+            <!-- PANEL IZQUIERDO: Parámetros del Altavoz (Formulario) -->
+            <aside class="panel">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom: 1px solid var(--card-border); padding-bottom: 0.5rem;">
+                    <h2 class="panel-title" style="margin-bottom:0; border-bottom:none; padding-bottom:0;">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                        </svg>
+                        Parámetros
+                    </h2>
+                    <label class="checkbox-container" style="color:var(--text-main); font-weight:600;">
+                        <input type="checkbox" id="proModeCheck">
+                        <div class="custom-checkbox"></div>
+                        <span style="font-size:0.85rem; color:var(--primary);">Modo Pro</span>
+                    </label>
+                </div>
+                
+                <div class="form-section">
+                    <div class="form-subsection-title">Parámetros Fundamentales</div>
+                    
+                    <div class="input-grid">
+                        <div class="input-group">
+                            <label for="fs">Fs <span class="label-desc">(Resonancia)</span></label>
+                            <div class="input-wrapper">
+                                <input type="number" id="fs" placeholder="45" step="any">
+                                <span class="unit-badge">Hz</span>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label for="vas">Vas <span class="label-desc">(Vol. Eq)</span></label>
+                            <div class="input-wrapper">
+                                <input type="number" id="vas" placeholder="60" step="any">
+                                <span class="unit-badge">L</span>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label for="qms">Qms <span class="label-desc">(Q Mecánico)</span></label>
+                            <div class="input-wrapper">
+                                <input type="number" id="qms" placeholder="4.5" step="any">
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label for="qes">Qes <span class="label-desc">(Q Eléctrico)</span></label>
+                            <div class="input-wrapper">
+                                <input type="number" id="qes" placeholder="0.45" step="any">
+                            </div>
+                        </div>
+                        
+                        <div class="input-group input-group-full">
+                            <label for="qts">Qts <span class="label-desc">(Q Total - se auto-calcula si queda vacío)</span></label>
+                            <div class="input-wrapper">
+                                <input type="number" id="qts" placeholder="0.41" step="any">
+                            </div>
+                        </div>
+                    </div>
 
-             <div class="info-box bg-blue-50 border border-blue-200 text-blue-800">
-                 <h4 class="text-blue-900">Próximos Pasos y Mejoras Posibles:</h4>
-                 <ul>
-                     <li>Permitir elegir diferentes valores de Qtc (sellada) y alineaciones específicas (ventilada: QB3, SBB4, etc.).</li>
-                     <li>Implementar simulaciones básicas de respuesta en frecuencia.</li>
-                     <li>Añadir cálculo de excursión del cono basado en Vb, Fb, Xmax, Sd para estimar manejo de potencia.</li>
-                     <li>Calcular velocidad del aire en el puerto para evitar ruido.</li>
-                     <li>Incluir cálculos para cajas paso-banda y puertos rectangulares.</li>
-                     <li>Incorporar más ayudas visuales y explicaciones detalladas.</li>
-                 </ul>
-             </div>
+                    <div class="form-subsection-title">Parámetros Físicos Básicos</div>
+                    
+                    <div class="input-grid">
+                        <div class="input-group">
+                            <label for="sd">Sd <span class="label-desc">(Área Cono)</span></label>
+                            <div class="input-wrapper">
+                                <input type="number" id="sd" placeholder="350" step="any">
+                                <span class="unit-badge">cm²</span>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label for="xmax">Xmax <span class="label-desc">(Excursión)</span></label>
+                            <div class="input-wrapper">
+                                <input type="number" id="xmax" placeholder="6.5" step="any">
+                                <span class="unit-badge">mm</span>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label for="re">Re <span class="label-desc">(Resist. DC)</span></label>
+                            <div class="input-wrapper">
+                                <input type="number" id="re" placeholder="3.6" step="any">
+                                <span class="unit-badge">Ω</span>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label for="le">Le <span class="label-desc">(Inductancia)</span></label>
+                            <div class="input-wrapper">
+                                <input type="number" id="le" placeholder="0.8" step="any">
+                                <span class="unit-badge">mH</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PARÁMETROS PRO: Ocultos por defecto -->
+                    <div id="proInputs" class="hidden" style="display:flex; flex-direction:column; gap:1.25rem;">
+                        <div class="form-subsection-title" style="color:var(--primary);">Electromecánicos Pro</div>
+                        <div class="input-grid">
+                            <div class="input-group">
+                                <label for="bl">BL <span class="label-desc">(Fuerza Motor)</span></label>
+                                <div class="input-wrapper">
+                                    <input type="number" id="bl" placeholder="12.5" step="any">
+                                    <span class="unit-badge">T-m</span>
+                                </div>
+                            </div>
+                            <div class="input-group">
+                                <label for="mms">Mms <span class="label-desc">(Masa Móvil)</span></label>
+                                <div class="input-wrapper">
+                                    <input type="number" id="mms" placeholder="45" step="any">
+                                    <span class="unit-badge">g</span>
+                                </div>
+                            </div>
+                            <div class="input-group">
+                                <label for="cms">Cms <span class="label-desc">(Compliancia)</span></label>
+                                <div class="input-wrapper">
+                                    <input type="number" id="cms" placeholder="0.35" step="any">
+                                    <span class="unit-badge">mm/N</span>
+                                </div>
+                            </div>
+                            <div class="input-group">
+                                <label for="pe">Pe <span class="label-desc">(Potencia RMS)</span></label>
+                                <div class="input-wrapper">
+                                    <input type="number" id="pe" placeholder="250" step="any">
+                                    <span class="unit-badge">W</span>
+                                </div>
+                            </div>
+                            <div class="input-group input-group-full">
+                                <label for="xlim">Xlim <span class="label-desc">(Límite Mecánico)</span></label>
+                                <div class="input-wrapper">
+                                    <input type="number" id="xlim" placeholder="12" step="any">
+                                    <span class="unit-badge">mm</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Parámetros Derivados Pro -->
+                <div id="proCalculatedCard" class="pro-calc-panel hidden">
+                    <span class="pro-calc-title">Parámetros Derivados (Pro)</span>
+                    <div class="pro-calc-row">
+                        <span class="pro-calc-label">Eficiencia de Ref. (η₀):</span>
+                        <span class="pro-calc-value" id="proEta">-- %</span>
+                    </div>
+                    <div class="pro-calc-row">
+                        <span class="pro-calc-label">Sensibilidad Ref. (1W/1m):</span>
+                        <span class="pro-calc-value" id="proSpl">-- dB</span>
+                    </div>
+                    <div class="pro-calc-row">
+                        <span class="pro-calc-label">SPL Máximo (RMS a Pe):</span>
+                        <span class="pro-calc-value" id="proSplMax">-- dB</span>
+                    </div>
+                    <div class="pro-calc-row">
+                        <span class="pro-calc-label">Pérdidas Susp. (Rms):</span>
+                        <span class="pro-calc-value" id="proRms">-- kg/s</span>
+                    </div>
+                    <div class="pro-calc-row">
+                        <span class="pro-calc-label">Impedancia Resonancia (Zmax):</span>
+                        <span class="pro-calc-value" id="proZmax">-- Ω</span>
+                    </div>
+                    <div class="pro-calc-row" id="autoCalculatedFieldsAlert" style="font-size:0.75rem; color:var(--text-muted); margin-top:0.25rem;">
+                        * Compliancia y Masa auto-calculadas.
+                    </div>
+                </div>
+
+                <!-- Notificaciones en vivo -->
+                <div id="validationAlert" class="notification-area">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;flex-shrink:0;">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span id="validationAlertText"></span>
+                </div>
+            </aside>
+
+            <!-- PANEL DERECHO: Gráfico y Pestañas de Resultados -->
+            <main class="dashboard-main">
+                
+                <!-- Gráfico de Respuesta -->
+                <div class="panel chart-card">
+                    <h2 class="panel-title">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M7 12l3-3 3 3 4-4M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                        </svg>
+                        Simulación de Respuesta en Frecuencia (dB vs Hz)
+                    </h2>
+                    <div class="chart-container">
+                        <canvas id="chartCanvas"></canvas>
+                    </div>
+                </div>
+
+                <!-- Indicador EBP sugerencia rápida -->
+                <div id="ebpCard" class="ebp-badge-card ebp-normal">
+                    <span>Efficiency Bandwidth Product (EBP): <strong id="ebpVal">N/A</strong></span>
+                    <span id="ebpTag" class="ebp-tag">Sin datos</span>
+                </div>
+
+                <!-- Pestañas de Diseño y Resultados -->
+                <div class="panel">
+                    <div class="tabs-header">
+                        <button class="tab-btn active" data-tab="sealed">
+                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                            </svg>
+                            Caja Sellada (Sealed)
+                        </button>
+                        <button class="tab-btn" data-tab="ported">
+                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+                            </svg>
+                            Caja Ventilada (Ported)
+                        </button>
+                        <button class="tab-btn" data-tab="wood">
+                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                            </svg>
+                            Dimensiones de la caja (Woodworking)
+                        </button>
+                    </div>
+
+                    <!-- PESTAÑA 1: CAJA SELLADA -->
+                    <div class="tab-content active" id="tab-sealed">
+                        <!-- Alerta de anulación de volumen por ebanistería -->
+                        <div id="sealedOverrideNote" class="alert-box warn hidden" style="margin-bottom: 1rem;">
+                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                            <span><strong>Volumen Vinculado:</strong> El volumen de la caja sellada está determinado por las dimensiones manuales ingresadas en la pestaña de <strong>Ebanistería</strong> ($Vb$ neto).</span>
+                        </div>
+
+                        <div class="results-summary">
+                            <div class="result-tile">
+                                <span class="result-tile-label">Volumen Neto (Vb)</span>
+                                <span class="result-tile-value" id="sealedVb">N/A</span>
+                                <span class="result-tile-sub" id="sealedVbFt">-- ft³</span>
+                            </div>
+                            <div class="result-tile">
+                                <span class="result-tile-label">Frecuencia de Corte (-3dB)</span>
+                                <span class="result-tile-value" id="sealedFc">N/A</span>
+                                <span class="result-tile-sub">Frec. de resonancia del sistema</span>
+                            </div>
+                            <div class="result-tile">
+                                <span class="result-tile-label">Qtc Ajustado</span>
+                                <span class="result-tile-value" id="sealedQtc">0.707</span>
+                                <span class="result-tile-sub">Alineación Butterworth actual</span>
+                            </div>
+                        </div>
+
+                        <div class="control-group" id="sealedControlGroup">
+                            <span class="control-title">Ajuste de Caja Sellada</span>
+                            
+                            <div class="slider-container">
+                                <div class="slider-header">
+                                    <span class="slider-name">Qtc Objetivo (Amortiguamiento)</span>
+                                    <span class="slider-val" id="qtcTargetVal">0.707</span>
+                                </div>
+                                <input type="range" id="qtcTargetSlider" min="0.5" max="1.3" step="0.01" value="0.707">
+                                <span class="wood-note">Menor Qtc (e.g. 0.5-0.6) requiere cajas más grandes pero mejora la transitoria. Mayor Qtc (e.g. 0.9-1.2) ahorra espacio a costa de picos tipo "boom".</span>
+                            </div>
+                        </div>
+
+                        <div class="alert-box info" id="sealedInfo">
+                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span>Las cajas selladas proveen una excelente respuesta transitoria (bajos rápidos y secos) y una caída suave de 12dB/octava ideal para espacio reducido.</span>
+                        </div>
+                    </div>
+
+                    <!-- PESTAÑA 2: CAJA VENTILADA -->
+                    <div class="tab-content" id="tab-ported">
+                        <!-- Alerta de anulación de volumen por ebanistería -->
+                        <div id="portedOverrideNote" class="alert-box warn hidden" style="margin-bottom: 1rem;">
+                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                            <span><strong>Volumen Vinculado:</strong> El volumen de la caja ventilada está determinado por las dimensiones manuales ingresadas en la pestaña de <strong>Ebanistería</strong> ($Vb$ neto).</span>
+                        </div>
+
+                        <div class="results-summary">
+                            <div class="result-tile">
+                                <span class="result-tile-label">Volumen Neto (Vb)</span>
+                                <span class="result-tile-value" id="portedVb">N/A</span>
+                                <span class="result-tile-sub" id="portedVbFt">-- ft³</span>
+                            </div>
+                            <div class="result-tile">
+                                <span class="result-tile-label">Frecuencia Sintonía (Fb)</span>
+                                <span class="result-tile-value" id="portedFb">N/A</span>
+                                <span class="result-tile-sub">Sintonía del puerto de aire</span>
+                            </div>
+                            <div class="result-tile">
+                                <span class="result-tile-label">Frecuencia Corte (-3dB)</span>
+                                <span class="result-tile-value" id="portedF3">N/A</span>
+                                <span class="result-tile-sub">Caída rápida de 24dB/octava</span>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-title">
+                                <span>Alineación y Sintonía</span>
+                                <label class="checkbox-container" id="customPortedContainer">
+                                    <input type="checkbox" id="customPortedCheck">
+                                    <div class="custom-checkbox"></div>
+                                    <span>Personalizar Vb / Fb</span>
+                                </label>
+                            </div>
+                            
+                            <div id="portedSliders" class="hidden" style="display:flex; flex-direction:column; gap:1rem;">
+                                <div class="slider-container" id="customVbContainer">
+                                    <div class="slider-header">
+                                        <span class="slider-name">Volumen de la Caja (Vb)</span>
+                                        <span class="slider-val" id="customVbVal">-- L</span>
+                                    </div>
+                                    <input type="range" id="customVbSlider" min="5" max="250" step="0.5">
+                                </div>
+                                <div class="slider-container">
+                                    <div class="slider-header">
+                                        <span class="slider-name">Frecuencia de Sintonía (Fb)</span>
+                                        <span class="slider-val" id="customFbVal">-- Hz</span>
+                                    </div>
+                                    <input type="range" id="customFbSlider" min="20" max="100" step="0.5">
+                                </div>
+                            </div>
+                            
+                            <div class="input-grid" style="border-top: 1px solid rgba(255,255,255,0.05); padding-top:1rem; margin-top:0.25rem;">
+                                <div class="input-group">
+                                    <label for="portCount">Cantidad de Puertos</label>
+                                    <div class="input-wrapper">
+                                        <input type="number" id="portCount" value="1" min="1" max="6" step="1">
+                                        <span class="unit-badge">u.</span>
+                                    </div>
+                                </div>
+                                <div class="input-group">
+                                    <label for="portDiameter">Diámetro del Puerto</label>
+                                    <div class="input-wrapper">
+                                        <input type="number" id="portDiameter" value="7.5" step="any">
+                                        <span class="unit-badge">cm</span>
+                                    </div>
+                                </div>
+                                <div class="result-tile input-group-full" style="padding: 0.5rem 1rem; flex-direction:row; justify-content:space-between; align-items:center;">
+                                    <span class="result-tile-label" style="margin-bottom:0;">Longitud requerida (por puerto):</span>
+                                    <span class="result-tile-value" id="portLengthResult" style="font-size:1.15rem;">N/A</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Panel de Sugerencias de Puerto BassBox Pro Style -->
+                        <div class="control-group" id="portSuggestionGroup">
+                            <span class="control-title" style="color:var(--ported-color);">Sugerencias de Puertos (Evitar Turbulencia)</span>
+                            <div id="portSuggestionContent" class="wood-note" style="display:flex; flex-direction:column; gap:0.5rem;">
+                                <!-- Se rellena por JavaScript -->
+                            </div>
+                        </div>
+
+                        <!-- Estado de Velocidad del Puerto -->
+                        <div id="portAlert" class="alert-box info" style="margin-bottom:1rem;">
+                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span id="portAlertText">Ingresa Sd y Xmax para calcular la velocidad de aire.</span>
+                        </div>
+
+                        <div class="alert-box info" style="background: rgba(52, 211, 153, 0.05); border-color: rgba(52, 211, 153, 0.15); color: #d1fae5;">
+                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                            </svg>
+                            <span>Las cajas ventiladas aprovechan la onda trasera mediante el puerto para extender la respuesta y ganar eficiencia en graves extremos.</span>
+                        </div>
+                    </div>
+
+                    <!-- PESTAÑA 3: CORTE DE MADERA (EBANISTERÍA) -->
+                    <div class="tab-content" id="tab-wood">
+                        <div class="wood-layout">
+                            
+                            <!-- Selector del modo de ebanistería -->
+                            <div style="display:flex; gap:0.5rem; margin-bottom:0.75rem; background:rgba(3,7,18,0.45); padding:0.25rem; border-radius:8px;">
+                                <button id="woodModeCalcBtn" class="tab-btn active" style="font-size:0.8rem; padding:0.4rem 0.75rem; flex:1; justify-content:center; border-bottom:none; border-radius:6px;" type="button">
+                                    Calcular Medidas desde Vb
+                                </button>
+                                <button id="woodModeInputBtn" class="tab-btn" style="font-size:0.8rem; padding:0.4rem 0.75rem; flex:1; justify-content:center; border-bottom:none; border-radius:6px;" type="button">
+                                    Ingresar Medidas Físicas
+                                </button>
+                            </div>
+
+                            <!-- Selector de Forma de Caja (BassBox Pro Style) -->
+                            <div class="wood-grid-controls" style="background:#f8fafc; border: 1px solid var(--card-border); padding:0.75rem; border-radius:8px;">
+                                <div class="input-group">
+                                    <label for="woodShapeSelect">Forma de la Caja</label>
+                                    <select id="woodShapeSelect" class="preset-select" style="width:100%; height:38px;">
+                                        <option value="rectangular" selected>Prisma Rectangular (Estándar)</option>
+                                        <option value="trapezoidal">Trapezoidal (Cuña para Coche)</option>
+                                    </select>
+                                </div>
+
+                                <div class="input-group" id="woodConstraintGroup">
+                                    <label for="woodConstraintSelect">Bloqueo de Dimensiones (Fijar)</label>
+                                    <select id="woodConstraintSelect" class="preset-select" style="width:100%; height:38px;">
+                                        <option value="none" selected>Proporciones Libres (Ratios)</option>
+                                        <option value="lock_h_d">Fijar Alto y Profundidad (Calcular Ancho)</option>
+                                        <option value="lock_h_w">Fijar Alto y Ancho (Calcular Profundidad)</option>
+                                        <option value="lock_w_d">Fijar Ancho y Profundidad (Calcular Alto)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- MODO A: Calcular Medidas desde Vb (Auto) -->
+                            <div id="woodAutoSection" class="wood-layout">
+                                <div class="wood-grid-controls">
+                                    <div class="input-group">
+                                        <label for="woodSource">Fuente del Volumen</label>
+                                        <select id="woodSource" class="preset-select" style="width:100%; height:38px;">
+                                            <option value="sealed">Caja Sellada (Vb)</option>
+                                            <option value="ported" selected>Caja Ventilada (Vb)</option>
+                                        </select>
+                                    </div>
+                                    <div class="input-group" id="woodAutoRatioContainer">
+                                        <label for="woodRatio">Proporción Acústica</label>
+                                        <select id="woodRatio" class="preset-select" style="width:100%; height:38px;">
+                                            <option value="golden" selected>Aurea (1.618 : 1 : 0.618)</option>
+                                            <option value="classic">Clásica (1.400 : 1 : 0.800)</option>
+                                            <option value="cube">Cubo (1.000 : 1 : 1.000)</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <!-- Inputs dinámicos para dimensiones bloqueadas -->
+                                <div id="woodAutoLockContainer" class="wood-grid-controls hidden">
+                                    <div class="input-group">
+                                        <label id="woodLockLabel1" for="woodLockVal1">Dimensión 1</label>
+                                        <div class="input-wrapper">
+                                            <input type="number" id="woodLockVal1" step="any">
+                                            <span class="unit-badge" id="woodLockBadge1">cm</span>
+                                        </div>
+                                    </div>
+                                    <div class="input-group">
+                                        <label id="woodLockLabel2" for="woodLockVal2">Dimensión 2</label>
+                                        <div class="input-wrapper">
+                                            <input type="number" id="woodLockVal2" step="any">
+                                            <span class="unit-badge" id="woodLockBadge2">cm</span>
+                                        </div>
+                                    </div>
+                                    <div class="input-group" id="woodLockVal3Group">
+                                        <label id="woodLockLabel3" for="woodLockVal3">Profundidad Superior Fija (D1)</label>
+                                        <div class="input-wrapper">
+                                            <input type="number" id="woodLockVal3" step="any">
+                                            <span class="unit-badge" id="woodLockBadge3">cm</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- MODO B: Ingresar Medidas Físicas de la Caja (Manual) -->
+                            <div id="woodManualSection" class="wood-layout hidden">
+                                <!-- Rectangular Inputs -->
+                                <div id="woodManualRectContainer" class="wood-grid-controls">
+                                    <div class="input-group">
+                                        <label for="woodExtHeight">Alto Externo</label>
+                                        <div class="input-wrapper">
+                                            <input type="number" id="woodExtHeight" value="42.0" step="any">
+                                            <span class="unit-badge">cm</span>
+                                        </div>
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="woodExtWidth">Ancho Externo</label>
+                                        <div class="input-wrapper">
+                                            <input type="number" id="woodExtWidth" value="32.0" step="any">
+                                            <span class="unit-badge">cm</span>
+                                        </div>
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="woodExtDepth">Profundidad Externa</label>
+                                        <div class="input-wrapper">
+                                            <input type="number" id="woodExtDepth" value="28.0" step="any">
+                                            <span class="unit-badge">cm</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Trapezoidal Inputs -->
+                                <div id="woodManualTrapContainer" class="wood-grid-controls hidden">
+                                    <div class="input-group">
+                                        <label for="woodTrapExtHeight">Alto Externo</label>
+                                        <div class="input-wrapper">
+                                            <input type="number" id="woodTrapExtHeight" value="40.0" step="any">
+                                            <span class="unit-badge">cm</span>
+                                        </div>
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="woodTrapExtWidth">Ancho Externo</label>
+                                        <div class="input-wrapper">
+                                            <input type="number" id="woodTrapExtWidth" value="45.0" step="any">
+                                            <span class="unit-badge">cm</span>
+                                        </div>
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="woodTrapExtDepthTop">Profundidad Superior Externa (D1)</label>
+                                        <div class="input-wrapper">
+                                            <input type="number" id="woodTrapExtDepthTop" value="18.0" step="any">
+                                            <span class="unit-badge">cm</span>
+                                        </div>
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="woodTrapExtDepthBot">Profundidad Inferior Externa (D2)</label>
+                                        <div class="input-wrapper">
+                                            <input type="number" id="woodTrapExtDepthBot" value="32.0" step="any">
+                                            <span class="unit-badge">cm</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="input-grid">
+                                    <div class="input-group input-group-full">
+                                        <label for="woodLinkSelect">Vincular Volumen Neto a la Simulación</label>
+                                        <select id="woodLinkSelect" class="preset-select" style="width:100%; height:38px;">
+                                            <option value="none" selected>No vincular (Solo calcular volumen)</option>
+                                            <option value="sealed">Aplicar a Caja Sellada (Simular Qtc/Fc)</option>
+                                            <option value="ported">Aplicar a Caja Ventilada (Simular Fb/Puerto)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Parámetros Comunes de Ebanistería -->
+                            <div class="wood-grid-controls" style="border-top: 1px solid var(--card-border); padding-top:1rem; margin-top:0.25rem;">
+                                <div class="input-group">
+                                    <label for="woodThickness">Espesor de Madera</label>
+                                    <div class="input-wrapper">
+                                        <input type="number" id="woodThickness" value="15" step="any" min="1">
+                                        <span class="unit-badge">mm</span>
+                                    </div>
+                                </div>
+                                <div class="input-group">
+                                    <label for="woodExtra">Vol. Extra <span class="label-desc">(Altavoz/Ducto/Ref.)</span></label>
+                                    <div class="input-wrapper">
+                                        <input type="number" id="woodExtra" value="3.5" step="any">
+                                        <span class="unit-badge">L</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="results-summary">
+                                <div class="result-tile">
+                                    <span class="result-tile-label" id="woodVolLabel">Volumen Total Requerido</span>
+                                    <span class="result-tile-value" id="woodVolTotal">N/A</span>
+                                    <span class="result-tile-sub" id="woodVolSubText">Incluye volumen neto + extra</span>
+                                </div>
+                                <div class="result-tile">
+                                    <span class="result-tile-label">Dimensiones Internas</span>
+                                    <span class="result-tile-value" id="woodDimInt" style="font-size:0.95rem; font-weight:600; margin-top:0.4rem;">N/A</span>
+                                    <span class="result-tile-sub">Alto x Ancho x Profundidad</span>
+                                </div>
+                                <div class="result-tile">
+                                    <span class="result-tile-label" id="woodDimExtLabel">Dimensiones Externas</span>
+                                    <span class="result-tile-value" id="woodDimExt" style="font-size:0.95rem; font-weight:600; margin-top:0.4rem;">N/A</span>
+                                    <span class="result-tile-sub">Alto x Ancho x Profundidad</span>
+                                </div>
+                            </div>
+
+                            <!-- Especificaciones del Puerto vinculadas a la madera -->
+                            <div id="woodPortDetails" class="pro-calc-panel hidden" style="margin-top:0.5rem; border-color:var(--ported-color); background:rgba(72, 169, 124, 0.04);">
+                                <span class="pro-calc-title" style="color:var(--ported-color);">Puerto(s) de Sintonía para este Diseño</span>
+                                <div class="pro-calc-row">
+                                    <span class="pro-calc-label">Cantidad e Instalación:</span>
+                                    <span class="pro-calc-value" id="woodPortQtySize">N/A</span>
+                                </div>
+                                <div class="pro-calc-row">
+                                    <span class="pro-calc-label">Longitud Requerida (cada uno):</span>
+                                    <span class="pro-calc-value" id="woodPortLength">N/A</span>
+                                </div>
+                                <div class="pro-calc-row">
+                                    <span class="pro-calc-label">Velocidad del Aire / Ruido:</span>
+                                    <span class="pro-calc-value" id="woodPortVelocity">N/A</span>
+                                </div>
+                                <div class="pro-calc-row" style="font-size:0.72rem; color:var(--text-muted); margin-top:0.25rem;">
+                                    * Consejo: Dejar al menos una distancia libre equivalente a un diámetro de puerto entre el extremo interno del tubo y la pared del fondo.
+                                </div>
+                            </div>
+
+                            <div>
+                                <span class="control-title" style="margin-bottom:0.5rem;">Lista de Corte Sugerida (Grosor: <span id="woodThicknessVal">18</span>mm)</span>
+                                <table class="wood-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Pieza</th>
+                                            <th>Cant.</th>
+                                            <th>Dimensión de Corte</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="woodCutSheet">
+                                        <tr>
+                                            <td colspan="3" style="text-align:center; color:var(--text-muted);">Sin datos para calcular.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <p class="wood-note" id="woodAssemblyNote">
+                                * <strong>Método de ensamble:</strong> Las piezas laterales encierran el fondo y el frente, y las tapas superior e inferior cierran la estructura. Recuerda sellar todas las juntas con pegamento y silicona.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer Notas Informativas -->
+                <footer class="info-footer">
+                    <h4>Notas de Fabricación y Simulación:</h4>
+                    <ul>
+                        <li>El volumen calculado ($Vb$) representa el espacio neto. Debe sumarse el volumen de la madera del puerto, la estructura del altavoz y los refuerzos.</li>
+                        <li>El material acústico absorbente (fibra de poliéster, lana de roca) incrementa virtualmente el volumen de la caja entre un 10% y un 20%.</li>
+                        <li>Las dimensiones de ebanistería áureas distribuyen las resonancias internas de manera óptima para atenuar ondas estacionarias destructivas.</li>
+                    </ul>
+                </footer>
+            </main>
         </div>
     </div>
 
     <script>
-        // --- Elementos del DOM ---
-        const inputs = {
+        // --- PRESETS DE ALTAVOCES COMPLETOS ---
+        const PRESETS = {
+            sub12: {
+                fs: 28,
+                vas: 65,
+                qms: 5.0,
+                qes: 0.45,
+                qts: 0.41,
+                sd: 510,
+                xmax: 14,
+                re: 3.6,
+                le: 1.2,
+                bl: 15.5,
+                mms: 185,
+                cms: 0.17,
+                pe: 400,
+                xlim: 22
+            },
+            hifi8: {
+                fs: 38,
+                vas: 45,
+                qms: 3.8,
+                qes: 0.40,
+                qts: 0.36,
+                sd: 215,
+                xmax: 5.5,
+                re: 5.8,
+                le: 0.6,
+                bl: 8.5,
+                mms: 28,
+                cms: 0.62,
+                pe: 80,
+                xlim: 10
+            },
+            pro10: {
+                fs: 60,
+                vas: 35,
+                qms: 6.2,
+                qes: 0.32,
+                qts: 0.30,
+                sd: 350,
+                xmax: 3.5,
+                re: 5.2,
+                le: 0.4,
+                bl: 12.8,
+                mms: 34,
+                cms: 0.21,
+                pe: 250,
+                xlim: 8
+            }
+        };
+
+        // --- ELEMENTOS DEL DOM ---
+        const elements = {
+            presetSelect: document.getElementById('presetSelect'),
+            proModeCheck: document.getElementById('proModeCheck'),
+            proInputs: document.getElementById('proInputs'),
+            proCalculatedCard: document.getElementById('proCalculatedCard'),
+            
             fs: document.getElementById('fs'),
-            qts: document.getElementById('qts'),
             vas: document.getElementById('vas'),
             qms: document.getElementById('qms'),
             qes: document.getElementById('qes'),
+            qts: document.getElementById('qts'),
+            sd: document.getElementById('sd'),
+            xmax: document.getElementById('xmax'),
             re: document.getElementById('re'),
             le: document.getElementById('le'),
-            vd: document.getElementById('vd'),
-            cms: document.getElementById('cms'),
+            
             bl: document.getElementById('bl'),
             mms: document.getElementById('mms'),
-            ebp: document.getElementById('ebp'),
-            xmax: document.getElementById('xmax'),
-            sd: document.getElementById('sd'),
+            cms: document.getElementById('cms'),
+            pe: document.getElementById('pe'),
             xlim: document.getElementById('xlim'),
-            portDiameter: document.getElementById('port-diameter')
+            
+            proEta: document.getElementById('proEta'),
+            proSpl: document.getElementById('proSpl'),
+            proSplMax: document.getElementById('proSplMax'),
+            proRms: document.getElementById('proRms'),
+            proZmax: document.getElementById('proZmax'),
+            autoCalculatedFieldsAlert: document.getElementById('autoCalculatedFieldsAlert'),
+
+            validationAlert: document.getElementById('validationAlert'),
+            validationAlertText: document.getElementById('validationAlertText'),
+            ebpCard: document.getElementById('ebpCard'),
+            ebpVal: document.getElementById('ebpVal'),
+            ebpTag: document.getElementById('ebpTag'),
+            
+            // Sealed
+            sealedOverrideNote: document.getElementById('sealedOverrideNote'),
+            sealedControlGroup: document.getElementById('sealedControlGroup'),
+            sealedVb: document.getElementById('sealedVb'),
+            sealedVbFt: document.getElementById('sealedVbFt'),
+            sealedFc: document.getElementById('sealedFc'),
+            sealedQtc: document.getElementById('sealedQtc'),
+            qtcSlider: document.getElementById('qtcTargetSlider'),
+            qtcSliderVal: document.getElementById('qtcTargetVal'),
+            
+            // Ported
+            portedOverrideNote: document.getElementById('portedOverrideNote'),
+            customPortedContainer: document.getElementById('customPortedContainer'),
+            customVbContainer: document.getElementById('customVbContainer'),
+            portedVb: document.getElementById('portedVb'),
+            portedVbFt: document.getElementById('portedVbFt'),
+            portedFb: document.getElementById('portedFb'),
+            portedF3: document.getElementById('portedF3'),
+            customPortedCheck: document.getElementById('customPortedCheck'),
+            portedSliders: document.getElementById('portedSliders'),
+            customVbSlider: document.getElementById('customVbSlider'),
+            customVbVal: document.getElementById('customVbVal'),
+            customFbSlider: document.getElementById('customFbSlider'),
+            customFbVal: document.getElementById('customFbVal'),
+            portCount: document.getElementById('portCount'),
+            portDiameter: document.getElementById('portDiameter'),
+            portLengthResult: document.getElementById('portLengthResult'),
+            portAlert: document.getElementById('portAlert'),
+            portAlertText: document.getElementById('portAlertText'),
+            
+            // Wood
+            woodModeCalcBtn: document.getElementById('woodModeCalcBtn'),
+            woodModeInputBtn: document.getElementById('woodModeInputBtn'),
+            woodShapeSelect: document.getElementById('woodShapeSelect'),
+            woodConstraintSelect: document.getElementById('woodConstraintSelect'),
+            
+            woodAutoSection: document.getElementById('woodAutoSection'),
+            woodAutoRatioContainer: document.getElementById('woodAutoRatioContainer'),
+            woodAutoLockContainer: document.getElementById('woodAutoLockContainer'),
+            woodLockLabel1: document.getElementById('woodLockLabel1'),
+            woodLockLabel2: document.getElementById('woodLockLabel2'),
+            woodLockLabel3: document.getElementById('woodLockLabel3'),
+            woodLockBadge1: document.getElementById('woodLockBadge1'),
+            woodLockBadge2: document.getElementById('woodLockBadge2'),
+            woodLockBadge3: document.getElementById('woodLockBadge3'),
+            woodLockVal1: document.getElementById('woodLockVal1'),
+            woodLockVal2: document.getElementById('woodLockVal2'),
+            woodLockVal3: document.getElementById('woodLockVal3'),
+            woodLockVal3Group: document.getElementById('woodLockVal3Group'),
+            
+            woodManualSection: document.getElementById('woodManualSection'),
+            woodManualRectContainer: document.getElementById('woodManualRectContainer'),
+            woodManualTrapContainer: document.getElementById('woodManualTrapContainer'),
+            woodExtHeight: document.getElementById('woodExtHeight'),
+            woodExtWidth: document.getElementById('woodExtWidth'),
+            woodExtDepth: document.getElementById('woodExtDepth'),
+            
+            woodTrapExtHeight: document.getElementById('woodTrapExtHeight'),
+            woodTrapExtWidth: document.getElementById('woodTrapExtWidth'),
+            woodTrapExtDepthTop: document.getElementById('woodTrapExtDepthTop'),
+            woodTrapExtDepthBot: document.getElementById('woodTrapExtDepthBot'),
+            
+            woodLinkSelect: document.getElementById('woodLinkSelect'),
+            woodSource: document.getElementById('woodSource'),
+            woodThickness: document.getElementById('woodThickness'),
+            woodRatio: document.getElementById('woodRatio'),
+            woodExtra: document.getElementById('woodExtra'),
+            woodVolLabel: document.getElementById('woodVolLabel'),
+            woodVolTotal: document.getElementById('woodVolTotal'),
+            woodVolSubText: document.getElementById('woodVolSubText'),
+            woodDimInt: document.getElementById('woodDimInt'),
+            woodDimExtLabel: document.getElementById('woodDimExtLabel'),
+            woodDimExt: document.getElementById('woodDimExt'),
+            woodThicknessVal: document.getElementById('woodThicknessVal'),
+            woodCutSheet: document.getElementById('woodCutSheet'),
+            woodAssemblyNote: document.getElementById('woodAssemblyNote')
         };
 
-        const calculateBtn = document.getElementById('calculate-btn');
-        const recalculatePortBtn = document.getElementById('recalculate-port-btn');
-        const resultsSection = document.getElementById('results-section');
-        const sealedResultsDiv = document.getElementById('sealed-results');
-        const portedResultsDiv = document.getElementById('ported-results');
-        const errorMessageP = document.getElementById('error-message');
-        const paramSummaryDiv = document.getElementById('param-summary');
-        const ebpSuggestionDiv = document.getElementById('ebp-suggestion');
-
-        // --- Constantes ---
-        const QTC_TARGET = 0.707; // Para alineación Butterworth sellada
-
-        // --- Funciones de Utilidad ---
-        function parseInput(element, allowZero = false) {
-            const value = parseFloat(element.value);
-            if (isNaN(value) || (!allowZero && value <= 0)) {
-                return null; // Retorna null si no es un número válido o es <= 0 (a menos que se permita)
-            }
-            return value;
+        // --- CONSTANTES ---
+        const QL_LOSSES = 7.0; // Pérdidas acústicas en caja ventilada (promedio WinISD)
+        
+        // Frecuencias para Chart.js (Barrido logarítmico 10 Hz - 500 Hz)
+        const chartFrequencies = [];
+        for (let i = 0; i <= 100; i++) {
+            const f = 10 * Math.pow(500 / 10, i / 100);
+            chartFrequencies.push(Math.round(f * 10) / 10);
         }
 
-        function litersToCubicFeet(liters) {
-            return liters / 28.3168;
-        }
+        let responseChart = null;
+        let currentWoodMode = 'calc'; // 'calc' (Auto) o 'input' (Manual)
 
-        // --- Funciones de Cálculo ---
+        // --- APLICAR CONFIGURACIÓN DE PUERTO DESDE LAS SUGERENCIAS ---
+        window.applyPortConfig = function(numPorts, diameter) {
+            elements.portCount.value = numPorts;
+            elements.portDiameter.value = diameter;
+            calculateAll();
+        };
 
-        /**
-         * Valida las entradas y calcula Qts/EBP si es necesario.
-         * @returns {object|null} Objeto con todos los parámetros parseados o null si hay error crítico.
-         */
-        function getParameters() {
-            let errorMsg = '';
-            const params = {};
+        // --- SISTEMA DE PESTAÑAS PRINCIPALES ---
+        document.querySelectorAll('.tabs-header .tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tabs-header .tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                
+                btn.classList.add('active');
+                const targetTab = btn.getAttribute('data-tab');
+                document.getElementById(`tab-${targetTab}`).classList.add('active');
+            });
+        });
 
-            // Parsear todos los parámetros
-            params.fs = parseInput(inputs.fs);
-            params.qts_in = parseInput(inputs.qts); // Qts ingresado
-            params.vas = parseInput(inputs.vas);
-            params.qms = parseInput(inputs.qms);
-            params.qes = parseInput(inputs.qes);
-            params.re = parseInput(inputs.re, true); // Re puede ser 0? Mejor no.
-            params.le = parseInput(inputs.le, true); // Le puede ser 0
-            params.vd = parseInput(inputs.vd);
-            params.cms = parseInput(inputs.cms);
-            params.bl = parseInput(inputs.bl);
-            params.mms = parseInput(inputs.mms);
-            params.ebp_in = parseInput(inputs.ebp); // EBP ingresado
-            params.xmax = parseInput(inputs.xmax);
-            params.sd = parseInput(inputs.sd);
-            params.xlim = parseInput(inputs.xlim);
+        // --- SISTEMA DE SUB-PESTAÑAS DE EBANISTERÍA ---
+        elements.woodModeCalcBtn.addEventListener('click', () => {
+            currentWoodMode = 'calc';
+            elements.woodModeCalcBtn.classList.add('active');
+            elements.woodModeInputBtn.classList.remove('active');
+            
+            elements.woodVolLabel.textContent = "Volumen Total Requerido";
+            elements.woodVolSubText.textContent = "Incluye volumen neto + extra";
+            elements.woodDimExtLabel.textContent = "Dimensiones Externas";
+            
+            updateWoodUI();
+            calculateAll();
+        });
 
-            // --- Validación y Cálculo de Qts ---
-            params.qts = null;
-            if (params.qts_in !== null) {
-                params.qts = params.qts_in;
-                if (params.qms !== null && params.qes !== null) {
-                    const qts_calc = 1 / (1 / params.qms + 1 / params.qes);
-                    if (Math.abs(params.qts - qts_calc) > 0.01) { // Tolerancia
-                        errorMsg += `Advertencia: Qts ingresado (${params.qts.toFixed(3)}) difiere del calculado con Qms/Qes (${qts_calc.toFixed(3)}). Usando Qts ingresado. `;
-                    }
-                }
-            } else if (params.qms !== null && params.qes !== null) {
-                params.qts = 1 / (1 / params.qms + 1 / params.qes);
+        elements.woodModeInputBtn.addEventListener('click', () => {
+            currentWoodMode = 'input';
+            elements.woodModeInputBtn.classList.add('active');
+            elements.woodModeCalcBtn.classList.remove('active');
+            
+            elements.woodVolLabel.textContent = "Volumen Neto Resultante";
+            elements.woodVolSubText.textContent = "Volumen acústico neto (libre)";
+            elements.woodDimExtLabel.textContent = "Dimensiones Externas (Fijas)";
+            
+            updateWoodUI();
+            calculateAll();
+        });
+
+        elements.woodShapeSelect.addEventListener('change', () => {
+            const shape = elements.woodShapeSelect.value;
+            if (shape === 'trapezoidal') {
+                elements.woodAssemblyNote.innerHTML = "* <strong>Método de ensamble (Wedge):</strong> Los laterales son trapecios que determinan la inclinación frontal. Las tapas superior e inferior cierran las uniones y el frente inclinado ($H_{slant}$) requiere cortes angulados.";
             } else {
-                 errorMsg += 'Error: Debes ingresar Qts, o ambos Qms y Qes. ';
+                elements.woodAssemblyNote.innerHTML = "* <strong>Método de ensamble:</strong> Las piezas laterales encierran el fondo y el frente, y las tapas superior e inferior cierran la estructura. Recuerda sellar todas las juntas con pegamento y silicona.";
+            }
+            updateWoodUI();
+            calculateAll();
+        });
+
+        elements.woodConstraintSelect.addEventListener('change', () => {
+            updateWoodUI();
+            calculateAll();
+        });
+
+        function updateWoodUI() {
+            const mode = currentWoodMode;
+            const shape = elements.woodShapeSelect.value;
+            const constraint = elements.woodConstraintSelect.value;
+
+            elements.woodAutoSection.classList.add('hidden');
+            elements.woodManualSection.classList.add('hidden');
+            elements.woodAutoRatioContainer.classList.add('hidden');
+            elements.woodAutoLockContainer.classList.add('hidden');
+            elements.woodLockVal3Group.classList.add('hidden');
+            elements.woodManualRectContainer.classList.add('hidden');
+            elements.woodManualTrapContainer.classList.add('hidden');
+
+            const constraintGroup = document.getElementById('woodConstraintGroup');
+            if (mode === 'input') {
+                constraintGroup.classList.add('hidden');
+            } else {
+                constraintGroup.classList.remove('hidden');
             }
 
-             // --- Validación y Cálculo de EBP ---
-             params.ebp = null;
-             if (params.ebp_in !== null) {
-                 params.ebp = params.ebp_in;
-                 if (params.fs !== null && params.qes !== null) {
-                     const ebp_calc = params.fs / params.qes;
-                     if (Math.abs(params.ebp - ebp_calc) > 1) { // Tolerancia
-                         errorMsg += `Advertencia: EBP ingresado (${params.ebp.toFixed(1)}) difiere del calculado con Fs/Qes (${ebp_calc.toFixed(1)}). Usando EBP ingresado. `;
-                     }
-                 }
-             } else if (params.fs !== null && params.qes !== null) {
-                 params.ebp = params.fs / params.qes;
-             } // No es crítico si falta EBP
+            if (mode === 'calc') {
+                elements.woodAutoSection.classList.remove('hidden');
+                
+                if (shape === 'rectangular') {
+                    if (constraint === 'none') {
+                        elements.woodAutoRatioContainer.classList.remove('hidden');
+                    } else {
+                        elements.woodAutoLockContainer.classList.remove('hidden');
+                        
+                        if (constraint === 'lock_h_d') {
+                            elements.woodLockLabel1.innerHTML = "Alto Externo Fijo";
+                            elements.woodLockLabel2.innerHTML = "Profundidad Externa Fija";
+                            elements.woodLockBadge1.textContent = "cm";
+                            elements.woodLockBadge2.textContent = "cm";
+                            if (!elements.woodLockVal1.value) elements.woodLockVal1.value = "40";
+                            if (!elements.woodLockVal2.value) elements.woodLockVal2.value = "30";
+                        } else if (constraint === 'lock_h_w') {
+                            elements.woodLockLabel1.innerHTML = "Alto Externo Fijo";
+                            elements.woodLockLabel2.innerHTML = "Ancho Externo Fijo";
+                            elements.woodLockBadge1.textContent = "cm";
+                            elements.woodLockBadge2.textContent = "cm";
+                            if (!elements.woodLockVal1.value) elements.woodLockVal1.value = "40";
+                            if (!elements.woodLockVal2.value) elements.woodLockVal2.value = "35";
+                        } else if (constraint === 'lock_w_d') {
+                            elements.woodLockLabel1.innerHTML = "Ancho Externo Fijo";
+                            elements.woodLockLabel2.innerHTML = "Profundidad Externa Fija";
+                            elements.woodLockBadge1.textContent = "cm";
+                            elements.woodLockBadge2.textContent = "cm";
+                            if (!elements.woodLockVal1.value) elements.woodLockVal1.value = "35";
+                            if (!elements.woodLockVal2.value) elements.woodLockVal2.value = "30";
+                        }
+                    }
+                } else if (shape === 'trapezoidal') {
+                    elements.woodAutoLockContainer.classList.remove('hidden');
+                    elements.woodLockVal3Group.classList.remove('hidden');
+                    
+                    elements.woodLockLabel1.innerHTML = "Alto Externo Fijo";
+                    elements.woodLockLabel2.innerHTML = "Ancho Externo Fijo";
+                    elements.woodLockLabel3.innerHTML = "Prof. Superior Fija (D1)";
+                    elements.woodLockBadge1.textContent = "cm";
+                    elements.woodLockBadge2.textContent = "cm";
+                    elements.woodLockBadge3.textContent = "cm";
 
-            // --- Validación Crítica ---
-            if (params.fs === null || params.qts === null || params.vas === null) {
-                 errorMsg += 'Error: Fs, Vas y (Qts o Qms/Qes) son obligatorios para los cálculos básicos.';
-                 errorMessageP.textContent = errorMsg;
-                 resultsSection.classList.add('hidden');
-                 return null;
+                    if (!elements.woodLockVal1.value) elements.woodLockVal1.value = "40";
+                    if (!elements.woodLockVal2.value) elements.woodLockVal2.value = "45";
+                    if (!elements.woodLockVal3.value) elements.woodLockVal3.value = "18";
+                }
+            } else {
+                elements.woodManualSection.classList.remove('hidden');
+                if (shape === 'rectangular') {
+                    elements.woodManualRectContainer.classList.remove('hidden');
+                } else if (shape === 'trapezoidal') {
+                    elements.woodManualTrapContainer.classList.remove('hidden');
+                }
+            }
+        }
+
+        // --- VARIABLES GLOBALES PARA RESPUESTA DE CAJA ---
+        let currentCalculatedSealed = null;
+        let currentCalculatedPorted = null;
+
+        // --- FUNCIONES AUXILIARES DE CÁLCULO ---
+
+        function getSpeakerParams() {
+            const fs = parseFloat(elements.fs.value);
+            const vas = parseFloat(elements.vas.value);
+            let qms = parseFloat(elements.qms.value);
+            let qes = parseFloat(elements.qes.value);
+            let qts = parseFloat(elements.qts.value);
+            
+            // Auto-calcular Qts si no se especifica y Qms/Qes existen
+            if (isNaN(qts)) {
+                if (!isNaN(qms) && !isNaN(qes) && qms > 0 && qes > 0) {
+                    qts = 1 / ((1 / qms) + (1 / qes));
+                    elements.qts.placeholder = qts.toFixed(3);
+                } else {
+                    return null;
+                }
+            } else {
+                elements.qts.placeholder = "se auto-calcula si queda vacío";
             }
 
-            errorMessageP.textContent = errorMsg.trim(); // Mostrar advertencias si las hay
-            return params;
+            if (isNaN(fs) || isNaN(vas) || isNaN(qts) || fs <= 0 || vas <= 0 || qts <= 0) {
+                return null;
+            }
+
+            const sd = parseFloat(elements.sd.value) || null;
+            const xmax = parseFloat(elements.xmax.value) || null;
+            const re = parseFloat(elements.re.value) || null;
+            const le = parseFloat(elements.le.value) || null;
+
+            const bl = parseFloat(elements.bl.value) || null;
+            const mms = parseFloat(elements.mms.value) || null;
+            const cms = parseFloat(elements.cms.value) || null;
+            const pe = parseFloat(elements.pe.value) || null;
+            const xlim = parseFloat(elements.xlim.value) || null;
+
+            return {
+                fs, vas, qms, qes, qts, sd, xmax, re, le,
+                bl, mms, cms, pe, xlim
+            };
         }
 
-        function calculateSealed(fs, qts, vas) {
-             if (qts >= QTC_TARGET) {
-                  return { Vb: Infinity, Fc: fs, error: `Qts (${qts.toFixed(3)}) es >= ${QTC_TARGET}. No se puede alcanzar Qtc=${QTC_TARGET}. Considera un Qtc más alto o una caja ventilada.` };
-             }
-            const alpha = Math.pow(QTC_TARGET / qts, 2) - 1;
-            const Vb = vas / alpha;
-            const Fc = QTC_TARGET / qts * fs;
-            return { Vb, Fc };
+        function showValidationState(show, message = "") {
+            if (show) {
+                elements.validationAlertText.textContent = message;
+                elements.validationAlert.classList.add('active');
+                elements.validationAlert.classList.add('error');
+            } else {
+                elements.validationAlert.classList.remove('active');
+                elements.validationAlert.classList.remove('error');
+            }
         }
 
-        function calculatePorted(fs, qts, vas) {
-            // Fórmulas aproximadas (pueden variar según alineación deseada)
-            const Vb = 15 * vas * Math.pow(qts, 2.87);
-            const Fb = (0.42 * fs) / Math.pow(qts, 0.9);
-            const F3 = (0.26 * fs) / Math.pow(qts, 1.4); // F3 aproximado
+        function resetOutputs() {
+            elements.ebpVal.textContent = "N/A";
+            elements.ebpCard.className = "ebp-badge-card ebp-normal";
+            elements.ebpTag.textContent = "Sin datos";
+            
+            elements.sealedVb.textContent = "N/A";
+            elements.sealedVbFt.textContent = "-- ft³";
+            elements.sealedFc.textContent = "N/A";
+            
+            elements.portedVb.textContent = "N/A";
+            elements.portedVbFt.textContent = "-- ft³";
+            elements.portedFb.textContent = "N/A";
+            elements.portedF3.textContent = "N/A";
+            elements.portLengthResult.textContent = "N/A";
+            
+            elements.woodVolTotal.textContent = "N/A";
+            elements.woodDimInt.textContent = "N/A";
+            elements.woodDimExt.textContent = "N/A";
+            elements.woodCutSheet.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">Sin datos para calcular.</td></tr>`;
+            
+            const portSuggestionContent = document.getElementById('portSuggestionContent');
+            if (portSuggestionContent) {
+                portSuggestionContent.innerHTML = `<p class="wood-note" style="color:var(--text-muted); font-size:0.75rem;">Completa los parámetros del altavoz.</p>`;
+            }
+            
+            elements.portAlert.className = "alert-box info";
+            elements.portAlertText.textContent = "Ingresa Sd y Xmax para calcular la velocidad de aire.";
+
+            if (responseChart) {
+                responseChart.destroy();
+                responseChart = null;
+            }
+        }
+
+        function runProCalculations(params) {
+            let cms = params.cms;
+            let mms = params.mms;
+            let bl = params.bl;
+
+            let autoCms = false;
+            let autoMms = false;
+            let autoBl = false;
+
+            if (!cms && params.vas && params.sd) {
+                cms = 716.1 * params.vas / (params.sd * params.sd);
+                autoCms = true;
+                elements.cms.placeholder = cms.toFixed(3);
+            }
+            if (!mms && params.fs && cms) {
+                mms = 25330 / (params.fs * params.fs * cms);
+                autoMms = true;
+                elements.mms.placeholder = mms.toFixed(1);
+            }
+            if (!bl && params.fs && mms && params.re && params.qes) {
+                bl = Math.sqrt((2 * Math.PI * params.fs * (mms / 1000) * params.re) / params.qes);
+                autoBl = true;
+                elements.bl.placeholder = bl.toFixed(2);
+            }
+
+            let eta0 = 0;
+            if (params.qes && params.fs && params.vas) {
+                eta0 = 9.64e-10 * Math.pow(params.fs, 3) * params.vas / params.qes;
+            }
+            elements.proEta.textContent = eta0 > 0 ? `${(eta0 * 100).toFixed(3)} %` : "-- %";
+
+            let spl = 0;
+            if (eta0 > 0) {
+                spl = 112.2 + 10 * Math.log10(eta0);
+            }
+            elements.proSpl.textContent = spl > 0 ? `${spl.toFixed(1)} dB` : "-- dB";
+
+            let splMax = 0;
+            if (spl > 0 && params.pe) {
+                splMax = spl + 10 * Math.log10(params.pe);
+            }
+            elements.proSplMax.textContent = splMax > 0 ? `${splMax.toFixed(1)} dB` : "-- dB";
+
+            let rms = 0;
+            if (params.fs && mms && params.qms) {
+                rms = (2 * Math.PI * params.fs * (mms / 1000)) / params.qms;
+            }
+            elements.proRms.textContent = rms > 0 ? `${rms.toFixed(2)} kg/s` : "-- kg/s";
+
+            let zmax = 0;
+            if (params.re && params.qms && params.qes) {
+                zmax = params.re * (1 + params.qms / params.qes);
+            }
+            elements.proZmax.textContent = zmax > 0 ? `${zmax.toFixed(1)} Ω` : "-- Ω";
+
+            if (autoCms || autoMms || autoBl) {
+                elements.autoCalculatedFieldsAlert.classList.remove('hidden');
+            } else {
+                elements.autoCalculatedFieldsAlert.classList.add('hidden');
+            }
+        }
+
+        function calculateSuggestedPorted(params) {
+            const Vb = 15 * params.vas * Math.pow(params.qts, 2.87);
+            const Fb = (0.42 * params.fs) / Math.pow(params.qts, 0.9);
+            const F3 = (0.26 * params.fs) / Math.pow(params.qts, 1.4);
             return { Vb, Fb, F3 };
         }
 
-        function calculatePortLength(Vb_liters, Fb, portDiameter_cm) {
-            if (isNaN(portDiameter_cm) || portDiameter_cm <= 0 || Fb <= 0 || Vb_liters <= 0) {
-                 return null; // Entrada inválida
-             }
-            const R_cm = portDiameter_cm / 2;
-             // Fórmula empírica común: Lv = ( (2356 * R^2) / (Fb^2 * Vb_liters) ) - (k * R)
-             // k ~ 1.4 para tubo con un extremo enrasado y otro libre
-             if (Fb === 0 || Vb_liters === 0) return 0; // Evitar división por cero
+        function estimateF3(fs, qts, Vb, Fb, vas) {
+            const h = Fb / fs;
+            const alpha = vas / Vb;
+            const Ql = QL_LOSSES;
+            
+            const a3 = 1 / qts + h / Ql;
+            const a2 = 1 + h * h * (1 + alpha) + h / (qts * Ql);
+            const a1 = h * h / qts + h / Ql;
+            const a0 = h * h;
 
-            const Lv_cm = ( (2356 * R_cm * R_cm) / (Fb * Fb * Vb_liters) ) - (1.4 * R_cm);
-            return Lv_cm > 0 ? Lv_cm : 0; // Longitud no puede ser negativa
+            let low = 10;
+            let high = 500;
+            for (let iter = 0; iter < 20; iter++) {
+                const mid = (low + high) / 2;
+                const y = mid / fs;
+                const real = Math.pow(y, 4) - a2 * y * y + a0;
+                const imag = a1 * y - a3 * Math.pow(y, 3);
+                const mag = Math.pow(y, 4) / Math.sqrt(real * real + imag * imag + 1e-20);
+                
+                if (mag < 0.707) {
+                    low = mid;
+                } else {
+                    high = mid;
+                }
+            }
+            return (low + high) / 2;
         }
 
-        // --- Funciones de Visualización ---
+        // --- REACTIVIDAD: VINCULACIÓN DE INPUTS EN TIEMPO REAL ---
+        
+        // Parámetros de altavoz (T/S)
+        const speakerInputsList = [
+            elements.fs, elements.vas, elements.qms, elements.qes, elements.qts,
+            elements.sd, elements.xmax, elements.re, elements.le,
+            elements.bl, elements.mms, elements.cms, elements.pe, elements.xlim
+        ];
+        speakerInputsList.forEach(input => {
+            input.addEventListener('input', calculateAll);
+            input.addEventListener('change', calculateAll);
+        });
 
-        function displayParamSummary(params) {
-            paramSummaryDiv.innerHTML = `
-                <p><strong>Fs:</strong> ${params.fs?.toFixed(1) ?? 'N/A'} Hz</p>
-                <p><strong>Qts:</strong> ${params.qts?.toFixed(3) ?? 'N/A'} ${params.qts_in === null && params.qts !== null ? '(Calculado)' : ''}</p>
-                <p><strong>Vas:</strong> ${params.vas?.toFixed(1) ?? 'N/A'} Litros</p>
-                <p><strong>EBP:</strong> ${params.ebp?.toFixed(1) ?? 'N/A'} ${params.ebp_in === null && params.ebp !== null ? '(Calculado)' : ''}</p>
-            `;
+        // Parámetros de ebanistería y dimensiones de caja
+        const cabinetInputsList = [
+            elements.woodExtHeight, elements.woodExtWidth, elements.woodExtDepth,
+            elements.woodTrapExtHeight, elements.woodTrapExtWidth, elements.woodTrapExtDepthTop, elements.woodTrapExtDepthBot,
+            elements.woodLockVal1, elements.woodLockVal2, elements.woodLockVal3,
+            elements.woodThickness, elements.woodExtra, elements.woodLinkSelect,
+            elements.woodSource, elements.woodRatio
+        ];
+        cabinetInputsList.forEach(input => {
+            input.addEventListener('input', calculateAll);
+            input.addEventListener('change', calculateAll);
+        });
+
+        // Parámetros del puerto
+        const portInputsList = [
+            elements.portCount, elements.portDiameter
+        ];
+        portInputsList.forEach(input => {
+            input.addEventListener('input', calculateAll);
+            input.addEventListener('change', calculateAll);
+        });
+
+        // Deslizadores de afinación
+        elements.qtcSlider.addEventListener('input', () => {
+            elements.qtcSliderVal.textContent = parseFloat(elements.qtcSlider.value).toFixed(3);
+            calculateAll();
+        });
+
+        elements.customVbSlider.addEventListener('input', () => {
+            elements.customVbVal.textContent = parseFloat(elements.customVbSlider.value).toFixed(1) + " L";
+            calculateAll();
+        });
+
+        elements.customFbSlider.addEventListener('input', () => {
+            elements.customFbVal.textContent = parseFloat(elements.customFbSlider.value).toFixed(1) + " Hz";
+            calculateAll();
+        });
+
+        // Checkbox de personalización de puerto
+        elements.customPortedCheck.addEventListener('change', () => {
+            if (elements.customPortedCheck.checked) {
+                elements.portedSliders.classList.remove('hidden');
+            } else {
+                elements.portedSliders.classList.add('hidden');
+            }
+            calculateAll();
+        });
+
+        // Checkbox de Modo Pro
+        elements.proModeCheck.addEventListener('change', () => {
+            const show = elements.proModeCheck.checked;
+            if (show) {
+                elements.proInputs.classList.remove('hidden');
+                elements.proCalculatedCard.classList.remove('hidden');
+            } else {
+                elements.proInputs.classList.add('hidden');
+                elements.proCalculatedCard.classList.add('hidden');
+            }
+            calculateAll();
+        });
+
+        // Manejador de preajustes de altavoz
+        elements.presetSelect.addEventListener('change', () => {
+            const val = elements.presetSelect.value;
+            if (val && PRESETS[val]) {
+                const preset = PRESETS[val];
+                elements.fs.value = preset.fs;
+                elements.vas.value = preset.vas;
+                elements.qms.value = preset.qms || "";
+                elements.qes.value = preset.qes || "";
+                elements.qts.value = preset.qts || "";
+                elements.sd.value = preset.sd || "";
+                elements.xmax.value = preset.xmax || "";
+                elements.re.value = preset.re || "";
+                elements.le.value = preset.le || "";
+                
+                elements.bl.value = preset.bl || "";
+                elements.mms.value = preset.mms || "";
+                elements.cms.value = preset.cms || "";
+                elements.pe.value = preset.pe || "";
+                elements.xlim.value = preset.xlim || "";
+                
+                calculateAll();
+            }
+        });
+
+        // --- CÁLCULOS PRINCIPALES ---
+        function calculateAll() {
+            const params = getSpeakerParams();
+            
+            if (!params) {
+                showValidationState(true, "Completa los parámetros mínimos del altavoz (Fs, Vas, Qts).");
+                resetOutputs();
+                return;
+            }
+
+            showValidationState(false);
+            
+            // EBP
+            let ebp = null;
+            if (params.qes) {
+                ebp = params.fs / params.qes;
+                elements.ebpVal.textContent = ebp.toFixed(1);
+                updateEBPSuggestion(ebp);
+            } else {
+                elements.ebpVal.textContent = "N/A";
+                elements.ebpCard.className = "ebp-badge-card ebp-normal";
+                elements.ebpTag.textContent = "Qes requerido para EBP";
+            }
+
+            // Modo Pro
+            if (elements.proModeCheck.checked) {
+                runProCalculations(params);
+            }
+
+            // Dimensionamiento Manual o Bloqueo
+            let manualNetVol = null;
+            let woodLink = 'none';
+            
+            if (currentWoodMode === 'input') {
+                const manualWoodData = calculateManualWoodVolume();
+                if (manualWoodData && manualWoodData.valid) {
+                    manualNetVol = manualWoodData.vNeto;
+                    woodLink = elements.woodLinkSelect.value;
+                }
+            }
+
+            // Caja Sellada (Sealed)
+            let sealedVb, sealedFc, sealedQtc;
+            
+            if (currentWoodMode === 'input' && woodLink === 'sealed' && manualNetVol > 0) {
+                sealedVb = manualNetVol;
+                const alpha = params.vas / sealedVb;
+                sealedQtc = params.qts * Math.sqrt(alpha + 1);
+                sealedFc = params.fs * Math.sqrt(alpha + 1);
+                
+                elements.sealedOverrideNote.classList.remove('hidden');
+                elements.sealedControlGroup.classList.add('hidden');
+                elements.sealedQtc.textContent = `${sealedQtc.toFixed(3)} (Vinculado)`;
+            } else {
+                const qtcTarget = parseFloat(elements.qtcSlider.value);
+                elements.sealedQtc.textContent = qtcTarget.toFixed(3);
+                elements.sealedOverrideNote.classList.add('hidden');
+                elements.sealedControlGroup.classList.remove('hidden');
+                
+                if (params.qts >= qtcTarget) {
+                    sealedVb = 0;
+                    sealedFc = 0;
+                    sealedQtc = qtcTarget;
+                } else {
+                    const alpha = Math.pow(qtcTarget / params.qts, 2) - 1;
+                    sealedVb = params.vas / alpha;
+                    sealedFc = (qtcTarget / params.qts) * params.fs;
+                    sealedQtc = qtcTarget;
+                }
+            }
+
+            if (sealedVb <= 0) {
+                elements.sealedVb.textContent = "Inviable";
+                elements.sealedVbFt.textContent = "Qts es muy alto para este Qtc";
+                elements.sealedFc.textContent = "N/A";
+                currentCalculatedSealed = { valid: false };
+            } else {
+                elements.sealedVb.textContent = `${sealedVb.toFixed(1)} L`;
+                elements.sealedVbFt.textContent = `${(sealedVb / 28.317).toFixed(3)} ft³`;
+                elements.sealedFc.textContent = `${sealedFc.toFixed(1)} Hz`;
+                
+                currentCalculatedSealed = {
+                    valid: true,
+                    Vb: sealedVb,
+                    Fc: sealedFc,
+                    Qtc: sealedQtc
+                };
+            }
+
+            // Caja Ventilada (Ported)
+            let VbPorted, FbPorted, F3Ported;
+            
+            if (currentWoodMode === 'input' && woodLink === 'ported' && manualNetVol > 0) {
+                VbPorted = manualNetVol;
+                
+                elements.portedOverrideNote.classList.remove('hidden');
+                elements.portedSliders.classList.remove('hidden');
+                elements.customVbContainer.classList.add('hidden');
+                elements.customPortedContainer.classList.add('hidden');
+                
+                FbPorted = parseFloat(elements.customFbSlider.value);
+                if (isNaN(FbPorted)) {
+                    const sug = calculateSuggestedPorted(params);
+                    FbPorted = sug.Fb;
+                    elements.customFbSlider.value = Math.round(FbPorted);
+                    elements.customFbVal.textContent = `${Math.round(FbPorted)} Hz`;
+                }
+                
+                F3Ported = estimateF3(params.fs, params.qts, VbPorted, FbPorted, params.vas);
+            } else {
+                elements.portedOverrideNote.classList.add('hidden');
+                elements.customPortedContainer.classList.remove('hidden');
+                elements.customVbContainer.classList.remove('hidden');
+                
+                if (elements.customPortedCheck.checked) {
+                    VbPorted = parseFloat(elements.customVbSlider.value);
+                    FbPorted = parseFloat(elements.customFbSlider.value);
+                    F3Ported = estimateF3(params.fs, params.qts, VbPorted, FbPorted, params.vas);
+                } else {
+                    const sug = calculateSuggestedPorted(params);
+                    VbPorted = sug.Vb;
+                    FbPorted = sug.Fb;
+                    F3Ported = sug.F3;
+                }
+            }
+
+            elements.portedVb.textContent = `${VbPorted.toFixed(1)} L`;
+            elements.portedVbFt.textContent = `${(VbPorted / 28.317).toFixed(3)} ft³`;
+            elements.portedFb.textContent = `${FbPorted.toFixed(1)} Hz`;
+            elements.portedF3.textContent = `${F3Ported.toFixed(1)} Hz`;
+
+            currentCalculatedPorted = {
+                valid: true,
+                Vb: VbPorted,
+                Fb: FbPorted,
+                F3: F3Ported,
+                Fs: params.fs,
+                Qts: params.qts,
+                Vas: params.vas
+            };
+
+            // Ducto de sintonía Multi-Puerto (BassBox Pro Style)
+            const nPorts = parseInt(elements.portCount.value) || 1;
+            const dPort = parseFloat(elements.portDiameter.value);
+            
+            if (nPorts > 0 && !isNaN(dPort) && dPort > 0 && VbPorted > 0) {
+                const rPort = dPort / 2;
+                // Ecuación de longitud corregida para n puertos:
+                const Lv = ((23562.5 * Math.pow(dPort, 2) * nPorts) / (FbPorted * FbPorted * VbPorted)) - (1.46 * rPort);
+                
+                if (Lv <= 0) {
+                    elements.portLengthResult.textContent = "Excesivamente corto";
+                } else if (Lv > 120) {
+                    elements.portLengthResult.textContent = `${Lv.toFixed(1)} cm (Excede caja)`;
+                } else {
+                    elements.portLengthResult.textContent = `${Lv.toFixed(1)} cm`;
+                }
+                
+                calculatePortVelocity(FbPorted, dPort, nPorts, params);
+            } else {
+                elements.portLengthResult.textContent = "N/A";
+                elements.portAlert.className = "alert-box info";
+                elements.portAlertText.textContent = "Ingresa un diámetro y cantidad de puertos válidos.";
+            }
+
+            // Actualizar panel de sugerencias de puertos
+            updatePortSuggestions(VbPorted, FbPorted, params);
+
+            // Actualizar Gráfico
+            updateChart(currentCalculatedSealed, currentCalculatedPorted);
+            
+            // Ebanistería (Corte de Madera)
+            calculateWood();
         }
 
-         function displayEBPSuggestion(ebp) {
-             if (ebp === null) {
-                 ebpSuggestionDiv.classList.add('hidden');
-                 return;
-             }
-             let suggestion = '';
-             if (ebp < 50) {
-                 suggestion = `Un EBP de ${ebp.toFixed(1)} sugiere que este altavoz es generalmente <strong>más adecuado para una caja sellada</strong>.`;
-             } else if (ebp > 90) {
-                 suggestion = `Un EBP de ${ebp.toFixed(1)} sugiere que este altavoz es generalmente <strong>más adecuado para una caja ventilada (ported)</strong>.`;
-             } else {
-                 suggestion = `Un EBP de ${ebp.toFixed(1)} está en un rango intermedio, lo que indica que el altavoz podría funcionar bien <strong>tanto en cajas selladas como ventiladas</strong>. La elección dependerá de tus preferencias de tamaño y respuesta en bajos.`;
-             }
-             ebpSuggestionDiv.innerHTML = `<h4 class="text-purple-900">Sugerencia de Caja (basada en EBP):</h4><p>${suggestion}</p>`;
-             ebpSuggestionDiv.classList.remove('hidden');
-         }
+        // --- CÁLCULO DE SUGERENCIAS DE CONFIGURACIÓN DE PUERTOS ---
+        function suggestPortConfig(Vb, Fb, params) {
+            if (!params.sd || !params.xmax) {
+                return { valid: false, reason: "Ingresa el área del cono (Sd) y excursión (Xmax) en la barra lateral para recibir sugerencias de puertos sin ruido de viento." };
+            }
 
-        function displaySealedResults(sealedData) {
-            sealedResultsDiv.innerHTML = ''; // Limpiar
-            if (sealedData.error) {
-                 sealedResultsDiv.innerHTML = `<p class="text-red-600">${sealedData.error}</p>`;
-            } else if (isFinite(sealedData.Vb)) {
-                sealedResultsDiv.innerHTML = `
-                    <p><strong>Volumen Interno Neto (Vb):</strong> ${sealedData.Vb.toFixed(2)} Litros / ${litersToCubicFeet(sealedData.Vb).toFixed(3)} ft³</p>
-                    <p><strong>Frecuencia de Corte (-3dB, Fc):</strong> ${sealedData.Fc.toFixed(1)} Hz</p>
+            // Diámetro mínimo teórico en cm para evitar chuffing (<15m/s):
+            // D_min = sqrt(0.1 * Sd * Xmax / sqrt(Fb))
+            const dMin = Math.sqrt((0.1 * params.sd * params.xmax) / Math.sqrt(Fb));
+
+            // Diámetros comerciales estándar a evaluar (en cm)
+            // 5cm (2"), 7.5cm (3"), 10cm (4"), 15cm (6")
+            const standardSizes = [5.0, 7.5, 10.0, 15.0];
+            const options = [];
+
+            // Opción 1: Puerto único con diámetro mínimo teórico exacto
+            const rMin = dMin / 2;
+            const lvMin = ((23562.5 * Math.pow(dMin, 2)) / (Fb * Fb * Vb)) - (1.46 * rMin);
+            options.push({
+                numPorts: 1,
+                diameter: dMin,
+                length: lvMin > 0 ? lvMin : 0,
+                isCustom: false
+            });
+
+            // Opción 2: Intentar encajar puertos comerciales estándar (1 a 4 puertos)
+            standardSizes.forEach(size => {
+                // Cantidad requerida de puertos de este tamaño para igualar o superar el área mínima
+                // Area_min = pi * dMin^2 / 4, Area_size = pi * size^2 / 4 -> numPorts = Math.ceil(dMin^2 / size^2)
+                const numPorts = Math.ceil(Math.pow(dMin / size, 2));
+                if (numPorts > 0 && numPorts <= 4) {
+                    const rPort = size / 2;
+                    const lv = ((23562.5 * Math.pow(size, 2) * numPorts) / (Fb * Fb * Vb)) - (1.46 * rPort);
+                    options.push({
+                        numPorts: numPorts,
+                        diameter: size,
+                        length: lv > 0 ? lv : 0,
+                        isCustom: true
+                    });
+                }
+            });
+
+            return {
+                valid: true,
+                dMin,
+                options
+            };
+        }
+
+        // --- ACTUALIZAR EL PANEL DE SUGERENCIAS DE PUERTOS ---
+        function updatePortSuggestions(Vb, Fb, params) {
+            const container = document.getElementById('portSuggestionContent');
+            if (!container) return;
+
+            const sug = suggestPortConfig(Vb, Fb, params);
+            if (!sug.valid) {
+                container.innerHTML = `<p class="wood-note" style="color:var(--text-muted); font-size:0.75rem;">${sug.reason}</p>`;
+                return;
+            }
+
+            let html = `<p class="wood-note" style="margin-bottom:0.4rem; line-height:1.4;">Para evitar turbulencias ("chuffing") a excursión máxima ($Xmax$), se requiere una superficie de ventilación equivalente a un conducto redondo de <strong>${sug.dMin.toFixed(1)} cm</strong> de diámetro.</p>`;
+            
+            html += `<table class="wood-table" style="font-size:0.8rem;">
+                <thead>
+                    <tr>
+                        <th>Cant. x Diámetro</th>
+                        <th>Tipo Ducto</th>
+                        <th>Longitud Unit.</th>
+                        <th>Simular</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+            sug.options.forEach(opt => {
+                const typeText = !opt.isCustom ? "Mínimo Teórico" : `Comercial ${opt.diameter === 5 ? '2"' : opt.diameter === 7.5 ? '3"' : opt.diameter === 10 ? '4"' : '6"'}`;
+                const lengthText = opt.length > 0 ? `${opt.length.toFixed(1)} cm` : "Inviable";
+                
+                html += `
+                    <tr>
+                        <td><strong>${opt.numPorts}x</strong> de ${opt.diameter.toFixed(1)} cm</td>
+                        <td>${typeText}</td>
+                        <td style="font-weight:600;">${lengthText}</td>
+                        <td>
+                            <button onclick="applyPortConfig(${opt.numPorts}, ${opt.diameter.toFixed(1)})" class="preset-select" style="padding:0.25rem 0.5rem; font-size:0.75rem; background:var(--primary); border:1px solid var(--primary); color:#ffffff; border-radius:6px; cursor:pointer; font-weight:500;">
+                                Aplicar
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += `</tbody></table>`;
+            container.innerHTML = html;
+        }
+
+        // --- VELOCIDAD DEL AIRE MULTI-PUERTO ---
+        function calculatePortVelocity(Fb, dPort, nPorts, params) {
+            if (!params.sd || !params.xmax) {
+                elements.portAlert.className = "alert-box info";
+                elements.portAlertText.innerHTML = "<strong>Falta Sd/Xmax:</strong> Ingresa el área del cono y excursión en 'Parámetros Físicos Básicos' para estimar la velocidad del aire y prevenir turbulencias.";
+                return;
+            }
+
+            // v_p = (0.008 * Fb * Sd * Xmax) / (nPorts * dPort^2)
+            const vPeak = (0.008 * Fb * params.sd * params.xmax) / (nPorts * Math.pow(dPort, 2));
+            let alertClass = "success";
+            let text = "";
+
+            if (vPeak < 10.0) {
+                alertClass = "success";
+                text = `<strong>Velocidad de aire excelente (${vPeak.toFixed(1)} m/s):</strong> Puerto libre de ruidos de turbulencia. Operación silenciosa.`;
+            } else if (vPeak >= 10.0 && vPeak <= 17.0) {
+                alertClass = "warn";
+                text = `<strong>Velocidad moderada (${vPeak.toFixed(1)} m/s):</strong> Aceptable para la mayoría de aplicaciones. Se recomienda usar extremos redondeados (flared) para evitar soplidos leves.`;
+            } else {
+                alertClass = "danger";
+                text = `<strong>¡Velocidad crítica! (${vPeak.toFixed(1)} m/s):</strong> Flujo ruidoso. El puerto producirá soplidos ("chuffing"). Aumenta el diámetro o la cantidad de puertos.`;
+            }
+
+            elements.portAlert.className = `alert-box ${alertClass}`;
+            elements.portAlertText.innerHTML = text;
+        }
+
+        // --- CÁLCULO DE VOLUMEN DESDE MEDIDAS EXTERNAS (MANUAL) ---
+        function calculateManualWoodVolume() {
+            const shape = elements.woodShapeSelect.value;
+            const thickness = (parseFloat(elements.woodThickness.value) || 0) / 10;
+            const volExtra = parseFloat(elements.woodExtra.value) || 0;
+
+            if (shape === 'rectangular') {
+                const hExt = parseFloat(elements.woodExtHeight.value);
+                const wExt = parseFloat(elements.woodExtWidth.value);
+                const dExt = parseFloat(elements.woodExtDepth.value);
+
+                if (isNaN(hExt) || isNaN(wExt) || isNaN(dExt) || isNaN(thickness) || hExt <= 0 || wExt <= 0 || dExt <= 0) {
+                    return { valid: false };
+                }
+
+                const hInt = hExt - (2 * thickness);
+                const wInt = wExt - (2 * thickness);
+                const dInt = dExt - (2 * thickness);
+
+                if (hInt <= 0 || wInt <= 0 || dInt <= 0) {
+                    return { valid: false, error: "Espesor excede medidas." };
+                }
+
+                const vBruto = (hInt * wInt * dInt) / 1000;
+                const vNeto = Math.max(0, vBruto - volExtra);
+
+                return {
+                    valid: true,
+                    hInt, wInt, dInt,
+                    hExt, wExt, dExt,
+                    vBruto,
+                    vNeto
+                };
+            } else {
+                const hExt = parseFloat(elements.woodTrapExtHeight.value);
+                const wExt = parseFloat(elements.woodTrapExtWidth.value);
+                const d1Ext = parseFloat(elements.woodTrapExtDepthTop.value);
+                const d2Ext = parseFloat(elements.woodTrapExtDepthBot.value);
+
+                if (isNaN(hExt) || isNaN(wExt) || isNaN(d1Ext) || isNaN(d2Ext) || hExt <= 0 || wExt <= 0 || d1Ext <= 0 || d2Ext <= 0) {
+                    return { valid: false };
+                }
+
+                const hInt = hExt - (2 * thickness);
+                const wInt = wExt - (2 * thickness);
+                const d1Int = Math.max(0, d1Ext - (2 * thickness));
+                const d2Int = Math.max(0, d2Ext - (2 * thickness));
+
+                if (hInt <= 0 || wInt <= 0 || d1Int <= 0 || d2Int <= 0) {
+                    return { valid: false, error: "Espesor excede medidas." };
+                }
+
+                const dAvgInt = (d1Int + d2Int) / 2;
+                const vBruto = (hInt * wInt * dAvgInt) / 1000;
+                const vNeto = Math.max(0, vBruto - volExtra);
+
+                return {
+                    valid: true,
+                    hInt, wInt,
+                    d1Int, d2Int,
+                    hExt, wExt,
+                    d1Ext, d2Ext,
+                    vBruto,
+                    vNeto
+                };
+            }
+        }
+
+        // --- CÁLCULO DE EBANISTERÍA GENERAL ---
+        function calculateWood() {
+            const shape = elements.woodShapeSelect.value;
+            const thickness = (parseFloat(elements.woodThickness.value) || 0) / 10;
+            const volExtra = parseFloat(elements.woodExtra.value) || 0;
+            
+            elements.woodThicknessVal.textContent = Math.round(thickness * 10);
+
+            let hInt, wInt, dInt, d1Int, d2Int;
+            let hExt, wExt, dExt, d1Ext, d2Ext;
+            let netVol = 0;
+            let totalVol = 0;
+
+            if (currentWoodMode === 'calc') {
+                const source = elements.woodSource.value;
+                const constraint = elements.woodConstraintSelect.value;
+
+                if (source === 'sealed' && currentCalculatedSealed && currentCalculatedSealed.valid) {
+                    netVol = currentCalculatedSealed.Vb;
+                } else if (source === 'ported' && currentCalculatedPorted && currentCalculatedPorted.valid) {
+                    netVol = currentCalculatedPorted.Vb;
+                }
+
+                if (netVol <= 0) {
+                    elements.woodVolTotal.textContent = "N/A";
+                    elements.woodDimInt.textContent = "N/A";
+                    elements.woodDimExt.textContent = "N/A";
+                    elements.woodCutSheet.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">Calcula primero los parámetros del altavoz.</td></tr>`;
+                    return;
+                }
+
+                totalVol = netVol + volExtra;
+                elements.woodVolTotal.textContent = `${totalVol.toFixed(1)} L`;
+                
+                const volCm3 = totalVol * 1000;
+
+                if (shape === 'rectangular') {
+                    if (constraint === 'none') {
+                        const ratioType = elements.woodRatio.value;
+                        let r_w = 1.0, r_h = 1.618, r_d = 0.618;
+                        if (ratioType === 'classic') { r_h = 1.4; r_d = 0.8; }
+                        else if (ratioType === 'cube') { r_h = 1.0; r_d = 1.0; }
+
+                        const factor = r_h * r_d;
+                        wInt = Math.pow(volCm3 / factor, 1/3);
+                        hInt = r_h * wInt;
+                        dInt = r_d * wInt;
+                    } else {
+                        const val1 = parseFloat(elements.woodLockVal1.value);
+                        const val2 = parseFloat(elements.woodLockVal2.value);
+
+                        if (isNaN(val1) || isNaN(val2) || val1 <= 0 || val2 <= 0) {
+                            elements.woodDimInt.textContent = "Ingresa restricciones";
+                            elements.woodDimExt.textContent = "N/A";
+                            return;
+                        }
+
+                        if (constraint === 'lock_h_d') {
+                            hExt = val1; dExt = val2;
+                            hInt = hExt - (2 * thickness);
+                            dInt = dExt - (2 * thickness);
+                            wInt = volCm3 / (hInt * dInt);
+                            wExt = wInt + (2 * thickness);
+                        } else if (constraint === 'lock_h_w') {
+                            hExt = val1; wExt = val2;
+                            hInt = hExt - (2 * thickness);
+                            wInt = wExt - (2 * thickness);
+                            dInt = volCm3 / (hInt * wInt);
+                            dExt = dInt + (2 * thickness);
+                        } else if (constraint === 'lock_w_d') {
+                            wExt = val1; dExt = val2;
+                            wInt = wExt - (2 * thickness);
+                            dInt = dExt - (2 * thickness);
+                            hInt = volCm3 / (wInt * dInt);
+                            hExt = hInt + (2 * thickness);
+                        }
+                    }
+
+                    if (hInt <= 0 || wInt <= 0 || dInt <= 0) {
+                        elements.woodDimInt.textContent = "Grosor excede restricciones";
+                        elements.woodDimExt.textContent = "N/A";
+                        return;
+                    }
+
+                    if (constraint === 'none') {
+                        hExt = hInt + (2 * thickness);
+                        wExt = wInt + (2 * thickness);
+                        dExt = dInt + (2 * thickness);
+                    }
+
+                    elements.woodDimInt.textContent = `${hInt.toFixed(1)} x ${wInt.toFixed(1)} x ${dInt.toFixed(1)} cm`;
+                    elements.woodDimExt.textContent = `${hExt.toFixed(1)} x ${wExt.toFixed(1)} x ${dExt.toFixed(1)} cm`;
+
+                } else {
+                    const valH = parseFloat(elements.woodLockVal1.value);
+                    const valW = parseFloat(elements.woodLockVal2.value);
+                    const valD1 = parseFloat(elements.woodLockVal3.value);
+
+                    if (isNaN(valH) || isNaN(valW) || isNaN(valD1) || valH <= 0 || valW <= 0 || valD1 <= 0) {
+                        elements.woodDimInt.textContent = "Ingresa restricciones";
+                        elements.woodDimExt.textContent = "N/A";
+                        return;
+                    }
+
+                    hExt = valH;
+                    wExt = valW;
+                    d1Ext = valD1;
+
+                    hInt = hExt - (2 * thickness);
+                    wInt = wExt - (2 * thickness);
+                    d1Int = Math.max(0, d1Ext - (2 * thickness));
+
+                    if (hInt <= 0 || wInt <= 0 || d1Int <= 0) {
+                        elements.woodDimInt.textContent = "Grosor excede restricciones";
+                        elements.woodDimExt.textContent = "N/A";
+                        return;
+                    }
+
+                    const dAvg = volCm3 / (hInt * wInt);
+                    d2Int = (2 * dAvg) - d1Int;
+                    d2Ext = d2Int + (2 * thickness);
+
+                    if (d2Int <= 0) {
+                        elements.woodDimInt.textContent = "Espacio insuficiente (D1 es muy alto)";
+                        elements.woodDimExt.textContent = "N/A";
+                        return;
+                    }
+
+                    elements.woodDimInt.textContent = `${hInt.toFixed(1)} x ${wInt.toFixed(1)} x d(sup:${d1Int.toFixed(1)}/inf:${d2Int.toFixed(1)}) cm`;
+                    elements.woodDimExt.textContent = `${hExt.toFixed(1)} x ${wExt.toFixed(1)} x d(sup:${d1Ext.toFixed(1)}/inf:${d2Ext.toFixed(1)}) cm`;
+                }
+
+            } else {
+                // --- MODO B: INGRESAR MEDIDAS MANUALES ---
+                const data = calculateManualWoodVolume();
+                if (!data.valid) {
+                    elements.woodVolTotal.textContent = "Error";
+                    elements.woodDimInt.textContent = data.error ? "Madera excesiva" : "Ingresa medidas";
+                    elements.woodDimExt.textContent = "N/A";
+                    elements.woodCutSheet.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">Ingresa dimensiones externas válidas.</td></tr>`;
+                    return;
+                }
+
+                netVol = data.vNeto;
+                totalVol = data.vBruto;
+                
+                hInt = data.hInt;
+                wInt = data.wInt;
+                hExt = data.hExt;
+                wExt = data.wExt;
+                
+                if (shape === 'rectangular') {
+                    dInt = data.dInt;
+                    dExt = data.dExt;
+                    elements.woodVolTotal.textContent = `${netVol.toFixed(1)} L`;
+                    elements.woodDimInt.textContent = `${hInt.toFixed(1)} x ${wInt.toFixed(1)} x ${dInt.toFixed(1)} cm`;
+                    elements.woodDimExt.textContent = `${hExt.toFixed(1)} x ${wExt.toFixed(1)} x ${dExt.toFixed(1)} cm`;
+                } else {
+                    d1Int = data.d1Int;
+                    d2Int = data.d2Int;
+                    d1Ext = data.d1Ext;
+                    d2Ext = data.d2Ext;
+                    elements.woodVolTotal.textContent = `${netVol.toFixed(1)} L`;
+                    elements.woodDimInt.textContent = `${hInt.toFixed(1)} x ${wInt.toFixed(1)} x d(sup:${d1Int.toFixed(1)}/inf:${d2Int.toFixed(1)}) cm`;
+                    elements.woodDimExt.textContent = `${hExt.toFixed(1)} x ${wExt.toFixed(1)} x d(sup:${d1Ext.toFixed(1)}/inf:${d2Ext.toFixed(1)}) cm`;
+                }
+            }
+
+            // Generar tabla de corte
+            let tableHtml = "";
+            if (shape === 'rectangular') {
+                tableHtml = `
+                    <tr>
+                        <td><strong>2 x Caras Laterales (Izquierda y Derecha)</strong></td>
+                        <td>2</td>
+                        <td style="font-weight:600;">${hExt.toFixed(1)} x ${dExt.toFixed(1)} cm</td>
+                    </tr>
+                    <tr>
+                        <td><strong>2 x Tapas (Superior e Inferior)</strong></td>
+                        <td>2</td>
+                        <td style="font-weight:600;">${wInt.toFixed(1)} x ${dExt.toFixed(1)} cm</td>
+                    </tr>
+                    <tr>
+                        <td><strong>2 x Caras (Frontal y Trasera)</strong></td>
+                        <td>2</td>
+                        <td style="font-weight:600;">${hInt.toFixed(1)} x ${wInt.toFixed(1)} cm</td>
+                    </tr>
                 `;
             } else {
-                 sealedResultsDiv.innerHTML = `<p class="text-orange-600">Cálculo de Vb resultó en infinito o no válido.</p>`;
+                const hSlant = Math.sqrt(Math.pow(hInt, 2) + Math.pow(Math.abs(d2Int - d1Int), 2));
+                
+                tableHtml = `
+                    <tr>
+                        <td><strong>2 x Caras Laterales (Trapecios Inclinados)</strong></td>
+                        <td>2</td>
+                        <td style="font-weight:600;">Alto: ${hExt.toFixed(1)} cm<br>Sup: ${d1Ext.toFixed(1)} / Inf: ${d2Ext.toFixed(1)} cm</td>
+                    </tr>
+                    <tr>
+                        <td><strong>1 x Tapa Superior</strong></td>
+                        <td>1</td>
+                        <td style="font-weight:600;">${wInt.toFixed(1)} x ${d1Ext.toFixed(1)} cm</td>
+                    </tr>
+                    <tr>
+                        <td><strong>1 x Tapa Inferior</strong></td>
+                        <td>1</td>
+                        <td style="font-weight:600;">${wInt.toFixed(1)} x ${d2Ext.toFixed(1)} cm</td>
+                    </tr>
+                    <tr>
+                        <td><strong>1 x Cara Trasera (Recta)</strong></td>
+                        <td>1</td>
+                        <td style="font-weight:600;">${hInt.toFixed(1)} x ${wInt.toFixed(1)} cm</td>
+                    </tr>
+                    <tr>
+                        <td><strong>1 x Cara Frontal (Inclinada - Bafle)</strong></td>
+                        <td>1</td>
+                        <td style="font-weight:600;">${hSlant.toFixed(1)} (inclinado) x ${wInt.toFixed(1)} cm</td>
+                    </tr>
+                `;
+            }
+            elements.woodCutSheet.innerHTML = tableHtml;
+
+            // Sugerir/actualizar detalles de puerto en la pestaña de ebanistería
+            const woodPortDetails = document.getElementById('woodPortDetails');
+            if (woodPortDetails) {
+                const source = elements.woodSource.value;
+                if (source === 'ported' && currentCalculatedPorted && currentCalculatedPorted.valid) {
+                    woodPortDetails.classList.remove('hidden');
+                    
+                    const nPorts = parseInt(elements.portCount.value) || 1;
+                    const dPort = parseFloat(elements.portDiameter.value);
+                    
+                    if (nPorts > 0 && !isNaN(dPort) && dPort > 0) {
+                        const rPort = dPort / 2;
+                        const FbPorted = currentCalculatedPorted.Fb;
+                        const VbPorted = currentCalculatedPorted.Vb;
+                        const Lv = ((23562.5 * Math.pow(dPort, 2) * nPorts) / (FbPorted * FbPorted * VbPorted)) - (1.46 * rPort);
+                        
+                        document.getElementById('woodPortQtySize').textContent = `${nPorts}x Puerto(s) de ${dPort.toFixed(1)} cm (Diámetro)`;
+                        
+                        if (Lv <= 0) {
+                            document.getElementById('woodPortLength').textContent = "Excesivamente corto";
+                        } else if (Lv > 120) {
+                            document.getElementById('woodPortLength').textContent = `${Lv.toFixed(1)} cm (Excede profundidad)`;
+                        } else {
+                            document.getElementById('woodPortLength').textContent = `${Lv.toFixed(1)} cm`;
+                        }
+
+                        // Air velocity
+                        const params = getSpeakerParams();
+                        if (params && params.sd && params.xmax) {
+                            const vPeak = (0.008 * FbPorted * params.sd * params.xmax) / (nPorts * Math.pow(dPort, 2));
+                            let color = "var(--success)";
+                            let label = "Baja (Silencioso)";
+                            if (vPeak >= 10.0 && vPeak <= 17.0) {
+                                color = "var(--warning)";
+                                label = "Moderada (Ok con bordes redondeados)";
+                            } else if (vPeak > 17.0) {
+                                color = "var(--danger)";
+                                label = "Crítica (Genera soplidos/turbulencia)";
+                            }
+                            document.getElementById('woodPortVelocity').innerHTML = `<span style="color:${color}; font-weight:600;">${vPeak.toFixed(1)} m/s - ${label}</span>`;
+                        } else {
+                            document.getElementById('woodPortVelocity').textContent = "Sd y Xmax requeridos";
+                        }
+                    } else {
+                        document.getElementById('woodPortQtySize').textContent = "N/A";
+                        document.getElementById('woodPortLength').textContent = "N/A";
+                        document.getElementById('woodPortVelocity').textContent = "N/A";
+                    }
+                } else {
+                    woodPortDetails.classList.add('hidden');
+                }
             }
         }
 
-        function displayPortLength(portLength_cm) {
-             if (portLength_cm === null) {
-                return `<p class="text-red-600">Ingrese un diámetro de puerto válido.</p>`;
-            } else if (portLength_cm === 0) {
-                 return `<p class="text-orange-600"><strong>Longitud del Puerto (Lv):</strong> Calculada como 0 o negativa. Considera un diámetro diferente, un Vb mayor o verifica parámetros.</p>`;
+        // --- CÁLCULO DE SUGERENCIA VENTILADA ---
+        function updateEBPSuggestion(ebp) {
+            let className = "ebp-badge-card ";
+            let tag = "";
+            let desc = "";
+
+            if (ebp < 50) {
+                className += "ebp-sealed";
+                tag = "Sugerido: Sellada";
+                desc = `EBP de ${ebp.toFixed(1)} sugiere que la bobina está bien amortiguada, ideal para recinto cerrado (Sealed).`;
+            } else if (ebp > 90) {
+                className += "ebp-ported";
+                tag = "Sugerido: Ventilada";
+                desc = `EBP de ${ebp.toFixed(1)} indica alto control electromecánico, ideal para puerto sintonizado (Ported).`;
             } else {
-                return `<p><strong>Longitud del Puerto (Lv):</strong> ${portLength_cm.toFixed(1)} cm</p>`;
+                className += "ebp-normal";
+                tag = "Multiuso";
+                desc = `EBP de ${ebp.toFixed(1)} está en rango medio. Apto para cajas cerradas o ventiladas según preferencia espacial.`;
             }
+
+            elements.ebpCard.className = className;
+            elements.ebpTag.textContent = tag;
+            elements.ebpVal.textContent = ebp.toFixed(1) + ` - ${desc}`;
         }
 
-        function displayPortedResults(portedData) {
-            portedResultsDiv.innerHTML = ''; // Limpiar
-            portedResultsDiv.dataset.vb = portedData.Vb; // Guardar para recálculo
-            portedResultsDiv.dataset.fb = portedData.Fb; // Guardar para recálculo
+        // --- RENDERIZAR GRÁFICO (CHART.JS) ---
+        function updateChart(sealedData, portedData) {
+            const canvas = document.getElementById('chartCanvas');
+            if (!canvas) return;
 
-            const portDiameter_cm = parseInput(inputs.portDiameter);
-            const portLength_cm = calculatePortLength(portedData.Vb, portedData.Fb, portDiameter_cm);
+            const sealedPoints = [];
+            const portedPoints = [];
 
-            portedResultsDiv.innerHTML = `
-                <p><strong>Volumen Interno Neto (Vb):</strong> ${portedData.Vb.toFixed(2)} Litros / ${litersToCubicFeet(portedData.Vb).toFixed(3)} ft³</p>
-                <p><strong>Frecuencia de Sintonización (Fb):</strong> ${portedData.Fb.toFixed(1)} Hz</p>
-                <p><strong>Frecuencia de Corte Aprox. (-3dB, F3):</strong> ${portedData.F3.toFixed(1)} Hz</p>
-                <div id="port-length-result" class="mt-2">
-                    ${displayPortLength(portLength_cm)}
-                </div>
-            `;
-        }
+            chartFrequencies.forEach(f => {
+                if (sealedData && sealedData.valid) {
+                    const x = f / sealedData.Fc;
+                    const mag = (x * x) / Math.sqrt(Math.pow(x * x - 1, 2) + Math.pow(x / sealedData.Qtc, 2));
+                    const db = 20 * Math.log10(mag + 1e-10);
+                    sealedPoints.push({ x: f, y: Math.max(-30, db) });
+                }
 
-        // --- Manejadores de Eventos ---
-        function handleCalculate() {
-            const params = getParameters();
-            if (!params) return; // Detener si hay errores críticos
+                if (portedData && portedData.valid) {
+                    const h = portedData.Fb / portedData.Fs;
+                    const alpha = portedData.Vas / portedData.Vb;
+                    
+                    const a3 = 1 / portedData.Qts + h / QL_LOSSES;
+                    const a2 = 1 + h * h * (1 + alpha) + h / (portedData.Qts * QL_LOSSES);
+                    const a1 = h * h / portedData.Qts + h / QL_LOSSES;
+                    const a0 = h * h;
 
-            displayParamSummary(params);
-            displayEBPSuggestion(params.ebp);
+                    const y = f / portedData.Fs;
+                    const real = Math.pow(y, 4) - a2 * y * y + a0;
+                    const imag = a1 * y - a3 * Math.pow(y, 3);
+                    const mag = Math.pow(y, 4) / Math.sqrt(real * real + imag * imag + 1e-20);
+                    const db = 20 * Math.log10(mag + 1e-10);
+                    
+                    portedPoints.push({ x: f, y: Math.max(-30, db) });
+                }
+            });
 
-            const sealedData = calculateSealed(params.fs, params.qts, params.vas);
-            const portedData = calculatePorted(params.fs, params.qts, params.vas);
-
-            displaySealedResults(sealedData);
-            displayPortedResults(portedData);
-
-            resultsSection.classList.remove('hidden'); // Mostrar resultados
-        }
-
-        function handleRecalculatePort() {
-            const Vb_liters = parseFloat(portedResultsDiv.dataset.vb);
-            const Fb = parseFloat(portedResultsDiv.dataset.fb);
-            const portDiameter_cm = parseInput(inputs.portDiameter);
-
-            if (isNaN(Vb_liters) || isNaN(Fb)) {
-                 errorMessageP.textContent = 'Calcula primero las cajas antes de ajustar el puerto.';
-                 return;
+            const datasets = [];
+            if (sealedData && sealedData.valid) {
+                datasets.push({
+                    label: `Caja Sellada (Vb ${sealedData.Vb.toFixed(1)}L, Qtc ${sealedData.Qtc.toFixed(2)})`,
+                    data: sealedPoints,
+                    borderColor: '#0284c7',
+                    backgroundColor: 'rgba(2, 132, 199, 0.03)',
+                    borderWidth: 3,
+                    pointRadius: 0,
+                    tension: 0.3
+                });
             }
-             errorMessageP.textContent = ''; // Limpiar error
 
-            const portLength_cm = calculatePortLength(Vb_liters, Fb, portDiameter_cm);
-            const portLengthResultDiv = document.getElementById('port-length-result');
-             if (portLengthResultDiv) {
-                 portLengthResultDiv.innerHTML = displayPortLength(portLength_cm);
-             } else {
-                 // Si el div no existe (error previo?), intentar recalcular todo
-                 handleCalculate();
-             }
+            if (portedData && portedData.valid) {
+                datasets.push({
+                    label: `Caja Ventilada (Vb ${portedData.Vb.toFixed(1)}L, Fb ${portedData.Fb.toFixed(1)}Hz)`,
+                    data: portedPoints,
+                    borderColor: '#059669',
+                    backgroundColor: 'rgba(5, 150, 105, 0.03)',
+                    borderWidth: 3,
+                    pointRadius: 0,
+                    tension: 0.3
+                });
+            }
+
+            if (responseChart) {
+                responseChart.destroy();
+            }
+
+            const ctx = canvas.getContext('2d');
+            responseChart = new Chart(ctx, {
+                type: 'line',
+                data: { datasets: datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'logarithmic',
+                            min: 10,
+                            max: 500,
+                            grid: { color: '#e2e8f0' },
+                            title: { display: true, text: 'Frecuencia (Hz)', color: '#475569', font: { family: 'Outfit', size: 11 } },
+                            ticks: {
+                                color: '#475569',
+                                font: { family: 'Outfit', size: 10 },
+                                callback: function(value) {
+                                    if ([10, 20, 30, 50, 70, 100, 200, 300, 500].includes(value)) {
+                                        return value + ' Hz';
+                                    }
+                                    return null;
+                                }
+                            }
+                        },
+                        y: {
+                            min: -24,
+                            max: 6,
+                            grid: { color: '#e2e8f0' },
+                            title: { display: true, text: 'Ganancia (dB)', color: '#475569', font: { family: 'Outfit', size: 11 } },
+                            ticks: {
+                                color: '#475569',
+                                font: { family: 'Outfit', size: 10 },
+                                stepSize: 3
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: { color: '#0f172a', font: { family: 'Outfit', size: 12 } }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            titleColor: '#0f172a',
+                            bodyColor: '#475569',
+                            titleFont: { family: 'Space Grotesk' },
+                            bodyFont: { family: 'Outfit' },
+                            borderColor: '#cbd5e1',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.dataset.label}: ${context.parsed.y.toFixed(1)} dB a ${context.parsed.x} Hz`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
         }
 
-        // --- Event Listeners ---
-        calculateBtn.addEventListener('click', handleCalculate);
-        recalculatePortBtn.addEventListener('click', handleRecalculatePort);
-
-         // Calcular al presionar Enter en inputs clave
-         [inputs.fs, inputs.qts, inputs.vas, inputs.qms, inputs.qes].forEach(input => {
-             input?.addEventListener('keypress', function(event) { // Check if input exists
-                 if (event.key === 'Enter') {
-                     event.preventDefault();
-                     calculateBtn.click();
-                 }
-             });
-         });
-         // Recalcular puerto al presionar Enter en diámetro
-         inputs.portDiameter?.addEventListener('keypress', function(event) {
-             if (event.key === 'Enter') {
-                 event.preventDefault();
-                 recalculatePortBtn.click();
-             }
-         });
-
-         // Auto-llenar con datos de ejemplo al cargar (opcional)
-         /*
-         window.onload = () => {
-             inputs.fs.value = 50;
-             inputs.re.value = 5.31;
-             inputs.le.value = 0.66;
-             inputs.qms.value = 5.21;
-             inputs.qes.value = 0.66;
-             inputs.qts.value = 0.59; // O dejar vacío para que calcule
-             inputs.vas.value = 82.2;
-             inputs.vd.value = 114;
-             inputs.cms.value = 0.46;
-             inputs.bl.value = 7.5;
-             inputs.mms.value = 22;
-             inputs.ebp.value = 76; // O dejar vacío
-             inputs.xmax.value = 3.2;
-             inputs.sd.value = 355.4;
-             inputs.xlim.value = 9.1;
-         }
-         */
-
+        // --- INICIALIZACIÓN ---
+        window.addEventListener('load', () => {
+            elements.presetSelect.value = "hifi8";
+            elements.presetSelect.dispatchEvent(new Event('change'));
+            updateWoodUI();
+        });
     </script>
 </body>
 </html>
