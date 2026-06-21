@@ -3,9 +3,11 @@ import type { SpeakerParams } from '../types';
 import { type Lang, translate } from '../utils/translations';
 import { calcAutoParams } from '../wasm/index.ts';
 import { PRESETS } from '../utils/presets';
+import { type UnitSystem, convertTo, convertFrom, getUnitLabel } from '../utils/units';
 
 interface SpeakerParamsFormProps {
   lang: Lang;
+  unitSystem: UnitSystem;
   params: SpeakerParams;
   onParamsChange: (newParams: SpeakerParams) => void;
   driverConfig: string;
@@ -15,8 +17,18 @@ interface SpeakerParamsFormProps {
   onPresetChange: (presetId: string, params: SpeakerParams | null) => void;
 }
 
+const UNIT_TYPES: Record<string, 'volume' | 'volume_small' | 'length' | 'length_small' | 'area'> = {
+  vas: 'volume',
+  sd: 'area',
+  xmax: 'length_small',
+  gapHeight: 'length_small',
+  vcDiameter: 'length_small',
+  vd: 'volume_small'
+};
+
 export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
   lang,
+  unitSystem,
   params,
   onParamsChange,
   driverConfig,
@@ -52,15 +64,30 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
     fetchDerived();
   }, [params]);
 
+  const displayValue = (field: keyof SpeakerParams) => {
+    const val = params[field];
+    if (val === undefined || val === null) return '';
+    const unitType = UNIT_TYPES[field];
+    if (unitType) {
+      const converted = convertTo(val as number, unitType, unitSystem);
+      return (Math.round(converted * 10000) / 10000).toString();
+    }
+    return val.toString();
+  };
+
   const handleInputChange = (field: keyof SpeakerParams, val: string) => {
     const nextParams = { ...params };
     if (field === 'diaNominal') {
       nextParams.diaNominal = val;
     } else {
-      const num = parseFloat(val);
+      let num = parseFloat(val);
       if (isNaN(num)) {
         delete nextParams[field];
       } else {
+        const unitType = UNIT_TYPES[field];
+        if (unitType) {
+          num = convertFrom(num, unitType, unitSystem);
+        }
         (nextParams[field] as number) = num;
       }
     }
@@ -278,13 +305,13 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
             <div className="input-wrapper">
               <input 
                 type="number" 
-                value={params.vas ?? ''} 
+                value={displayValue('vas')} 
                 onChange={(e) => handleInputChange('vas', e.target.value)}
-                placeholder="60" 
+                placeholder={convertTo(60, 'volume', unitSystem).toFixed(1)} 
                 step="any" 
                 required
               />
-              <span className="unit-badge">L</span>
+              <span className="unit-badge">{getUnitLabel('volume', unitSystem)}</span>
             </div>
           </div>
           <div className="input-group">
@@ -328,12 +355,12 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
             <div className="input-wrapper">
               <input 
                 type="number" 
-                value={params.sd ?? ''} 
+                value={displayValue('sd')} 
                 onChange={(e) => handleInputChange('sd', e.target.value)}
-                placeholder="350" 
+                placeholder={convertTo(350, 'area', unitSystem).toFixed(1)} 
                 step="any" 
               />
-              <span className="unit-badge">cm²</span>
+              <span className="unit-badge">{getUnitLabel('area', unitSystem)}</span>
             </div>
           </div>
           <div className="input-group">
@@ -341,12 +368,12 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
             <div className="input-wrapper">
               <input 
                 type="number" 
-                value={params.xmax ?? ''} 
+                value={displayValue('xmax')} 
                 onChange={(e) => handleInputChange('xmax', e.target.value)}
-                placeholder="6.5" 
+                placeholder={convertTo(6.5, 'length_small', unitSystem).toFixed(2)} 
                 step="any" 
               />
-              <span className="unit-badge">mm</span>
+              <span className="unit-badge">{getUnitLabel('length_small', unitSystem)}</span>
             </div>
           </div>
           <div className="input-group">
@@ -424,12 +451,12 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
               <div className="input-wrapper">
                 <input 
                   type="number" 
-                  value={params.xlim ?? ''} 
+                  value={displayValue('xlim')} 
                   onChange={(e) => handleInputChange('xlim', e.target.value)}
-                  placeholder="9.1" 
+                  placeholder={convertTo(9.1, 'length_small', unitSystem).toFixed(2)} 
                   step="any" 
                 />
-                <span className="unit-badge">mm</span>
+                <span className="unit-badge">{getUnitLabel('length_small', unitSystem)}</span>
               </div>
             </div>
             <div className="input-group input-group-full">
@@ -437,12 +464,12 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
               <div className="input-wrapper">
                 <input 
                   type="number" 
-                  value={params.vd ?? ''} 
+                  value={displayValue('vd')} 
                   onChange={(e) => handleInputChange('vd', e.target.value)}
-                  placeholder={derived?.vd.toFixed(1) || "114"} 
+                  placeholder={derived ? convertTo(derived.vd, 'volume_small', unitSystem).toFixed(1) : convertTo(114, 'volume_small', unitSystem).toFixed(1)} 
                   step="any" 
                 />
-                <span className="unit-badge">cc</span>
+                <span className="unit-badge">{getUnitLabel('volume_small', unitSystem)}</span>
               </div>
             </div>
           </div>

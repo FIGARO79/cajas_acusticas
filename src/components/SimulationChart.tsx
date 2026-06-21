@@ -9,6 +9,7 @@ import {
   Title,
   Tooltip,
   Legend,
+  Filler,
 } from 'chart.js';
 import type { CalculatedSealed, CalculatedPorted, SpeakerParams } from '../types';
 import { type Lang, translate } from '../utils/translations';
@@ -21,7 +22,8 @@ ChartJS.register(
   LineElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  Filler
 );
 
 interface SimulationChartProps {

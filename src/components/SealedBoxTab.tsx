@@ -1,9 +1,11 @@
 import React from 'react';
 import { type Lang, translate } from '../utils/translations';
 import type { CalculatedSealed } from '../types';
+import { type UnitSystem } from '../utils/units';
 
 interface SealedBoxTabProps {
   lang: Lang;
+  unitSystem: UnitSystem;
   sealedData: CalculatedSealed;
   targetQtc: number;
   setTargetQtc: (qtc: number) => void;
@@ -12,6 +14,7 @@ interface SealedBoxTabProps {
 
 export const SealedBoxTab: React.FC<SealedBoxTabProps> = ({
   lang,
+  unitSystem,
   sealedData,
   targetQtc,
   setTargetQtc,
@@ -21,12 +24,20 @@ export const SealedBoxTab: React.FC<SealedBoxTabProps> = ({
 
   const getSealedVbText = () => {
     if (!sealedData.valid || sealedData.Vb <= 0) return t("Inviable");
-    return `${sealedData.Vb.toFixed(1)} L`;
+    if (unitSystem === 'metric') {
+      return `${sealedData.Vb.toFixed(1)} L`;
+    } else {
+      return `${(sealedData.Vb / 28.3168466).toFixed(3)} ft³`;
+    }
   };
 
   const getSealedVbFtText = () => {
     if (!sealedData.valid || sealedData.Vb <= 0) return t("Qts es muy alto para este Qtc");
-    return `${(sealedData.Vb / 28.317).toFixed(3)} ft³`;
+    if (unitSystem === 'metric') {
+      return `${(sealedData.Vb / 28.3168466).toFixed(3)} ft³`;
+    } else {
+      return `${sealedData.Vb.toFixed(1)} L`;
+    }
   };
 
   return (

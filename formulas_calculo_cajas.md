@@ -1,6 +1,6 @@
 # Compendio de Fórmulas y Funciones de Cálculo para Cajas Acústicas
 
-Este documento reúne todas las funciones matemáticas y algoritmos de cálculo acústico utilizados por **BassBox Pro v6.0** para el dimensionamiento de las diferentes topologías de recintos acústicos (cajas de altavoces/subwoofers).
+Este documento reúne todas las funciones matemáticas y algoritmos de cálculo acústico utilizados para el dimensionamiento de las diferentes topologías de recintos acústicos (cajas de altavoces/subwoofers).
 
 ---
 
@@ -80,7 +80,7 @@ Para calcular la longitud requerida de un ducto cilíndrico de diámetro $D_v$:
     $$L_v = \frac{2004 \cdot D_v^2}{F_b^2 \cdot V_b} - 0.732 \cdot D_v$$
 
 ### 3. Fórmulas de Alineación Óptima (Small/Bullock)
-Si no se especifica el volumen, BassBox Pro calcula alineaciones estándar basadas en aproximaciones polinómicas del $Q_{ts}$ del altavoz:
+Si no se especifica el volumen, la aplicacion calcula alineaciones estándar basadas en aproximaciones polinómicas del $Q_{ts}$ del altavoz:
 
 #### A. Alineación SBB4 (Sub-Butterworth de 4.º Orden)
 *Recomendada para altavoces con $Q_{ts} < 0.35$ (proporciona respuesta plana con caída suave y rápida).*

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <!-- Relleno Acústico Leve (1 capa de material en las paredes) -->
+  <path d="M 70,29 L 151,29 L 151,171 L 60,171" stroke="#000000" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" opacity="0.3" stroke-dasharray="8 8"/>
+
+  <!-- Gabinete (Vista Lateral) -->
+  <rect x="40" y="20" width="120" height="160" rx="8" stroke="#000000" stroke-width="6" fill="none" />
+
+  <!-- Parlante (Perfil Montado a la Izquierda) -->
+  <!-- Marco/Labio Exterior -->
+  <rect x="34" y="45" width="6" height="110" rx="2" stroke="#000000" stroke-width="5" fill="none"/>
+  <!-- Canasta -->
+  <path d="M 40,50 L 75,80 L 75,120 L 40,150" stroke="#000000" stroke-width="5" stroke-linejoin="round" fill="none"/>
+  <!-- Imán -->
+  <rect x="75" y="80" width="20" height="40" rx="3" stroke="#000000" stroke-width="5" fill="none"/>
+  <!-- Cono -->
+  <path d="M 40,60 L 70,85 M 40,140 L 70,115" stroke="#000000" stroke-width="4.5" fill="none"/>
+  <!-- Copo (Dustcap) -->
+  <path d="M 50,90 C 56,93 56,107 50,110" stroke="#000000" stroke-width="4.5" fill="none"/>
+</svg>

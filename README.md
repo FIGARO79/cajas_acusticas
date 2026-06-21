@@ -1,73 +1,56 @@
-# React + TypeScript + Vite
+# AcousticSim - Calculadora de Cajas Acústicas Premium
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+[![CI Status](https://img.shields.io/github/actions/workflow/status/FIGARO79/cajas_acusticas/ci.yml?branch=main)](https://github.com/FIGARO79/cajas_acusticas/actions)
+[![License](https://img.shields.io/github/license/FIGARO79/cajas_acusticas)](LICENSE)
 
-Currently, two official plugins are available:
+AcousticSim es una aplicación web interactiva que permite diseñar y simular cajas acústicas para altavoces, ofreciendo cálculos precisos de volúmenes, frecuencias de resonancia y respuesta en frecuencia. La herramienta está construida con **React**, **TypeScript** y **Vite**, y utiliza WebAssembly, compilado a partir de **Rust**, para procesos intensivos de cálculo, garantizando una experiencia fluida y responsiva.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## ✨ Características
 
-## React Compiler
+- **Cálculo automático** de dimensiones óptimas usando fórmulas avanzadas.
+- Visualización de la respuesta en frecuencia mediante gráficos interactivos.
+- Soporte para diferentes tipos de cajas: sellada, bass‑reflex y transmisión.
+- Interfaz moderna con diseño oscuro, efectos suaves y animaciones micro‑interactivas.
+- Exportación de resultados a PDF/JSON para documentación y fabricación.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 🚀 Instalación rápida
 
-## Expanding the ESLint configuration
+```bash
+# Clonar el repositorio
+git clone https://github.com/FIGARO79/cajas_acusticas.git
+cd cajas_acusticas
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+# Instalar dependencias
+npm ci
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Ejecutar en modo desarrollo
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Accede a `http://localhost:5173` en tu navegador.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## 📦 Uso
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+1. Selecciona el tipo de caja y el modelo de altavoz.
+2. Introduce parámetros como Fs, Qts, Vas y Sd.
+3. Pulsa **Calcular** y visualiza los resultados en la tabla y el gráfico.
+4. Ajusta los parámetros y observa los cambios en tiempo real.
+
+## 📚 Documentación
+
+- [Guía de usuario](https://github.com/FIGARO79/cajas_acusticas/wiki)
+- [API interna](https://github.com/FIGARO79/cajas_acusticas/blob/main/src/README_API.md)
+
+## 🛠️ Contribuir
+
+1. Forkea el proyecto.
+2. Crea una rama `feature/nueva-funcionalidad`.
+3. Envía un Pull Request describiendo los cambios.
+
+## 📄 Licencia
+
+Distribuido bajo la licencia MIT. Ver el archivo [LICENSE](LICENSE) para más información.
+
+---
+
+_Desarrollado con ❤️ por **Fabio** y la comunidad open‑source._

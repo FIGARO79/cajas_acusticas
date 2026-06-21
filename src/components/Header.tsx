@@ -1,9 +1,12 @@
 import React from 'react';
 import { type Lang, translate } from '../utils/translations';
+import { type UnitSystem } from '../utils/units';
 
 interface HeaderProps {
   lang: Lang;
   setLang: (l: Lang) => void;
+  unitSystem: UnitSystem;
+  setUnitSystem: (u: UnitSystem) => void;
   theme: 'dark' | 'light';
   toggleTheme: () => void;
 }
@@ -11,6 +14,8 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   lang,
   setLang,
+  unitSystem,
+  setUnitSystem,
   toggleTheme,
 }) => {
   const t = (text: string) => translate(text, lang);
@@ -29,6 +34,25 @@ export const Header: React.FC<HeaderProps> = ({
             <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
           </svg>
         </button>
+        <div className="control-divider"></div>
+        <div className="unit-selector" style={{ display: 'flex', gap: '2px', background: 'rgba(255,255,255,0.05)', padding: '2px', borderRadius: '6px' }}>
+          <button 
+            className={`lang-btn ${unitSystem === 'metric' ? 'active' : ''}`} 
+            onClick={() => setUnitSystem('metric')} 
+            title={t("Sistema Métrico (Litros, cm, mm)")}
+            style={{ minWidth: '40px', fontSize: '0.72rem', padding: '4px 8px' }}
+          >
+            {t("Métrico")}
+          </button>
+          <button 
+            className={`lang-btn ${unitSystem === 'imperial' ? 'active' : ''}`} 
+            onClick={() => setUnitSystem('imperial')} 
+            title={t("Sistema Inglés (Pies cúbicos, pulgadas)")}
+            style={{ minWidth: '40px', fontSize: '0.72rem', padding: '4px 8px' }}
+          >
+            {t("Inglés")}
+          </button>
+        </div>
         <div className="control-divider"></div>
         <div className="lang-selector">
           <button className={`lang-btn ${lang === 'es' ? 'active' : ''}`} onClick={() => setLang('es')} title="Español">ES</button>

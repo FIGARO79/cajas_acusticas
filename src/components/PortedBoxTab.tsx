@@ -4,8 +4,11 @@ import type { CalculatedPorted, SpeakerParams } from '../types';
 import { suggestPortConfig } from '../utils/acousticMath';
 import { calcSuggestedPorted } from '../wasm/index';
 
+import { type UnitSystem, convertTo, convertFrom, getUnitLabel } from '../utils/units';
+
 interface PortedBoxTabProps {
   lang: Lang;
+  unitSystem: UnitSystem;
   portedData: CalculatedPorted;
   params: SpeakerParams;
   customVb: number;
@@ -23,6 +26,7 @@ interface PortedBoxTabProps {
 
 export const PortedBoxTab: React.FC<PortedBoxTabProps> = ({
   lang,
+  unitSystem,
   portedData,
   params,
   customVb,
@@ -60,12 +64,15 @@ export const PortedBoxTab: React.FC<PortedBoxTabProps> = ({
       const rPort = pDia / 2;
       const Lv = ((23562.5 * Math.pow(pDia, 2) * portCount) / (portedData.Fb * portedData.Fb * portedData.Vb)) - (1.46 * rPort);
       
+      const displayLv = convertTo(Lv, 'length', unitSystem);
+      const unitLabel = getUnitLabel('length', unitSystem);
+
       if (Lv <= 0) {
         setPortLength(t("Excesivamente corto"));
       } else if (Lv > 120) {
-        setPortLength(`${Lv.toFixed(1)} cm (${t("Excede caja")})`);
+        setPortLength(`${displayLv.toFixed(1)} ${unitLabel} (${t("Excede caja")})`);
       } else {
-        setPortLength(`${Lv.toFixed(1)} cm`);
+        setPortLength(`${displayLv.toFixed(1)} ${unitLabel}`);
       }
 
       if (params.sd && params.xmax) {
@@ -78,7 +85,7 @@ export const PortedBoxTab: React.FC<PortedBoxTabProps> = ({
       setPortLength('N/A');
       setVPeak(null);
     }
-  }, [portCount, portDiameter, portedData, params, lang]);
+  }, [portCount, portDiameter, portedData, params, lang, unitSystem]);
 
   const handleApplyPort = (num: number, dia: number) => {
     setPortCount(num);
@@ -128,8 +135,16 @@ export const PortedBoxTab: React.FC<PortedBoxTabProps> = ({
       <div className="results-summary">
         <div className="result-tile">
           <span className="result-tile-label">{t("Volumen Neto (Vb)")}</span>
-          <span className="result-tile-value">{portedData.valid ? `${portedData.Vb.toFixed(1)} L` : 'N/A'}</span>
-          <span className="result-tile-sub">{(portedData.Vb / 28.317).toFixed(3)} ft³</span>
+          <span className="result-tile-value">
+            {portedData.valid 
+              ? (unitSystem === 'metric' ? `${portedData.Vb.toFixed(1)} L` : `${(portedData.Vb / 28.3168466).toFixed(3)} ft³`) 
+              : 'N/A'}
+          </span>
+          <span className="result-tile-sub">
+            {portedData.valid 
+              ? (unitSystem === 'metric' ? `${(portedData.Vb / 28.3168466).toFixed(3)} ft³` : `${portedData.Vb.toFixed(1)} L`) 
+              : ''}
+          </span>
         </div>
         <div className="result-tile">
           <span className="result-tile-label">{t("Frecuencia Sintonía (Fb)")}</span>
@@ -166,15 +181,19 @@ export const PortedBoxTab: React.FC<PortedBoxTabProps> = ({
               <div className="slider-container">
                 <div className="slider-header">
                   <span className="slider-name">{t("Volumen de la Caja (Vb)")}</span>
-                  <span className="slider-val">{customVb.toFixed(1)} L</span>
+                  <span className="slider-val">
+                    {unitSystem === 'metric' 
+                      ? `${customVb.toFixed(1)} L` 
+                      : `${convertTo(customVb, 'volume', unitSystem).toFixed(3)} ft³`}
+                  </span>
                 </div>
                 <input 
                   type="range" 
-                  min="5" 
-                  max="250" 
-                  step="0.5" 
-                  value={customVb} 
-                  onChange={(e) => setCustomVb(parseFloat(e.target.value))} 
+                  min={convertTo(5, 'volume', unitSystem)} 
+                  max={convertTo(250, 'volume', unitSystem)} 
+                  step={unitSystem === 'metric' ? "0.5" : "0.01"} 
+                  value={convertTo(customVb, 'volume', unitSystem)} 
+                  onChange={(e) => setCustomVb(convertFrom(parseFloat(e.target.value), 'volume', unitSystem))} 
                 />
               </div>
             )}
@@ -230,10 +249,10 @@ export const PortedBoxTab: React.FC<PortedBoxTabProps> = ({
               <input 
                 type="number" 
                 step="any" 
-                value={portDiameter} 
-                onChange={(e) => setPortDiameter(e.target.value === '' ? '' : (parseFloat(e.target.value) || 0))} 
+                value={portDiameter !== '' ? (Math.round(convertTo(portDiameter, 'length', unitSystem) * 1000) / 1000) : ''} 
+                onChange={(e) => setPortDiameter(e.target.value === '' ? '' : convertFrom(parseFloat(e.target.value), 'length', unitSystem))} 
               />
-              <span className="unit-badge">cm</span>
+              <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
             </div>
           </div>
           <div className="input-group">
@@ -260,7 +279,7 @@ export const PortedBoxTab: React.FC<PortedBoxTabProps> = ({
             <>
               <p style={{ marginBottom: '0.4rem', lineHeight: '1.4' }}>
                 {t('Para evitar turbulencias ("chuffing") a excursión máxima ($Xmax$), se requiere una superficie de ventilación equivalente a un conducto redondo de')}{' '}
-                <strong>{suggestions.dMin?.toFixed(1)} cm</strong> {t('de diámetro.')}
+                <strong>{convertTo(suggestions.dMin || 0, 'length', unitSystem).toFixed(2)} {getUnitLabel('length', unitSystem)}</strong> {t('de diámetro.')}
               </p>
               <table className="wood-table" style={{ fontSize: '0.8rem' }}>
                 <thead>
@@ -276,11 +295,16 @@ export const PortedBoxTab: React.FC<PortedBoxTabProps> = ({
                     const typeText = !opt.isCustom 
                       ? t("Mínimo Teórico") 
                       : `${t("Comercial")} ${opt.diameter === 5 ? '2"' : opt.diameter === 7.5 ? '3"' : opt.diameter === 10 ? '4"' : '6"'}`;
-                    const lengthText = opt.length > 0 ? `${opt.length.toFixed(1)} cm` : t("Inviable");
+                    
+                    const displayOptDia = convertTo(opt.diameter, 'length', unitSystem);
+                    const displayOptLen = convertTo(opt.length, 'length', unitSystem);
+                    const unitLabel = getUnitLabel('length', unitSystem);
+
+                    const lengthText = opt.length > 0 ? `${displayOptLen.toFixed(1)} ${unitLabel}` : t("Inviable");
                     
                     return (
                       <tr key={idx}>
-                        <td><strong>{opt.numPorts}x</strong> de {opt.diameter.toFixed(1)} cm</td>
+                        <td><strong>{opt.numPorts}x</strong> de {displayOptDia.toFixed(2)} {unitLabel}</td>
                         <td>{typeText}</td>
                         <td style={{ fontWeight: 500 }}>{lengthText}</td>
                         <td>

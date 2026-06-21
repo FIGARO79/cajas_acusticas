@@ -45,24 +45,11 @@ pub struct FilterLR {
 
 #[wasm_bindgen]
 pub fn calc_filtro_linkwitz_riley(fc: f64, r: f64) -> FilterLR {
-    // Usando formulas completas en lugar de la aproximación 0.0796/fc para R=8
-    // LR2/LR4 tienen los mismos componentes en diferentes configuraciones de red
-    // Para simplificar, la reactancia es:
-    // C = 1 / (2 * pi * fc * R) / sqrt(2) no, la fórmula es específica para Q=0.5:
-    // C = 1 / (4 * pi * fc * R) aprox ? No, mejor:
-    // Sabemos que para LR (Q=0.5), wp*L = R, 1/(wp*C) = R
-    // L = R / (2 * pi * fc), C = 1 / (2 * pi * fc * R)
-    // Pero en el documento dice C = 0.0796/fc para fc en kHz.
-    // 0.0796 / (fc_kHz) = 79.6 / fc_hz. 
-    // 1 / (4 * pi * R) = 1 / (4 * 3.14159 * 8) = 1 / 100.53 = 0.00994 (no cuadra).
-    // Usemos la aproximación general:
-    // Si R = 8, C(uF) = 79.6 * 8 / R / fc_kHz ?? No, el factor es lineal.
-    // LR2 tiene 2 polos, Q=0.5 -> C_series = 1 / (2*pi*fc*R) * sqrt(algo)
-    // Reemplazando a la fórmula de la tabla:
-    // C = 0.0796 / (fc/1000) * (8/r)
-    let fc_khz = fc / 1000.0;
-    let c = (0.0796 / fc_khz) * (8.0 / r); // uF
-    let l = (0.3183 / fc_khz) * (r / 8.0); // mH
+    // Para un filtro Linkwitz-Riley de 2.º orden (Q = 0.5):
+    // C = 1 / (4 * pi * fc * R) -> Convertido a uF: C_uF = 1_000_000 / (4 * pi * fc * R)
+    // L = R / (pi * fc) -> Convertido a mH: L_mH = (R * 1000) / (pi * fc)
+    let c = 1_000_000.0 / (4.0 * PI * fc * r);
+    let l = (r * 1000.0) / (PI * fc);
 
     FilterLR { c, l }
 }

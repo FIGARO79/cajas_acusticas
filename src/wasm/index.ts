@@ -24,6 +24,7 @@ export function getWasm() {
 export async function calcAutoParams(params: {
   vas: number; sd: number; fs: number; re: number; qes: number; xmax: number;
   mms?: number; cms?: number; bl?: number; vd?: number;
+  qms?: number; pe?: number; sens?: number;
 }) {
   const wasm = await getWasm();
   const res = wasm.calc_auto_params(
@@ -38,6 +39,32 @@ export async function calcAutoParams(params: {
     params.bl ?? null,
     params.vd ?? null
   );
+
+  let eta0 = 0;
+  if (params.qes && params.fs && params.vas) {
+    eta0 = 9.64e-10 * Math.pow(params.fs, 3) * params.vas / params.qes;
+  }
+
+  let spl = params.sens;
+  if (!spl && eta0 > 0) {
+    spl = 112.2 + 10 * Math.log10(eta0);
+  }
+
+  let splMax = 0;
+  if (spl && params.pe) {
+    splMax = spl + 10 * Math.log10(params.pe);
+  }
+
+  let rms = 0;
+  if (params.fs && res.mms && params.qms) {
+    rms = (2 * Math.PI * params.fs * (res.mms / 1000)) / params.qms;
+  }
+
+  let zmax = 0;
+  if (params.re && params.qms && params.qes) {
+    zmax = params.re * (1 + params.qms / params.qes);
+  }
+
   return {
     cms: res.cms,
     mms: res.mms,
@@ -47,6 +74,11 @@ export async function calcAutoParams(params: {
     autoMms: res.auto_mms,
     autoBl: res.auto_bl,
     autoVd: res.auto_vd,
+    eta0,
+    spl,
+    splMax,
+    rms,
+    zmax,
   };
 }
 

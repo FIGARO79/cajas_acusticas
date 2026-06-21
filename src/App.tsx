@@ -5,16 +5,19 @@ import { SimulationChart } from './components/SimulationChart';
 import { SealedBoxTab } from './components/SealedBoxTab';
 import { PortedBoxTab } from './components/PortedBoxTab';
 import { CabinetTab } from './components/CabinetTab';
+import { CrossoverTab } from './components/CrossoverTab';
 import { type Lang, translate } from './utils/translations';
+import { type UnitSystem } from './utils/units';
 import type { SpeakerParams, CalculatedSealed, CalculatedPorted } from './types';
 import { estimateF3 } from './utils/acousticMath';
-import { getWasm } from './wasm/index.ts';
+import { getWasm, initWasm } from './wasm/index.ts';
 
 function App() {
   // Theme & Language
   const [lang, setLang] = useState<Lang>(() => (localStorage.getItem('lang') as Lang) || 'es');
+  const [unitSystem, setUnitSystem] = useState<UnitSystem>(() => (localStorage.getItem('unitSystem') as UnitSystem) || 'metric');
   const [theme, setTheme] = useState<'dark' | 'light'>(() => (localStorage.getItem('theme') as 'dark' | 'light') || 'dark');
-  const [activeTab, setActiveTab] = useState<'sealed' | 'ported' | 'wood' | 'damping'>('sealed');
+  const [activeTab, setActiveTab] = useState<'sealed' | 'ported' | 'wood' | 'damping' | 'crossover'>('sealed');
 
   // Preset
   const [preset, setPreset] = useState<string>('hifi8');
@@ -100,6 +103,16 @@ function App() {
     localStorage.setItem('lang', lang);
   }, [lang]);
 
+  // Sync unitSystem to storage
+  useEffect(() => {
+    localStorage.setItem('unitSystem', unitSystem);
+  }, [unitSystem]);
+
+  // Initialize WASM module on component mount
+  useEffect(() => {
+    initWasm().catch(err => console.error('WASM init error:', err));
+  }, []);
+
   const toggleTheme = () => {
     setTheme(prev => prev === 'dark' ? 'light' : 'dark');
   };
@@ -107,9 +120,14 @@ function App() {
   const handlePresetChange = (presetId: string, newParams: SpeakerParams | null) => {
     setPreset(presetId);
     if (newParams) {
-      setParams(newParams);
+      // Compute Qts automatically if Qms and Qes are provided but Qts is missing
+      const updatedParams: SpeakerParams = { ...newParams };
+      if (updatedParams.qms && updatedParams.qes && (updatedParams.qts === undefined || updatedParams.qts === null)) {
+        updatedParams.qts = Math.round((updatedParams.qms * updatedParams.qes) / (updatedParams.qms + updatedParams.qes) * 1000) / 1000;
+      }
+      setParams(updatedParams);
       // Automatically toggle pro parameters if specifications exist
-      if (newParams.diaNominal) {
+      if (updatedParams.diaNominal) {
         // Preset contains nominal specs, could enable pro calculations UI
       }
     } else {
@@ -307,6 +325,8 @@ function App() {
       <Header 
         lang={lang} 
         setLang={setLang} 
+        unitSystem={unitSystem}
+        setUnitSystem={setUnitSystem}
         theme={theme} 
         toggleTheme={toggleTheme} 
       />
@@ -315,6 +335,7 @@ function App() {
         {/* PARÁMETROS IZQUIERDA */}
         <SpeakerParamsForm 
           lang={lang}
+          unitSystem={unitSystem}
           params={params}
           onParamsChange={setParams}
           driverConfig={driverConfig}
@@ -359,31 +380,38 @@ function App() {
                 className={`tab-btn ${activeTab === 'sealed' ? 'active' : ''}`} 
                 onClick={() => setActiveTab('sealed')}
               >
-                {t("Caja Sellada (Sealed)")}
+                {t("Caja Sellada")}
               </button>
               <button 
                 className={`tab-btn ${activeTab === 'ported' ? 'active' : ''}`} 
                 onClick={() => setActiveTab('ported')}
               >
-                {t("Caja Ventilada (Ported)")}
+                {t("Caja Ventilada")}
               </button>
               <button 
                 className={`tab-btn ${activeTab === 'wood' ? 'active' : ''}`} 
                 onClick={() => setActiveTab('wood')}
               >
-                {t("Dimensiones de la caja (Woodworking)")}
+                {t("Dimensiones de la caja")}
               </button>
               <button 
                 className={`tab-btn ${activeTab === 'damping' ? 'active' : ''}`} 
                 onClick={() => setActiveTab('damping')}
               >
-                {t("Relleno Acústico (Damping)")}
+                {t("Relleno Acústico")}
+              </button>
+              <button 
+                className={`tab-btn ${activeTab === 'crossover' ? 'active' : ''}`} 
+                onClick={() => setActiveTab('crossover')}
+              >
+                {t("Divisores de Frecuencia")}
               </button>
             </div>
 
             {activeTab === 'sealed' && (
               <SealedBoxTab 
                 lang={lang}
+                unitSystem={unitSystem}
                 sealedData={sealedData}
                 targetQtc={targetQtc}
                 setTargetQtc={setTargetQtc}
@@ -394,6 +422,7 @@ function App() {
             {activeTab === 'ported' && (
               <PortedBoxTab 
                 lang={lang}
+                unitSystem={unitSystem}
                 portedData={portedData}
                 params={adjParams}
                 customVb={customVb}
@@ -413,6 +442,7 @@ function App() {
             {activeTab === 'wood' && (
               <CabinetTab 
                 lang={lang}
+                unitSystem={unitSystem}
                 params={adjParams}
                 sealedData={sealedData}
                 portedData={portedData}
@@ -515,11 +545,11 @@ function App() {
                     </strong>
                     <p style={{ fontSize: '0.82rem', lineHeight: '1.5', margin: 0, color: 'var(--text-main)', opacity: 0.9 }}>
                       {dampingType === 'none'     && t("Caja completamente vacía. El aire se comprime sin absorber calor. Ideal para simulaciones de referencia o cuando no se utiliza ningún material absorbente.")}
-                      {dampingType === 'light'    && t("Se cubren únicamente las paredes internas con una capa delgada de guata de poliéster o fieltro de unos 2 a 3 cm. Ayuda a atenuar rebotes y ondas estacionarias de alta frecuencia sin alterar significativamente el volumen virtual.")}
+                      {dampingType === 'light'    && t("Se cubren únicamente las paredes internas con una capa delgada de unos 2 a 3 cm. Ayuda a atenuar rebotes y ondas estacionarias de alta frecuencia sin alterar significativamente el volumen virtual.")}
                       {dampingType === 'moderate' && t("Se rellena la caja de forma suelta y esponjosa ocupando gran parte del espacio, sin compactarla. Logra un aumento virtual del volumen acústico del ~12%, ideal para compactar el diseño del bafle conservando buenos graves.")}
                       {dampingType === 'heavy'    && t("Se rellena la caja con fibra uniforme y más densa, cubriendo casi todo el volumen interior pero sin comprimir a presión. Maximiza el aumento de volumen virtual hasta un ~20%, ideal para cajas muy compactas.")}
                     </p>
-                    <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
                       <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                         <span style={{ fontWeight: 700, color: 'var(--primary)' }}>
                           {dampingType === 'none' ? '0%' : dampingType === 'light' ? '+5%' : dampingType === 'moderate' ? '+12%' : '+20%'}
@@ -531,9 +561,31 @@ function App() {
                         </span>{' '}{t("Proceso térmico")}
                       </div>
                     </div>
+                    <div style={{ marginTop: '0.85rem', paddingTop: '0.85rem', borderTop: '1px solid var(--card-border)' }}>
+                      <strong style={{ fontSize: '0.78rem', color: 'var(--text-main)', display: 'block', marginBottom: '0.4rem' }}>
+                        {t("Los materiales más utilizados son:")}
+                      </strong>
+                      <ul style={{ fontSize: '0.78rem', lineHeight: '1.45', margin: 0, paddingLeft: '1.1rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                        <li>
+                          <strong>{t("Delcrón o guata:")}</strong> {t("Es el material más común (aspecto de algodón sintético) usado en almohadas; es económico y muy eficiente para absorber el sonido.")}
+                        </li>
+                        <li>
+                          <strong>{t("Lana de roca o fibra de vidrio:")}</strong> {t("Materiales aislantes clásicos. Son muy efectivos acústicamente, aunque se debe manipular con cuidado para evitar que el polvo ingrese al cono del parlante.")}
+                        </li>
+                        <li>
+                          <strong>{t("Espuma acústica:")}</strong> {t("Se utiliza en forma de planchas en las paredes internas o como aros alrededor del parlante para evitar fugas de aire.")}
+                        </li>
+                        <li>
+                          <strong>{t("Algodón natural:")}</strong> {t("Otra alternativa económica que ayuda a disipar el calor interno y controlar las resonancias.")}
+                        </li>
+                      </ul>
+                    </div>
                   </div>
                 </div>
               </div>
+            )}
+            {activeTab === 'crossover' && (
+              <CrossoverTab lang={lang} />
             )}
           </div>
         </main>

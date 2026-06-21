@@ -1,0 +1,1077 @@
+import React, { useState } from 'react';
+import { type Lang, translate } from '../utils/translations';
+import { getWasm } from '../wasm/index.ts';
+
+interface CrossoverTabProps {
+  lang: Lang;
+}
+
+export const CrossoverTab: React.FC<CrossoverTabProps> = ({ lang }) => {
+  const t = (text: string) => translate(text, lang);
+
+  // 1. Crossover Way Mode
+  const [crossoverWays, setCrossoverWays] = useState<'2way' | '3way'>('2way');
+
+  // 2. Crossover Inputs
+  const [fc, setFc] = useState<number>(2500); // For 2-way
+  const [fcLow, setFcLow] = useState<number>(500); // For 3-way Low-Mid
+  const [fcHigh, setFcHigh] = useState<number>(4000); // For 3-way Mid-High
+  const [zTweeter, setZTweeter] = useState<number>(8);
+  const [zMidrange, setZMidrange] = useState<number>(8);
+  const [zWoofer, setZWoofer] = useState<number>(8);
+  const [crossoverType, setCrossoverType] = useState<'1st_order' | '2nd_butter' | '2nd_lr' | '4th_lr'>('2nd_lr');
+
+  // 3. Zobel Network Inputs
+  const [re, setRe] = useState<number>(5.8);
+  const [le, setLe] = useState<number>(0.6); // mH
+
+  // 4. L-Pad Attenuator Inputs
+  const [attenuation, setAttenuation] = useState<number>(3); // dB
+  const [zLoad, setZLoad] = useState<number>(8);
+
+  // --- CROSSOVER CALCULATIONS ---
+  const calculateCrossover = () => {
+    const Rt = zTweeter;
+    const Rm = zMidrange;
+    const Rw = zWoofer;
+
+    if (crossoverWays === '2way') {
+      const f = fc;
+      if (f <= 0 || Rt <= 0 || Rw <= 0) return null;
+
+      try {
+        const wasm = getWasm();
+
+        // 1st Order (6 dB/oct)
+        if (crossoverType === '1st_order') {
+          const hpRes = wasm.calc_filtro_1er_orden(f, Rt);
+          const lpRes = wasm.calc_filtro_1er_orden(f, Rw);
+          return {
+            ways: '2way' as const,
+            type: '1st',
+            hp: { c1: hpRes.c, l1: null },
+            lp: { l1: lpRes.l, c1: null }
+          };
+        }
+
+        // 2nd Order Butterworth (12 dB/oct)
+        if (crossoverType === '2nd_butter') {
+          const hpRes = wasm.calc_filtro_2do_orden_butterworth(f, Rt);
+          const lpRes = wasm.calc_filtro_2do_orden_butterworth(f, Rw);
+          return {
+            ways: '2way' as const,
+            type: '2nd_butter',
+            hp: { c1: hpRes.c_hp, l1: hpRes.l_hp },
+            lp: { l1: lpRes.l_lp, c1: lpRes.c_lp }
+          };
+        }
+
+        // 2nd Order Linkwitz-Riley (12 dB/oct)
+        if (crossoverType === '2nd_lr') {
+          const hpRes = wasm.calc_filtro_linkwitz_riley(f, Rt);
+          const lpRes = wasm.calc_filtro_linkwitz_riley(f, Rw);
+          return {
+            ways: '2way' as const,
+            type: '2nd_lr',
+            hp: { c1: hpRes.c, l1: hpRes.l },
+            lp: { l1: lpRes.l, c1: lpRes.c }
+          };
+        }
+
+        // 4th Order Linkwitz-Riley (24 dB/oct)
+        if (crossoverType === '4th_lr') {
+          const c1_t = 0.0796 * 1000000 / (f * Rt / 1000);
+          const c2_t = 0.1592 * 1000000 / (f * Rt / 1000);
+          const l1_t = 0.1592 * Rt * 1000 / (f / 1000);
+          const l2_t = 0.0796 * Rt * 1000 / (f / 1000);
+
+          const c1_w = 0.0796 * 1000000 / (f * Rw / 1000);
+          const c2_w = 0.1592 * 1000000 / (f * Rw / 1000);
+          const l1_w = 0.1592 * Rw * 1000 / (f / 1000);
+          const l2_w = 0.0796 * Rw * 1000 / (f / 1000);
+
+          return {
+            ways: '2way' as const,
+            type: '4th_lr',
+            hp: { c1: c1_t / 1000, l1: l1_t / 1000, c2: c2_t / 1000, l2: l2_t / 1000 },
+            lp: { l1: l1_w / 1000, c1: c1_w / 1000, l2: l2_w / 1000, c2: c2_w / 1000 }
+          };
+        }
+      } catch (e) {
+        console.error("WASM crossover calculation error, falling back to JS:", e);
+      }
+
+      // Fallback JS math (2-way)
+      return {
+        ways: '2way' as const,
+        type: '1st',
+        hp: { c1: 1000000 / (2 * Math.PI * f * Rt), l1: null },
+        lp: { l1: (Rw * 1000) / (2 * Math.PI * f), c1: null }
+      };
+    } else {
+      // 3-way Crossover Calculations
+      // fL = fcLow, fH = fcHigh.
+      const fL = fcLow;
+      const fH = fcHigh;
+      if (fL <= 0 || fH <= 0 || fL >= fH || Rt <= 0 || Rm <= 0 || Rw <= 0) return null;
+
+      // We'll calculate components for:
+      // Tweeter (High Pass at fH)
+      // Midrange (Bandpass: High Pass at fL and Low Pass at fH)
+      // Woofer (Low Pass at fL)
+      
+      if (crossoverType === '1st_order') {
+        // 1st order: 6dB/oct
+        // C_tweeter = 1 / (2*pi*fH*Rt)
+        // Midrange HP: C_mid_hp = 1 / (2*pi*fL*Rm)
+        // Midrange LP: L_mid_lp = Rm / (2*pi*fH)
+        // Woofer LP: L_woofer = Rw / (2*pi*fL)
+        const c_tweeter = 1000000 / (2 * Math.PI * fH * Rt);
+        const c_mid_hp = 1000000 / (2 * Math.PI * fL * Rm);
+        const l_mid_lp = (Rm * 1000) / (2 * Math.PI * fH);
+        const l_woofer = (Rw * 1000) / (2 * Math.PI * fL);
+
+        return {
+          ways: '3way' as const,
+          type: '1st',
+          hp: { c1: c_tweeter, l1: null },
+          bp: { c_hp: c_mid_hp, l_hp: null, l_lp: l_mid_lp, c_lp: null },
+          lp: { l1: l_woofer, c1: null }
+        };
+      }
+
+      if (crossoverType === '2nd_butter') {
+        // 2nd order Butterworth: 12dB/oct
+        const sqrt2 = Math.sqrt(2);
+        
+        // Tweeter (High-pass at fH)
+        const c1_tweeter = 1000000 / (2 * Math.PI * fH * Rt * sqrt2);
+        const l1_tweeter = (Rt * 1000) / (2 * Math.PI * fH * sqrt2);
+
+        // Midrange Bandpass:
+        // HP section at fL:
+        const c_mid_hp = 1000000 / (2 * Math.PI * fL * Rm * sqrt2);
+        const l_mid_hp = (Rm * 1000) / (2 * Math.PI * fL * sqrt2);
+        // LP section at fH:
+        const c_mid_lp = (sqrt2 * 1000000) / (2 * Math.PI * fH * Rm);
+        const l_mid_lp = (Rm * sqrt2 * 1000) / (2 * Math.PI * fH);
+
+        // Woofer (Low-pass at fL)
+        const c1_woofer = (sqrt2 * 1000000) / (2 * Math.PI * fL * Rw);
+        const l1_woofer = (Rw * sqrt2 * 1000) / (2 * Math.PI * fL);
+
+        return {
+          ways: '3way' as const,
+          type: '2nd_butter',
+          hp: { c1: c1_tweeter, l1: l1_tweeter },
+          bp: { c_hp: c_mid_hp, l_hp: l_mid_hp, l_lp: l_mid_lp, c_lp: c_mid_lp },
+          lp: { l1: l1_woofer, c1: c1_woofer }
+        };
+      }
+
+      if (crossoverType === '2nd_lr') {
+        // 2nd order Linkwitz-Riley (Q=0.5)
+        // C_hp = 1 / (4*pi*f*R)
+        // L_hp = R / (pi*f) (parallel) -> wait, LR2 equations:
+        // C = 0.0796 / (f_kHz * R) -> C = 1_000_000 / (4 * pi * f * R)
+        // L = R / (pi * f)
+        
+        const c_t = 1000000 / (4 * Math.PI * fH * Rt);
+        const l_t = (Rt * 1000) / (Math.PI * fH);
+
+        const c_m_hp = 1000000 / (4 * Math.PI * fL * Rm);
+        const l_m_hp = (Rm * 1000) / (Math.PI * fL);
+        const c_m_lp = 1000000 / (4 * Math.PI * fH * Rm);
+        const l_m_lp = (Rm * 1000) / (Math.PI * fH);
+
+        const c_w = 1000000 / (4 * Math.PI * fL * Rw);
+        const l_w = (Rw * 1000) / (Math.PI * fL);
+
+        return {
+          ways: '3way' as const,
+          type: '2nd_lr',
+          hp: { c1: c_t, l1: l_t },
+          bp: { c_hp: c_m_hp, l_hp: l_m_hp, l_lp: l_m_lp, c_lp: c_m_lp },
+          lp: { l1: l_w, c1: c_w }
+        };
+      }
+
+      // 4th Order Linkwitz-Riley for 3-way
+      // We will perform calculations using cascading math
+      const c1_t = 0.0796 * 1000000 / (fH * Rt);
+      const c2_t = 0.1592 * 1000000 / (fH * Rt);
+      const l1_t = 0.1592 * Rt * 1000 / fH;
+      const l2_t = 0.0796 * Rt * 1000 / fH;
+
+      // Midrange HP section at fL (4th Order)
+      const c1_m_hp = 0.0796 * 1000000 / (fL * Rm);
+      const c2_m_hp = 0.1592 * 1000000 / (fL * Rm);
+      const l1_m_hp = 0.1592 * Rm * 1000 / fL;
+      const l2_m_hp = 0.0796 * Rm * 1000 / fL;
+
+      // Midrange LP section at fH (4th Order)
+      const c1_m_lp = 0.0796 * 1000000 / (fH * Rm);
+      const c2_m_lp = 0.1592 * 1000000 / (fH * Rm);
+      const l1_m_lp = 0.1592 * Rm * 1000 / fH;
+      const l2_m_lp = 0.0796 * Rm * 1000 / fH;
+
+      // Woofer LP section at fL (4th Order)
+      const c1_w = 0.0796 * 1000000 / (fL * Rw);
+      const c2_w = 0.1592 * 1000000 / (fL * Rw);
+      const l1_w = 0.1592 * Rw * 1000 / fL;
+      const l2_w = 0.0796 * Rw * 1000 / fL;
+
+      return {
+        ways: '3way' as const,
+        type: '4th_lr',
+        hp: { c1: c1_t, l1: l1_t, c2: c2_t, l2: l2_t },
+        bp: { 
+          c1_hp: c1_m_hp, c2_hp: c2_m_hp, l1_hp: l1_m_hp, l2_hp: l2_m_hp,
+          c1_lp: c1_m_lp, c2_lp: c2_m_lp, l1_lp: l1_m_lp, l2_lp: l2_m_lp 
+        },
+        lp: { l1: l1_w, c1: c1_w, l2: l2_w, c2: c2_w }
+      };
+    }
+  };
+
+  const xoverResults = calculateCrossover();
+
+  // --- ZOBEL CALCULATIONS ---
+  const calculateZobel = () => {
+    if (re <= 0 || le <= 0) return null;
+    try {
+      const wasm = getWasm();
+      const res = wasm.calc_zobel(re, le);
+      return { rz: res.rz, cz: res.cz };
+    } catch (e) {
+      console.error("WASM Zobel error, falling back:", e);
+      const rz = 1.25 * re;
+      const cz = (le * 1000) / (rz * rz);
+      return { rz, cz };
+    }
+  };
+
+  const zobelResults = calculateZobel();
+
+  // --- L-PAD CALCULATIONS ---
+  const calculateLPad = () => {
+    if (attenuation <= 0 || zLoad <= 0) return null;
+    try {
+      const wasm = getWasm();
+      const res = wasm.calc_lpad(attenuation, zLoad);
+      return { r1: res.r1, r2: res.r2 };
+    } catch (e) {
+      console.error("WASM LPad error, falling back:", e);
+      const k = Math.pow(10, -attenuation / 20);
+      const r1 = zLoad * (1 - k);
+      const r2 = zLoad * k / (1 - k);
+      return { r1, r2 };
+    }
+  };
+
+  const lpadResults = calculateLPad();
+
+  const renderSchematic = () => {
+    if (!xoverResults) return null;
+
+    const renderLegend = () => (
+      <div style={{ 
+        display: 'flex', 
+        flexWrap: 'wrap', 
+        gap: '1.5rem', 
+        marginTop: '1.5rem', 
+        paddingTop: '1rem', 
+        borderTop: '1px solid var(--card-border)', 
+        width: '100%', 
+        justifyContent: 'center',
+        fontSize: '0.85rem',
+        color: 'var(--text-muted)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <svg width="40" height="20" viewBox="0 0 40 20" style={{ color: 'var(--text-main)' }}>
+            <path d="M 5,10 Q 12,3 19,10 Q 26,3 33,10" fill="none" stroke="currentColor" strokeWidth="2.5" />
+          </svg>
+          <span><strong>Bobina (Inductor - L):</strong> {t("Filtra altas frecuencias")}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <svg width="40" height="20" viewBox="0 0 40 20" style={{ color: 'var(--text-main)' }}>
+            <line x1="16" y1="2" x2="16" y2="18" stroke="currentColor" strokeWidth="3.5" />
+            <line x1="24" y1="2" x2="24" y2="18" stroke="currentColor" strokeWidth="3.5" />
+            <line x1="5" y1="10" x2="16" y2="10" stroke="currentColor" strokeWidth="2" />
+            <line x1="24" y1="10" x2="35" y2="10" stroke="currentColor" strokeWidth="2" />
+          </svg>
+          <span><strong>Condensador (Capacitor - C):</strong> {t("Filtra bajas frecuencias")}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <svg width="40" height="20" viewBox="0 0 40 20" style={{ color: 'var(--text-main)' }}>
+            <path d="M 5,10 L 10,5 L 15,15 L 20,5 L 25,15 L 30,5 L 35,10" fill="none" stroke="currentColor" strokeWidth="2" />
+          </svg>
+          <span><strong>Resistencia (R):</strong> {t("Atenúa o acopla impedancia")}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <svg width="30" height="20" viewBox="0 0 30 20" style={{ color: 'var(--text-main)' }}>
+            <rect x="2" y="5" width="6" height="10" fill="none" stroke="currentColor" strokeWidth="2" />
+            <polygon points="8,5 18,1 18,19 8,15" fill="none" stroke="currentColor" strokeWidth="2" />
+          </svg>
+          <span><strong>Altavoz (Parlante):</strong> {t("Produce el sonido")}</span>
+        </div>
+      </div>
+    );
+
+    if (xoverResults.ways === '2way') {
+      const hp = xoverResults.hp;
+      const lp = xoverResults.lp;
+
+      return (
+        <div style={{ background: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--card-border)', padding: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '1rem', width: '100%', boxSizing: 'border-box' }}>
+          <span className="control-title" style={{ alignSelf: 'flex-start', fontSize: '1rem', color: 'var(--text-main)', marginBottom: '1.25rem', fontWeight: 600 }}>
+            {t("Esquema de Conexión del Crossover (2 Vías)")}
+          </span>
+          <svg width="100%" height="450" viewBox="0 0 800 450" fill="none" style={{ maxWidth: '100%', color: 'var(--text-main)' }}>
+            {/* --- HIGH PASS (TWEETER) --- */}
+            {/* Input labels */}
+            <text x="30" y="70" fill="#ef4444" fontSize="26" fontWeight="bold">+</text>
+            <text x="30" y="190" fill="currentColor" fontSize="28" fontWeight="bold">-</text>
+
+            <text x="50" y="35" fill="var(--text-muted)" fontSize="14" fontWeight="bold">ENTRADA (DE AMP)</text>
+
+            {/* Wires */}
+            <line x1="60" y1="60" x2="160" y2="60" stroke="#ef4444" strokeWidth="4" />
+            <line x1="60" y1="180" x2="580" y2="180" stroke="currentColor" strokeWidth="4" />
+
+            {/* C1 Capacitor */}
+            <line x1="160" y1="60" x2="200" y2="60" stroke="#ef4444" strokeWidth="4" />
+            <line x1="200" y1="30" x2="200" y2="90" stroke="#ef4444" strokeWidth="6" />
+            <line x1="215" y1="30" x2="215" y2="90" stroke="#ef4444" strokeWidth="6" />
+            <line x1="215" y1="60" x2="260" y2="60" stroke="#ef4444" strokeWidth="4" />
+            <text x="140" y="115" fill="var(--primary)" fontSize="16" fontWeight="bold">C1 = {hp.c1 ? `${hp.c1.toFixed(2)} µF` : ''}</text>
+
+            {/* Wire between C1 and node */}
+            <line x1="260" y1="60" x2="380" y2="60" stroke="#ef4444" strokeWidth="4" />
+
+            {/* L1 (Parallel) for 2nd order and 4th order */}
+            {hp.l1 !== null && hp.l1 !== undefined && hp.l1 > 0 ? (
+              <>
+                {/* Parallel Node */}
+                <circle cx="380" cy="60" r="7" fill="#ef4444" />
+                <circle cx="380" cy="180" r="7" fill="currentColor" />
+                <line x1="380" y1="60" x2="380" y2="75" stroke="#ef4444" strokeWidth="4" />
+                
+                {/* Vertical Inductor L1 */}
+                <path d="M 380,75 Q 355,87 380,99 Q 355,111 380,123 Q 355,135 380,147 Q 355,159 380,171" fill="none" stroke="currentColor" strokeWidth="4" />
+                
+                <line x1="380" y1="171" x2="380" y2="180" stroke="currentColor" strokeWidth="4" />
+                <text x="400" y="125" fill="var(--primary)" fontSize="16" fontWeight="bold">L1 = {hp.l1.toFixed(3)} mH</text>
+              </>
+            ) : null}
+
+            {/* Wire to Tweeter */}
+            <line x1="380" y1="60" x2="580" y2="60" stroke="#ef4444" strokeWidth="4" />
+            
+            {/* Tweeter Symbol */}
+            <rect x="580" y="32" width="16" height="56" fill="none" stroke="currentColor" strokeWidth="4" />
+            <polygon points="596,32 626,12 626,108 596,88" fill="none" stroke="currentColor" strokeWidth="4" />
+            {/* Cable de terminal negativo del altavoz Tweeter baja directo por detrás (x=580) a la línea común */}
+            <line x1="580" y1="88" x2="580" y2="180" stroke="currentColor" strokeWidth="4" />
+            <text x="645" y="55" fill="currentColor" fontSize="16" fontWeight="bold">Tweeter</text>
+            <text x="645" y="78" fill="var(--text-muted)" fontSize="13">High Pass (Vías Altas)</text>
+
+            {/* --- LOW PASS (WOOFER) --- */}
+            {/* Divider */}
+            <line x1="20" y1="225" x2="780" y2="225" stroke="var(--card-border)" strokeWidth="2" strokeDasharray="8 8" />
+
+            {/* Input labels */}
+            <text x="30" y="280" fill="#ef4444" fontSize="26" fontWeight="bold">+</text>
+            <text x="30" y="400" fill="currentColor" fontSize="28" fontWeight="bold">-</text>
+
+            {/* Input wires */}
+            <line x1="60" y1="270" x2="140" y2="270" stroke="#ef4444" strokeWidth="4" />
+            <line x1="60" y1="390" x2="580" y2="390" stroke="currentColor" strokeWidth="4" />
+
+            {/* Woofer Components */}
+            {crossoverType === '4th_lr' ? (
+              <>
+                {/* Woofer Series L1 (4th order) */}
+                <path d="M 120,270 Q 132,245 144,270 Q 156,245 168,270 Q 180,245 192,270 Q 204,245 216,270" fill="none" stroke="#ef4444" strokeWidth="4" />
+                <line x1="216" y1="270" x2="250" y2="270" stroke="#ef4444" strokeWidth="4" />
+                <text x="120" y="320" fill="var(--success)" fontSize="15" fontWeight="bold">L1 = {lp.l1 ? `${lp.l1.toFixed(3)} mH` : ''}</text>
+
+                {/* Woofer Parallel C1 (4th order) */}
+                <circle cx="250" cy="270" r="7" fill="#ef4444" />
+                <circle cx="250" cy="390" r="7" fill="currentColor" />
+                <line x1="250" y1="270" x2="250" y2="295" stroke="#ef4444" strokeWidth="4" />
+                <line x1="225" y1="295" x2="275" y2="295" stroke="currentColor" strokeWidth="6" />
+                <line x1="225" y1="307" x2="275" y2="307" stroke="currentColor" strokeWidth="6" />
+                <line x1="250" y1="307" x2="250" y2="390" stroke="currentColor" strokeWidth="4" />
+                <text x="270" y="355" fill="var(--success)" fontSize="15" fontWeight="bold">C1 = {lp.c1 ? `${lp.c1.toFixed(2)} µF` : ''}</text>
+
+                {/* Wire from C1 node to L2 */}
+                <line x1="250" y1="270" x2="330" y2="270" stroke="#ef4444" strokeWidth="4" />
+
+                {/* Woofer Series L2 (4th order) */}
+                <path d="M 330,270 Q 342,245 354,270 Q 366,245 378,270 Q 390,245 402,270 Q 414,245 426,270" fill="none" stroke="#ef4444" strokeWidth="4" />
+                <line x1="426" y1="270" x2="460" y2="270" stroke="#ef4444" strokeWidth="4" />
+                <text x="330" y="320" fill="var(--success)" fontSize="15" fontWeight="bold">L2 = {lp.l2 ? `${lp.l2.toFixed(3)} mH` : ''}</text>
+
+                {/* Woofer Parallel C2 (4th order) */}
+                <circle cx="460" cy="270" r="7" fill="#ef4444" />
+                <circle cx="460" cy="390" r="7" fill="currentColor" />
+                <line x1="460" y1="270" x2="460" y2="295" stroke="#ef4444" strokeWidth="4" />
+                <line x1="435" y1="295" x2="485" y2="295" stroke="currentColor" strokeWidth="6" />
+                <line x1="435" y1="307" x2="485" y2="307" stroke="currentColor" strokeWidth="6" />
+                <line x1="460" y1="307" x2="460" y2="390" stroke="currentColor" strokeWidth="4" />
+                <text x="480" y="355" fill="var(--success)" fontSize="15" fontWeight="bold">C2 = {lp.c2 ? `${lp.c2.toFixed(2)} µF` : ''}</text>
+
+                {/* Wire to Woofer */}
+                <line x1="460" y1="270" x2="580" y2="270" stroke="#ef4444" strokeWidth="4" />
+              </>
+            ) : (
+              <>
+                {/* L1 (Series Inductor - 1st or 2nd order) */}
+                <path d="M 140,270 Q 152,245 164,270 Q 176,245 188,270 Q 200,245 212,270 Q 224,245 236,270" fill="none" stroke="#ef4444" strokeWidth="4" />
+                <line x1="236" y1="270" x2="380" y2="270" stroke="#ef4444" strokeWidth="4" />
+                <text x="140" y="320" fill="var(--success)" fontSize="16" fontWeight="bold">L1 = {lp.l1 ? `${lp.l1.toFixed(3)} mH` : ''}</text>
+
+                {/* C1 (Parallel Capacitor - 2nd order) */}
+                {lp.c1 !== null && lp.c1 !== undefined && lp.c1 > 0 ? (
+                  <>
+                    <circle cx="380" cy="270" r="7" fill="#ef4444" />
+                    <circle cx="380" cy="390" r="7" fill="currentColor" />
+                    <line x1="380" y1="270" x2="380" y2="295" stroke="#ef4444" strokeWidth="4" />
+                    <line x1="355" y1="295" x2="405" y2="295" stroke="currentColor" strokeWidth="6" />
+                    <line x1="355" y1="307" x2="405" y2="307" stroke="currentColor" strokeWidth="6" />
+                    <line x1="380" y1="307" x2="380" y2="390" stroke="currentColor" strokeWidth="4" />
+                    <text x="400" y="315" fill="var(--success)" fontSize="16" fontWeight="bold">C1 = {lp.c1.toFixed(2)} µF</text>
+                  </>
+                ) : null}
+
+                {/* Wire to Woofer */}
+                <line x1="380" y1="270" x2="580" y2="270" stroke="#ef4444" strokeWidth="4" />
+              </>
+            )}
+
+            {/* Woofer Symbol */}
+            <rect x="580" y="235" width="16" height="70" fill="none" stroke="currentColor" strokeWidth="4" />
+            <polygon points="596,235 626,205 626,340 596,310" fill="none" stroke="currentColor" strokeWidth="4" />
+            {/* Cable de terminal negativo del altavoz Woofer baja directo por detrás (x=580) a la línea común */}
+            <line x1="580" y1="305" x2="580" y2="390" stroke="currentColor" strokeWidth="4" />
+            <text x="645" y="265" fill="currentColor" fontSize="16" fontWeight="bold">Woofer</text>
+            <text x="645" y="288" fill="var(--text-muted)" fontSize="13">Low Pass (Vías Bajas)</text>
+          </svg>
+          {renderLegend()}
+        </div>
+      );
+    } else {
+      // 3-way dynamic schematic rendering
+      const hp = xoverResults.hp;
+      const bp = xoverResults.bp as any;
+      const lp = xoverResults.lp;
+
+      return (
+        <div style={{ background: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--card-border)', padding: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '1rem', width: '100%', boxSizing: 'border-box' }}>
+          <span className="control-title" style={{ alignSelf: 'flex-start', fontSize: '1rem', color: 'var(--text-main)', marginBottom: '1.25rem', fontWeight: 600 }}>
+            {t("Esquema de Conexión del Crossover (3 Vías)")}
+          </span>
+          <svg width="100%" height="640" viewBox="0 0 850 640" fill="none" style={{ maxWidth: '100%', color: 'var(--text-main)' }}>
+            {/* --- INPUT COMMONS --- */}
+            {/* Polo Positivo (Rojo) */}
+            <text x="25" y="70" fill="#ef4444" fontSize="26" fontWeight="bold">+</text>
+            <line x1="60" y1="60" x2="110" y2="60" stroke="#ef4444" strokeWidth="4" />
+            
+            {/* Riel distribuidor positivo vertical (Rojo) */}
+            <circle cx="110" cy="60" r="7" fill="#ef4444" />
+            <line x1="110" y1="60" x2="110" y2="480" stroke="#ef4444" strokeWidth="4" />
+            <circle cx="110" cy="270" r="7" fill="#ef4444" />
+            <circle cx="110" cy="480" r="7" fill="#ef4444" />
+            
+            {/* Polo Negativo / Tierra (Negro) */}
+            <text x="25" y="580" fill="currentColor" fontSize="28" fontWeight="bold">-</text>
+            {/* Riel vertical de retorno negativo (Tierra) a la izquierda */}
+            <line x1="80" y1="180" x2="80" y2="570" stroke="currentColor" strokeWidth="4" />
+            <circle cx="80" cy="180" r="7" fill="currentColor" />
+            <circle cx="80" cy="390" r="7" fill="currentColor" />
+            <circle cx="80" cy="570" r="7" fill="currentColor" />
+            <line x1="80" y1="180" x2="580" y2="180" stroke="currentColor" strokeWidth="4" />
+            <line x1="80" y1="390" x2="580" y2="390" stroke="currentColor" strokeWidth="4" />
+            <line x1="60" y1="570" x2="580" y2="570" stroke="currentColor" strokeWidth="4" />
+            <text x="70" y="600" fill="currentColor" fontSize="13" fontWeight="bold">LINEA COMÚN NEGATIVO (TIERRA)</text>
+
+            {/* --- RAIL 1: TWEETER (HIGH PASS) --- */}
+            {/* Entrada Positiva */}
+            <line x1="110" y1="60" x2="160" y2="60" stroke="#ef4444" strokeWidth="4" />
+            
+            {/* Tweeter Series C1 (En la línea roja positiva) */}
+            <line x1="160" y1="60" x2="190" y2="60" stroke="#ef4444" strokeWidth="4" />
+            <line x1="190" y1="30" x2="190" y2="90" stroke="#ef4444" strokeWidth="6" />
+            <line x1="205" y1="30" x2="205" y2="90" stroke="#ef4444" strokeWidth="6" />
+            <line x1="205" y1="60" x2="245" y2="60" stroke="#ef4444" strokeWidth="4" />
+            <text x="140" y="115" fill="var(--primary)" fontSize="15" fontWeight="bold">C1 = {hp.c1 ? `${hp.c1.toFixed(2)} µF` : ''}</text>
+
+            {/* Tweeter Parallel L1 (Derivación a riel negativo horizontal y=180) */}
+            {hp.l1 !== null && hp.l1 !== undefined && hp.l1 > 0 ? (
+              <>
+                <circle cx="310" cy="60" r="7" fill="#ef4444" />
+                <line x1="310" y1="60" x2="310" y2="75" stroke="#ef4444" strokeWidth="4" />
+                <path d="M 310,75 Q 285,87 310,99 Q 285,111 310,123 Q 285,135 310,147 Q 285,159 310,171" fill="none" stroke="currentColor" strokeWidth="4" />
+                {/* Conexión del paralelo hacia el riel negativo de agudos y=180 */}
+                <line x1="310" y1="171" x2="310" y2="180" stroke="currentColor" strokeWidth="4" />
+                <circle cx="310" cy="180" r="7" fill="currentColor" />
+                <text x="330" y="125" fill="var(--primary)" fontSize="15" fontWeight="bold">L1 = {hp.l1.toFixed(3)} mH</text>
+              </>
+            ) : null}
+            <line x1="245" y1="60" x2="580" y2="60" stroke="#ef4444" strokeWidth="4" />
+            
+            {/* Tweeter Symbol */}
+            <rect x="580" y="32" width="16" height="56" fill="none" stroke="currentColor" strokeWidth="4" />
+            <polygon points="596,32 626,12 626,108 596,88" fill="none" stroke="currentColor" strokeWidth="4" />
+            
+            {/* Cable de terminal negativo del altavoz Tweeter baja directo por detrás (x=580) a su riel y=180 */}
+            <line x1="580" y1="88" x2="580" y2="180" stroke="currentColor" strokeWidth="4" />
+            <circle cx="580" cy="180" r="7" fill="currentColor" />
+            <text x="645" y="55" fill="currentColor" fontSize="16" fontWeight="bold">Tweeter</text>
+            <text x="645" y="78" fill="var(--text-muted)" fontSize="13">High Pass (Vías Altas)</text>
+
+
+            {/* --- RAIL 2: MIDRANGE (BANDPASS) --- */}
+            {/* Entrada Positiva */}
+            <line x1="110" y1="270" x2="160" y2="270" stroke="#ef4444" strokeWidth="4" />
+            
+            {/* Midrange Series C (HP section) */}
+            {((bp?.c_hp !== undefined && bp?.c_hp !== null && bp?.c_hp > 0) || (bp?.c1_hp !== undefined && bp?.c1_hp !== null && bp?.c1_hp > 0)) ? (
+              <>
+                <line x1="160" y1="270" x2="185" y2="270" stroke="#ef4444" strokeWidth="4" />
+                <line x1="185" y1="240" x2="185" y2="300" stroke="#ef4444" strokeWidth="6" />
+                <line x1="200" y1="240" x2="200" y2="300" stroke="#ef4444" strokeWidth="6" />
+                <line x1="200" y1="270" x2="235" y2="270" stroke="#ef4444" strokeWidth="4" />
+                <text x="140" y="320" fill="#eab308" fontSize="14" fontWeight="bold">C1 = {((bp?.c_hp || bp?.c1_hp) as number).toFixed(2)} µF</text>
+              </>
+            ) : (
+              <line x1="160" y1="270" x2="235" y2="270" stroke="#ef4444" strokeWidth="4" />
+            )}
+
+            {/* Midrange Series L (LP section) */}
+            {((bp?.l_lp !== undefined && bp?.l_lp !== null && bp?.l_lp > 0) || (bp?.l1_lp !== undefined && bp?.l1_lp !== null && bp?.l1_lp > 0)) ? (
+              <>
+                <path d="M 235,270 Q 247,245 259,270 Q 271,245 283,270 Q 295,245 307,270 Q 319,245 331,270" fill="none" stroke="#ef4444" strokeWidth="4" />
+                <text x="235" y="230" fill="#eab308" fontSize="14" fontWeight="bold">L1 = {((bp?.l_lp || bp?.l1_lp) as number).toFixed(3)} mH</text>
+              </>
+            ) : (
+              <line x1="235" y1="270" x2="331" y2="270" stroke="#ef4444" strokeWidth="4" />
+            )}
+            <line x1="331" y1="270" x2="580" y2="270" stroke="#ef4444" strokeWidth="4" />
+
+            {/* Midrange Shunts (Parallel C/L para Butterworth/LR) */}
+            {bp?.l_hp !== null && bp?.l_hp !== undefined && bp?.l_hp > 0 && (
+              <>
+                <circle cx="380" cy="270" r="7" fill="#ef4444" />
+                
+                {/* L_bp (Parallel Inductor) */}
+                <line x1="380" y1="270" x2="380" y2="285" stroke="#ef4444" strokeWidth="4" />
+                <path d="M 380,285 Q 355,297 380,309 Q 355,321 380,333 Q 355,345 380,350" fill="none" stroke="currentColor" strokeWidth="4" />
+                {/* Conecta a riel negativo de medios y=390 */}
+                <line x1="380" y1="350" x2="380" y2="390" stroke="currentColor" strokeWidth="4" />
+                <circle cx="380" cy="390" r="7" fill="currentColor" />
+                <text x="290" y="365" fill="#eab308" fontSize="14" fontWeight="bold">L2 = {bp.l_hp.toFixed(3)} mH</text>
+              </>
+            )}
+
+            {bp?.c_lp !== null && bp?.c_lp !== undefined && bp?.c_lp > 0 && (
+              <>
+                {/* C_bp (Parallel Capacitor) */}
+                <circle cx="460" cy="270" r="7" fill="#ef4444" />
+                <line x1="460" y1="270" x2="460" y2="285" stroke="#ef4444" strokeWidth="4" />
+                <line x1="435" y1="285" x2="485" y2="285" stroke="currentColor" strokeWidth="6" />
+                <line x1="435" y1="297" x2="485" y2="297" stroke="currentColor" strokeWidth="6" />
+                {/* Conecta a riel negativo de medios y=390 */}
+                <line x1="460" y1="297" x2="460" y2="390" stroke="currentColor" strokeWidth="4" />
+                <circle cx="460" cy="390" r="7" fill="currentColor" />
+                <text x="480" y="320" fill="#eab308" fontSize="14" fontWeight="bold">C2 = {bp.c_lp.toFixed(2)} µF</text>
+              </>
+            )}
+
+            {/* Midrange Symbol */}
+            <rect x="580" y="237" width="16" height="66" fill="none" stroke="currentColor" strokeWidth="4" />
+            <polygon points="596,237 626,215 626,325 596,303" fill="none" stroke="currentColor" strokeWidth="4" />
+            
+            {/* Cable de terminal negativo del altavoz Midrange baja directo por detrás (x=580) a su riel y=390 */}
+            <line x1="580" y1="303" x2="580" y2="390" stroke="currentColor" strokeWidth="4" />
+            <circle cx="580" cy="390" r="7" fill="currentColor" />
+            <text x="645" y="260" fill="currentColor" fontSize="16" fontWeight="bold">Midrange</text>
+            <text x="645" y="283" fill="var(--text-muted)" fontSize="13">Band Pass (Medios)</text>
+
+
+            {/* --- RAIL 3: WOOFER (LOW PASS) --- */}
+            {/* Entrada Positiva */}
+            <line x1="110" y1="480" x2="160" y2="480" stroke="#ef4444" strokeWidth="4" />
+
+            {crossoverType === '4th_lr' ? (
+              <>
+                {/* Woofer Series L1 (4th order) */}
+                <path d="M 160,480 Q 172,455 184,480 Q 196,455 208,480 Q 220,455 232,480 Q 244,455 256,480" fill="none" stroke="#ef4444" strokeWidth="4" />
+                <line x1="256" y1="480" x2="290" y2="480" stroke="#ef4444" strokeWidth="4" />
+                <text x="140" y="440" fill="var(--success)" fontSize="14" fontWeight="bold">L1 = {lp.l1 ? `${lp.l1.toFixed(3)} mH` : ''}</text>
+
+                {/* Woofer Parallel C1 (4th order) */}
+                {lp.c1 !== null && lp.c1 !== undefined && lp.c1 > 0 ? (
+                  <>
+                    <circle cx="290" cy="480" r="7" fill="#ef4444" />
+                    <line x1="290" y1="480" x2="290" y2="495" stroke="#ef4444" strokeWidth="4" />
+                    <line x1="265" y1="495" x2="315" y2="495" stroke="currentColor" strokeWidth="6" />
+                    <line x1="265" y1="507" x2="315" y2="507" stroke="currentColor" strokeWidth="6" />
+                    <line x1="290" y1="507" x2="290" y2="570" stroke="currentColor" strokeWidth="4" />
+                    <circle cx="290" cy="570" r="7" fill="currentColor" />
+                    <text x="272" y="530" textAnchor="end" fill="var(--success)" fontSize="14" fontWeight="bold">C1 = {lp.c1.toFixed(2)} µF</text>
+                  </>
+                ) : null}
+
+                {/* Wire from C1 to L2 */}
+                <line x1="290" y1="480" x2="370" y2="480" stroke="#ef4444" strokeWidth="4" />
+
+                {/* Woofer Series L2 (4th order) */}
+                {lp.l2 !== null && lp.l2 !== undefined && lp.l2 > 0 ? (
+                  <>
+                    <path d="M 370,480 Q 382,455 394,480 Q 406,455 418,480 Q 430,455 442,480 Q 454,455 466,480" fill="none" stroke="#ef4444" strokeWidth="4" />
+                    <line x1="466" y1="480" x2="500" y2="480" stroke="#ef4444" strokeWidth="4" />
+                    <text x="370" y="440" fill="var(--success)" fontSize="14" fontWeight="bold">L2 = {lp.l2.toFixed(3)} mH</text>
+                  </>
+                ) : (
+                  <line x1="290" y1="480" x2="500" y2="480" stroke="#ef4444" strokeWidth="4" />
+                )}
+
+                {/* Woofer Parallel C2 (4th order) */}
+                {lp.c2 !== null && lp.c2 !== undefined && lp.c2 > 0 ? (
+                  <>
+                    <circle cx="500" cy="480" r="7" fill="#ef4444" />
+                    <line x1="500" y1="480" x2="500" y2="495" stroke="#ef4444" strokeWidth="4" />
+                    <line x1="475" y1="495" x2="525" y2="495" stroke="currentColor" strokeWidth="6" />
+                    <line x1="475" y1="507" x2="525" y2="507" stroke="currentColor" strokeWidth="6" />
+                    <line x1="500" y1="507" x2="500" y2="570" stroke="currentColor" strokeWidth="4" />
+                    <circle cx="500" cy="570" r="7" fill="currentColor" />
+                    <text x="482" y="530" textAnchor="end" fill="var(--success)" fontSize="13" fontWeight="bold">C2 = {lp.c2.toFixed(2)} µF</text>
+                  </>
+                ) : null}
+
+                {/* Wire to Woofer */}
+                <line x1="500" y1="480" x2="580" y2="480" stroke="#ef4444" strokeWidth="4" />
+              </>
+            ) : (
+              <>
+                {/* Woofer Series L1 */}
+                <path d="M 160,480 Q 172,455 184,480 Q 196,455 208,480 Q 220,455 232,480 Q 244,455 256,480" fill="none" stroke="#ef4444" strokeWidth="4" />
+                <line x1="256" y1="480" x2="580" y2="480" stroke="#ef4444" strokeWidth="4" />
+                <text x="140" y="440" fill="var(--success)" fontSize="15" fontWeight="bold">L1 = {lp.l1 ? `${lp.l1.toFixed(3)} mH` : ''}</text>
+
+                {/* Woofer Parallel C1 */}
+                {lp.c1 !== null && lp.c1 !== undefined && lp.c1 > 0 ? (
+                  <>
+                    <circle cx="340" cy="480" r="7" fill="#ef4444" />
+                    <line x1="340" y1="480" x2="340" y2="495" stroke="#ef4444" strokeWidth="4" />
+                    <line x1="315" y1="495" x2="365" y2="495" stroke="currentColor" strokeWidth="6" />
+                    <line x1="315" y1="507" x2="365" y2="507" stroke="currentColor" strokeWidth="6" />
+                    {/* Conexión del capacitor a tierra común y=570 */}
+                    <line x1="340" y1="507" x2="340" y2="570" stroke="currentColor" strokeWidth="4" />
+                    <circle cx="340" cy="570" r="7" fill="currentColor" />
+                    <text x="322" y="530" textAnchor="end" fill="var(--success)" fontSize="15" fontWeight="bold">C1 = {lp.c1.toFixed(2)} µF</text>
+                  </>
+                ) : null}
+              </>
+            )}
+
+            {/* Woofer Symbol */}
+            <rect x="580" y="445" width="16" height="70" fill="none" stroke="currentColor" strokeWidth="4" />
+            <polygon points="596,445 626,415 626,550 596,520" fill="none" stroke="currentColor" strokeWidth="4" />
+            
+            {/* Cable de terminal negativo del Woofer baja directo por detrás (x=580) a la línea común y=570 */}
+            <line x1="580" y1="515" x2="580" y2="570" stroke="currentColor" strokeWidth="4" />
+            <circle cx="580" cy="570" r="7" fill="currentColor" />
+            <text x="645" y="470" fill="currentColor" fontSize="16" fontWeight="bold">Woofer</text>
+            <text x="645" y="493" fill="var(--text-muted)" fontSize="13">Low Pass (Vías Bajas)</text>
+          </svg>
+          {renderLegend()}
+        </div>
+      );
+    }
+  };
+
+
+
+  return (
+    <div className="tab-content active" id="tab-crossover" style={{ padding: '1.5rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        
+        {/* PANEL DE CALCULOS Y CONFIGURACIONES */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '1.5rem', alignItems: 'start' }}>
+          
+          {/* PANEL IZQUIERDO: CONFIGURACIÓN FILTROS */}
+          <div className="panel" style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', padding: '1.25rem', borderRadius: '10px' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', borderBottom: '1px solid var(--card-border)', paddingBottom: '0.75rem' }}>
+              <button 
+                className={`preset-select ${crossoverWays === '2way' ? 'active' : ''}`}
+                style={{ flex: 1, padding: '0.4rem 0.8rem', background: crossoverWays === '2way' ? 'var(--primary)' : 'transparent', color: crossoverWays === '2way' ? '#fff' : 'var(--text-main)', border: '1px solid var(--card-border)', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
+                onClick={() => setCrossoverWays('2way')}
+              >
+                {t("2 Vías (Woofer + Tweeter)")}
+              </button>
+              <button 
+                className={`preset-select ${crossoverWays === '3way' ? 'active' : ''}`}
+                style={{ flex: 1, padding: '0.4rem 0.8rem', background: crossoverWays === '3way' ? 'var(--primary)' : 'transparent', color: crossoverWays === '3way' ? '#fff' : 'var(--text-main)', border: '1px solid var(--card-border)', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
+                onClick={() => setCrossoverWays('3way')}
+              >
+                {t("3 Vías (Woofer + Mid + Tweet)")}
+              </button>
+            </div>
+
+            <span className="control-title" style={{ display: 'block', marginBottom: '1rem', color: 'var(--primary)' }}>
+              {crossoverWays === '2way' ? t("Calculadora de Crossover pasivo de 2 Vías") : t("Calculadora de Crossover pasivo de 3 Vías")}
+            </span>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {crossoverWays === '2way' ? (
+                <div className="input-group">
+                  <label>{t("Frecuencia de Cruce (Fc)")}</label>
+                  <div className="input-wrapper">
+                    <input 
+                      type="number" 
+                      value={fc} 
+                      onChange={(e) => setFc(parseFloat(e.target.value) || 0)} 
+                      min="20" 
+                      max="20000"
+                    />
+                    <span className="unit-badge">Hz</span>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="input-group">
+                    <label>{t("Cruce Bajo (Woofer-Mid)")}</label>
+                    <div className="input-wrapper">
+                      <input 
+                        type="number" 
+                        value={fcLow} 
+                        onChange={(e) => setFcLow(parseFloat(e.target.value) || 0)} 
+                        min="20" 
+                        max="5000"
+                      />
+                      <span className="unit-badge">Hz</span>
+                    </div>
+                  </div>
+                  <div className="input-group">
+                    <label>{t("Cruce Alto (Mid-Tweeter)")}</label>
+                    <div className="input-wrapper">
+                      <input 
+                        type="number" 
+                        value={fcHigh} 
+                        onChange={(e) => setFcHigh(parseFloat(e.target.value) || 0)} 
+                        min="200" 
+                        max="20000"
+                      />
+                      <span className="unit-badge">Hz</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: crossoverWays === '2way' ? '1fr 1fr' : '1fr 1fr 1fr', gap: '0.75rem' }}>
+                <div className="input-group">
+                  <label>{t("Imp. Tweeter")}</label>
+                  <div className="input-wrapper">
+                    <input 
+                      type="number" 
+                      value={zTweeter} 
+                      onChange={(e) => setZTweeter(parseFloat(e.target.value) || 0)} 
+                      min="2" 
+                      max="32"
+                    />
+                    <span className="unit-badge">Ω</span>
+                  </div>
+                </div>
+                {crossoverWays === '3way' && (
+                  <div className="input-group">
+                    <label>{t("Imp. Midrange")}</label>
+                    <div className="input-wrapper">
+                      <input 
+                        type="number" 
+                        value={zMidrange} 
+                        onChange={(e) => setZMidrange(parseFloat(e.target.value) || 0)} 
+                        min="2" 
+                        max="32"
+                      />
+                      <span className="unit-badge">Ω</span>
+                    </div>
+                  </div>
+                )}
+                <div className="input-group">
+                  <label>{t("Imp. Woofer")}</label>
+                  <div className="input-wrapper">
+                    <input 
+                      type="number" 
+                      value={zWoofer} 
+                      onChange={(e) => setZWoofer(parseFloat(e.target.value) || 0)} 
+                      min="2" 
+                      max="32"
+                    />
+                    <span className="unit-badge">Ω</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="input-group">
+                <label>{t("Tipo y Pendiente del Filtro")}</label>
+                <select 
+                  value={crossoverType} 
+                  onChange={(e) => setCrossoverType(e.target.value as any)} 
+                  className="input-select"
+                  style={{ width: '100%', height: '38px' }}
+                >
+                  <option value="1st_order">{t("1.º Orden - 6 dB/oct (Sencillo)")}</option>
+                  <option value="2nd_butter">{t("2.º Orden Butterworth - 12 dB/oct")}</option>
+                  <option value="2nd_lr">{t("2.º Orden Linkwitz-Riley - 12 dB/oct")}</option>
+                  <option value="4th_lr">{t("4.º Orden Linkwitz-Riley - 24 dB/oct (Premium)")}</option>
+                </select>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '1rem', lineHeight: '1.4' }}>
+              {t("* Nota: Los filtros de segundo orden (12 dB/oct) generalmente requieren invertir la polaridad del Tweeter (conectar + a -) para evitar cancelaciones en el punto de cruce.")}
+            </p>
+          </div>
+
+          {/* PANEL DERECHO: COMPONENTES RESULTANTES */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            
+            {/* RESULTADO CROSSOVER */}
+            <div className="panel" style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', padding: '1.25rem', borderRadius: '10px' }}>
+              <span className="control-title" style={{ display: 'block', marginBottom: '0.85rem', color: 'var(--success)' }}>
+                {t("Componentes del Filtro")} ({t(crossoverType)})
+              </span>
+
+              {xoverResults ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: crossoverWays === '2way' ? '1fr 1fr' : '1fr 1fr 1fr', gap: '0.75rem' }}>
+                    
+                    {/* TWEETER FILTRO */}
+                    <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '0.85rem', borderRadius: '8px', border: '1px solid var(--card-border)' }}>
+                      <strong style={{ fontSize: '0.85rem', color: 'var(--primary)', display: 'block', marginBottom: '0.5rem' }}>
+                        🔊 {t("Paso Alto (Tweeter)")}
+                      </strong>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.8rem' }}>
+                        {xoverResults.hp.c1 !== null && (
+                          <div>
+                            <span style={{ color: 'var(--text-muted)' }}>C1 ({t("Serie")}):</span>{' '}
+                            <strong style={{ color: 'var(--text-main)' }}>{xoverResults.hp.c1.toFixed(2)} µF</strong>
+                          </div>
+                        )}
+                        {(xoverResults.hp as any).c2 && (
+                          <div>
+                            <span style={{ color: 'var(--text-muted)' }}>C2 ({t("Serie")}):</span>{' '}
+                            <strong style={{ color: 'var(--text-main)' }}>{(xoverResults.hp as any).c2.toFixed(2)} µF</strong>
+                          </div>
+                        )}
+                        {xoverResults.hp.l1 !== null && (
+                          <div>
+                            <span style={{ color: 'var(--text-muted)' }}>L1 ({t("Paralelo")}):</span>{' '}
+                            <strong style={{ color: 'var(--text-main)' }}>{xoverResults.hp.l1.toFixed(3)} mH</strong>
+                          </div>
+                        )}
+                        {(xoverResults.hp as any).l2 && (
+                          <div>
+                            <span style={{ color: 'var(--text-muted)' }}>L2 ({t("Paralelo")}):</span>{' '}
+                            <strong style={{ color: 'var(--text-main)' }}>{(xoverResults.hp as any).l2.toFixed(3)} mH</strong>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* MIDRANGE FILTRO (Condicional para 3 vías) */}
+                    {crossoverWays === '3way' && (xoverResults as any).bp && (
+                      <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '0.85rem', borderRadius: '8px', border: '1px solid var(--card-border)' }}>
+                        <strong style={{ fontSize: '0.85rem', color: '#eab308', display: 'block', marginBottom: '0.5rem' }}>
+                          📣 {t("Banda de Paso (Mid)")}
+                        </strong>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.8rem' }}>
+                          {((xoverResults as any).bp.c_hp !== undefined || (xoverResults as any).bp.c1_hp !== undefined) && (
+                            <div>
+                              <span style={{ color: 'var(--text-muted)' }}>C1 ({t("Serie")}):</span>{' '}
+                              <strong style={{ color: 'var(--text-main)' }}>
+                                {((xoverResults as any).bp.c_hp || (xoverResults as any).bp.c1_hp).toFixed(2)} µF
+                              </strong>
+                            </div>
+                          )}
+                          {((xoverResults as any).bp.l_lp !== undefined || (xoverResults as any).bp.l1_lp !== undefined) && (
+                            <div>
+                              <span style={{ color: 'var(--text-muted)' }}>L1 ({t("Serie")}):</span>{' '}
+                              <strong style={{ color: 'var(--text-main)' }}>
+                                {((xoverResults as any).bp.l_lp || (xoverResults as any).bp.l1_lp).toFixed(3)} mH
+                              </strong>
+                            </div>
+                          )}
+                          {(xoverResults as any).bp.l_hp && (
+                            <div>
+                              <span style={{ color: 'var(--text-muted)' }}>L2 ({t("Paralelo")}):</span>{' '}
+                              <strong style={{ color: 'var(--text-main)' }}>{(xoverResults as any).bp.l_hp.toFixed(3)} mH</strong>
+                            </div>
+                          )}
+                          {(xoverResults as any).bp.c_lp && (
+                            <div>
+                              <span style={{ color: 'var(--text-muted)' }}>C2 ({t("Paralelo")}):</span>{' '}
+                              <strong style={{ color: 'var(--text-main)' }}>{(xoverResults as any).bp.c_lp.toFixed(2)} µF</strong>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* WOOFER FILTRO */}
+                    <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '0.85rem', borderRadius: '8px', border: '1px solid var(--card-border)' }}>
+                      <strong style={{ fontSize: '0.85rem', color: 'var(--ported-color)', display: 'block', marginBottom: '0.5rem' }}>
+                        🔉 {t("Paso Bajo (Woofer)")}
+                      </strong>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.8rem' }}>
+                        {xoverResults.lp.l1 !== null && (
+                          <div>
+                            <span style={{ color: 'var(--text-muted)' }}>L1 ({t("Serie")}):</span>{' '}
+                            <strong style={{ color: 'var(--text-main)' }}>{xoverResults.lp.l1.toFixed(3)} mH</strong>
+                          </div>
+                        )}
+                        {(xoverResults.lp as any).l2 && (
+                          <div>
+                            <span style={{ color: 'var(--text-muted)' }}>L2 ({t("Serie")}):</span>{' '}
+                            <strong style={{ color: 'var(--text-main)' }}>{(xoverResults.lp as any).l2.toFixed(3)} mH</strong>
+                          </div>
+                        )}
+                        {xoverResults.lp.c1 !== null && (
+                          <div>
+                            <span style={{ color: 'var(--text-muted)' }}>C1 ({t("Paralelo")}):</span>{' '}
+                            <strong style={{ color: 'var(--text-main)' }}>{xoverResults.lp.c1.toFixed(2)} µF</strong>
+                          </div>
+                        )}
+                        {(xoverResults.lp as any).c2 && (
+                          <div>
+                            <span style={{ color: 'var(--text-muted)' }}>C2 ({t("Paralelo")}):</span>{' '}
+                            <strong style={{ color: 'var(--text-main)' }}>{(xoverResults.lp as any).c2.toFixed(2)} µF</strong>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              ) : (
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{t("Completa los valores del crossover.")}</p>
+              )}
+            </div>
+
+            {/* RED ZOBEL */}
+            <div className="panel" style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', padding: '1.25rem', borderRadius: '10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
+                <span className="control-title" style={{ color: 'var(--warning)', margin: 0 }}>
+                  ⚡ {t("Red Zobel (Compensación de Impedancia)")}
+                </span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '0.85rem' }}>
+                <div className="input-group">
+                  <label>Re (Resistencia DC)</label>
+                  <div className="input-wrapper">
+                    <input 
+                      type="number" 
+                      value={re} 
+                      onChange={(e) => setRe(parseFloat(e.target.value) || 0)} 
+                      step="any"
+                    />
+                    <span className="unit-badge">Ω</span>
+                  </div>
+                </div>
+                <div className="input-group">
+                  <label>Le (Inductancia Bobina)</label>
+                  <div className="input-wrapper">
+                    <input 
+                      type="number" 
+                      value={le} 
+                      onChange={(e) => setLe(parseFloat(e.target.value) || 0)} 
+                      step="any"
+                    />
+                    <span className="unit-badge">mH</span>
+                  </div>
+                </div>
+              </div>
+
+              {zobelResults ? (
+                <div style={{ background: 'rgba(245, 158, 11, 0.05)', border: '1px solid rgba(245, 158, 11, 0.2)', padding: '0.75rem', borderRadius: '8px', fontSize: '0.8rem', display: 'flex', justifyContent: 'space-around' }}>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)' }}>Resistencia (Rz):</span>{' '}
+                    <strong style={{ color: 'var(--text-main)' }}>{zobelResults.rz.toFixed(2)} Ω</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)' }}>Capacitor (Cz):</span>{' '}
+                    <strong style={{ color: 'var(--text-main)' }}>{zobelResults.cz.toFixed(2)} µF</strong>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            {/* ATENUADOR L-PAD */}
+            <div className="panel" style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', padding: '1.25rem', borderRadius: '10px' }}>
+              <span className="control-title" style={{ display: 'block', marginBottom: '0.85rem', color: '#38bdf8' }}>
+                ⚖️ {t("Atenuador L-Pad (Balance de Tweeter)")}
+              </span>
+              <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginBottom: '0.85rem', lineHeight: '1.3' }}>
+                {t("Compensa la diferencia de sensibilidad (dB) entre el altavoz de agudos y el resto de vías, manteniendo constante la impedancia total vista por el filtro.")}
+              </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '0.85rem' }}>
+                <div className="input-group">
+                  <label>{t("Atenuación Deseada")}</label>
+                  <div className="input-wrapper">
+                    <input 
+                      type="number" 
+                      value={attenuation} 
+                      onChange={(e) => setAttenuation(parseFloat(e.target.value) || 0)} 
+                      min="1" 
+                      max="40"
+                    />
+                    <span className="unit-badge">dB</span>
+                  </div>
+                </div>
+                <div className="input-group">
+                  <label>{t("Impedancia Carga (Speaker)")}</label>
+                  <div className="input-wrapper">
+                    <input 
+                      type="number" 
+                      value={zLoad} 
+                      onChange={(e) => setZLoad(parseFloat(e.target.value) || 0)} 
+                      min="2" 
+                      max="32"
+                    />
+                    <span className="unit-badge">Ω</span>
+                  </div>
+                </div>
+              </div>
+
+              {lpadResults ? (
+                <div style={{ background: 'rgba(56, 189, 248, 0.05)', border: '1px solid rgba(56, 189, 248, 0.2)', padding: '0.75rem', borderRadius: '8px', fontSize: '0.8rem', display: 'flex', justifyContent: 'space-around' }}>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)' }}>R_ser ({t("Serie")}):</span>{' '}
+                    <strong style={{ color: 'var(--text-main)' }}>{lpadResults.r1.toFixed(2)} Ω</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)' }}>R_par ({t("Paralelo")}):</span>{' '}
+                    <strong style={{ color: 'var(--text-main)' }}>{lpadResults.r2.toFixed(2)} Ω</strong>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+          </div>
+
+        </div>
+
+        {/* DIAGRAMA DE ANCHO COMPLETO DEBAJO */}
+        <div style={{ width: '100%' }}>
+          {renderSchematic()}
+        </div>
+
+      </div>
+    </div>
+  );
+};
