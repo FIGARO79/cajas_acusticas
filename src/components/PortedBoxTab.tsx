@@ -17,8 +17,8 @@ interface PortedBoxTabProps {
   setCustomFb: (fb: number) => void;
   customPorted: boolean;
   setCustomPorted: (val: boolean) => void;
-  portCount: number;
-  setPortCount: (count: number) => void;
+  portCount: number | '';
+  setPortCount: (count: number | '') => void;
   portDiameter: number | '';
   setPortDiameter: (diameter: number | '') => void;
   isLinkedToCabinet: boolean;
@@ -60,9 +60,10 @@ export const PortedBoxTab: React.FC<PortedBoxTabProps> = ({
 
   useEffect(() => {
     const pDia = portDiameter || 0;
-    if (portCount > 0 && pDia > 0 && portedData.Vb > 0) {
+    const pCount = typeof portCount === 'number' ? portCount : 0;
+    if (pCount > 0 && pDia > 0 && portedData.Vb > 0) {
       const rPort = pDia / 2;
-      const Lv = ((23562.5 * Math.pow(pDia, 2) * portCount) / (portedData.Fb * portedData.Fb * portedData.Vb)) - (1.46 * rPort);
+      const Lv = ((23562.5 * Math.pow(pDia, 2) * pCount) / (portedData.Fb * portedData.Fb * portedData.Vb)) - (1.46 * rPort);
       
       const displayLv = convertTo(Lv, 'length', unitSystem);
       const unitLabel = getUnitLabel('length', unitSystem);
@@ -76,7 +77,7 @@ export const PortedBoxTab: React.FC<PortedBoxTabProps> = ({
       }
 
       if (params.sd && params.xmax) {
-        const peak = (0.008 * portedData.Fb * params.sd * params.xmax) / (portCount * Math.pow(pDia, 2));
+        const peak = (0.008 * portedData.Fb * params.sd * params.xmax) / (pCount * Math.pow(pDia, 2));
         setVPeak(peak);
       } else {
         setVPeak(null);
@@ -238,13 +239,26 @@ export const PortedBoxTab: React.FC<PortedBoxTabProps> = ({
                 min="1" 
                 max="6" 
                 value={portCount} 
-                onChange={(e) => setPortCount(parseInt(e.target.value) || 1)} 
+                onChange={(e) => {
+                  if (e.target.value === '') {
+                    setPortCount('');
+                    return;
+                  }
+                  const newCount = parseInt(e.target.value);
+                  if (!isNaN(newCount)) {
+                    if (newCount > 0 && typeof portCount === 'number' && portCount > 0 && portDiameter && portDiameter > 0) {
+                      const ratio = Math.sqrt(portCount / newCount);
+                      setPortDiameter(portDiameter * ratio);
+                    }
+                    setPortCount(newCount);
+                  }
+                }} 
               />
               <span className="unit-badge">u.</span>
             </div>
           </div>
           <div className="input-group">
-            <label>{t("Diámetro del Puerto")}</label>
+            <label>{t("Diámetro del Puerto (Interno)")}</label>
             <div className="input-wrapper">
               <input 
                 type="number" 
@@ -333,7 +347,7 @@ export const PortedBoxTab: React.FC<PortedBoxTabProps> = ({
       {/* Estado de Velocidad del Puerto */}
       <div className={portVelocityAlert.className} style={{ marginBottom: '1rem' }} dangerouslySetInnerHTML={{ __html: portVelocityAlert.html }} />
 
-      <div className="alert-box info" style={{ background: 'rgba(52, 211, 153, 0.05)', borderColor: 'rgba(52, 211, 153, 0.15)', color: '#d1fae5' }}>
+      <div className="alert-box success" style={{ marginTop: '1rem' }}>
         <span>{t("Las cajas ventiladas aprovechan la onda trasera mediante el puerto para extender la respuesta y ganar eficiencia en graves extremos.")}</span>
       </div>
     </div>

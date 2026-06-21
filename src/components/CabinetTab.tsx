@@ -48,7 +48,7 @@ interface CabinetTabProps {
   woodExtra: number | '';
   setWoodExtra: (v: number | '') => void;
   // Port specs
-  portCount: number;
+  portCount: number | '';
   portDiameter: number | '';
   dampingFactor: number;
 }
@@ -334,15 +334,16 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
 
   useEffect(() => {
     const pDia = portDiameter || 0;
-    if (woodSource === 'ported' && portedData.valid && portCount > 0 && pDia > 0 && cabinetData?.valid) {
+    const pCount = typeof portCount === 'number' ? portCount : 0;
+    if (woodSource === 'ported' && portedData.valid && pCount > 0 && pDia > 0 && cabinetData?.valid) {
       const rPort = pDia / 2;
-      const Lv = ((23562.5 * Math.pow(pDia, 2) * portCount) / (portedData.Fb * portedData.Fb * cabinetData.vNeto)) - (1.46 * rPort);
+      const Lv = ((23562.5 * Math.pow(pDia, 2) * pCount) / (portedData.Fb * portedData.Fb * cabinetData.vNeto)) - (1.46 * rPort);
       
       const displayPDia = convertTo(pDia, 'length', unitSystem);
       const displayLv = convertTo(Lv, 'length', unitSystem);
       const uLabel = getUnitLabel('length', unitSystem);
 
-      const qtySize = `${portCount}x ${t("Puerto(s) de")} ${displayPDia.toFixed(2)} ${uLabel} (${t("Diámetro")})`;
+      const qtySize = `${pCount}x ${t("Puerto(s) de")} ${displayPDia.toFixed(2)} ${uLabel} (${t("Diámetro")})`;
       let length = 'N/A';
       if (Lv <= 0) {
         length = t("Excesivamente corto");
@@ -354,7 +355,7 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
 
       let velocity = 'N/A';
       if (params.sd && params.xmax) {
-        const vPeak = (0.008 * portedData.Fb * params.sd * params.xmax) / (portCount * Math.pow(pDia, 2));
+        const vPeak = (0.008 * portedData.Fb * params.sd * params.xmax) / (pCount * Math.pow(pDia, 2));
         let color = "var(--success)";
         let label = "Baja (Silencioso)";
         if (vPeak >= 10.0 && vPeak <= 17.0) {

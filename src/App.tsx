@@ -49,7 +49,7 @@ function App() {
   const [customPorted, setCustomPorted] = useState<boolean>(false);
 
   // Ports configuration
-  const [portCount, setPortCount] = useState<number>(1);
+  const [portCount, setPortCount] = useState<number | ''>(1);
   const [portDiameter, setPortDiameter] = useState<number | ''>(7.5);
 
   // Woodworking parameters
