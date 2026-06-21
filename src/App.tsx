@@ -51,6 +51,10 @@ function App() {
   // Ports configuration
   const [portCount, setPortCount] = useState<number | ''>(1);
   const [portDiameter, setPortDiameter] = useState<number | ''>(7.5);
+  const [portShape, setPortShape] = useState<'round' | 'rectangular' | 'custom'>('round');
+  const [portWidth, setPortWidth] = useState<number | ''>(10);
+  const [portHeight, setPortHeight] = useState<number | ''>(5);
+  const [portArea, setPortArea] = useState<number | ''>(50);
 
   // Woodworking parameters
   const [woodMode, setWoodMode] = useState<'calc' | 'input'>('calc');
@@ -435,6 +439,12 @@ function App() {
                 setPortCount={setPortCount}
                 portDiameter={portDiameter}
                 setPortDiameter={setPortDiameter}
+                portShape={portShape}
+                setPortShape={setPortShape}
+                portWidth={portWidth}
+                setPortWidth={setPortWidth}
+                portHeight={portHeight}
+                setPortHeight={setPortHeight}
                 isLinkedToCabinet={woodMode === 'input' && manualNetVol > 0}
               />
             )}
@@ -482,6 +492,9 @@ function App() {
                 setWoodExtra={setWoodExtra}
                 portCount={portCount}
                 portDiameter={portDiameter}
+                portShape={portShape}
+                portWidth={portWidth}
+                portHeight={portHeight}
                 dampingFactor={dampingFactor}
               />
             )}

@@ -50,6 +50,10 @@ interface CabinetTabProps {
   // Port specs
   portCount: number | '';
   portDiameter: number | '';
+  portShape: 'round' | 'rectangular' | 'custom';
+  portWidth: number | '';
+  portHeight: number | '';
+  portArea: number | '';
   dampingFactor: number;
 }
 
@@ -95,6 +99,10 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
   setWoodExtra,
   portCount,
   portDiameter,
+  portShape,
+  portWidth,
+  portHeight,
+  portArea,
   dampingFactor
 }) => {
   const t = (text: string) => translate(text, lang);
@@ -333,48 +341,68 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
   const [portInfo, setPortInfo] = useState<{ qtySize: string, length: string, velocity: string } | null>(null);
 
   useEffect(() => {
-    const pDia = portDiameter || 0;
     const pCount = typeof portCount === 'number' ? portCount : 0;
-    if (woodSource === 'ported' && portedData.valid && pCount > 0 && pDia > 0 && cabinetData?.valid) {
-      const rPort = pDia / 2;
-      const Lv = ((23562.5 * Math.pow(pDia, 2) * pCount) / (portedData.Fb * portedData.Fb * cabinetData.vNeto)) - (1.46 * rPort);
-      
-      const displayPDia = convertTo(pDia, 'length', unitSystem);
-      const displayLv = convertTo(Lv, 'length', unitSystem);
+    if (woodSource === 'ported' && portedData.valid && pCount > 0 && cabinetData?.valid) {
+      let pDia = 0;
+      let areaLabel = '';
       const uLabel = getUnitLabel('length', unitSystem);
 
-      const qtySize = `${pCount}x ${t("Puerto(s) de")} ${displayPDia.toFixed(2)} ${uLabel} (${t("Diámetro")})`;
-      let length = 'N/A';
-      if (Lv <= 0) {
-        length = t("Excesivamente corto");
-      } else if (Lv > 120) {
-        length = `${displayLv.toFixed(1)} ${uLabel} (${t("Excede profundidad")})`;
+      if (portShape === 'round') {
+        pDia = portDiameter || 0;
+        const displayPDia = convertTo(pDia, 'length', unitSystem);
+        areaLabel = `${displayPDia.toFixed(2)} ${uLabel} (${t("Diámetro")})`;
       } else {
-        length = `${displayLv.toFixed(1)} ${uLabel}`;
+        const w = portWidth || 0;
+        const h = portHeight || 0;
+        const singleArea = w * h;
+        pDia = 2 * Math.sqrt(singleArea / Math.PI); // Diámetro equivalente
+        
+        const displayW = convertTo(w, 'length', unitSystem);
+        const displayH = convertTo(h, 'length', unitSystem);
+        areaLabel = `${displayW.toFixed(1)}x${displayH.toFixed(1)} ${uLabel} (${t("Rectangular")})`;
       }
 
-      let velocity = 'N/A';
-      if (params.sd && params.xmax) {
-        const vPeak = (0.008 * portedData.Fb * params.sd * params.xmax) / (pCount * Math.pow(pDia, 2));
-        let color = "var(--success)";
-        let label = "Baja (Silencioso)";
-        if (vPeak >= 10.0 && vPeak <= 17.0) {
-          color = "var(--warning)";
-          label = "Moderada (Ok con bordes redondeados)";
-        } else if (vPeak > 17.0) {
-          color = "var(--danger)";
-          label = "Crítica (Genera soplidos/turbulencia)";
+      if (pDia > 0) {
+        const rPort = pDia / 2;
+        const Lv = ((23562.5 * Math.pow(pDia, 2) * pCount) / (portedData.Fb * portedData.Fb * cabinetData.vNeto)) - (1.46 * rPort);
+        
+        const displayLv = convertTo(Lv, 'length', unitSystem);
+
+        const qtySize = `${pCount}x ${t("Puerto(s) de")} ${areaLabel}`;
+        let length = 'N/A';
+        if (Lv <= 0) {
+          length = t("Excesivamente corto");
+        } else if (Lv > 120) {
+          length = `${displayLv.toFixed(1)} ${uLabel} (${t("Excede profundidad")})`;
+        } else {
+          length = `${displayLv.toFixed(1)} ${uLabel}`;
         }
-        velocity = `<span style="color:${color}; font-weight:500;">${vPeak.toFixed(1)} m/s - ${t(label)}</span>`;
-      } else {
-        velocity = t("Sd y Xmax requeridos");
-      }
 
-      setPortInfo({ qtySize, length, velocity });
+        let velocity = 'N/A';
+        if (params.sd && params.xmax) {
+          const vPeak = (0.008 * portedData.Fb * params.sd * params.xmax) / (pCount * Math.pow(pDia, 2));
+          let color = "var(--success)";
+          let label = "Baja (Silencioso)";
+          if (vPeak >= 10.0 && vPeak <= 17.0) {
+            color = "var(--warning)";
+            label = "Moderada (Ok con bordes redondeados)";
+          } else if (vPeak > 17.0) {
+            color = "var(--danger)";
+            label = "Crítica (Genera soplidos/turbulencia)";
+          }
+          velocity = `<span style="color:${color}; font-weight:500;">${vPeak.toFixed(1)} m/s - ${t(label)}</span>`;
+        } else {
+          velocity = t("Sd y Xmax requeridos");
+        }
+
+        setPortInfo({ qtySize, length, velocity });
+      } else {
+        setPortInfo(null);
+      }
     } else {
       setPortInfo(null);
     }
-  }, [woodSource, portedData, portCount, portDiameter, cabinetData, params, lang, unitSystem]);
+  }, [woodSource, portedData, portCount, portDiameter, portShape, portWidth, portHeight, cabinetData, params, lang, unitSystem]);
 
   const handleApplySuggestedCabinet = () => {
     let netVol = 0;
