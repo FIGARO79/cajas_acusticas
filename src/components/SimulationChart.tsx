@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -12,7 +12,7 @@ import {
 } from 'chart.js';
 import type { CalculatedSealed, CalculatedPorted, SpeakerParams } from '../types';
 import { type Lang, translate } from '../utils/translations';
-import { getSealedCurve, getPortedCurve } from '../utils/acousticMath';
+import { calcSealedCurve, calcPortedCurve } from '../wasm/index';
 
 ChartJS.register(
   LinearScale,
@@ -51,8 +51,35 @@ export const SimulationChart: React.FC<SimulationChartProps> = ({
     return freqs;
   })();
 
-  const sealedPoints = sealedData ? getSealedCurve(sealedData, params).map((y, idx) => ({ x: frequencies[idx], y: Math.max(-35, y) })) : [];
-  const portedPoints = portedData ? getPortedCurve(portedData, params).map((y, idx) => ({ x: frequencies[idx], y: Math.max(-35, y) })) : [];
+  // State for curve points
+  const [sealedPoints, setSealedPoints] = useState<{x:number,y:number}[]>([]);
+  const [portedPoints, setPortedPoints] = useState<{x:number,y:number}[]>([]);
+
+  // Recalculate curves when data or params change
+  useEffect(() => {
+    let cancelled = false;
+    if (sealedData) {
+      calcSealedCurve(sealedData, params).then(vals => {
+        if (!cancelled) {
+          const pts = vals.map((y:number, idx:number) => ({ x: frequencies[idx], y: Math.max(-35, y) }));
+          setSealedPoints(pts);
+        }
+      });
+    } else {
+      setSealedPoints([]);
+    }
+    if (portedData) {
+      calcPortedCurve(portedData, params).then(vals => {
+        if (!cancelled) {
+          const pts = vals.map((y:number, idx:number) => ({ x: frequencies[idx], y: Math.max(-35, y) }));
+          setPortedPoints(pts);
+        }
+      });
+    } else {
+      setPortedPoints([]);
+    }
+    return () => { cancelled = true; };
+  }, [sealedData, portedData, params]);
 
   // Encontrar el valor máximo de ganancia para evitar desbordes en el eje Y
   const allYValues = [...sealedPoints.map(p => p.y), ...portedPoints.map(p => p.y)];

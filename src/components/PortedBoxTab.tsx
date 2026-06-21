@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { type Lang, translate } from '../utils/translations';
 import type { CalculatedPorted, SpeakerParams } from '../types';
-import { suggestPortConfig, calculateSuggestedPorted } from '../utils/acousticMath';
+import { suggestPortConfig } from '../utils/acousticMath';
+import { calcSuggestedPorted } from '../wasm/index';
 
 interface PortedBoxTabProps {
   lang: Lang;
@@ -182,8 +183,8 @@ export const PortedBoxTab: React.FC<PortedBoxTabProps> = ({
                 <span className="slider-name">{t("Frecuencia de Sintonía (Fb)")}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <button
-                    onClick={() => {
-                      const sug = calculateSuggestedPorted(params);
+                    onClick={async () => {
+                      const sug = await calcSuggestedPorted(params.qts, params.fs, params.vas);
                       if (sug && sug.Fb) {
                         setCustomFb(Math.round(sug.Fb * 10) / 10);
                       }

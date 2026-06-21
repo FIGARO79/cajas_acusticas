@@ -7,7 +7,8 @@ import { PortedBoxTab } from './components/PortedBoxTab';
 import { CabinetTab } from './components/CabinetTab';
 import { type Lang, translate } from './utils/translations';
 import type { SpeakerParams, CalculatedSealed, CalculatedPorted } from './types';
-import { estimateF3, calculateSuggestedPorted } from './utils/acousticMath';
+import { estimateF3 } from './utils/acousticMath';
+import { getWasm } from './wasm/index.ts';
 
 function App() {
   // Theme & Language
@@ -193,45 +194,41 @@ function App() {
       return { valid: false, Vb: 0, Fc: 0, Qtc: targetQtc, F3: 0 };
     }
 
-    let sealedVb = 0;
-    let sealedFc = 0;
-    let sealedQtc = targetQtc;
-    let sealedF3 = 0;
+    const wasm = getWasm();
 
     if (woodMode === 'input' && manualNetVol > 0) {
-      sealedVb = manualNetVol * dampingFactor;
-      const alpha = adjParams.vas / sealedVb;
-      sealedQtc = adjParams.qts * Math.sqrt(alpha + 1);
-      sealedFc = adjParams.fs * Math.sqrt(alpha + 1);
-    } else {
-      if (adjParams.qts >= targetQtc) {
-        sealedVb = 0;
-        sealedFc = 0;
-        sealedQtc = targetQtc;
-      } else {
-        const alpha = Math.pow(targetQtc / adjParams.qts, 2) - 1;
-        sealedVb = adjParams.vas / alpha;
-        sealedFc = (targetQtc / adjParams.qts) * adjParams.fs;
-        sealedQtc = targetQtc;
-      }
-    }
-
-    if (sealedFc > 0 && sealedQtc > 0 && sealedVb > 0) {
-      const term1 = (1 / (sealedQtc * sealedQtc)) - 2;
-      const term2 = Math.sqrt(term1 * term1 + 4);
-      const factor = Math.pow((term1 + term2) / 2, 0.5);
-      sealedF3 = sealedFc * factor;
-
+      let sealedVb = manualNetVol * dampingFactor;
+      let alpha = adjParams.vas / sealedVb;
+      let sealedQtc = adjParams.qts * Math.sqrt(alpha + 1);
+      
+      // We calculate Fc and F3 correctly using Wasm by passing the resulting vb
+      const result = wasm.calc_caja_sellada(adjParams.fs, adjParams.vas, adjParams.qts, sealedVb, targetQtc);
       return {
         valid: true,
         Vb: sealedVb,
-        Fc: sealedFc,
+        Fc: result.fc,
         Qtc: sealedQtc,
-        F3: sealedF3
+        F3: result.f3
+      };
+    } else {
+      if (adjParams.qts >= targetQtc) {
+        return { valid: false, Vb: 0, Fc: 0, Qtc: targetQtc, F3: 0 };
+      }
+      
+      // To get optimal vb from Qtc, we can pass a dummy vb_target and read vb_optimo
+      const tempResult = wasm.calc_caja_sellada(adjParams.fs, adjParams.vas, adjParams.qts, 10.0, targetQtc);
+      let optimalVb = tempResult.vb_optimo;
+      
+      const result = wasm.calc_caja_sellada(adjParams.fs, adjParams.vas, adjParams.qts, optimalVb, targetQtc);
+
+      return {
+        valid: true,
+        Vb: optimalVb,
+        Fc: result.fc,
+        Qtc: result.qtc,
+        F3: result.f3
       };
     }
-
-    return { valid: false, Vb: 0, Fc: 0, Qtc: targetQtc, F3: 0 };
   };
 
   const sealedData = calculateSealed();
@@ -247,6 +244,8 @@ function App() {
     let F3Ported = 0;
     let alignmentActive = '';
 
+    const wasm = getWasm();
+
     if (woodMode === 'input' && manualNetVol > 0) {
       VbPorted = manualNetVol * dampingFactor;
       FbPorted = customFb;
@@ -259,11 +258,11 @@ function App() {
         F3Ported = estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas);
         alignmentActive = 'Manual';
       } else {
-        const sug = calculateSuggestedPorted(adjParams);
-        VbPorted = sug.Vb;
-        FbPorted = sug.Fb;
-        F3Ported = sug.F3;
-        alignmentActive = sug.alignmentName;
+        const result = wasm.calc_alineacion_ventilada(adjParams.fs, adjParams.vas, adjParams.qts, "QB3");
+        VbPorted = result.vb;
+        FbPorted = result.fb;
+        F3Ported = result.f3;
+        alignmentActive = 'Óptima (QB3 Wasm)';
       }
     }
 

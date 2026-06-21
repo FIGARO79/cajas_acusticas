@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { SpeakerParams } from '../types';
 import { type Lang, translate } from '../utils/translations';
-import { runProCalculations } from '../utils/acousticMath';
+import { calcAutoParams } from '../wasm/index.ts';
 import { PRESETS } from '../utils/presets';
 
 interface SpeakerParamsFormProps {
@@ -38,15 +38,18 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
   };
 
   // Derived calculations
-  const [derived, setDerived] = useState<ReturnType<typeof runProCalculations> | null>(null);
+  const [derived, setDerived] = useState<Awaited<ReturnType<typeof calcAutoParams>> | null>(null);
 
   useEffect(() => {
-    if (params.fs && params.vas && params.qts) {
-      const results = runProCalculations(params);
-      setDerived(results);
-    } else {
-      setDerived(null);
-    }
+    const fetchDerived = async () => {
+      if (params.fs && params.vas && params.qts) {
+        const results = await calcAutoParams(params);
+        setDerived(results);
+      } else {
+        setDerived(null);
+      }
+    };
+    fetchDerived();
   }, [params]);
 
   const handleInputChange = (field: keyof SpeakerParams, val: string) => {
