@@ -1,0 +1,546 @@
+import { useState, useEffect } from 'react';
+import { Header } from './components/Header';
+import { SpeakerParamsForm } from './components/SpeakerParamsForm';
+import { SimulationChart } from './components/SimulationChart';
+import { SealedBoxTab } from './components/SealedBoxTab';
+import { PortedBoxTab } from './components/PortedBoxTab';
+import { CabinetTab } from './components/CabinetTab';
+import { type Lang, translate } from './utils/translations';
+import type { SpeakerParams, CalculatedSealed, CalculatedPorted } from './types';
+import { estimateF3, calculateSuggestedPorted } from './utils/acousticMath';
+
+function App() {
+  // Theme & Language
+  const [lang, setLang] = useState<Lang>(() => (localStorage.getItem('lang') as Lang) || 'es');
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => (localStorage.getItem('theme') as 'dark' | 'light') || 'dark');
+  const [activeTab, setActiveTab] = useState<'sealed' | 'ported' | 'wood' | 'damping'>('sealed');
+
+  // Preset
+  const [preset, setPreset] = useState<string>('hifi8');
+
+  // Speaker parameters
+  const [params, setParams] = useState<SpeakerParams>({
+    fs: 38,
+    vas: 45,
+    qms: 3.8,
+    qes: 0.40,
+    qts: 0.36,
+    sd: 215,
+    xmax: 5.5,
+    re: 5.8,
+    le: 0.6,
+    bl: 8.5,
+    mms: 28,
+    cms: 0.62,
+    pe: 80,
+    xlim: 10
+  });
+
+  const [driverConfig, setDriverConfig] = useState<string>('single');
+
+  // Sliders and tuning overrides
+  const [targetQtc, setTargetQtc] = useState<number>(0.707);
+  const [customVb, setCustomVb] = useState<number>(45);
+  const [customFb, setCustomFb] = useState<number>(38);
+  const [customPorted, setCustomPorted] = useState<boolean>(false);
+
+  // Ports configuration
+  const [portCount, setPortCount] = useState<number>(1);
+  const [portDiameter, setPortDiameter] = useState<number | ''>(7.5);
+
+  // Woodworking parameters
+  const [woodMode, setWoodMode] = useState<'calc' | 'input'>('calc');
+  const [woodShape, setWoodShape] = useState<'rectangular' | 'trapezoidal'>('rectangular');
+  const [woodConstraint, setWoodConstraint] = useState<string>('none');
+  const [woodSource, setWoodSource] = useState<'sealed' | 'ported'>('ported');
+  const [woodRatio, setWoodRatio] = useState<'golden' | 'classic' | 'cube'>('golden');
+  const [dampingType, setDampingType] = useState<'none' | 'light' | 'moderate' | 'heavy'>('none');
+
+  const getDampingFactor = () => {
+    switch (dampingType) {
+      case 'light': return 1.05;
+      case 'moderate': return 1.12;
+      case 'heavy': return 1.20;
+      default: return 1.00;
+    }
+  };
+  const dampingFactor = getDampingFactor();
+
+  // Lock sizes for Auto Wood
+  const [woodLockVal1, setWoodLockVal1] = useState<number | ''>(40);
+  const [woodLockVal2, setWoodLockVal2] = useState<number | ''>(30);
+  const [woodLockVal3, setWoodLockVal3] = useState<number | ''>(20);
+
+  // Manual dimensions
+  const [woodExtHeight, setWoodExtHeight] = useState<number | ''>(42);
+  const [woodExtWidth, setWoodExtWidth] = useState<number | ''>(32);
+  const [woodExtDepth, setWoodExtDepth] = useState<number | ''>(28);
+
+  const [woodTrapExtHeight, setWoodTrapExtHeight] = useState<number | ''>(40);
+  const [woodTrapExtWidth, setWoodTrapExtWidth] = useState<number | ''>(45);
+  const [woodTrapExtDepthTop, setWoodTrapExtDepthTop] = useState<number | ''>(18);
+  const [woodTrapExtDepthBot, setWoodTrapExtDepthBot] = useState<number | ''>(32);
+
+  const [woodThickness, setWoodThickness] = useState<number | ''>(15);
+  const [woodExtra, setWoodExtra] = useState<number | ''>(3.5);
+
+  // Validation
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  // Sync theme to document element
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  // Sync lang to document element and storage
+  useEffect(() => {
+    document.documentElement.lang = lang;
+    localStorage.setItem('lang', lang);
+  }, [lang]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  };
+
+  const handlePresetChange = (presetId: string, newParams: SpeakerParams | null) => {
+    setPreset(presetId);
+    if (newParams) {
+      setParams(newParams);
+      // Automatically toggle pro parameters if specifications exist
+      if (newParams.diaNominal) {
+        // Preset contains nominal specs, could enable pro calculations UI
+      }
+    } else {
+      setParams({
+        fs: 0,
+        vas: 0,
+        qms: 0,
+        qes: 0,
+        qts: 0,
+        sd: 0,
+        xmax: 0,
+        re: 0,
+        le: 0
+      });
+    }
+  };
+
+  // Adjust parameters based on driver configuration (Parallel/Series/Isobaric)
+  const getAdjustedParams = (): SpeakerParams => {
+    const adj = { ...params };
+    if (!adj.fs || !adj.vas || !adj.qts) return adj;
+
+    if (driverConfig === 'parallel_2') {
+      adj.vas = params.vas * 2;
+    } else if (driverConfig === 'series_2') {
+      adj.vas = params.vas * 2;
+    } else if (driverConfig === 'isobaric') {
+      adj.vas = params.vas * 0.5;
+    }
+    return adj;
+  };
+
+  const adjParams = getAdjustedParams();
+
+  // Validate parameters
+  useEffect(() => {
+    const t = (text: string) => translate(text, lang);
+    if (!params.fs || !params.vas || !params.qts) {
+      setValidationError(t("Completa los parámetros mínimos del altavoz (Fs, Vas, Qts)."));
+    } else {
+      setValidationError(null);
+    }
+  }, [params, lang]);
+
+  // EBP Calculation
+  const ebpValue = params.qes ? (params.fs / params.qes) : null;
+
+  // Manual wood volume calculation (needed for link overrides)
+  // Manual wood volume calculation (needed for link overrides)
+  const getManualWoodNetVolume = () => {
+    const thickness = (woodThickness || 0) / 10;
+    const extra = woodExtra || 0;
+    if (woodShape === 'rectangular') {
+      const hExt = woodExtHeight || 0;
+      const wExt = woodExtWidth || 0;
+      const dExt = woodExtDepth || 0;
+      const hInt = hExt - (2 * thickness);
+      const wInt = wExt - (2 * thickness);
+      const dInt = dExt - (2 * thickness);
+      if (hInt <= 0 || wInt <= 0 || dInt <= 0) return 0;
+      return Math.max(0, ((hInt * wInt * dInt) / 1000) - extra);
+    } else {
+      const hExt = woodTrapExtHeight || 0;
+      const wExt = woodTrapExtWidth || 0;
+      const d1Ext = woodTrapExtDepthTop || 0;
+      const d2Ext = woodTrapExtDepthBot || 0;
+      const hInt = hExt - (2 * thickness);
+      const wInt = wExt - (2 * thickness);
+      const d1Int = Math.max(0, d1Ext - (2 * thickness));
+      const d2Int = Math.max(0, d2Ext - (2 * thickness));
+      if (hInt <= 0 || wInt <= 0 || d1Int <= 0 || d2Int <= 0) return 0;
+      const dAvgInt = (d1Int + d2Int) / 2;
+      return Math.max(0, ((hInt * wInt * dAvgInt) / 1000) - extra);
+    }
+  };
+
+  const manualNetVol = getManualWoodNetVolume();
+
+  // --- CALCULAR CAJA SELLADA ---
+  const calculateSealed = (): CalculatedSealed => {
+    if (validationError || !adjParams.fs || !adjParams.vas || !adjParams.qts) {
+      return { valid: false, Vb: 0, Fc: 0, Qtc: targetQtc, F3: 0 };
+    }
+
+    let sealedVb = 0;
+    let sealedFc = 0;
+    let sealedQtc = targetQtc;
+    let sealedF3 = 0;
+
+    if (woodMode === 'input' && manualNetVol > 0) {
+      sealedVb = manualNetVol * dampingFactor;
+      const alpha = adjParams.vas / sealedVb;
+      sealedQtc = adjParams.qts * Math.sqrt(alpha + 1);
+      sealedFc = adjParams.fs * Math.sqrt(alpha + 1);
+    } else {
+      if (adjParams.qts >= targetQtc) {
+        sealedVb = 0;
+        sealedFc = 0;
+        sealedQtc = targetQtc;
+      } else {
+        const alpha = Math.pow(targetQtc / adjParams.qts, 2) - 1;
+        sealedVb = adjParams.vas / alpha;
+        sealedFc = (targetQtc / adjParams.qts) * adjParams.fs;
+        sealedQtc = targetQtc;
+      }
+    }
+
+    if (sealedFc > 0 && sealedQtc > 0 && sealedVb > 0) {
+      const term1 = (1 / (sealedQtc * sealedQtc)) - 2;
+      const term2 = Math.sqrt(term1 * term1 + 4);
+      const factor = Math.pow((term1 + term2) / 2, 0.5);
+      sealedF3 = sealedFc * factor;
+
+      return {
+        valid: true,
+        Vb: sealedVb,
+        Fc: sealedFc,
+        Qtc: sealedQtc,
+        F3: sealedF3
+      };
+    }
+
+    return { valid: false, Vb: 0, Fc: 0, Qtc: targetQtc, F3: 0 };
+  };
+
+  const sealedData = calculateSealed();
+
+  // --- CALCULAR CAJA VENTILADA ---
+  const calculatePorted = (): CalculatedPorted => {
+    if (validationError || !adjParams.fs || !adjParams.vas || !adjParams.qts) {
+      return { valid: false, Vb: 0, Fb: 0, F3: 0, Fs: adjParams.fs || 0, Qts: adjParams.qts || 0, Vas: adjParams.vas || 0, alignment: '' };
+    }
+
+    let VbPorted = 0;
+    let FbPorted = 0;
+    let F3Ported = 0;
+    let alignmentActive = '';
+
+    if (woodMode === 'input' && manualNetVol > 0) {
+      VbPorted = manualNetVol * dampingFactor;
+      FbPorted = customFb;
+      F3Ported = estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas);
+      alignmentActive = 'Manual';
+    } else {
+      if (customPorted) {
+        VbPorted = customVb;
+        FbPorted = customFb;
+        F3Ported = estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas);
+        alignmentActive = 'Manual';
+      } else {
+        const sug = calculateSuggestedPorted(adjParams);
+        VbPorted = sug.Vb;
+        FbPorted = sug.Fb;
+        F3Ported = sug.F3;
+        alignmentActive = sug.alignmentName;
+      }
+    }
+
+    return {
+      valid: true,
+      Vb: VbPorted,
+      Fb: FbPorted,
+      F3: F3Ported,
+      Fs: adjParams.fs,
+      Qts: adjParams.qts,
+      Vas: adjParams.vas,
+      alignment: alignmentActive
+    };
+  };
+
+  const portedData = calculatePorted();
+
+  // Auto update slider values when preset changes
+  useEffect(() => {
+    if (!customPorted && portedData.valid) {
+      setCustomVb(Math.round(portedData.Vb * 10) / 10);
+      setCustomFb(Math.round(portedData.Fb * 10) / 10);
+    }
+  }, [preset, customPorted, portedData.valid]);
+
+  const t = (text: string) => translate(text, lang);
+
+  // Suggest EBP alignment recommendation
+  const getEbpRecommendation = () => {
+    if (ebpValue === null) return t("Qes requerido para EBP");
+    if (ebpValue < 50) {
+      return `${t("Sugerido: Sellada")} - ${t("Bobina bien amortiguada. Sugerencia: Caja Sellada (Sealed).")}`;
+    } else if (ebpValue > 90) {
+      return `${t("Sugerido: Ventilada")} - ${t("Alto control electromecánico. Sugerencia: Caja Ventilada (Ported).")}`;
+    } else {
+      return `${t("Multiuso")} - ${t("Rango medio. Sugerencia: Apta para caja sellada o ventilada.")}`;
+    }
+  };
+
+  return (
+    <div className="container">
+      <Header 
+        lang={lang} 
+        setLang={setLang} 
+        theme={theme} 
+        toggleTheme={toggleTheme} 
+      />
+
+      <div className="dashboard-grid">
+        {/* PARÁMETROS IZQUIERDA */}
+        <SpeakerParamsForm 
+          lang={lang}
+          params={params}
+          onParamsChange={setParams}
+          driverConfig={driverConfig}
+          onDriverConfigChange={setDriverConfig}
+          validationError={validationError}
+          preset={preset}
+          onPresetChange={handlePresetChange}
+        />
+
+        {/* CONTENIDOS DERECHA */}
+        <main className="dashboard-main">
+          {/* EBP Badges */}
+          <div className={`ebp-badge-card ${ebpValue ? (ebpValue < 50 ? 'ebp-sealed' : ebpValue > 90 ? 'ebp-ported' : 'ebp-normal') : 'ebp-normal'}`} style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', padding: '0.8rem 1.2rem', borderRadius: '8px' }}>
+            <div style={{ fontSize: '0.95rem', fontWeight: 700, display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '0.4rem' }}>
+              <span>EBP: {ebpValue ? ebpValue.toFixed(1) : 'N/A'}</span>
+              <span style={{ fontSize: '0.75rem', opacity: 0.85, fontWeight: 500 }}>
+                {t("(Efficiency Bandwidth Product = Fs / Qes)")}
+              </span>
+            </div>
+            <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>
+              {getEbpRecommendation()}
+            </div>
+            <div style={{ fontSize: '0.72rem', opacity: 0.85, lineHeight: '1.3' }}>
+              {t("EBP ayuda a decidir la caja: < 50 ideal Sellada, > 90 ideal Ventilada, entre 50 y 90 apta para ambas.")}
+            </div>
+          </div>
+
+          {/* Gráfico */}
+          <SimulationChart 
+            lang={lang}
+            theme={theme}
+            sealedData={sealedData.valid ? sealedData : null}
+            portedData={portedData.valid ? portedData : null}
+            params={adjParams}
+          />
+
+          {/* Caja Acústica Pestañas */}
+          <div className="panel">
+            {/* Tabs header */}
+            <div className="tabs-header">
+              <button 
+                className={`tab-btn ${activeTab === 'sealed' ? 'active' : ''}`} 
+                onClick={() => setActiveTab('sealed')}
+              >
+                {t("Caja Sellada (Sealed)")}
+              </button>
+              <button 
+                className={`tab-btn ${activeTab === 'ported' ? 'active' : ''}`} 
+                onClick={() => setActiveTab('ported')}
+              >
+                {t("Caja Ventilada (Ported)")}
+              </button>
+              <button 
+                className={`tab-btn ${activeTab === 'wood' ? 'active' : ''}`} 
+                onClick={() => setActiveTab('wood')}
+              >
+                {t("Dimensiones de la caja (Woodworking)")}
+              </button>
+              <button 
+                className={`tab-btn ${activeTab === 'damping' ? 'active' : ''}`} 
+                onClick={() => setActiveTab('damping')}
+              >
+                {t("Relleno Acústico (Damping)")}
+              </button>
+            </div>
+
+            {activeTab === 'sealed' && (
+              <SealedBoxTab 
+                lang={lang}
+                sealedData={sealedData}
+                targetQtc={targetQtc}
+                setTargetQtc={setTargetQtc}
+                isLinkedToCabinet={woodMode === 'input' && manualNetVol > 0}
+              />
+            )}
+
+            {activeTab === 'ported' && (
+              <PortedBoxTab 
+                lang={lang}
+                portedData={portedData}
+                params={adjParams}
+                customVb={customVb}
+                setCustomVb={setCustomVb}
+                customFb={customFb}
+                setCustomFb={setCustomFb}
+                customPorted={customPorted}
+                setCustomPorted={setCustomPorted}
+                portCount={portCount}
+                setPortCount={setPortCount}
+                portDiameter={portDiameter}
+                setPortDiameter={setPortDiameter}
+                isLinkedToCabinet={woodMode === 'input' && manualNetVol > 0}
+              />
+            )}
+
+            {activeTab === 'wood' && (
+              <CabinetTab 
+                lang={lang}
+                params={adjParams}
+                sealedData={sealedData}
+                portedData={portedData}
+                woodMode={woodMode}
+                setWoodMode={setWoodMode}
+                woodShape={woodShape}
+                setWoodShape={setWoodShape}
+                woodConstraint={woodConstraint}
+                setWoodConstraint={setWoodConstraint}
+                woodSource={woodSource}
+                setWoodSource={setWoodSource}
+                woodRatio={woodRatio}
+                setWoodRatio={setWoodRatio}
+                woodLockVal1={woodLockVal1}
+                setWoodLockVal1={setWoodLockVal1}
+                woodLockVal2={woodLockVal2}
+                setWoodLockVal2={setWoodLockVal2}
+                woodLockVal3={woodLockVal3}
+                setWoodLockVal3={setWoodLockVal3}
+                woodExtHeight={woodExtHeight}
+                setWoodExtHeight={setWoodExtHeight}
+                woodExtWidth={woodExtWidth}
+                setWoodExtWidth={setWoodExtWidth}
+                woodExtDepth={woodExtDepth}
+                setWoodExtDepth={setWoodExtDepth}
+                woodTrapExtHeight={woodTrapExtHeight}
+                setWoodTrapExtHeight={setWoodTrapExtHeight}
+                woodTrapExtWidth={woodTrapExtWidth}
+                setWoodTrapExtWidth={setWoodTrapExtWidth}
+                woodTrapExtDepthTop={woodTrapExtDepthTop}
+                setWoodTrapExtDepthTop={setWoodTrapExtDepthTop}
+                woodTrapExtDepthBot={woodTrapExtDepthBot}
+                setWoodTrapExtDepthBot={setWoodTrapExtDepthBot}
+                woodThickness={woodThickness}
+                setWoodThickness={setWoodThickness}
+                woodExtra={woodExtra}
+                setWoodExtra={setWoodExtra}
+                portCount={portCount}
+                portDiameter={portDiameter}
+                dampingFactor={dampingFactor}
+              />
+            )}
+
+            {/* Pestaña Damping */}
+            {activeTab === 'damping' && (
+              <div className="tab-content active" style={{ padding: '1.5rem' }}>
+                {/* Selector de variante */}
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '0.75rem', lineHeight: '1.4' }}>
+                    {t("Relleno Acústico (Damping / Fill):")}
+                  </p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
+                    {[
+                      { id: 'none',     label: t("Ninguno (0%)"),     desc: t("Sin Relleno (Proceso Adiabático)") },
+                      { id: 'light',    label: t("Leve (~5%)"),        desc: t("Relleno Leve (Damping de Paredes)") },
+                      { id: 'moderate', label: t("Moderado (~12%)"),  desc: t("Relleno Moderado (Fibra Suelta)") },
+                      { id: 'heavy',    label: t("Denso (~20%)"),      desc: t("Relleno Denso (Fibra Uniforme)") }
+                    ].map(opt => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setDampingType(opt.id as any)}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          fontSize: '0.82rem',
+                          borderRadius: '8px',
+                          border: '2px solid ' + (dampingType === opt.id ? 'var(--primary)' : 'var(--card-border)'),
+                          background: dampingType === opt.id ? 'var(--primary)' : 'var(--card-bg)',
+                          color: dampingType === opt.id ? '#ffffff' : 'var(--text-main)',
+                          cursor: 'pointer',
+                          fontWeight: dampingType === opt.id ? 700 : 500,
+                          transition: 'all 0.18s ease',
+                          boxShadow: dampingType === opt.id ? '0 0 0 3px var(--primary-glow)' : 'none'
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Panel de visualización */}
+                <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'flex-start', background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '10px', padding: '1.25rem' }}>
+                  <img
+                    src={
+                      dampingType === 'light'    ? '/damping_light.jpg' :
+                      dampingType === 'moderate' ? '/damping_moderate.jpg' :
+                      dampingType === 'heavy'    ? '/damping_heavy.jpg' :
+                      '/damping_none.jpg'
+                    }
+                    alt={t("Esquema de relleno")}
+                    style={{ width: '160px', height: '160px', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--card-border)', flexShrink: 0 }}
+                  />
+                  <div style={{ flex: 1, minWidth: '180px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <strong style={{ fontSize: '1rem', color: 'var(--primary)' }}>
+                      {dampingType === 'none'     && t("Sin Relleno (Proceso Adiabático)")}
+                      {dampingType === 'light'    && t("Relleno Leve (Damping de Paredes)")}
+                      {dampingType === 'moderate' && t("Relleno Moderado (Fibra Suelta)")}
+                      {dampingType === 'heavy'    && t("Relleno Denso (Fibra Uniforme)")}
+                    </strong>
+                    <p style={{ fontSize: '0.82rem', lineHeight: '1.5', margin: 0, color: 'var(--text-main)', opacity: 0.9 }}>
+                      {dampingType === 'none'     && t("Caja completamente vacía. El aire se comprime sin absorber calor. Ideal para simulaciones de referencia o cuando no se utiliza ningún material absorbente.")}
+                      {dampingType === 'light'    && t("Se cubren únicamente las paredes internas con una capa delgada de guata de poliéster o fieltro de unos 2 a 3 cm. Ayuda a atenuar rebotes y ondas estacionarias de alta frecuencia sin alterar significativamente el volumen virtual.")}
+                      {dampingType === 'moderate' && t("Se rellena la caja de forma suelta y esponjosa ocupando gran parte del espacio, sin compactarla. Logra un aumento virtual del volumen acústico del ~12%, ideal para compactar el diseño del bafle conservando buenos graves.")}
+                      {dampingType === 'heavy'    && t("Se rellena la caja con fibra uniforme y más densa, cubriendo casi todo el volumen interior pero sin comprimir a presión. Maximiza el aumento de volumen virtual hasta un ~20%, ideal para cajas muy compactas.")}
+                    </p>
+                    <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                        <span style={{ fontWeight: 700, color: 'var(--primary)' }}>
+                          {dampingType === 'none' ? '0%' : dampingType === 'light' ? '+5%' : dampingType === 'moderate' ? '+12%' : '+20%'}
+                        </span>{' '}{t("Vol. virtual (Vb aparente)")}
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                        <span style={{ fontWeight: 700, color: dampingType === 'none' ? 'var(--text-muted)' : 'var(--success)' }}>
+                          {dampingType === 'none' ? t("Adiabático") : t("Isotérmico")}
+                        </span>{' '}{t("Proceso térmico")}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
+
+export default App;
