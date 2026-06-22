@@ -371,7 +371,7 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({ lang, onRegisterExpo
             <text x="30" y="70" fill="#ef4444" fontSize="26" fontWeight="bold">+</text>
             <text x="30" y="190" fill="currentColor" fontSize="28" fontWeight="bold">-</text>
 
-            <text x="30" y="-5" fill="var(--text-muted)" fontSize="14" fontWeight="bold">ENTRADA (DE AMP)</text>
+            <text x="30" y="-5" fill="var(--text-muted)" fontSize="14" fontWeight="bold">{t("ENTRADA (DE AMP)")}</text>
 
             {/* Wires */}
             <line x1="60" y1="60" x2="160" y2="60" stroke="#ef4444" strokeWidth="4" />
@@ -475,8 +475,8 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({ lang, onRegisterExpo
             <rect x={tweeterX} y="32" width="16" height="56" fill="none" stroke="currentColor" strokeWidth="4" />
             <polygon points={`${tweeterX + 16},32 ${tweeterX + 46},12 ${tweeterX + 46},108 ${tweeterX + 16},88`} fill="none" stroke="currentColor" strokeWidth="4" />
             <line x1={tweeterX} y1="88" x2={tweeterX} y2="180" stroke="currentColor" strokeWidth="4" />
-            <text x={tweeterTextX} y="55" fill="currentColor" fontSize="16" fontWeight="bold">Tweeter</text>
-            <text x={tweeterTextX} y="78" fill="var(--text-muted)" fontSize="13">High Pass (Vías Altas)</text>
+            <text x={tweeterTextX} y="55" fill="currentColor" fontSize="16" fontWeight="bold">{t("Tweeter")}</text>
+            <text x={tweeterTextX} y="78" fill="var(--text-muted)" fontSize="13">{t("High Pass (Vías Altas)")}</text>
 
             {/* --- LOW PASS (WOOFER) --- */}
             {/* Divider */}
@@ -570,8 +570,8 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({ lang, onRegisterExpo
             <rect x={wooferX} y="235" width="16" height="70" fill="none" stroke="currentColor" strokeWidth="4" />
             <polygon points={`${wooferX + 16},235 ${wooferX + 46},205 ${wooferX + 46},340 ${wooferX + 16},310`} fill="none" stroke="currentColor" strokeWidth="4" />
             <line x1={wooferX} y1="305" x2={wooferX} y2="390" stroke="currentColor" strokeWidth="4" />
-            <text x={wooferTextX} y="265" fill="currentColor" fontSize="16" fontWeight="bold">Woofer</text>
-            <text x={wooferTextX} y="288" fill="var(--text-muted)" fontSize="13">Low Pass (Vías Bajas)</text>
+            <text x={wooferTextX} y="265" fill="currentColor" fontSize="16" fontWeight="bold">{t("Woofer")}</text>
+            <text x={wooferTextX} y="288" fill="var(--text-muted)" fontSize="13">{t("Low Pass (Vías Bajas)")}</text>
           </svg>
           {renderLegend()}
         </div>
@@ -615,7 +615,7 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({ lang, onRegisterExpo
             <line x1="80" y1="180" x2={tweeterX} y2="180" stroke="currentColor" strokeWidth="4" />
             <line x1="80" y1="390" x2={midrangeX} y2="390" stroke="currentColor" strokeWidth="4" />
             <line x1="80" y1="570" x2={wooferX} y2="570" stroke="currentColor" strokeWidth="4" />
-            <text x="70" y="600" fill="currentColor" fontSize="13" fontWeight="bold">LINEA COMÚN NEGATIVO (TIERRA)</text>
+            <text x="70" y="600" fill="currentColor" fontSize="13" fontWeight="bold">{t("LINEA COMÚN NEGATIVO (TIERRA)")}</text>
 
             {/* --- RAIL 1: TWEETER (HIGH PASS) --- */}
             <line x1="110" y1="60" x2="160" y2="60" stroke="#ef4444" strokeWidth="4" />
@@ -667,8 +667,8 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({ lang, onRegisterExpo
             
             <line x1={tweeterX} y1="88" x2={tweeterX} y2="180" stroke="currentColor" strokeWidth="4" />
             <circle cx={tweeterX} cy="180" r="7" fill="currentColor" />
-            <text x={tweeterTextX} y="55" fill="currentColor" fontSize="16" fontWeight="bold">Tweeter</text>
-            <text x={tweeterTextX} y="78" fill="var(--text-muted)" fontSize="13">High Pass (Vías Altas)</text>
+            <text x={tweeterTextX} y="55" fill="currentColor" fontSize="16" fontWeight="bold">{t("Tweeter")}</text>
+            <text x={tweeterTextX} y="78" fill="var(--text-muted)" fontSize="13">{t("High Pass (Vías Altas)")}</text>
 
             {/* --- RAIL 2: MIDRANGE (BANDPASS) --- */}
             <line x1="110" y1="270" x2="160" y2="270" stroke="#ef4444" strokeWidth="4" />
@@ -726,8 +726,8 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({ lang, onRegisterExpo
             <polygon points={`${midrangeX + 16},237 ${midrangeX + 46},215 ${midrangeX + 46},325 ${midrangeX + 16},303`} fill="none" stroke="currentColor" strokeWidth="4" />
             <line x1={midrangeX} y1="303" x2={midrangeX} y2="390" stroke="currentColor" strokeWidth="4" />
             <circle cx={midrangeX} cy="390" r="7" fill="currentColor" />
-            <text x={midrangeTextX} y="260" fill="currentColor" fontSize="16" fontWeight="bold">Midrange</text>
-            <text x={midrangeTextX} y="283" fill="var(--text-muted)" fontSize="13">Band Pass (Medios)</text>
+            <text x={midrangeTextX} y="260" fill="currentColor" fontSize="16" fontWeight="bold">{t("Midrange")}</text>
+            <text x={midrangeTextX} y="283" fill="var(--text-muted)" fontSize="13">{t("Band Pass (Medios)")}</text>
 
             {/* --- RAIL 3: WOOFER (LOW PASS) --- */}
             <line x1="110" y1="480" x2="160" y2="480" stroke="#ef4444" strokeWidth="4" />
@@ -828,8 +828,8 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({ lang, onRegisterExpo
             
             <line x1={wooferX} y1="515" x2={wooferX} y2="570" stroke="currentColor" strokeWidth="4" />
             <circle cx={wooferX} cy="570" r="7" fill="currentColor" />
-            <text x={wooferTextX} y="470" fill="currentColor" fontSize="16" fontWeight="bold">Woofer</text>
-            <text x={wooferTextX} y="493" fill="var(--text-muted)" fontSize="13">Low Pass (Vías Bajas)</text>
+            <text x={wooferTextX} y="470" fill="currentColor" fontSize="16" fontWeight="bold">{t("Woofer")}</text>
+            <text x={wooferTextX} y="493" fill="var(--text-muted)" fontSize="13">{t("Low Pass (Vías Bajas)")}</text>
           </svg>
           {renderLegend()}
         </div>
@@ -1121,6 +1121,10 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({ lang, onRegisterExpo
                   <span>{t("Implementar")}</span>
                 </label>
               </div>
+
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.4', margin: '0 0 0.85rem 0' }}>
+                {t("La red Zobel compensa el aumento de la impedancia del altavoz provocado por la inductancia de la bobina de voz (Le) a altas frecuencias. Al aplanar la impedancia, permite que el filtro crossover funcione según la frecuencia de diseño.")}
+              </p>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '0.85rem' }}>
                 <div className="input-group">
