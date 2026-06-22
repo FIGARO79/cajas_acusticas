@@ -55,6 +55,7 @@ interface CabinetTabProps {
   portHeight: number | '';
   portArea: number | '';
   dampingFactor: number;
+  onCabinetDataChange?: (data: any) => void;
 }
 
 export const CabinetTab: React.FC<CabinetTabProps> = ({
@@ -103,10 +104,17 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
   portWidth,
   portHeight,
   portArea,
-  dampingFactor
+  dampingFactor,
+  onCabinetDataChange
 }) => {
   const t = (text: string) => translate(text, lang);
   const [cabinetData, setCabinetData] = useState<WoodCabinetData | null>(null);
+
+  useEffect(() => {
+    if (onCabinetDataChange) {
+      onCabinetDataChange(cabinetData);
+    }
+  }, [cabinetData, onCabinetDataChange]);
 
   // Helper to read values converted to UI unit system
   const displayVal = (val: number | '', type: 'length' | 'length_small' | 'volume') => {
@@ -351,6 +359,11 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
         pDia = portDiameter || 0;
         const displayPDia = convertTo(pDia, 'length', unitSystem);
         areaLabel = `${displayPDia.toFixed(2)} ${uLabel} (${t("Diámetro")})`;
+      } else if (portShape === 'custom') {
+        const a = portArea || 0;
+        pDia = 2 * Math.sqrt(a / Math.PI);
+        const displayArea = convertTo(a, 'area', unitSystem);
+        areaLabel = `${displayArea.toFixed(1)} ${getUnitLabel('area', unitSystem)} (${t("Área libre")})`;
       } else {
         const w = portWidth || 0;
         const h = portHeight || 0;

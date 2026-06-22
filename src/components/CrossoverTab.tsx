@@ -1,21 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { type Lang, translate } from '../utils/translations';
 import { getWasm } from '../wasm/index.ts';
 
 interface CrossoverTabProps {
   lang: Lang;
+  onRegisterExporter?: (exporter: () => any) => void;
 }
 
-export const CrossoverTab: React.FC<CrossoverTabProps> = ({ lang }) => {
+export const CrossoverTab: React.FC<CrossoverTabProps> = ({ lang, onRegisterExporter }) => {
   const t = (text: string) => translate(text, lang);
 
   // 1. Crossover Way Mode
   const [crossoverWays, setCrossoverWays] = useState<'2way' | '3way'>('2way');
 
   // 2. Crossover Inputs
-  const [fc, setFc] = useState<number>(2500); // For 2-way
-  const [fcLow, setFcLow] = useState<number>(500); // For 3-way Low-Mid
-  const [fcHigh, setFcHigh] = useState<number>(4000); // For 3-way Mid-High
+  const [fc, setFc] = useState<number | ''>(2500); // For 2-way
+  const [fcLow, setFcLow] = useState<number | ''>(500); // For 3-way Low-Mid
+  const [fcHigh, setFcHigh] = useState<number | ''>(4000); // For 3-way Mid-High
   const [zTweeter, setZTweeter] = useState<number>(8);
   const [zMidrange, setZMidrange] = useState<number>(8);
   const [zWoofer, setZWoofer] = useState<number>(8);
@@ -39,7 +40,7 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({ lang }) => {
 
     if (crossoverWays === '2way') {
       const f = fc;
-      if (f <= 0 || Rt <= 0 || Rw <= 0) return null;
+      if (!f || f <= 0 || Rt <= 0 || Rw <= 0) return null;
 
       try {
         const wasm = getWasm();
@@ -115,7 +116,7 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({ lang }) => {
       // fL = fcLow, fH = fcHigh.
       const fL = fcLow;
       const fH = fcHigh;
-      if (fL <= 0 || fH <= 0 || fL >= fH || Rt <= 0 || Rm <= 0 || Rw <= 0) return null;
+      if (!fL || !fH || fL <= 0 || fH <= 0 || fL >= fH || Rt <= 0 || Rm <= 0 || Rw <= 0) return null;
 
       // We'll calculate components for:
       // Tweeter (High Pass at fH)
@@ -272,6 +273,35 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({ lang }) => {
   };
 
   const lpadResults = calculateLPad();
+
+  useEffect(() => {
+    if (onRegisterExporter) {
+      onRegisterExporter(() => {
+        return {
+          crossoverWays,
+          crossoverType,
+          fc,
+          fcLow,
+          fcHigh,
+          zTweeter,
+          zMidrange,
+          zWoofer,
+          enableZobel,
+          re,
+          le,
+          enableLPad,
+          attenuation,
+          zLoad,
+          xoverResults,
+          zobelResults,
+          lpadResults
+        };
+      });
+    }
+  }, [
+    crossoverWays, crossoverType, fc, fcLow, fcHigh, zTweeter, zMidrange, zWoofer,
+    enableZobel, re, le, enableLPad, attenuation, zLoad, xoverResults, zobelResults, lpadResults, onRegisterExporter
+  ]);
 
   const renderSchematic = () => {
     if (!xoverResults) return null;
@@ -848,7 +878,7 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({ lang }) => {
                       <input 
                         type="number" 
                         value={fc} 
-                        onChange={(e) => setFc(parseFloat(e.target.value) || 0)} 
+                        onChange={(e) => setFc(e.target.value === '' ? '' : parseFloat(e.target.value))} 
                         min="20" 
                         max="20000"
                       />
@@ -863,7 +893,7 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({ lang }) => {
                         <input 
                           type="number" 
                           value={fcLow} 
-                          onChange={(e) => setFcLow(parseFloat(e.target.value) || 0)} 
+                          onChange={(e) => setFcLow(e.target.value === '' ? '' : parseFloat(e.target.value))} 
                           min="20" 
                           max="5000"
                         />
@@ -876,7 +906,7 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({ lang }) => {
                         <input 
                           type="number" 
                           value={fcHigh} 
-                          onChange={(e) => setFcHigh(parseFloat(e.target.value) || 0)} 
+                          onChange={(e) => setFcHigh(e.target.value === '' ? '' : parseFloat(e.target.value))} 
                           min="200" 
                           max="20000"
                         />

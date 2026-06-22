@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Header } from './components/Header';
 import { SpeakerParamsForm } from './components/SpeakerParamsForm';
 import { SimulationChart } from './components/SimulationChart';
@@ -11,6 +11,7 @@ import { type UnitSystem } from './utils/units';
 import type { SpeakerParams, CalculatedSealed, CalculatedPorted } from './types';
 import { estimateF3 } from './utils/acousticMath';
 import { getWasm, initWasm } from './wasm/index.ts';
+import { generateReportHTML } from './utils/reportGenerator';
 
 function App() {
   // Theme & Language
@@ -91,6 +92,16 @@ function App() {
 
   const [woodThickness, setWoodThickness] = useState<number | ''>(15);
   const [woodExtra, setWoodExtra] = useState<number | ''>(3.5);
+
+  // Shared state for technical report exporting
+  const cabinetRef = useRef<any>(null);
+  const handleCabinetDataChange = useCallback((data: any) => {
+    cabinetRef.current = data;
+  }, []);
+  const crossoverRef = useRef<(() => any) | null>(null);
+  const handleRegisterCrossover = useCallback((exp: () => any) => {
+    crossoverRef.current = exp;
+  }, []);
 
   // Validation
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -324,6 +335,96 @@ function App() {
     }
   };
 
+  const handleExportReport = () => {
+    // Recopilar datos del crossover si está registrado
+    let xoverData: any = {};
+    if (crossoverRef.current) {
+      xoverData = crossoverRef.current();
+    }
+
+    // Longitud del puerto, diámetro equivalente, velocidad del aire
+    let pLen = 'N/A';
+    let vp: number | null = null;
+    const pCount = typeof portCount === 'number' ? portCount : 0;
+    if (pCount > 0 && portedData.valid && portedData.Vb > 0) {
+      let pDia = 0;
+      if (portShape === 'round') {
+        pDia = portDiameter || 0;
+      } else if (portShape === 'custom') {
+        const a = portArea || 0;
+        pDia = 2 * Math.sqrt(a / Math.PI);
+      } else {
+        const w = portWidth || 0;
+        const h = portHeight || 0;
+        pDia = 2 * Math.sqrt((w * h) / Math.PI);
+      }
+      
+      if (pDia > 0) {
+        const rPort = pDia / 2;
+        const Lv = ((23562.5 * Math.pow(pDia, 2) * pCount) / (portedData.Fb * portedData.Fb * (cabinetRef.current?.vNeto || portedData.Vb))) - (1.46 * rPort);
+        if (Lv <= 0) {
+          pLen = t("Excesivamente corto");
+        } else {
+          pLen = `${Lv.toFixed(1)} cm`;
+        }
+
+        // Velocidad del aire
+        if (params.sd && params.xmax) {
+          const vd = (params.sd * params.xmax) / 10000;
+          const peakV = 2 * Math.PI * portedData.Fb * vd * 0.001; // m3/s aprox
+          const totalArea = pCount * Math.PI * Math.pow(pDia / 2, 2) * 0.0001; // m2
+          if (totalArea > 0) {
+            vp = peakV / totalArea;
+          }
+        }
+      }
+    }
+
+    const htmlContent = generateReportHTML(
+      lang,
+      unitSystem,
+      params,
+      activeTab === 'sealed' ? 'sealed' : 'ported',
+      sealedData,
+      portedData,
+      dampingType,
+      cabinetRef.current,
+      crossoverRef.current ? {
+        crossoverWays: xoverData.crossoverWays,
+        crossoverType: xoverData.crossoverType,
+        fc: xoverData.fc,
+        fcLow: xoverData.fcLow,
+        fcHigh: xoverData.fcHigh,
+        zTweeter: xoverData.zTweeter,
+        zMidrange: xoverData.zMidrange,
+        zWoofer: xoverData.zWoofer,
+        enableZobel: xoverData.enableZobel,
+        re: xoverData.re,
+        le: xoverData.le,
+        enableLPad: xoverData.enableLPad,
+        attenuation: xoverData.attenuation,
+        zLoad: xoverData.zLoad,
+        xoverResults: xoverData.xoverResults,
+        zobelResults: xoverData.zobelResults,
+        lpadResults: xoverData.lpadResults
+      } : null,
+      pCount,
+      portShape,
+      portDiameter || 0,
+      portWidth || 0,
+      portHeight || 0,
+      portArea || 0,
+      pLen,
+      vp
+    );
+
+    const reportWindow = window.open('', '_blank');
+    if (reportWindow) {
+      reportWindow.document.write(htmlContent);
+      reportWindow.document.close();
+    }
+  };
+
   return (
     <div className="container">
       <Header 
@@ -333,6 +434,7 @@ function App() {
         setUnitSystem={setUnitSystem}
         theme={theme} 
         toggleTheme={toggleTheme} 
+        onExportReport={handleExportReport}
       />
 
       <div className="dashboard-grid">
@@ -445,6 +547,8 @@ function App() {
                 setPortWidth={setPortWidth}
                 portHeight={portHeight}
                 setPortHeight={setPortHeight}
+                portArea={portArea}
+                setPortArea={setPortArea}
                 isLinkedToCabinet={woodMode === 'input' && manualNetVol > 0}
               />
             )}
@@ -495,7 +599,9 @@ function App() {
                 portShape={portShape}
                 portWidth={portWidth}
                 portHeight={portHeight}
+                portArea={portArea}
                 dampingFactor={dampingFactor}
+                onCabinetDataChange={handleCabinetDataChange}
               />
             )}
 
@@ -598,7 +704,7 @@ function App() {
               </div>
             )}
             {activeTab === 'crossover' && (
-              <CrossoverTab lang={lang} />
+              <CrossoverTab lang={lang} onRegisterExporter={handleRegisterCrossover} />
             )}
           </div>
         </main>
