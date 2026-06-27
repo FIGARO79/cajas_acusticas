@@ -200,8 +200,8 @@ export const PortedBoxTab: React.FC<PortedBoxTabProps> = ({
         <div className="control-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <span>{t("Alineación y Sintonía")}</span>
-            <span style={{ fontSize: '0.72rem', textTransform: 'none', color: '#818cf8', fontWeight: 600, background: 'rgba(99, 102, 241, 0.15)', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
-              {t(portedData.alignment)}
+            <span style={{ fontSize: '12px', color: 'inherit', fontWeight: 600, textTransform: 'none' }}>
+              {" - "}{t(portedData.alignment)}
             </span>
           </div>
           {!isLinkedToCabinet && (
@@ -340,7 +340,7 @@ export const PortedBoxTab: React.FC<PortedBoxTabProps> = ({
                 <div className="input-wrapper">
                   <input 
                     type="number" 
-                    step="any" 
+                    step="0.1" 
                     value={portDiameter !== '' ? (Math.round(convertTo(portDiameter, 'length', unitSystem) * 1000) / 1000) : ''} 
                     onChange={(e) => setPortDiameter(e.target.value === '' ? '' : convertFrom(parseFloat(e.target.value), 'length', unitSystem))} 
                   />
@@ -356,7 +356,7 @@ export const PortedBoxTab: React.FC<PortedBoxTabProps> = ({
                   <div className="input-wrapper">
                     <input 
                       type="number" 
-                      step="any" 
+                      step="0.1" 
                       value={portWidth !== '' ? (Math.round(convertTo(portWidth, 'length', unitSystem) * 100) / 100) : ''} 
                       onChange={(e) => setPortWidth(e.target.value === '' ? '' : convertFrom(parseFloat(e.target.value), 'length', unitSystem))} 
                     />
@@ -368,7 +368,7 @@ export const PortedBoxTab: React.FC<PortedBoxTabProps> = ({
                   <div className="input-wrapper">
                     <input 
                       type="number" 
-                      step="any" 
+                      step="0.1" 
                       value={portHeight !== '' ? (Math.round(convertTo(portHeight, 'length', unitSystem) * 100) / 100) : ''} 
                       onChange={(e) => setPortHeight(e.target.value === '' ? '' : convertFrom(parseFloat(e.target.value), 'length', unitSystem))} 
                     />

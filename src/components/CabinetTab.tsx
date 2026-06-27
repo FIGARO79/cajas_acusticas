@@ -781,8 +781,8 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
 
         {/* Puerto de sintonía en ebanistería */}
         {portInfo && (
-          <div className="pro-calc-panel" style={{ marginTop: '0.5rem', borderColor: 'var(--ported-color)', background: 'rgba(72, 169, 124, 0.04)' }}>
-            <span className="pro-calc-title" style={{ color: 'var(--ported-color)' }}>{t("Puerto(s) de Sintonía para este Diseño")}</span>
+          <div className="pro-calc-panel" style={{ marginTop: '0.5rem' }}>
+            <span className="pro-calc-title">{t("Puerto(s) de Sintonía para este Diseño")}</span>
             <div className="pro-calc-row">
               <span className="pro-calc-label">{t("Cantidad e Instalación:")}</span>
               <span className="pro-calc-value">{portInfo.qtySize}</span>

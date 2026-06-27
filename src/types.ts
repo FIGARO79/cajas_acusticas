@@ -68,3 +68,12 @@ export interface WoodCabinetData {
   thickness: number;
   pieces: WoodCutPiece[];
 }
+
+export interface CustomDriver {
+  id: string;
+  brand: string;
+  model: string;
+  params: SpeakerParams;
+  isCustom: boolean;
+}
+

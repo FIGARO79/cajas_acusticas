@@ -8,7 +8,7 @@ import { CabinetTab } from './components/CabinetTab';
 import { CrossoverTab } from './components/CrossoverTab';
 import { type Lang, translate } from './utils/translations';
 import { type UnitSystem } from './utils/units';
-import type { SpeakerParams, CalculatedSealed, CalculatedPorted } from './types';
+import type { SpeakerParams, CalculatedSealed, CalculatedPorted, CustomDriver } from './types';
 import { estimateF3 } from './utils/acousticMath';
 import { getWasm, initWasm } from './wasm/index.ts';
 import { generateReportHTML } from './utils/reportGenerator';
@@ -20,7 +20,24 @@ function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => (localStorage.getItem('theme') as 'dark' | 'light') || 'dark');
   const [activeTab, setActiveTab] = useState<'sealed' | 'ported' | 'wood' | 'damping' | 'crossover'>('sealed');
 
-  // Preset
+  // Altavoces personalizados guardados en localStorage
+  const [customDrivers, setCustomDrivers] = useState<CustomDriver[]>(() => {
+    try {
+      const saved = localStorage.getItem('custom_drivers');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const handleCustomDriversChange = (updated: CustomDriver[]) => {
+    setCustomDrivers(updated);
+    try {
+      localStorage.setItem('custom_drivers', JSON.stringify(updated));
+    } catch (err) {
+      console.error('Error al guardar custom_drivers en localStorage:', err);
+    }
+  };
   const [preset, setPreset] = useState<string>('hifi8');
 
   // Speaker parameters
@@ -449,6 +466,8 @@ function App() {
           validationError={validationError}
           preset={preset}
           onPresetChange={handlePresetChange}
+          customDrivers={customDrivers}
+          onCustomDriversChange={handleCustomDriversChange}
         />
 
         {/* CONTENIDOS DERECHA */}
@@ -706,6 +725,7 @@ function App() {
             {activeTab === 'crossover' && (
               <CrossoverTab lang={lang} onRegisterExporter={handleRegisterCrossover} />
             )}
+
           </div>
         </main>
       </div>
