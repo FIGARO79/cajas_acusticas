@@ -50,7 +50,7 @@ body {
   background-image: var(--bg-gradient);
   color: var(--text-main);
   min-height: 100vh;
-  padding: 2rem 1.5rem;
+  padding: 2rem;
   line-height: 1.6;
   overflow-x: hidden;
 }

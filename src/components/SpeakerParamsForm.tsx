@@ -442,7 +442,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
               style={{ width: '100%', height: '34px' }}
               disabled={loadingDb}
             >
-              <option value="">{t("-- Todas las marcas --")}</option>
+              <option value="">{t("Todas las marcas")}</option>
               {brandsList.map(brand => (
                 <option key={brand} value={brand}>{brand}</option>
               ))}
