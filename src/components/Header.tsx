@@ -9,7 +9,6 @@ interface HeaderProps {
   setUnitSystem: (u: UnitSystem) => void;
   theme: 'dark' | 'light';
   toggleTheme: () => void;
-  onExportReport?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -18,7 +17,6 @@ export const Header: React.FC<HeaderProps> = ({
   unitSystem,
   setUnitSystem,
   toggleTheme,
-  onExportReport,
 }) => {
   const t = (text: string) => translate(text, lang);
 
@@ -26,24 +24,6 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <>
       <div className="top-bar-controls">
-        {onExportReport && (
-          <>
-            <button 
-              className="lang-btn" 
-              onClick={onExportReport} 
-              title={t("Exportar Reporte Técnico PDF")}
-              style={{ padding: '4px 10px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-              {t("Reporte PDF")}
-            </button>
-            <div className="control-divider"></div>
-          </>
-        )}
         <button className="theme-toggle-btn" onClick={toggleTheme} title={t("Cambiar tema")}>
           {/* Icono sol */}
           <svg className="sun-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">

@@ -24,6 +24,12 @@ export function generateReportHTML(
 ): string {
   const t = (text: string) => translate(text, lang);
   
+  const formatNum = (val: any, decimals: number = 2, fallback: string = 'N/A'): string => {
+    if (val === undefined || val === null || isNaN(val)) return fallback;
+    const num = typeof val === 'number' ? val : parseFloat(val);
+    return isNaN(num) ? fallback : num.toFixed(decimals);
+  };
+  
   // 1. Obtener curvas mediante WASM síncrono si está disponible
   let sealedCurve: number[] = [];
   let portedCurve: number[] = [];
@@ -137,54 +143,54 @@ export function generateReportHTML(
     
     let xoverDetails = '';
     if (crossoverWays === '2way') {
-      const hp = xoverResults.hp;
-      const lp = xoverResults.lp;
+      const hp = xoverResults.hp || {};
+      const lp = xoverResults.lp || {};
       xoverDetails = `
         <div class="xover-box">
           <h4>${t("Vía de Agudos (High Pass)")}</h4>
           <ul>
-            ${hp.c1 !== null ? `<li>C1: <strong>${hp.c1.toFixed(2)} µF</strong></li>` : ''}
-            ${hp.c2 !== undefined && hp.c2 !== null ? `<li>C2: <strong>${hp.c2.toFixed(2)} µF</strong></li>` : ''}
-            ${hp.l1 !== null ? `<li>L1: <strong>${hp.l1.toFixed(3)} mH</strong></li>` : ''}
-            ${hp.l2 !== undefined && hp.l2 !== null ? `<li>L2: <strong>${hp.l2.toFixed(3)} mH</strong></li>` : ''}
+            ${hp.c1 !== undefined && hp.c1 !== null ? `<li>C1: <strong>${formatNum(hp.c1, 2)} µF</strong></li>` : ''}
+            ${hp.c2 !== undefined && hp.c2 !== null ? `<li>C2: <strong>${formatNum(hp.c2, 2)} µF</strong></li>` : ''}
+            ${hp.l1 !== undefined && hp.l1 !== null ? `<li>L1: <strong>${formatNum(hp.l1, 3)} mH</strong></li>` : ''}
+            ${hp.l2 !== undefined && hp.l2 !== null ? `<li>L2: <strong>${formatNum(hp.l2, 3)} mH</strong></li>` : ''}
           </ul>
         </div>
         <div class="xover-box">
           <h4>${t("Vía de Graves (Low Pass)")}</h4>
           <ul>
-            ${lp.l1 !== null ? `<li>L1: <strong>${lp.l1.toFixed(3)} mH</strong></li>` : ''}
-            ${lp.l2 !== undefined && lp.l2 !== null ? `<li>L2: <strong>${lp.l2.toFixed(3)} mH</strong></li>` : ''}
-            ${lp.c1 !== null ? `<li>C1: <strong>${lp.c1.toFixed(2)} µF</strong></li>` : ''}
-            ${lp.c2 !== undefined && lp.c2 !== null ? `<li>C2: <strong>${lp.c2.toFixed(2)} µF</strong></li>` : ''}
+            ${lp.l1 !== undefined && lp.l1 !== null ? `<li>L1: <strong>${formatNum(lp.l1, 3)} mH</strong></li>` : ''}
+            ${lp.l2 !== undefined && lp.l2 !== null ? `<li>L2: <strong>${formatNum(lp.l2, 3)} mH</strong></li>` : ''}
+            ${lp.c1 !== undefined && lp.c1 !== null ? `<li>C1: <strong>${formatNum(lp.c1, 2)} µF</strong></li>` : ''}
+            ${lp.c2 !== undefined && lp.c2 !== null ? `<li>C2: <strong>${formatNum(lp.c2, 2)} µF</strong></li>` : ''}
           </ul>
         </div>
       `;
     } else {
-      const hp = xoverResults.hp;
+      const hp = xoverResults.hp || {};
       const bp = xoverResults.bp || {};
-      const lp = xoverResults.lp;
+      const lp = xoverResults.lp || {};
       xoverDetails = `
         <div class="xover-box">
           <h4>${t("Vía de Agudos (High Pass)")}</h4>
           <ul>
-            ${hp.c1 !== null ? `<li>C1: <strong>${hp.c1.toFixed(2)} µF</strong></li>` : ''}
-            ${hp.l1 !== null ? `<li>L1: <strong>${hp.l1.toFixed(3)} mH</strong></li>` : ''}
+            ${hp.c1 !== undefined && hp.c1 !== null ? `<li>C1: <strong>${formatNum(hp.c1, 2)} µF</strong></li>` : ''}
+            ${hp.l1 !== undefined && hp.l1 !== null ? `<li>L1: <strong>${formatNum(hp.l1, 3)} mH</strong></li>` : ''}
           </ul>
         </div>
         <div class="xover-box">
           <h4>${t("Vía de Medios (Band Pass)")}</h4>
           <ul>
-            ${(bp.c_hp || bp.c1_hp) ? `<li>C_hp: <strong>${(bp.c_hp || bp.c1_hp).toFixed(2)} µF</strong></li>` : ''}
-            ${(bp.l_lp || bp.l1_lp) ? `<li>L_lp: <strong>${(bp.l_lp || bp.l1_lp).toFixed(3)} mH</strong></li>` : ''}
-            ${bp.l_hp ? `<li>L_hp: <strong>${bp.l_hp.toFixed(3)} mH</strong></li>` : ''}
-            ${bp.c_lp ? `<li>C_lp: <strong>${bp.c_lp.toFixed(2)} µF</strong></li>` : ''}
+            ${(bp.c_hp !== undefined && bp.c_hp !== null) || (bp.c1_hp !== undefined && bp.c1_hp !== null) ? `<li>C_hp: <strong>${formatNum(bp.c_hp || bp.c1_hp, 2)} µF</strong></li>` : ''}
+            ${(bp.l_lp !== undefined && bp.l_lp !== null) || (bp.l1_lp !== undefined && bp.l1_lp !== null) ? `<li>L_lp: <strong>${formatNum(bp.l_lp || bp.l1_lp, 3)} mH</strong></li>` : ''}
+            ${bp.l_hp !== undefined && bp.l_hp !== null ? `<li>L_hp: <strong>${formatNum(bp.l_hp, 3)} mH</strong></li>` : ''}
+            ${bp.c_lp !== undefined && bp.c_lp !== null ? `<li>C_lp: <strong>${formatNum(bp.c_lp, 2)} µF</strong></li>` : ''}
           </ul>
         </div>
         <div class="xover-box">
           <h4>${t("Vía de Graves (Low Pass)")}</h4>
           <ul>
-            ${lp.l1 !== null ? `<li>L1: <strong>${lp.l1.toFixed(3)} mH</strong></li>` : ''}
-            ${lp.c1 !== null ? `<li>C1: <strong>${lp.c1.toFixed(2)} µF</strong></li>` : ''}
+            ${lp.l1 !== undefined && lp.l1 !== null ? `<li>L1: <strong>${formatNum(lp.l1, 3)} mH</strong></li>` : ''}
+            ${lp.c1 !== undefined && lp.c1 !== null ? `<li>C1: <strong>${formatNum(lp.c1, 2)} µF</strong></li>` : ''}
           </ul>
         </div>
       `;
@@ -196,8 +202,8 @@ export function generateReportHTML(
         <div class="xover-box highlight">
           <h4>${t("Red Zobel")}</h4>
           <ul>
-            <li>Cz: <strong>${zobelResults.cz.toFixed(2)} µF</strong></li>
-            <li>Rz: <strong>${zobelResults.rz.toFixed(2)} Ω</strong></li>
+            <li>Cz: <strong>${formatNum(zobelResults.cz, 2)} µF</strong></li>
+            <li>Rz: <strong>${formatNum(zobelResults.rz, 2)} Ω</strong></li>
           </ul>
         </div>
       `;
@@ -207,8 +213,8 @@ export function generateReportHTML(
         <div class="xover-box highlight">
           <h4>${t("Atenuador L-Pad")}</h4>
           <ul>
-            <li>R1 (Serie): <strong>${lpadResults.r1.toFixed(2)} Ω</strong></li>
-            <li>R2 (Paralelo): <strong>${lpadResults.r2.toFixed(2)} Ω</strong></li>
+            <li>R1 (Serie): <strong>${formatNum(lpadResults.r1, 2)} Ω</strong></li>
+            <li>R2 (Paralelo): <strong>${formatNum(lpadResults.r2, 2)} Ω</strong></li>
           </ul>
         </div>
       `;
@@ -242,19 +248,19 @@ export function generateReportHTML(
           <h3>${t("Ebanistería")}</h3>
           <p><strong>${t("Forma de la caja")}:</strong> ${isRect ? t("Rectangular") : t("Trapezoidal")}</p>
           <p><strong>${t("Grosor de madera")}:</strong> ${cabinetData.woodThickness} mm</p>
-          <p><strong>${t("Volumen neto")}:</strong> ${cabinetData.vNeto.toFixed(2)} L</p>
-          <p><strong>${t("Volumen bruto")}:</strong> ${cabinetData.vBruto.toFixed(2)} L</p>
+          <p><strong>${t("Volumen neto")}:</strong> ${formatNum(cabinetData.vNeto, 2)} L</p>
+          <p><strong>${t("Volumen bruto")}:</strong> ${formatNum(cabinetData.vBruto, 2)} L</p>
           <p><strong>${t("Dimensiones externas")}:</strong></p>
           <ul>
             ${isRect ? `
-              <li>${t("Alto")}: ${cabinetData.extHeight.toFixed(1)} cm</li>
-              <li>${t("Ancho")}: ${cabinetData.extWidth.toFixed(1)} cm</li>
-              <li>${t("Profundidad")}: ${cabinetData.extDepth.toFixed(1)} cm</li>
+              <li>${t("Alto")}: ${formatNum(cabinetData.extHeight, 1)} cm</li>
+              <li>${t("Ancho")}: ${formatNum(cabinetData.extWidth, 1)} cm</li>
+              <li>${t("Profundidad")}: ${formatNum(cabinetData.extDepth, 1)} cm</li>
             ` : `
-              <li>${t("Alto")}: ${cabinetData.extHeight.toFixed(1)} cm</li>
-              <li>${t("Ancho")}: ${cabinetData.extWidth.toFixed(1)} cm</li>
-              <li>${t("Prof. Superior")}: ${cabinetData.extDepthTop.toFixed(1)} cm</li>
-              <li>${t("Prof. Inferior")}: ${cabinetData.extDepthBot.toFixed(1)} cm</li>
+              <li>${t("Alto")}: ${formatNum(cabinetData.extHeight, 1)} cm</li>
+              <li>${t("Ancho")}: ${formatNum(cabinetData.extWidth, 1)} cm</li>
+              <li>${t("Prof. Superior")}: ${formatNum(cabinetData.extDepthTop, 1)} cm</li>
+              <li>${t("Prof. Inferior")}: ${formatNum(cabinetData.extDepthBot, 1)} cm</li>
             `}
           </ul>
         </div>
@@ -429,13 +435,13 @@ export function generateReportHTML(
           <p><strong>${t("Tipo de caja")}:</strong> ${boxType === 'sealed' ? t("Sellada") : t("Ventilada")}</p>
           ${boxType === 'sealed' 
             ? `
-              <p><strong>Qtc:</strong> ${sealedData.Qtc.toFixed(3)}</p>
-              <p><strong>Fc:</strong> ${sealedData.Fc.toFixed(1)} Hz</p>
-              <p><strong>F3:</strong> ${sealedData.F3.toFixed(1)} Hz</p>
+              <p><strong>Qtc:</strong> ${formatNum(sealedData.Qtc, 3)}</p>
+              <p><strong>Fc:</strong> ${formatNum(sealedData.Fc, 1)} Hz</p>
+              <p><strong>F3:</strong> ${formatNum(sealedData.F3, 1)} Hz</p>
             ` : `
-              <p><strong>Vb:</strong> ${portedData.Vb.toFixed(1)} ${uVol}</p>
-              <p><strong>Fb (Sintonía):</strong> ${portedData.Fb.toFixed(1)} Hz</p>
-              <p><strong>F3:</strong> ${portedData.F3.toFixed(1)} Hz</p>
+              <p><strong>Vb:</strong> ${formatNum(portedData.Vb, 1)} ${uVol}</p>
+              <p><strong>Fb (Sintonía):</strong> ${formatNum(portedData.Fb, 1)} Hz</p>
+              <p><strong>F3:</strong> ${formatNum(portedData.F3, 1)} Hz</p>
             `
           }
         </div>
@@ -456,7 +462,7 @@ export function generateReportHTML(
             ${portShape === 'rectangular' ? `<p><strong>${t("Dimensiones")}:</strong> ${portWidth} x ${portHeight} cm</p>` : ''}
             ${portShape === 'custom' ? `<p><strong>${t("Área del puerto")}:</strong> ${portArea} cm²</p>` : ''}
             <p><strong>${t("Longitud calculada")}:</strong> ${pLen}</p>
-            ${vp !== null ? `<p><strong>${t("Velocidad de aire")}:</strong> ${vp.toFixed(1)} m/s (${
+            ${vp !== null ? `<p><strong>${t("Velocidad de aire")}:</strong> ${formatNum(vp, 1)} m/s (${
               vp < 17 ? t("Excelente (silencioso)") :
               vp < 27 ? t("Moderada (aceptable)") :
               t("Crítica (soplo de turbulencia)")

@@ -10,6 +10,7 @@ interface SealedBoxTabProps {
   targetQtc: number;
   setTargetQtc: (qtc: number) => void;
   isLinkedToCabinet: boolean;
+  onExportReport?: () => void;
 }
 
 export const SealedBoxTab: React.FC<SealedBoxTabProps> = ({
@@ -18,7 +19,8 @@ export const SealedBoxTab: React.FC<SealedBoxTabProps> = ({
   sealedData,
   targetQtc,
   setTargetQtc,
-  isLinkedToCabinet
+  isLinkedToCabinet,
+  onExportReport
 }) => {
   const t = (text: string) => translate(text, lang);
 
@@ -109,6 +111,24 @@ export const SealedBoxTab: React.FC<SealedBoxTabProps> = ({
           {t("Las cajas selladas proveen una excelente respuesta transitoria (bajos rápidos y secos) y una caída suave de 12dB/octava ideal para espacio reducido.")}
         </span>
       </div>
+
+      {onExportReport && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid var(--card-border)' }}>
+          <button 
+            type="button" 
+            className="btn btn-primary" 
+            onClick={onExportReport}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            {t("Exportar Reporte PDF")}
+          </button>
+        </div>
+      )}
     </div>
   );
 };

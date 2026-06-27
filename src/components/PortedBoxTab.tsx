@@ -30,6 +30,7 @@ interface PortedBoxTabProps {
   portArea: number | '';
   setPortArea: (area: number | '') => void;
   isLinkedToCabinet: boolean;
+  onExportReport?: () => void;
 }
 
 export const PortedBoxTab: React.FC<PortedBoxTabProps> = ({
@@ -55,7 +56,8 @@ export const PortedBoxTab: React.FC<PortedBoxTabProps> = ({
   setPortHeight,
   portArea,
   setPortArea,
-  isLinkedToCabinet
+  isLinkedToCabinet,
+  onExportReport
 }) => {
   const t = (text: string) => translate(text, lang);
 
@@ -485,6 +487,24 @@ export const PortedBoxTab: React.FC<PortedBoxTabProps> = ({
       <div className="alert-box success" style={{ marginTop: '1rem' }}>
         <span>{t("Las cajas ventiladas aprovechan la onda trasera mediante el puerto para extender la respuesta y ganar eficiencia en graves extremos.")}</span>
       </div>
+
+      {onExportReport && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid var(--card-border)' }}>
+          <button 
+            type="button" 
+            className="btn btn-primary" 
+            onClick={onExportReport}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            {t("Exportar Reporte PDF")}
+          </button>
+        </div>
+      )}
     </div>
   );
 };
