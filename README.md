@@ -1,9 +1,9 @@
-# AcousticSim - Calculadora de Cajas Acústicas Premium
+# AcousticLAB - Calculadora de Cajas Acústicas Premium
 
 [![CI Status](https://img.shields.io/github/actions/workflow/status/FIGARO79/cajas_acusticas/ci.yml?branch=main)](https://github.com/FIGARO79/cajas_acusticas/actions)
 [![License](https://img.shields.io/github/license/FIGARO79/cajas_acusticas)](LICENSE)
 
-AcousticSim es una aplicación web interactiva que permite diseñar y simular cajas acústicas para altavoces, ofreciendo cálculos precisos de volúmenes, frecuencias de resonancia y respuesta en frecuencia. La herramienta está construida con **React**, **TypeScript** y **Vite**, y utiliza WebAssembly, compilado a partir de **Rust**, para procesos intensivos de cálculo, garantizando una experiencia fluida y responsiva.
+AcousticLAB es una aplicación web interactiva que permite diseñar y simular cajas acústicas para altavoces, ofreciendo cálculos precisos de volúmenes, frecuencias de resonancia y respuesta en frecuencia. La herramienta está construida con **React**, **TypeScript** y **Vite**, y utiliza WebAssembly, compilado a partir de **Rust**, para procesos intensivos de cálculo, garantizando una experiencia fluida y responsiva.
 
 ## ✨ Características
 

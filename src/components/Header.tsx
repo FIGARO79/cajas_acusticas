@@ -63,7 +63,7 @@ export const Header: React.FC<HeaderProps> = ({
 
       <header>
         <div className="logo-area">
-          <h1>AcousticSim</h1>
+          <h1>Acoustic<span className="logo-highlight">LAB</span></h1>
         </div>
         <p>{t("Calculadora y simulador Thiele/Small de cajas acústicas en tiempo real.")}</p>
       </header>

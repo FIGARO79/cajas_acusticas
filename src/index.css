@@ -123,6 +123,12 @@ h1 {
   letter-spacing: -0.02em;
 }
 
+h1 span.logo-highlight {
+  background: none;
+  -webkit-text-fill-color: #2563eb; /* Azul plano */
+  color: #2563eb;
+}
+
 header p {
   color: var(--text-muted);
   font-size: 0.925rem;

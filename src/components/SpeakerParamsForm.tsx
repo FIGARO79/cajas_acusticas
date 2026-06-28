@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import type { SpeakerParams, CustomDriver } from '../types';
 import { type Lang, translate } from '../utils/translations';
 import { calcAutoParams } from '../wasm/index.ts';
-import { PRESETS } from '../utils/presets';
 import { type UnitSystem, convertTo, convertFrom, getUnitLabel } from '../utils/units';
 
 interface SpeakerParamsFormProps {
@@ -176,7 +175,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
     onPresetChange(newDriver.id, newDriver.params);
     setSearchQuery(`${newDriver.brand} ${newDriver.model}`);
     setSelectedBrand(newDriver.brand);
-    setShowSaveModal(false);
+    setDriverTab('view');
     alert(t("Altavoz guardado correctamente en tu base de datos local."));
   };
 
@@ -211,7 +210,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
   };
 
   // Mapear campos de la base de datos a SpeakerParams
-  const mapDriverToSpeakerParams = (driver: any, brand: string): SpeakerParams => {
+  const mapDriverToSpeakerParams = (driver: any): SpeakerParams => {
     return {
       fs: driver.Fs || 0,
       vas: (driver.Vas || 0) * 1000, // m³ a litros
@@ -337,7 +336,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
   }, [driversDb, searchQuery, selectedBrand, customDrivers]);
 
   const handleSelectDriver = (item: { driver: any; brand: string; displayName: string }) => {
-    const mapped = mapDriverToSpeakerParams(item.driver, item.brand);
+    const mapped = mapDriverToSpeakerParams(item.driver);
     onPresetChange(item.driver.ID.toString(), mapped);
     setSearchQuery(item.displayName);
     setShowDropdown(false);
