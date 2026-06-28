@@ -380,79 +380,60 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
       <h3 className="panel-title">{t("Diseño")}</h3>
 
       {/* EBP Status Bar */}
-      <div className={`ebp-badge-card ${ebpValue ? (ebpValue < 50 ? 'ebp-sealed' : ebpValue > 90 ? 'ebp-ported' : 'ebp-normal') : 'ebp-normal'}`} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '0.75rem', padding: '0.4rem 0.75rem', borderRadius: '6px', marginBottom: '1rem', flexWrap: 'wrap' }}>
+      <div className={`ebp-badge-card ${ebpValue ? (ebpValue < 50 ? 'ebp-sealed' : ebpValue > 90 ? 'ebp-ported' : 'ebp-normal') : 'ebp-normal'}`}>
         <span style={{ fontSize: '0.82rem', fontWeight: 700 }}>EBP: {ebpValue ? ebpValue.toFixed(1) : 'N/A'}</span>
         <span style={{ fontSize: '0.74rem', opacity: 0.85, fontWeight: 500 }}>
           {getEbpRecommendation()}
         </span>
       </div>
 
-      {/* Selector de Tipo de Caja */}
-      <div className="input-group input-group-full" style={{ marginBottom: '1rem' }}>
-        <select
-          value={boxType}
-          onChange={(e) => setBoxType(e.target.value as any)}
-          className="input-select"
-          style={{ width: '100%', height: '38px', borderRadius: '8px' }}
+      {/* Segmented Control de Tipo de Caja */}
+      <div className="segmented-control" style={{ marginBottom: '1.25rem' }}>
+        <button
+          type="button"
+          className={boxType === 'sealed' ? 'active' : ''}
+          onClick={() => setBoxType('sealed')}
         >
-          <option value="sealed">{t("Caja Sellada")}</option>
-          <option value="ported">{t("Caja Ventilada")}</option>
-          <option value="bandpass">{t("Caja Paso Banda")}</option>
-        </select>
+          {t("Sellada")}
+        </button>
+        <button
+          type="button"
+          className={boxType === 'ported' ? 'active' : ''}
+          onClick={() => setBoxType('ported')}
+        >
+          {t("Ventilada")}
+        </button>
+        <button
+          type="button"
+          className={boxType === 'bandpass' ? 'active' : ''}
+          onClick={() => setBoxType('bandpass')}
+        >
+          {t("Paso Banda")}
+        </button>
       </div>
 
       {/* Pestañas de Control Central */}
-      <div className="tabs-header" style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', borderBottom: '1px solid var(--card-border)', paddingBottom: '0.5rem' }}>
+      <div className="sub-tabs-header">
         <button
           type="button"
           onClick={() => setActiveTab('wood')}
-          className={`tab-btn ${activeTab === 'wood' ? 'active' : ''}`}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: activeTab === 'wood' ? 'var(--text-main)' : 'var(--text-muted)',
-            fontWeight: activeTab === 'wood' ? 'bold' : 'normal',
-            fontSize: '0.8rem',
-            cursor: 'pointer',
-            paddingBottom: '0.2rem',
-            borderBottom: activeTab === 'wood' ? '2px solid var(--primary)' : 'none'
-          }}
+          className={activeTab === 'wood' ? 'active' : ''}
         >
-          {t("Dimensiones de la caja")}
+          {t("Medidas")}
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('damping')}
-          className={`tab-btn ${activeTab === 'damping' ? 'active' : ''}`}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: activeTab === 'damping' ? 'var(--text-main)' : 'var(--text-muted)',
-            fontWeight: activeTab === 'damping' ? 'bold' : 'normal',
-            fontSize: '0.8rem',
-            cursor: 'pointer',
-            paddingBottom: '0.2rem',
-            borderBottom: activeTab === 'damping' ? '2px solid var(--primary)' : 'none'
-          }}
+          className={activeTab === 'damping' ? 'active' : ''}
         >
-          {t("Relleno Acústico")}
+          {t("Absorbente")}
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('crossover')}
-          className={`tab-btn ${activeTab === 'crossover' ? 'active' : ''}`}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: activeTab === 'crossover' ? 'var(--text-main)' : 'var(--text-muted)',
-            fontWeight: activeTab === 'crossover' ? 'bold' : 'normal',
-            fontSize: '0.8rem',
-            cursor: 'pointer',
-            paddingBottom: '0.2rem',
-            borderBottom: activeTab === 'crossover' ? '2px solid var(--primary)' : 'none'
-          }}
+          className={activeTab === 'crossover' ? 'active' : ''}
         >
-          {t("Divisores de Frecuencia")}
+          {t("Divisor (Xover)")}
         </button>
       </div>
 
@@ -461,44 +442,54 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
         {activeTab === 'wood' && (
           <>
             {/* Modo de Medidas (Calcular / Ingresar) */}
-            <div className="wood-mode-selector-container" style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+            <div className="segmented-control" style={{ marginBottom: '0.85rem', padding: '2px', borderRadius: '10px' }}>
               <button
                 type="button"
-                className={`preset-select ${woodMode === 'calc' ? 'active' : ''}`}
+                className={woodMode === 'calc' ? 'active' : ''}
                 onClick={() => setWoodMode('calc')}
-                style={{ flex: 1, padding: '0.45rem', fontSize: '0.75rem', cursor: 'pointer', background: woodMode === 'calc' ? 'var(--primary)' : 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '6px', color: '#fff' }}
+                style={{ padding: '0.45rem 0.25rem', fontSize: '0.72rem', borderRadius: '7px' }}
               >
-                {t("Calcular desde Vb")}
+                {t("Calcular (Vb)")}
               </button>
               <button
                 type="button"
-                className={`preset-select ${woodMode === 'input' ? 'active' : ''}`}
+                className={woodMode === 'input' ? 'active' : ''}
                 onClick={() => setWoodMode('input')}
-                style={{ flex: 1, padding: '0.45rem', fontSize: '0.75rem', cursor: 'pointer', background: woodMode === 'input' ? 'var(--primary)' : 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '6px', color: '#fff' }}
+                style={{ padding: '0.45rem 0.25rem', fontSize: '0.72rem', borderRadius: '7px' }}
               >
-                {t("Ingresar Medidas")}
+                {t("Medidas Manuales")}
               </button>
             </div>
 
             {/* Forma de la caja */}
-            <div className="input-group">
+            <div className="input-group" style={{ marginBottom: '1rem' }}>
               <label>{t("Forma de caja")}</label>
-              <select
-                value={woodShape}
-                onChange={(e) => setWoodShape(e.target.value as any)}
-                className="input-select"
-                style={{ width: '100%', height: '34px' }}
-              >
-                <option value="rectangular">{t("Rectangular")}</option>
-                <option value="trapezoidal">{t("Trapezoidal")}</option>
-              </select>
+              <div className="segmented-control" style={{ padding: '2px', borderRadius: '8px' }}>
+                <button
+                  type="button"
+                  className={woodShape === 'rectangular' ? 'active' : ''}
+                  onClick={() => setWoodShape('rectangular')}
+                  style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', borderRadius: '6px' }}
+                >
+                  {t("Rectangular")}
+                </button>
+                <button
+                  type="button"
+                  className={woodShape === 'trapezoidal' ? 'active' : ''}
+                  onClick={() => setWoodShape('trapezoidal')}
+                  style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', borderRadius: '6px' }}
+                >
+                  {t("Trapezoidal")}
+                </button>
+              </div>
             </div>
 
             {/* Si es Modo Calcular: proporciones y bloqueos */}
             {woodMode === 'calc' && (
-              <>
+              <div className="premium-form-card">
+                <div className="form-subsection-title" style={{ marginTop: 0 }}>{t("Configuración de Cálculo")}</div>
                 {woodShape === 'rectangular' && (
-                  <div className="input-group">
+                  <div className="input-group" style={{ marginBottom: '0.75rem' }}>
                     <label>{t("Bloqueo de Dimensiones")}</label>
                     <select
                       value={woodConstraint}
@@ -515,7 +506,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 )}
 
                 {woodConstraint === 'none' && woodShape === 'rectangular' && (
-                  <div className="input-group">
+                  <div className="input-group" style={{ marginBottom: '0.75rem' }}>
                     <label>{t("Proporción Acústica")}</label>
                     <select
                       value={woodRatio}
@@ -573,20 +564,21 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     )}
                   </div>
                 )}
-              </>
+              </div>
             )}
 
             {/* Si es Modo Ingresar Medidas: inputs manuales */}
             {woodMode === 'input' && (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.4rem' }}>
+              <div className="premium-form-card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', borderBottom: '1px solid var(--card-border)', paddingBottom: '0.4rem' }}>
+                  <span className="form-subsection-title" style={{ border: 'none', padding: 0, margin: 0 }}>{t("Medidas Manuales")}</span>
                   <button
                     type="button"
                     onClick={handleApplySuggestedCabinet}
                     className="preset-select"
-                    style={{ padding: '0.35rem 0.7rem', fontSize: '0.75rem', background: 'var(--primary)', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer' }}
+                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', background: 'var(--primary)', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer' }}
                   >
-                    {t("Cargar Cajón Sugerido")}
+                    {t("Cargar Sugerido")}
                   </button>
                 </div>
                 {woodShape === 'rectangular' ? (
@@ -680,165 +672,188 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     </div>
                   </div>
                 )}
-              </>
+              </div>
             )}
 
             {/* Inputs comunes de ebanistería */}
-            <div className="input-grid" style={{ marginTop: '0.5rem' }}>
-              <div className="input-group">
-                <label>{t("Espesor madera")}</label>
-                <div className="input-wrapper">
-                  <input
-                    type="number"
-                    value={displayVal(woodThickness, 'length_small')}
-                    onChange={(e) => handleInputChange(e.target.value, setWoodThickness, 'length_small')}
-                    step="any"
-                  />
-                  <span className="unit-badge">{getUnitLabel('length_small', unitSystem)}</span>
+            <div className="premium-form-card">
+              <div className="form-subsection-title" style={{ marginTop: 0 }}>{t("Propiedades de la Madera")}</div>
+              <div className="input-grid">
+                <div className="input-group">
+                  <label>{t("Espesor madera")}</label>
+                  <div className="input-wrapper">
+                    <input
+                      type="number"
+                      value={displayVal(woodThickness, 'length_small')}
+                      onChange={(e) => handleInputChange(e.target.value, setWoodThickness, 'length_small')}
+                      step="any"
+                    />
+                    <span className="unit-badge">{getUnitLabel('length_small', unitSystem)}</span>
+                  </div>
                 </div>
-              </div>
-              <div className="input-group">
-                <label>{t("Vol extra")}</label>
-                <div className="input-wrapper">
-                  <input
-                    type="number"
-                    value={displayVal(woodExtra, 'volume')}
-                    onChange={(e) => handleInputChange(e.target.value, setWoodExtra, 'volume')}
-                    step="any"
-                  />
-                  <span className="unit-badge">{getUnitLabel('volume', unitSystem)}</span>
+                <div className="input-group">
+                  <label>{t("Vol extra")}</label>
+                  <div className="input-wrapper">
+                    <input
+                      type="number"
+                      value={displayVal(woodExtra, 'volume')}
+                      onChange={(e) => handleInputChange(e.target.value, setWoodExtra, 'volume')}
+                      step="any"
+                    />
+                    <span className="unit-badge">{getUnitLabel('volume', unitSystem)}</span>
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Dimensionamiento y alineación acústica del cajón */}
-            <div className="form-subsection-title" style={{ marginTop: '1rem' }}>{t("Dimensionamiento y Alineación")}</div>
-
-            <div className="input-grid">
-              <div className="input-group">
-                <label>{t("Volumen Neto (Vb)")}</label>
-                <div className="input-wrapper">
-                  <input
-                    type="number"
-                    value={Number(convertTo(boxType === 'sealed' ? (sealedData.valid ? sealedData.Vb : customVb) : boxType === 'ported' ? (portedData.valid ? portedData.Vb : customVb) : (bandpassData.valid ? (bandpassData.Vf + bandpassData.Vr) : customVb), 'volume', unitSystem).toFixed(2))}
-                    onChange={(e) => {
-                      const valLitres = convertFrom(parseFloat(e.target.value) || 0, 'volume', unitSystem);
-                      setCustomVb(valLitres);
-                      setCustomPorted(true);
-                    }}
-                    disabled={isLinkedToCabinet}
-                    step="any"
-                  />
-                  <span className="unit-badge">{getUnitLabel('volume', unitSystem)}</span>
-                </div>
-              </div>
-
-              {boxType !== 'sealed' && (
+            <div className="premium-form-card">
+              <div className="form-subsection-title" style={{ marginTop: 0 }}>{t("Alineación Acústica (Vb/Fb)")}</div>
+              <div className="input-grid">
                 <div className="input-group">
-                  <label>{boxType === 'bandpass' ? t("Sintonía Frontal (Fb)") : t("Sintonía (Fb)")}</label>
+                  <label>{t("Volumen Neto (Vb)")}</label>
                   <div className="input-wrapper">
                     <input
                       type="number"
-                      value={Number((boxType === 'ported' ? (portedData.valid ? portedData.Fb : customFb) : (bandpassData.valid ? bandpassData.Fb : customFb)).toFixed(1))}
+                      value={Number(convertTo(boxType === 'sealed' ? (sealedData.valid ? sealedData.Vb : customVb) : boxType === 'ported' ? (portedData.valid ? portedData.Vb : customVb) : (bandpassData.valid ? (bandpassData.Vf + bandpassData.Vr) : customVb), 'volume', unitSystem).toFixed(2))}
                       onChange={(e) => {
-                        setCustomFb(parseFloat(e.target.value) || 0);
+                        const valLitres = convertFrom(parseFloat(e.target.value) || 0, 'volume', unitSystem);
+                        setCustomVb(valLitres);
                         setCustomPorted(true);
                       }}
+                      disabled={isLinkedToCabinet}
                       step="any"
                     />
-                    <span className="unit-badge">Hz</span>
+                    <span className="unit-badge">{getUnitLabel('volume', unitSystem)}</span>
                   </div>
                 </div>
-              )}
-            </div>
 
-            {boxType === 'sealed' && (
-              <div className="input-group">
-                <label>{t("Q del Sistema Objetivo (Qtc)")}</label>
-                <div className="input-wrapper">
-                  <input
-                    type="number"
-                    value={targetQtc}
-                    onChange={(e) => setTargetQtc(parseFloat(e.target.value) || 0.707)}
-                    step="0.01"
-                  />
-                </div>
-              </div>
-            )}
-
-            {boxType === 'bandpass' && (
-              <div className="input-grid">
-                <div className="input-group">
-                  <label>{t("Orden del Filtro")}</label>
-                  <select
-                    value={bandpassOrder}
-                    onChange={(e) => setBandpassOrder(parseInt(e.target.value) as any)}
-                    className="input-select"
-                    style={{ width: '100%', height: '34px' }}
-                  >
-                    <option value={4}>{t("4.º Orden")}</option>
-                    <option value={6}>{t("6.º Orden (Paralelo)")}</option>
-                  </select>
-                </div>
-                {bandpassOrder === 4 ? (
+                {boxType !== 'sealed' && (
                   <div className="input-group">
-                    <label>{t("Factor de Calidad (S)")}</label>
+                    <label>{boxType === 'bandpass' ? t("Sintonía Frontal (Fb)") : t("Sintonía (Fb)")}</label>
                     <div className="input-wrapper">
                       <input
                         type="number"
-                        value={bandpassS}
-                        onChange={(e) => setBandpassS(parseFloat(e.target.value) || 0.707)}
-                        step="0.05"
+                        value={Number((boxType === 'ported' ? (portedData.valid ? portedData.Fb : customFb) : (bandpassData.valid ? bandpassData.Fb : customFb)).toFixed(1))}
+                        onChange={(e) => {
+                          setCustomFb(parseFloat(e.target.value) || 0);
+                          setCustomPorted(true);
+                        }}
+                        step="any"
                       />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="input-group">
-                    <label>{t("Ganancia (A)")}</label>
-                    <div className="input-wrapper">
-                      <input
-                        type="number"
-                        value={bandpassA}
-                        onChange={(e) => setBandpassA(parseFloat(e.target.value) || 2.0)}
-                        step="0.1"
-                      />
+                      <span className="unit-badge">Hz</span>
                     </div>
                   </div>
                 )}
               </div>
-            )}
+
+              {boxType === 'sealed' && (
+                <div className="input-group" style={{ marginTop: '0.5rem' }}>
+                  <label>{t("Q del Sistema Objetivo (Qtc)")}</label>
+                  <div className="input-wrapper">
+                    <input
+                      type="number"
+                      value={targetQtc}
+                      onChange={(e) => setTargetQtc(parseFloat(e.target.value) || 0.707)}
+                      step="0.01"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {boxType === 'bandpass' && (
+                <div className="input-grid" style={{ marginTop: '0.5rem' }}>
+                  <div className="input-group">
+                    <label>{t("Orden del Filtro")}</label>
+                    <select
+                      value={bandpassOrder}
+                      onChange={(e) => setBandpassOrder(parseInt(e.target.value) as any)}
+                      className="input-select"
+                      style={{ width: '100%', height: '34px' }}
+                    >
+                      <option value={4}>{t("4.º Orden")}</option>
+                      <option value={6}>{t("6.º Orden (Paralelo)")}</option>
+                    </select>
+                  </div>
+                  {bandpassOrder === 4 ? (
+                    <div className="input-group">
+                      <label>{t("Factor de Calidad (S)")}</label>
+                      <div className="input-wrapper">
+                        <input
+                          type="number"
+                          value={bandpassS}
+                          onChange={(e) => setBandpassS(parseFloat(e.target.value) || 0.707)}
+                          step="0.05"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="input-group">
+                      <label>{t("Ganancia (A)")}</label>
+                      <div className="input-wrapper">
+                        <input
+                          type="number"
+                          value={bandpassA}
+                          onChange={(e) => setBandpassA(parseFloat(e.target.value) || 2.0)}
+                          step="0.1"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             {boxType === 'ported' && (
-              <>
-                <div className="form-subsection-title">{t("Sintonización mediante")}</div>
-                <div className="input-group input-group-full">
-                  <select
-                    value={prTuning}
-                    onChange={(e) => setPrTuning(e.target.value as any)}
-                    className="input-select"
-                    style={{ width: '100%', height: '34px' }}
-                  >
-                    <option value="port">{t("Puerto / Conducto de Aire")}</option>
-                    <option value="radiator">{t("Radiador Pasivo")}</option>
-                  </select>
+              <div className="premium-form-card">
+                <div className="form-subsection-title" style={{ marginTop: 0 }}>{t("Configuración del Puerto")}</div>
+                <div className="input-group" style={{ marginBottom: '0.75rem' }}>
+                  <label>{t("Sintonización mediante")}</label>
+                  <div className="segmented-control" style={{ padding: '2px', borderRadius: '8px' }}>
+                    <button
+                      type="button"
+                      className={prTuning === 'port' ? 'active' : ''}
+                      onClick={() => setPrTuning('port')}
+                      style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', borderRadius: '6px' }}
+                    >
+                      {t("Puerto de Aire")}
+                    </button>
+                    <button
+                      type="button"
+                      className={prTuning === 'radiator' ? 'active' : ''}
+                      onClick={() => setPrTuning('radiator')}
+                      style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', borderRadius: '6px' }}
+                    >
+                      {t("Radiador Pasivo")}
+                    </button>
+                  </div>
                 </div>
 
                 {prTuning === 'port' ? (
                   <>
-                    <div className="input-group input-group-full">
+                    <div className="input-group" style={{ marginBottom: '0.75rem' }}>
                       <label>{t("Forma del Puerto")}</label>
-                      <select
-                        value={portShape}
-                        onChange={(e) => setPortShape(e.target.value as any)}
-                        className="input-select"
-                        style={{ width: '100%', height: '34px' }}
-                      >
-                        <option value="round">{t("Redondo")}</option>
-                        <option value="rectangular">{t("Rectangular")}</option>
-                      </select>
+                      <div className="segmented-control" style={{ padding: '2px', borderRadius: '8px' }}>
+                        <button
+                          type="button"
+                          className={portShape === 'round' ? 'active' : ''}
+                          onClick={() => setPortShape('round')}
+                          style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', borderRadius: '6px' }}
+                        >
+                          {t("Redondo")}
+                        </button>
+                        <button
+                          type="button"
+                          className={portShape === 'rectangular' ? 'active' : ''}
+                          onClick={() => setPortShape('rectangular')}
+                          style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', borderRadius: '6px' }}
+                        >
+                          {t("Rectangular")}
+                        </button>
+                      </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: portShape === 'rectangular' ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr', gap: '0.45rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: portShape === 'rectangular' ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr', gap: '0.45rem', marginBottom: '0.5rem' }}>
                       <div className="input-group">
                         <label>{t("Cantidad")}</label>
                         <div className="input-wrapper">
@@ -908,7 +923,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     </div>
 
                     {/* Alerta de Velocidad y Sugerencias de Puerto */}
-                    <div style={{ marginTop: '0.6rem' }} className={vPeak !== null ? (vPeak < 10 ? 'alert-box success' : vPeak <= 17 ? 'alert-box warn' : 'alert-box danger') : 'alert-box info'}>
+                    <div style={{ marginTop: '0.6rem', marginBottom: '0.5rem' }} className={vPeak !== null ? (vPeak < 10 ? 'alert-box success' : vPeak <= 17 ? 'alert-box warn' : 'alert-box danger') : 'alert-box info'}>
                       <span dangerouslySetInnerHTML={{ __html: vPeak !== null ? (vPeak < 10 ? `<strong>${t("Velocidad moderada/baja")}:</strong> ${vPeak.toFixed(1)} m/s. ${t("Silencioso.")}` : vPeak <= 17 ? `<strong>${t("Velocidad moderada")}:</strong> ${vPeak.toFixed(1)} m/s. ${t("Recomendado usar extremos redondeados.")}` : `<strong>${t("¡Velocidad crítica!")}:</strong> ${vPeak.toFixed(1)} m/s. ${t("Aumenta el diámetro.")}`) : t("Ingresa Sd y Xmax para calcular la velocidad.") }} />
                     </div>
 
@@ -973,14 +988,14 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     </div>
                   </div>
                 )}
-              </>
+              </div>
             )}
           </>
         )}
 
         {/* PESTAÑA B: RELLENO ACÚSTICO */}
         {activeTab === 'damping' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div className="premium-form-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
               {t("Selecciona la densidad de relleno para la caja:")}
             </p>
@@ -995,16 +1010,11 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                   key={opt.id}
                   type="button"
                   onClick={() => setDampingType(opt.id as any)}
-                  className="preset-select"
+                  className={`premium-panel-btn ${dampingType === opt.id ? 'active-primary' : ''}`}
                   style={{
-                    padding: '0.55rem',
-                    textAlign: 'left',
+                    padding: '0.65rem 0.85rem',
+                    justifyContent: 'flex-start',
                     fontSize: '0.78rem',
-                    background: dampingType === opt.id ? 'var(--primary)' : 'var(--card-bg)',
-                    border: '1px solid ' + (dampingType === opt.id ? 'var(--primary)' : 'var(--card-border)'),
-                    color: '#fff',
-                    borderRadius: '6px',
-                    cursor: 'pointer'
                   }}
                 >
                   {opt.label}
@@ -1016,22 +1026,32 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
 
         {/* PESTAÑA C: CROSSOVER / DIVISORES DE FRECUENCIA */}
         {activeTab === 'crossover' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-            <div className="input-grid">
-              <div className="input-group">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div className="premium-form-card">
+              <div className="form-subsection-title" style={{ marginTop: 0 }}>{t("Configuración del Divisor")}</div>
+              <div className="input-group" style={{ marginBottom: '0.75rem' }}>
                 <label>{t("Vías")}</label>
-                <select
-                  value={crossoverWays}
-                  onChange={(e) => setCrossoverWays(parseInt(e.target.value))}
-                  className="input-select"
-                  style={{ width: '100%', height: '34px' }}
-                >
-                  <option value={2}>{t("2 Vías")}</option>
-                  <option value={3}>{t("3 Vías")}</option>
-                </select>
+                <div className="segmented-control" style={{ padding: '2px', borderRadius: '8px' }}>
+                  <button
+                    type="button"
+                    className={crossoverWays === 2 ? 'active' : ''}
+                    onClick={() => setCrossoverWays(2)}
+                    style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', borderRadius: '6px' }}
+                  >
+                    {t("2 Vías")}
+                  </button>
+                  <button
+                    type="button"
+                    className={crossoverWays === 3 ? 'active' : ''}
+                    onClick={() => setCrossoverWays(3)}
+                    style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', borderRadius: '6px' }}
+                  >
+                    {t("3 Vías")}
+                  </button>
+                </div>
               </div>
 
-              <div className="input-group">
+              <div className="input-group" style={{ marginBottom: '0.75rem' }}>
                 <label>{t("Tipo Filtro")}</label>
                 <select
                   value={crossoverType}
@@ -1045,118 +1065,125 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                   <option value="4th_lr">{t("Linkwitz-Riley (24dB)")}</option>
                 </select>
               </div>
+
+              {crossoverWays === 2 ? (
+                <div className="input-group">
+                  <label>{t("Frecuencia Corte (Fc)")} (Hz)</label>
+                  <div className="input-wrapper">
+                    <input type="number" value={fc} onChange={(e) => setFc(parseFloat(e.target.value) || 2500)} step="50" />
+                  </div>
+                </div>
+              ) : (
+                <div className="input-grid">
+                  <div className="input-group">
+                    <label>{t("Fc Baja (Low)")} (Hz)</label>
+                    <div className="input-wrapper">
+                      <input type="number" value={fcLow} onChange={(e) => setFcLow(parseFloat(e.target.value) || 500)} step="50" />
+                    </div>
+                  </div>
+                  <div className="input-group">
+                    <label>{t("Fc Alta (High)")} (Hz)</label>
+                    <div className="input-wrapper">
+                      <input type="number" value={fcHigh} onChange={(e) => setFcHigh(parseFloat(e.target.value) || 4000)} step="50" />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {crossoverWays === 2 ? (
-              <div className="input-group">
-                <label>{t("Frecuencia Corte (Fc)")} (Hz)</label>
-                <div className="input-wrapper">
-                  <input type="number" value={fc} onChange={(e) => setFc(parseFloat(e.target.value) || 2500)} step="50" />
-                </div>
-              </div>
-            ) : (
+            <div className="premium-form-card">
+              <div className="form-subsection-title" style={{ marginTop: 0 }}>{t("Impedancias de Carga")} (Ω)</div>
               <div className="input-grid">
                 <div className="input-group">
-                  <label>{t("Fc Baja (Low)")} (Hz)</label>
+                  <label>{t("Tweeter")}</label>
                   <div className="input-wrapper">
-                    <input type="number" value={fcLow} onChange={(e) => setFcLow(parseFloat(e.target.value) || 500)} step="50" />
+                    <input type="number" value={zTweeter} onChange={(e) => setZTweeter(parseFloat(e.target.value) || 8)} />
                   </div>
                 </div>
+                {crossoverWays === 3 && (
+                  <div className="input-group">
+                    <label>{t("Rango Medio")}</label>
+                    <div className="input-wrapper">
+                      <input type="number" value={zMidrange} onChange={(e) => setZMidrange(parseFloat(e.target.value) || 8)} />
+                    </div>
+                  </div>
+                )}
                 <div className="input-group">
-                  <label>{t("Fc Alta (High)")} (Hz)</label>
+                  <label>{t("Woofer")}</label>
                   <div className="input-wrapper">
-                    <input type="number" value={fcHigh} onChange={(e) => setFcHigh(parseFloat(e.target.value) || 4000)} step="50" />
+                    <input type="number" value={zWoofer} onChange={(e) => setZWoofer(parseFloat(e.target.value) || 8)} />
                   </div>
-                </div>
-              </div>
-            )}
-
-            <div className="form-subsection-title">{t("Impedancias de Carga")} (Ω)</div>
-            <div className="input-grid">
-              <div className="input-group">
-                <label>{t("Tweeter")}</label>
-                <div className="input-wrapper">
-                  <input type="number" value={zTweeter} onChange={(e) => setZTweeter(parseFloat(e.target.value) || 8)} />
-                </div>
-              </div>
-              {crossoverWays === 3 && (
-                <div className="input-group">
-                  <label>{t("Rango Medio")}</label>
-                  <div className="input-wrapper">
-                    <input type="number" value={zMidrange} onChange={(e) => setZMidrange(parseFloat(e.target.value) || 8)} />
-                  </div>
-                </div>
-              )}
-              <div className="input-group">
-                <label>{t("Woofer")}</label>
-                <div className="input-wrapper">
-                  <input type="number" value={zWoofer} onChange={(e) => setZWoofer(parseFloat(e.target.value) || 8)} />
                 </div>
               </div>
             </div>
 
-            {/* Red Zobel */}
-            <div style={{ borderTop: '1px solid var(--card-border)', paddingTop: '0.5rem', marginTop: '0.4rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
-                <input
-                  type="checkbox"
-                  id="chk-zobel"
-                  checked={enableZobel}
-                  onChange={(e) => setEnableZobel(e.target.checked)}
-                  style={{ width: '16px', height: '16px' }}
-                />
-                <label htmlFor="chk-zobel" style={{ fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer' }}>
-                  {t("Implementar Red Zobel")}
-                </label>
-              </div>
-              {enableZobel && (
-                <div className="input-grid">
-                  <div className="input-group">
-                    <label>Re (Ω)</label>
-                    <div className="input-wrapper">
-                      <input type="number" value={zobelRe} onChange={(e) => setZobelRe(parseFloat(e.target.value) || 6)} />
-                    </div>
-                  </div>
-                  <div className="input-group">
-                    <label>Le (mH)</label>
-                    <div className="input-wrapper">
-                      <input type="number" value={zobelLe} onChange={(e) => setZobelLe(parseFloat(e.target.value) || 0.5)} step="0.05" />
-                    </div>
-                  </div>
+            {/* Red Zobel y L-Pad agrupadas en una tarjeta */}
+            <div className="premium-form-card">
+              <div className="form-subsection-title" style={{ marginTop: 0 }}>{t("Redes de Compensación")}</div>
+              
+              {/* Red Zobel */}
+              <div style={{ marginBottom: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                  <input
+                    type="checkbox"
+                    id="chk-zobel"
+                    checked={enableZobel}
+                    onChange={(e) => setEnableZobel(e.target.checked)}
+                    style={{ width: '16px', height: '16px' }}
+                  />
+                  <label htmlFor="chk-zobel" style={{ fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer' }}>
+                    {t("Implementar Red Zobel")}
+                  </label>
                 </div>
-              )}
-            </div>
+                {enableZobel && (
+                  <div className="input-grid">
+                    <div className="input-group">
+                      <label>Re (Ω)</label>
+                      <div className="input-wrapper">
+                        <input type="number" value={zobelRe} onChange={(e) => setZobelRe(parseFloat(e.target.value) || 6)} />
+                      </div>
+                    </div>
+                    <div className="input-group">
+                      <label>Le (mH)</label>
+                      <div className="input-wrapper">
+                        <input type="number" value={zobelLe} onChange={(e) => setZobelLe(parseFloat(e.target.value) || 0.5)} step="0.05" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
 
-            {/* L-Pad */}
-            <div style={{ borderTop: '1px solid var(--card-border)', paddingTop: '0.5rem', marginTop: '0.4rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
-                <input
-                  type="checkbox"
-                  id="chk-lpad"
-                  checked={enableLPad}
-                  onChange={(e) => setEnableLPad(e.target.checked)}
-                  style={{ width: '16px', height: '16px' }}
-                />
-                <label htmlFor="chk-lpad" style={{ fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer' }}>
-                  {t("Implementar Atenuador L-Pad")}
-                </label>
-              </div>
-              {enableLPad && (
-                <div className="input-grid">
-                  <div className="input-group">
-                    <label>{t("Atenuación (dB)")}</label>
-                    <div className="input-wrapper">
-                      <input type="number" value={lpadAttenuation} onChange={(e) => setLpadAttenuation(parseFloat(e.target.value) || 3)} step="0.5" />
-                    </div>
-                  </div>
-                  <div className="input-group">
-                    <label>{t("Impedancia Carga")}</label>
-                    <div className="input-wrapper">
-                      <input type="number" value={lpadZLoad} onChange={(e) => setLpadZLoad(parseFloat(e.target.value) || 8)} />
-                    </div>
-                  </div>
+              {/* L-Pad */}
+              <div style={{ borderTop: '1px solid var(--card-border)', paddingTop: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                  <input
+                    type="checkbox"
+                    id="chk-lpad"
+                    checked={enableLPad}
+                    onChange={(e) => setEnableLPad(e.target.checked)}
+                    style={{ width: '16px', height: '16px' }}
+                  />
+                  <label htmlFor="chk-lpad" style={{ fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer' }}>
+                    {t("Implementar Atenuador L-Pad")}
+                  </label>
                 </div>
-              )}
+                {enableLPad && (
+                  <div className="input-grid">
+                    <div className="input-group">
+                      <label>{t("Atenuación (dB)")}</label>
+                      <div className="input-wrapper">
+                        <input type="number" value={lpadAttenuation} onChange={(e) => setLpadAttenuation(parseFloat(e.target.value) || 3)} step="0.5" />
+                      </div>
+                    </div>
+                    <div className="input-group">
+                      <label>{t("Impedancia Carga")}</label>
+                      <div className="input-wrapper">
+                        <input type="number" value={lpadZLoad} onChange={(e) => setLpadZLoad(parseFloat(e.target.value) || 8)} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
