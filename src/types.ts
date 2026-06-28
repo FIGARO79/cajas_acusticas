@@ -44,6 +44,19 @@ export interface CalculatedPorted {
   alignment: string;
 }
 
+export interface CalculatedBandpass {
+  valid: boolean;
+  order: 4 | 6;
+  Vf: number;
+  Vr: number;
+  Fb: number;
+  F0?: number;
+  delta_f?: number;
+  Fl?: number;
+  Fh?: number;
+}
+
+
 export interface WoodCutPiece {
   name: string;
   qty: number;

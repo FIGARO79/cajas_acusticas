@@ -11,9 +11,9 @@ import {
   Legend,
   Filler,
 } from 'chart.js';
-import type { CalculatedSealed, CalculatedPorted, SpeakerParams } from '../types';
+import type { CalculatedSealed, CalculatedPorted, CalculatedBandpass, SpeakerParams } from '../types';
 import { type Lang, translate } from '../utils/translations';
-import { calcSealedCurve, calcPortedCurve } from '../wasm/index';
+import { calcSealedCurve, calcPortedCurve, calcBandpass4Curve, calcBandpass6Curve } from '../wasm/index';
 
 ChartJS.register(
   LinearScale,
@@ -31,6 +31,7 @@ interface SimulationChartProps {
   theme: 'dark' | 'light';
   sealedData: CalculatedSealed | null;
   portedData: CalculatedPorted | null;
+  bandpassData: CalculatedBandpass | null;
   params: SpeakerParams;
 }
 
@@ -39,6 +40,7 @@ export const SimulationChart: React.FC<SimulationChartProps> = ({
   theme,
   sealedData,
   portedData,
+  bandpassData,
   params,
 }) => {
   const t = (text: string) => translate(text, lang);
@@ -56,6 +58,7 @@ export const SimulationChart: React.FC<SimulationChartProps> = ({
   // State for curve points
   const [sealedPoints, setSealedPoints] = useState<{x:number,y:number}[]>([]);
   const [portedPoints, setPortedPoints] = useState<{x:number,y:number}[]>([]);
+  const [bandpassPoints, setBandpassPoints] = useState<{x:number,y:number}[]>([]);
 
   // Recalculate curves when data or params change
   useEffect(() => {
@@ -80,11 +83,34 @@ export const SimulationChart: React.FC<SimulationChartProps> = ({
     } else {
       setPortedPoints([]);
     }
+    if (bandpassData && bandpassData.valid) {
+      if (bandpassData.order === 4) {
+        calcBandpass4Curve(bandpassData.Vf, bandpassData.Vr, bandpassData.Fb, params).then(vals => {
+          if (!cancelled) {
+            const pts = vals.map((y:number, idx:number) => ({ x: frequencies[idx], y: Math.max(-35, y) }));
+            setBandpassPoints(pts);
+          }
+        });
+      } else {
+        calcBandpass6Curve(bandpassData.Vf, bandpassData.Vr, bandpassData.Fl || 0, bandpassData.Fh || 0, params).then(vals => {
+          if (!cancelled) {
+            const pts = vals.map((y:number, idx:number) => ({ x: frequencies[idx], y: Math.max(-35, y) }));
+            setBandpassPoints(pts);
+          }
+        });
+      }
+    } else {
+      setBandpassPoints([]);
+    }
     return () => { cancelled = true; };
-  }, [sealedData, portedData, params]);
+  }, [sealedData, portedData, bandpassData, params]);
 
   // Encontrar el valor máximo de ganancia para evitar desbordes en el eje Y
-  const allYValues = [...sealedPoints.map(p => p.y), ...portedPoints.map(p => p.y)];
+  const allYValues = [
+    ...sealedPoints.map(p => p.y),
+    ...portedPoints.map(p => p.y),
+    ...bandpassPoints.map(p => p.y)
+  ];
   const highestY = allYValues.length > 0 ? Math.max(...allYValues) : 0;
   const lowestY = allYValues.length > 0 ? Math.min(...allYValues) : -24;
   const dynamicMax = highestY > 6 ? Math.ceil((highestY + 1.5) / 3) * 3 : 6;
@@ -97,8 +123,10 @@ export const SimulationChart: React.FC<SimulationChartProps> = ({
   const chartTooltipBorder = theme === 'light' ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.15)';
   const chartSealedBg = 'rgba(14, 165, 233, 0.05)';
   const chartPortedBg = 'rgba(16, 185, 129, 0.05)';
+  const chartBandpassBg = 'rgba(245, 158, 11, 0.05)';
   const sealedBorderColor = '#0ea5e9';
   const portedBorderColor = '#10b981';
+  const bandpassBorderColor = '#f59e0b';
 
   const data = {
     datasets: [
@@ -122,10 +150,23 @@ export const SimulationChart: React.FC<SimulationChartProps> = ({
         fill: true,
         tension: 0.2,
       }] : []),
+      ...(bandpassData && bandpassData.valid ? [{
+        label: bandpassData.order === 4 
+          ? `${t("Caja Paso Banda 4.º")} (Vf ${bandpassData.Vf.toFixed(1)}L, Vr ${bandpassData.Vr.toFixed(1)}L, Fb ${bandpassData.Fb.toFixed(1)}Hz)`
+          : `${t("Caja Paso Banda 6.º")} (Vf ${bandpassData.Vf.toFixed(1)}L, Fl ${bandpassData.Fl?.toFixed(1)}Hz, Fh ${bandpassData.Fh?.toFixed(1)}Hz)`,
+        data: bandpassPoints,
+        borderColor: bandpassBorderColor,
+        backgroundColor: chartBandpassBg,
+        borderWidth: 2.5,
+        pointRadius: 0,
+        fill: true,
+        tension: 0.2,
+      }] : []),
     ],
   };
 
   const options = {
+
     responsive: true,
     maintainAspectRatio: false,
     scales: {

@@ -1,14 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Header } from './components/Header';
 import { SpeakerParamsForm } from './components/SpeakerParamsForm';
+import { BoxParamsForm } from './components/BoxParamsForm';
 import { SimulationChart } from './components/SimulationChart';
-import { SealedBoxTab } from './components/SealedBoxTab';
-import { PortedBoxTab } from './components/PortedBoxTab';
 import { CabinetTab } from './components/CabinetTab';
 import { CrossoverTab } from './components/CrossoverTab';
 import { type Lang, translate } from './utils/translations';
-import { type UnitSystem } from './utils/units';
-import type { SpeakerParams, CalculatedSealed, CalculatedPorted, CustomDriver } from './types';
+import { type UnitSystem, convertTo, getUnitLabel } from './utils/units';
+import type { SpeakerParams, CalculatedSealed, CalculatedPorted, CalculatedBandpass, CustomDriver } from './types';
 import { estimateF3 } from './utils/acousticMath';
 import { getWasm, initWasm } from './wasm/index.ts';
 import { generateReportHTML } from './utils/reportGenerator';
@@ -18,7 +17,14 @@ function App() {
   const [lang, setLang] = useState<Lang>(() => (localStorage.getItem('lang') as Lang) || 'es');
   const [unitSystem, setUnitSystem] = useState<UnitSystem>(() => (localStorage.getItem('unitSystem') as UnitSystem) || 'metric');
   const [theme, setTheme] = useState<'dark' | 'light'>(() => (localStorage.getItem('theme') as 'dark' | 'light') || 'dark');
-  const [activeTab, setActiveTab] = useState<'sealed' | 'ported' | 'wood' | 'damping' | 'crossover'>('sealed');
+  const [activeTab, setActiveTab] = useState<'sealed' | 'ported' | 'bandpass' | 'wood' | 'damping' | 'crossover'>('wood');
+  const [boxType, setBoxType] = useState<'sealed' | 'ported' | 'bandpass'>('sealed');
+  const t = (text: string) => translate(text, lang);
+
+  // Bandpass State
+  const [bandpassOrder, setBandpassOrder] = useState<4 | 6>(4);
+  const [bandpassS, setBandpassS] = useState<number>(0.707);
+  const [bandpassA, setBandpassA] = useState<number>(2.0);
 
   // Altavoces personalizados guardados en localStorage
   const [customDrivers, setCustomDrivers] = useState<CustomDriver[]>(() => {
@@ -74,11 +80,17 @@ function App() {
   const [portHeight, setPortHeight] = useState<number | ''>(5);
   const [portArea, setPortArea] = useState<number | ''>(50);
 
+  // Radiador Pasivo
+  const [prTuning, setPrTuning] = useState<'port' | 'radiator'>('port');
+  const [prDia, setPrDia] = useState<number>(20);
+  const [prVas, setPrVas] = useState<number>(45);
+  const [prFs, setPrFs] = useState<number>(25);
+  const [prMms, setPrMms] = useState<number>(35);
+
   // Woodworking parameters
   const [woodMode, setWoodMode] = useState<'calc' | 'input'>('calc');
   const [woodShape, setWoodShape] = useState<'rectangular' | 'trapezoidal'>('rectangular');
   const [woodConstraint, setWoodConstraint] = useState<string>('none');
-  const [woodSource, setWoodSource] = useState<'sealed' | 'ported'>('ported');
   const [woodRatio, setWoodRatio] = useState<'golden' | 'classic' | 'cube'>('golden');
   const [dampingType, setDampingType] = useState<'none' | 'light' | 'moderate' | 'heavy'>('none');
 
@@ -330,6 +342,111 @@ function App() {
 
   const portedData = calculatePorted();
 
+  // --- CALCULAR CAJA PASO BANDA (BANDPASS) ---
+  const calculateBandpass = (): CalculatedBandpass => {
+    if (validationError || !adjParams.fs || !adjParams.vas || !adjParams.qts) {
+      return { valid: false, order: bandpassOrder, Vf: 0, Vr: 0, Fb: 0, F0: 0, delta_f: 0, Fl: 0, Fh: 0 };
+    }
+
+    const wasm = getWasm();
+
+    try {
+      if (bandpassOrder === 4) {
+        const res = wasm.calc_bandpass_4(adjParams.fs, adjParams.vas, adjParams.qts, bandpassS);
+        return {
+          valid: true,
+          order: 4,
+          Vf: res.vf,
+          Vr: res.vr,
+          Fb: res.fb,
+          F0: res.f0,
+          delta_f: res.delta_f
+        };
+      } else {
+        const res = wasm.calc_bandpass_6(adjParams.fs, adjParams.vas, adjParams.qts, bandpassA);
+        return {
+          valid: true,
+          order: 6,
+          Vf: res.vf,
+          Vr: res.vr,
+          Fb: 0,
+          Fl: res.fl,
+          Fh: res.fh
+        };
+      }
+    } catch (e) {
+      console.error("Bandpass calculation error:", e);
+      return { valid: false, order: bandpassOrder, Vf: 0, Vr: 0, Fb: 0, F0: 0, delta_f: 0, Fl: 0, Fh: 0 };
+    }
+  };
+
+  const bandpassData = calculateBandpass();
+
+  // --- CÁLCULO SÍNCRONO DE LONGITUD DE PUERTO ---
+  const getPortLengthCalculation = () => {
+    const pCount = typeof portCount === 'number' ? portCount : 0;
+    if (pCount > 0 && portedData.Vb > 0) {
+      let pDia = 0;
+      if (portShape === 'round') {
+        pDia = typeof portDiameter === 'number' ? portDiameter : 0;
+      } else {
+        const w = typeof portWidth === 'number' ? portWidth : 0;
+        const h = typeof portHeight === 'number' ? portHeight : 0;
+        pDia = 2 * Math.sqrt((w * h) / Math.PI);
+      }
+
+      if (pDia > 0) {
+        const rPort = pDia / 2;
+        const Lv = ((23562.5 * Math.pow(pDia, 2) * pCount) / (portedData.Fb * portedData.Fb * portedData.Vb)) - (1.46 * rPort);
+        
+        const displayLv = convertTo(Lv, 'length', unitSystem);
+        const unitLabel = getUnitLabel('length', unitSystem);
+
+        if (Lv <= 0) {
+          return t("Excesivamente corto");
+        } else if (Lv > 120) {
+          return `${displayLv.toFixed(1)} ${unitLabel} (${t("Excede caja")})`;
+        } else {
+          return `${displayLv.toFixed(1)} ${unitLabel}`;
+        }
+      }
+    }
+    return 'N/A';
+  };
+
+  const portLength = getPortLengthCalculation();
+
+  // --- CÁLCULO SÍNCRONO DE RADIADOR PASIVO ---
+  const getRadiadorPasivoCalculations = () => {
+    if (portedData.valid && portedData.Vb > 0) {
+      const rho = 1.205;
+      const c = 343.0;
+      const sd_m2 = Math.PI * Math.pow((prDia / 100) / 2, 2);
+      const vb_m3 = portedData.Vb / 1000;
+      const vas_m3 = prVas / 1000;
+
+      const cab = vb_m3 / (rho * c * c * sd_m2 * sd_m2);
+      const cap = vas_m3 / (rho * c * c * sd_m2 * sd_m2);
+      const mp_propia = (prMms / 1000) / Math.pow(sd_m2, 2);
+
+      const fbNat = (1.0 / (2.0 * Math.PI)) * Math.sqrt(1.0 / (mp_propia * (cap + cab)));
+
+      const targetFb = portedData.Fb;
+      const mp_total_req = 1.0 / (4.0 * Math.PI * Math.PI * targetFb * targetFb * (cap + cab));
+      const mp_ad_req = mp_total_req - mp_propia;
+      const masaMecG = mp_ad_req * sd_m2 * sd_m2 * 1000;
+
+      return {
+        prFbNatural: fbNat || 0,
+        prMasaAnadidaG: Math.max(0, masaMecG) || 0
+      };
+    }
+    return { prFbNatural: 0, prMasaAnadidaG: 0 };
+  };
+
+  const { prFbNatural, prMasaAnadidaG } = getRadiadorPasivoCalculations();
+
+
   // Auto update slider values when preset changes
   useEffect(() => {
     if (!customPorted && portedData.valid) {
@@ -338,7 +455,7 @@ function App() {
     }
   }, [preset, customPorted, portedData.valid]);
 
-  const t = (text: string) => translate(text, lang);
+
 
   // Suggest EBP alignment recommendation
   const getEbpRecommendation = () => {
@@ -459,7 +576,8 @@ function App() {
         unitSystem={unitSystem}
         setUnitSystem={setUnitSystem}
         theme={theme} 
-        toggleTheme={toggleTheme} 
+        toggleTheme={toggleTheme}
+        onExportReport={handleExportReport}
       />
 
       <div className="dashboard-grid">
@@ -478,109 +596,145 @@ function App() {
           onCustomDriversChange={handleCustomDriversChange}
         />
 
+        {/* PARÁMETROS CENTRO: CAJA DE DISEÑO */}
+        <BoxParamsForm
+          lang={lang}
+          unitSystem={unitSystem}
+          boxType={boxType}
+          setBoxType={setBoxType}
+          customVb={customVb}
+          setCustomVb={setCustomVb}
+          customFb={customFb}
+          setCustomFb={setCustomFb}
+          customPorted={customPorted}
+          setCustomPorted={setCustomPorted}
+          params={adjParams}
+          portedData={portedData}
+          sealedData={sealedData}
+          bandpassData={bandpassData}
+          isLinkedToCabinet={woodMode === 'input' && manualNetVol > 0}
+          targetQtc={targetQtc}
+          setTargetQtc={setTargetQtc}
+          bandpassOrder={bandpassOrder}
+          setBandpassOrder={setBandpassOrder}
+          bandpassS={bandpassS}
+          setBandpassS={setBandpassS}
+          bandpassA={bandpassA}
+          setBandpassA={setBandpassA}
+          
+          portCount={portCount}
+          setPortCount={setPortCount}
+          portDiameter={portDiameter}
+          setPortDiameter={setPortDiameter}
+          portShape={portShape === 'custom' ? 'round' : portShape}
+          setPortShape={setPortShape}
+          portWidth={portWidth}
+          setPortWidth={setPortWidth}
+          portHeight={portHeight}
+          setPortHeight={setPortHeight}
+          portArea={portArea}
+          setPortArea={setPortArea}
+          portLength={portLength}
+
+          prTuning={prTuning}
+          setPrTuning={setPrTuning}
+          prDia={prDia}
+          setPrDia={setPrDia}
+          prVas={prVas}
+          setPrVas={setPrVas}
+          prFs={prFs}
+          setPrFs={setPrFs}
+          prMms={prMms}
+          setPrMms={setPrMms}
+          prFbNatural={prFbNatural}
+          prMasaAnadidaG={prMasaAnadidaG}
+        />
+
         {/* CONTENIDOS DERECHA */}
         <main className="dashboard-main">
-          {/* EBP Badges */}
-          <div className={`ebp-badge-card ${ebpValue ? (ebpValue < 50 ? 'ebp-sealed' : ebpValue > 90 ? 'ebp-ported' : 'ebp-normal') : 'ebp-normal'}`} style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', padding: '0.8rem 1.2rem', borderRadius: '8px' }}>
-            <div style={{ fontSize: '0.95rem', fontWeight: 700, display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '0.4rem' }}>
-              <span>EBP: {ebpValue ? ebpValue.toFixed(1) : 'N/A'}</span>
-              <span style={{ fontSize: '0.75rem', opacity: 0.85, fontWeight: 500 }}>
-                {t("(Efficiency Bandwidth Product = Fs / Qes)")}
-              </span>
-            </div>
-            <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>
+          {/* EBP Status Bar */}
+          <div className={`ebp-badge-card ${ebpValue ? (ebpValue < 50 ? 'ebp-sealed' : ebpValue > 90 ? 'ebp-ported' : 'ebp-normal') : 'ebp-normal'}`} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '0.75rem', padding: '0.3rem 0.75rem', borderRadius: '4px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: 700 }}>EBP: {ebpValue ? ebpValue.toFixed(1) : 'N/A'}</span>
+            <span style={{ fontSize: '0.68rem', opacity: 0.85, fontWeight: 500 }}>
               {getEbpRecommendation()}
-            </div>
-            <div style={{ fontSize: '0.72rem', opacity: 0.85, lineHeight: '1.3' }}>
-              {t("EBP ayuda a decidir la caja: < 50 ideal Sellada, > 90 ideal Ventilada, entre 50 y 90 apta para ambas.")}
-            </div>
+            </span>
           </div>
 
           {/* Gráfico */}
           <SimulationChart 
             lang={lang}
             theme={theme}
-            sealedData={sealedData.valid ? sealedData : null}
-            portedData={portedData.valid ? portedData : null}
+            sealedData={boxType === 'sealed' && sealedData.valid ? sealedData : null}
+            portedData={boxType === 'ported' && portedData.valid ? portedData : null}
+            bandpassData={boxType === 'bandpass' && bandpassData.valid ? bandpassData : null}
             params={adjParams}
           />
 
           {/* Caja Acústica Pestañas */}
           <div className="panel">
             {/* Tabs header */}
-            <div className="tabs-header">
+            <div className="tabs-header" style={{ display: 'flex', gap: '1.25rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--card-border)', padding: '0 0 0.5rem 0', background: 'transparent' }}>
               <button 
-                className={`tab-btn ${activeTab === 'sealed' ? 'active' : ''}`} 
-                onClick={() => setActiveTab('sealed')}
-              >
-                {t("Caja Sellada")}
-              </button>
-              <button 
-                className={`tab-btn ${activeTab === 'ported' ? 'active' : ''}`} 
-                onClick={() => setActiveTab('ported')}
-              >
-                {t("Caja Ventilada")}
-              </button>
-              <button 
-                className={`tab-btn ${activeTab === 'wood' ? 'active' : ''}`} 
+                type="button"
                 onClick={() => setActiveTab('wood')}
+                style={{ 
+                  background: 'none', 
+                  border: 'none', 
+                  padding: 0, 
+                  margin: 0, 
+                  color: activeTab === 'wood' ? 'var(--text-main)' : 'var(--text-muted)', 
+                  fontWeight: activeTab === 'wood' ? 'bold' : 'normal', 
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  fontFamily: 'var(--font-sans)',
+                  outline: 'none',
+                  letterSpacing: '0.02em',
+                  transition: 'color 0.15s ease'
+                }}
               >
                 {t("Dimensiones de la caja")}
               </button>
               <button 
-                className={`tab-btn ${activeTab === 'damping' ? 'active' : ''}`} 
+                type="button"
                 onClick={() => setActiveTab('damping')}
+                style={{ 
+                  background: 'none', 
+                  border: 'none', 
+                  padding: 0, 
+                  margin: 0, 
+                  color: activeTab === 'damping' ? 'var(--text-main)' : 'var(--text-muted)', 
+                  fontWeight: activeTab === 'damping' ? 'bold' : 'normal', 
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  fontFamily: 'var(--font-sans)',
+                  outline: 'none',
+                  letterSpacing: '0.02em',
+                  transition: 'color 0.15s ease'
+                }}
               >
                 {t("Relleno Acústico")}
               </button>
               <button 
-                className={`tab-btn ${activeTab === 'crossover' ? 'active' : ''}`} 
+                type="button"
                 onClick={() => setActiveTab('crossover')}
+                style={{ 
+                  background: 'none', 
+                  border: 'none', 
+                  padding: 0, 
+                  margin: 0, 
+                  color: activeTab === 'crossover' ? 'var(--text-main)' : 'var(--text-muted)', 
+                  fontWeight: activeTab === 'crossover' ? 'bold' : 'normal', 
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  fontFamily: 'var(--font-sans)',
+                  outline: 'none',
+                  letterSpacing: '0.02em',
+                  transition: 'color 0.15s ease'
+                }}
               >
                 {t("Divisores de Frecuencia")}
               </button>
             </div>
-
-            {activeTab === 'sealed' && (
-              <SealedBoxTab 
-                lang={lang}
-                unitSystem={unitSystem}
-                sealedData={sealedData}
-                targetQtc={targetQtc}
-                setTargetQtc={setTargetQtc}
-                isLinkedToCabinet={woodMode === 'input' && manualNetVol > 0}
-                onExportReport={handleExportReport}
-              />
-            )}
-
-            {activeTab === 'ported' && (
-              <PortedBoxTab 
-                lang={lang}
-                unitSystem={unitSystem}
-                portedData={portedData}
-                params={adjParams}
-                customVb={customVb}
-                setCustomVb={setCustomVb}
-                customFb={customFb}
-                setCustomFb={setCustomFb}
-                customPorted={customPorted}
-                setCustomPorted={setCustomPorted}
-                portCount={portCount}
-                setPortCount={setPortCount}
-                portDiameter={portDiameter}
-                setPortDiameter={setPortDiameter}
-                portShape={portShape}
-                setPortShape={setPortShape}
-                portWidth={portWidth}
-                setPortWidth={setPortWidth}
-                portHeight={portHeight}
-                setPortHeight={setPortHeight}
-                portArea={portArea}
-                setPortArea={setPortArea}
-                isLinkedToCabinet={woodMode === 'input' && manualNetVol > 0}
-                onExportReport={handleExportReport}
-              />
-            )}
 
             {activeTab === 'wood' && (
               <CabinetTab 
@@ -589,14 +743,14 @@ function App() {
                 params={adjParams}
                 sealedData={sealedData}
                 portedData={portedData}
+                bandpassData={bandpassData}
                 woodMode={woodMode}
                 setWoodMode={setWoodMode}
                 woodShape={woodShape}
                 setWoodShape={setWoodShape}
                 woodConstraint={woodConstraint}
                 setWoodConstraint={setWoodConstraint}
-                woodSource={woodSource}
-                setWoodSource={setWoodSource}
+                woodSource={boxType}
                 woodRatio={woodRatio}
                 setWoodRatio={setWoodRatio}
                 woodLockVal1={woodLockVal1}

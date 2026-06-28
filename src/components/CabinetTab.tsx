@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { type Lang, translate } from '../utils/translations';
-import type { CalculatedSealed, CalculatedPorted, SpeakerParams, WoodCabinetData, WoodCutPiece } from '../types';
+import type { CalculatedSealed, CalculatedPorted, CalculatedBandpass, SpeakerParams, WoodCabinetData, WoodCutPiece } from '../types';
 import { type UnitSystem, convertTo, convertFrom, getUnitLabel } from '../utils/units';
 
 interface CabinetTabProps {
@@ -9,14 +9,14 @@ interface CabinetTabProps {
   params: SpeakerParams;
   sealedData: CalculatedSealed;
   portedData: CalculatedPorted;
+  bandpassData: CalculatedBandpass;
   woodMode: 'calc' | 'input';
   setWoodMode: (mode: 'calc' | 'input') => void;
   woodShape: 'rectangular' | 'trapezoidal';
   setWoodShape: (shape: 'rectangular' | 'trapezoidal') => void;
   woodConstraint: string;
   setWoodConstraint: (constraint: string) => void;
-  woodSource: 'sealed' | 'ported';
-  setWoodSource: (source: 'sealed' | 'ported') => void;
+  woodSource: 'sealed' | 'ported' | 'bandpass';
   woodRatio: 'golden' | 'classic' | 'cube';
   setWoodRatio: (ratio: 'golden' | 'classic' | 'cube') => void;
   // Locks/Fijaciones
@@ -64,6 +64,7 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
   params,
   sealedData,
   portedData,
+  bandpassData,
   woodMode,
   setWoodMode,
   woodShape,
@@ -71,7 +72,6 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
   woodConstraint,
   setWoodConstraint,
   woodSource,
-  setWoodSource,
   woodRatio,
   setWoodRatio,
   woodLockVal1,
@@ -154,6 +154,8 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
         reqNetVol = sealedData.Vb;
       } else if (woodSource === 'ported' && portedData.valid) {
         reqNetVol = portedData.Vb;
+      } else if (woodSource === 'bandpass' && bandpassData.valid) {
+        reqNetVol = bandpassData.Vf + bandpassData.Vr;
       }
       netVol = reqNetVol / dampingFactor;
 
@@ -423,6 +425,8 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
       netVol = sealedData.Vb;
     } else if (woodSource === 'ported' && portedData.valid) {
       netVol = portedData.Vb;
+    } else if (woodSource === 'bandpass' && bandpassData.valid) {
+      netVol = bandpassData.Vf + bandpassData.Vr;
     }
 
     if (netVol <= 0) return;
@@ -530,18 +534,6 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
         {woodMode === 'calc' && (
           <div className="wood-layout">
             <div className="wood-grid-controls">
-              <div className="input-group">
-                <label>{t("Fuente del Volumen")}</label>
-                <select 
-                  value={woodSource} 
-                  onChange={(e) => setWoodSource(e.target.value as any)} 
-                  className="input-select"
-                  style={{ width: '100%', height: '38px' }}
-                >
-                  <option value="sealed">{t("Caja Sellada (Vb)")}</option>
-                  <option value="ported">{t("Caja Ventilada (Vb)")}</option>
-                </select>
-              </div>
               {woodConstraint === 'none' && woodShape === 'rectangular' && (
                 <div className="input-group">
                   <label>{t("Proporción Acústica")}</label>
@@ -613,7 +605,7 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
                 className="preset-select"
                 style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', background: 'var(--primary)', border: '1px solid var(--primary)', color: '#ffffff', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
                 type="button"
-                disabled={!(woodSource === 'sealed' ? sealedData.valid : portedData.valid)}
+                disabled={!(woodSource === 'sealed' ? sealedData.valid : woodSource === 'ported' ? portedData.valid : bandpassData.valid)}
               >
                 {t("Cargar Cajón Sugerido")}
               </button>

@@ -140,3 +140,53 @@ export async function calcPortedCurve(ported: CalculatedPorted, params: SpeakerP
   return arr;
 }
 
+/** Bandpass 4th order calculations */
+export async function calcBandpass4(fs: number, vas: number, qts: number, s: number) {
+  const wasm = await getWasm();
+  const res = wasm.calc_bandpass_4(fs, vas, qts, s);
+  return { vf: res.vf, vr: res.vr, fb: res.fb, f0: res.f0, delta_f: res.delta_f };
+}
+
+/** Bandpass 6th order calculations */
+export async function calcBandpass6(fs: number, vas: number, qts: number, a: number) {
+  const wasm = await getWasm();
+  const res = wasm.calc_bandpass_6(fs, vas, qts, a);
+  return { vf: res.vf, vr: res.vr, fh: res.fh, fl: res.fl };
+}
+
+/** Bandpass 4th order frequency response curve */
+export async function calcBandpass4Curve(vf: number, vr: number, fb: number, params: SpeakerParams) {
+  const wasm = await getWasm();
+  const res = wasm.calc_bandpass4_curve(
+    params.fs,
+    params.qts,
+    params.vas,
+    vf,
+    vr,
+    fb,
+    vf > 0 && vr > 0 && fb > 0
+  );
+  const arr: number[] = [];
+  res.forEach((v: any) => arr.push(v as number));
+  return arr;
+}
+
+/** Bandpass 6th order frequency response curve */
+export async function calcBandpass6Curve(vf: number, vr: number, fl: number, fh: number, params: SpeakerParams) {
+  const wasm = await getWasm();
+  const res = wasm.calc_bandpass6_curve(
+    params.fs,
+    params.qts,
+    params.vas,
+    vf,
+    vr,
+    fl,
+    fh,
+    vf > 0 && vr > 0 && fl > 0 && fh > 0
+  );
+  const arr: number[] = [];
+  res.forEach((v: any) => arr.push(v as number));
+  return arr;
+}
+
+

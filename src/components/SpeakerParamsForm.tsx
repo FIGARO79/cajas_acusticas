@@ -406,19 +406,45 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
 
   return (
     <aside className="panel">
-      {/* Selector de Pestañas (Segmented Control) */}
-      <div className="driver-tabs">
+      {/* Selector de Pestañas de Altavoz (Menú de Texto Plano) */}
+      <div className="driver-menu-links" style={{ display: 'flex', gap: '1.25rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--card-border)', paddingBottom: '0.5rem' }}>
         <button 
           type="button"
-          className={`driver-tab ${driverTab === 'view' ? 'active' : ''}`}
           onClick={() => setDriverTab('view')}
+          style={{ 
+            background: 'none', 
+            border: 'none', 
+            padding: 0, 
+            margin: 0, 
+            color: driverTab === 'view' ? 'var(--text-main)' : 'var(--text-muted)', 
+            fontWeight: driverTab === 'view' ? 'bold' : 'normal', 
+            fontSize: '0.82rem',
+            cursor: 'pointer',
+            fontFamily: 'var(--font-sans)',
+            outline: 'none',
+            letterSpacing: '0.02em',
+            transition: 'color 0.15s ease'
+          }}
         >
           {t("Cargar Altavoz")}
         </button>
         <button 
           type="button"
-          className={`driver-tab ${driverTab === 'edit' ? 'active' : ''}`}
           onClick={() => setDriverTab('edit')}
+          style={{ 
+            background: 'none', 
+            border: 'none', 
+            padding: 0, 
+            margin: 0, 
+            color: driverTab === 'edit' ? 'var(--text-main)' : 'var(--text-muted)', 
+            fontWeight: driverTab === 'edit' ? 'bold' : 'normal', 
+            fontSize: '0.82rem',
+            cursor: 'pointer',
+            fontFamily: 'var(--font-sans)',
+            outline: 'none',
+            letterSpacing: '0.02em',
+            transition: 'color 0.15s ease'
+          }}
         >
           {t("Agregar / Editar")}
         </button>
@@ -426,7 +452,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
 
       {/* PESTAÑA 1: CARGAR / SIMULACIÓN */}
       {driverTab === 'view' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.25rem' }} ref={searchRef}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', marginBottom: '0.5rem' }} ref={searchRef}>
           <div className="input-group input-group-full" style={{ marginBottom: 0 }}>
             <label>{t("Marca / Fabricante:")}</label>
             <select
@@ -502,7 +528,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
 
       {/* PESTAÑA 2: AGREGAR / EDITAR */}
       {driverTab === 'edit' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.25rem', padding: '0.5rem', borderRadius: '6px', background: 'rgba(255,255,255,0.01)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', marginBottom: '0.5rem', padding: '0.4rem', borderRadius: '4px', background: 'rgba(255,255,255,0.01)' }}>
           <div className="input-group input-group-full" style={{ marginBottom: 0 }}>
             <label>{t("Marca / Fabricante:")}</label>
             <input 
@@ -579,8 +605,8 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
           </div>
         </div>
       )}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--card-border)', paddingBottom: '0.5rem' }}>
-        <h2 className="panel-title" style={{ marginBottom: 0, borderBottom: 'none', paddingBottom: 0 }}>{t("Parámetros")}</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem', borderBottom: '1px solid var(--card-border)', paddingBottom: '0.25rem' }}>
+        <h2 className="panel-title" style={{ marginBottom: 0, borderBottom: 'none', paddingBottom: 0, fontSize: '12px', fontWeight: 700 }}>{t("Parámetros")}</h2>
       </div>
 
       <div className="form-section">
@@ -600,6 +626,20 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
             <option value="isobaric">{t("Isobárica / Push-Pull (0.5x Vb)")}</option>
           </select>
         </div>
+
+        {driverConfig !== 'single' && (
+          <div className="alert-box info" style={{ padding: '0.6rem 0.8rem', fontSize: '0.8rem', marginBottom: '1rem', borderLeftColor: 'var(--primary)' }}>
+            <span>
+              <strong>{t("Configuración Equivalente:")}</strong>
+              <ul style={{ margin: '0.3rem 0 0 1rem', padding: 0 }}>
+                <li>{t("Volumen equivalente (Vas_eq):")} <strong>{driverConfig === 'isobaric' ? (params.vas ? (params.vas / 2).toFixed(1) : 0) : (params.vas ? (params.vas * 2).toFixed(1) : 0)} L</strong></li>
+                <li>{t("Impedancia nominal equivalente:")} <strong>{driverConfig === 'parallel_2' ? (params.zNominal ? (params.zNominal / 2).toFixed(1) : 4) : driverConfig === 'series_2' ? (params.zNominal ? (params.zNominal * 2).toFixed(1) : 16) : (params.zNominal ?? 8)} Ω</strong></li>
+                <li>{t("Frecuencia de resonancia propia:")} <strong>{params.fs ?? 0} Hz</strong></li>
+                <li>{t("Sensibilidad resultante:")} <strong>{driverConfig === 'parallel_2' ? (params.sens ? (params.sens + 3).toFixed(1) : 92) : driverConfig === 'isobaric' ? (params.sens ? (params.sens - 3).toFixed(1) : 86) : (params.sens ?? 89)} dB (1W/1m)</strong></li>
+              </ul>
+            </span>
+          </div>
+        )}
 
         <div className="input-grid">
           <div className="input-group">
@@ -733,12 +773,12 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
         </div>
 
         {/* BLOQUE 2: PARÁMETROS THIELE & SMALL */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.4rem', marginTop: '0.5rem', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.2rem', marginTop: '0.3rem', borderBottom: '1px solid rgba(255, 255, 255, 0.04)', paddingBottom: '0.35rem', marginBottom: '0.45rem' }}>
           <div className="form-subsection-title" style={{ margin: 0, borderBottom: 'none', paddingBottom: 0 }}>{t("Parámetros Thiele & Small")}</div>
           <label className="checkbox-container" style={{ fontWeight: 500, marginBottom: 0, cursor: 'pointer' }}>
             <input type="checkbox" checked={proMode} onChange={(e) => setProMode(e.target.checked)} />
-            <div className="custom-checkbox"></div>
-            <span style={{ fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 600 }}>{t("Parámetros Avanzados")}</span>
+            <div className="custom-checkbox" style={{ width: '13px', height: '13px' }}></div>
+            <span style={{ fontSize: '0.72rem', color: 'var(--primary)', fontWeight: 600 }}>{t("Parámetros Avanzados")}</span>
           </label>
         </div>
 
