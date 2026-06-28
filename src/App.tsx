@@ -736,9 +736,9 @@ function App() {
           />
 
           {/* Grilla de Resultados y Diagramas en Paralelo */}
-          <div className="results-diagrams-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
+          <div className="results-diagrams-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '0px', marginTop: '0px' }}>
             {/* Panel Izquierdo: Cajón y Plano Técnico */}
-            <div className="panel" style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '8px', padding: '1rem' }}>
+            <div className="panel" style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '0', padding: '0px' }}>
               <CabinetTab 
                 lang={lang}
                 unitSystem={unitSystem}
@@ -792,7 +792,7 @@ function App() {
             </div>
 
             {/* Panel Derecho: Crossover y Circuito */}
-            <div className="panel" style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '8px', padding: '1rem' }}>
+            <div className="panel" style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '0', padding: '0px' }}>
               <CrossoverTab 
                 lang={lang} 
                 onRegisterExporter={handleRegisterCrossover}

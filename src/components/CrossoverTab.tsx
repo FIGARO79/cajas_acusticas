@@ -729,7 +729,11 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({
                 <line x1="185" y1="240" x2="185" y2="300" stroke="#ef4444" strokeWidth="6" />
                 <line x1="200" y1="240" x2="200" y2="300" stroke="#ef4444" strokeWidth="6" />
                 <line x1="200" y1="270" x2="235" y2="270" stroke="#ef4444" strokeWidth="4" />
-                <text x="140" y="320" fill="#eab308" fontSize="14" fontWeight="bold">C1 = {((bp?.c_hp || bp?.c1_hp) as number).toFixed(2)} µF</text>
+                <text x="140" y="320" fill="#eab308" fontSize="13" fontWeight="bold">
+                  {crossoverType === '4th_lr'
+                    ? `C1/C2_HP = ${bp.c1_hp.toFixed(1)} / ${bp.c2_hp.toFixed(1)} µF`
+                    : `C1 = ${(bp?.c_hp || bp?.c1_hp).toFixed(2)} µF`}
+                </text>
               </>
             ) : (
               <line x1="160" y1="270" x2="235" y2="270" stroke="#ef4444" strokeWidth="4" />
@@ -739,7 +743,11 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({
             {((bp?.l_lp !== undefined && bp?.l_lp !== null && bp?.l_lp > 0) || (bp?.l1_lp !== undefined && bp?.l1_lp !== null && bp?.l1_lp > 0)) ? (
               <>
                 <path d="M 235,270 Q 247,245 259,270 Q 271,245 283,270 Q 295,245 307,270 Q 319,245 331,270" fill="none" stroke="#ef4444" strokeWidth="4" />
-                <text x="235" y="230" fill="#eab308" fontSize="14" fontWeight="bold">L1 = {((bp?.l_lp || bp?.l1_lp) as number).toFixed(3)} mH</text>
+                <text x="235" y="230" fill="#eab308" fontSize="13" fontWeight="bold">
+                  {crossoverType === '4th_lr'
+                    ? `L1/L2_LP = ${bp.l1_lp.toFixed(2)} / ${bp.l2_lp.toFixed(2)} mH`
+                    : `L1 = ${(bp?.l_lp || bp?.l1_lp).toFixed(3)} mH`}
+                </text>
               </>
             ) : (
               <line x1="235" y1="270" x2="331" y2="270" stroke="#ef4444" strokeWidth="4" />
@@ -747,18 +755,22 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({
             <line x1="331" y1="270" x2={midrangeX} y2="270" stroke="#ef4444" strokeWidth="4" />
 
             {/* Midrange Shunts */}
-            {bp?.l_hp !== null && bp?.l_hp !== undefined && bp?.l_hp > 0 && (
+            {(((bp?.l_hp !== null && bp?.l_hp !== undefined && bp?.l_hp > 0) || crossoverType === '4th_lr') && bp) && (
               <>
                 <circle cx="380" cy="270" r="7" fill="#ef4444" />
                 <line x1="380" y1="270" x2="380" y2="285" stroke="#ef4444" strokeWidth="4" />
                 <path d="M 380,285 Q 355,297 380,309 Q 355,321 380,333 Q 355,345 380,350" fill="none" stroke="currentColor" strokeWidth="4" />
                 <line x1="380" y1="350" x2="380" y2="390" stroke="currentColor" strokeWidth="4" />
                 <circle cx="380" cy="390" r="7" fill="currentColor" />
-                <text x="290" y="365" fill="#eab308" fontSize="14" fontWeight="bold">L2 = {bp.l_hp.toFixed(3)} mH</text>
+                <text x="370" y="365" textAnchor="end" fill="#eab308" fontSize="13" fontWeight="bold">
+                  {crossoverType === '4th_lr'
+                    ? `L1/L2_HP = ${bp.l1_hp.toFixed(2)} / ${bp.l2_hp.toFixed(2)} mH`
+                    : `L2 = ${bp.l_hp.toFixed(3)} mH`}
+                </text>
               </>
             )}
 
-            {bp?.c_lp !== null && bp?.c_lp !== undefined && bp?.c_lp > 0 && (
+            {(((bp?.c_lp !== null && bp?.c_lp !== undefined && bp?.c_lp > 0) || crossoverType === '4th_lr') && bp) && (
               <>
                 <circle cx="460" cy="270" r="7" fill="#ef4444" />
                 <line x1="460" y1="270" x2="460" y2="285" stroke="#ef4444" strokeWidth="4" />
@@ -766,7 +778,11 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({
                 <line x1="435" y1="297" x2="485" y2="297" stroke="currentColor" strokeWidth="6" />
                 <line x1="460" y1="297" x2="460" y2="390" stroke="currentColor" strokeWidth="4" />
                 <circle cx="460" cy="390" r="7" fill="currentColor" />
-                <text x="480" y="320" fill="#eab308" fontSize="14" fontWeight="bold">C2 = {bp.c_lp.toFixed(2)} µF</text>
+                <text x="480" y="320" fill="#eab308" fontSize="13" fontWeight="bold">
+                  {crossoverType === '4th_lr'
+                    ? `C1/C2_LP = ${bp.c1_lp.toFixed(1)} / ${bp.c2_lp.toFixed(1)} µF`
+                    : `C2 = ${bp.c_lp.toFixed(2)} µF`}
+                </text>
               </>
             )}
 
@@ -886,40 +902,161 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({
     }
   };
 
-
-
   if (readOnly) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%', boxSizing: 'border-box' }}>
         {/* Componentes Calculados */}
         {xoverResults && (
           <div className="pro-calc-panel" style={{ marginTop: '0rem' }}>
-            <span className="pro-calc-title">{t("Componentes del Filtro")} ({crossoverWays === '2way' ? '2 Vías' : '3 Vías'}, {crossoverType === '2nd_lr' ? 'L-R' : crossoverType === '2nd_butter' ? 'Butterworth' : crossoverType === '1st_order' ? '1er Orden' : '4to Orden'})</span>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: '0.25rem' }}>
-              {xoverResults.hp.c1 && (
-                <div className="pro-calc-row" style={{ flex: '1 1 45%' }}>
-                  <span className="pro-calc-label">C1 (Agudos):</span>
-                  <span className="pro-calc-value">{xoverResults.hp.c1.toFixed(2)} µF</span>
+            <span className="pro-calc-title">
+              {t("Componentes del Filtro")} ({crossoverWays === '2way' ? '2 Vías' : '3 Vías'}, {crossoverType === '2nd_lr' ? 'L-R' : crossoverType === '2nd_butter' ? 'Butterworth' : crossoverType === '1st_order' ? '1er Orden' : '4to Orden'})
+            </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', marginTop: '0.4rem' }}>
+              
+              {/* --- AGUDOS (TWEETER) --- */}
+              <div style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', paddingBottom: '0.4rem' }}>
+                <span style={{ fontSize: '0.74rem', fontWeight: 'bold', color: 'var(--primary)', display: 'block', marginBottom: '0.2rem' }}>
+                  🔊 {t("Vía de Agudos")}
+                </span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
+                  {xoverResults.hp.c1 !== null && (
+                    <div className="pro-calc-row" style={{ flex: '1 1 45%' }}>
+                      <span className="pro-calc-label">C1 (Agudos):</span>
+                      <span className="pro-calc-value">{xoverResults.hp.c1.toFixed(2)} µF</span>
+                    </div>
+                  )}
+                  {(xoverResults.hp as any).c2 && (
+                    <div className="pro-calc-row" style={{ flex: '1 1 45%' }}>
+                      <span className="pro-calc-label">C2 (Agudos):</span>
+                      <span className="pro-calc-value">{(xoverResults.hp as any).c2.toFixed(2)} µF</span>
+                    </div>
+                  )}
+                  {xoverResults.hp.l1 !== null && (
+                    <div className="pro-calc-row" style={{ flex: '1 1 45%' }}>
+                      <span className="pro-calc-label">L1 (Agudos):</span>
+                      <span className="pro-calc-value">{xoverResults.hp.l1.toFixed(3)} mH</span>
+                    </div>
+                  )}
+                  {(xoverResults.hp as any).l2 && (
+                    <div className="pro-calc-row" style={{ flex: '1 1 45%' }}>
+                      <span className="pro-calc-label">L2 (Agudos):</span>
+                      <span className="pro-calc-value">{(xoverResults.hp as any).l2.toFixed(3)} mH</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* --- MEDIOS (MIDRANGE) --- */}
+              {crossoverWays === '3way' && (xoverResults as any).bp && (
+                <div style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', paddingBottom: '0.4rem' }}>
+                  <span style={{ fontSize: '0.74rem', fontWeight: 'bold', color: '#eab308', display: 'block', marginBottom: '0.2rem' }}>
+                    📣 {t("Vía de Medios (Banda de Paso)")}
+                  </span>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
+                    {crossoverType === '4th_lr' ? (
+                      <>
+                        <div className="pro-calc-row" style={{ flex: '1 1 45%' }}>
+                          <span className="pro-calc-label">C1_HP (Medios):</span>
+                          <span className="pro-calc-value">{(xoverResults as any).bp.c1_hp.toFixed(2)} µF</span>
+                        </div>
+                        <div className="pro-calc-row" style={{ flex: '1 1 45%' }}>
+                          <span className="pro-calc-label">C2_HP (Medios):</span>
+                          <span className="pro-calc-value">{(xoverResults as any).bp.c2_hp.toFixed(2)} µF</span>
+                        </div>
+                        <div className="pro-calc-row" style={{ flex: '1 1 45%' }}>
+                          <span className="pro-calc-label">L1_HP (Medios):</span>
+                          <span className="pro-calc-value">{(xoverResults as any).bp.l1_hp.toFixed(3)} mH</span>
+                        </div>
+                        <div className="pro-calc-row" style={{ flex: '1 1 45%' }}>
+                          <span className="pro-calc-label">L2_HP (Medios):</span>
+                          <span className="pro-calc-value">{(xoverResults as any).bp.l2_hp.toFixed(3)} mH</span>
+                        </div>
+                        <div className="pro-calc-row" style={{ flex: '1 1 45%' }}>
+                          <span className="pro-calc-label">L1_LP (Medios):</span>
+                          <span className="pro-calc-value">{(xoverResults as any).bp.l1_lp.toFixed(3)} mH</span>
+                        </div>
+                        <div className="pro-calc-row" style={{ flex: '1 1 45%' }}>
+                          <span className="pro-calc-label">L2_LP (Medios):</span>
+                          <span className="pro-calc-value">{(xoverResults as any).bp.l2_lp.toFixed(3)} mH</span>
+                        </div>
+                        <div className="pro-calc-row" style={{ flex: '1 1 45%' }}>
+                          <span className="pro-calc-label">C1_LP (Medios):</span>
+                          <span className="pro-calc-value">{(xoverResults as any).bp.c1_lp.toFixed(2)} µF</span>
+                        </div>
+                        <div className="pro-calc-row" style={{ flex: '1 1 45%' }}>
+                          <span className="pro-calc-label">C2_LP (Medios):</span>
+                          <span className="pro-calc-value">{(xoverResults as any).bp.c2_lp.toFixed(2)} µF</span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {((xoverResults as any).bp.c_hp !== undefined || (xoverResults as any).bp.c1_hp !== undefined) && (
+                          <div className="pro-calc-row" style={{ flex: '1 1 45%' }}>
+                            <span className="pro-calc-label">C_HP (Medios):</span>
+                            <span className="pro-calc-value">
+                              {((xoverResults as any).bp.c_hp || (xoverResults as any).bp.c1_hp).toFixed(2)} µF
+                            </span>
+                          </div>
+                        )}
+                        {((xoverResults as any).bp.l_lp !== undefined || (xoverResults as any).bp.l1_lp !== undefined) && (
+                          <div className="pro-calc-row" style={{ flex: '1 1 45%' }}>
+                            <span className="pro-calc-label">L_LP (Medios):</span>
+                            <span className="pro-calc-value">
+                              {((xoverResults as any).bp.l_lp || (xoverResults as any).bp.l1_lp).toFixed(3)} mH
+                            </span>
+                          </div>
+                        )}
+                        {(xoverResults as any).bp.l_hp && (
+                          <div className="pro-calc-row" style={{ flex: '1 1 45%' }}>
+                            <span className="pro-calc-label">L_HP (Medios):</span>
+                            <span className="pro-calc-value">{(xoverResults as any).bp.l_hp.toFixed(3)} mH</span>
+                          </div>
+                        )}
+                        {(xoverResults as any).bp.c_lp && (
+                          <div className="pro-calc-row" style={{ flex: '1 1 45%' }}>
+                            <span className="pro-calc-label">C_LP (Medios):</span>
+                            <span className="pro-calc-value">{(xoverResults as any).bp.c_lp.toFixed(2)} µF</span>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
               )}
-              {xoverResults.hp.l1 && (
-                <div className="pro-calc-row" style={{ flex: '1 1 45%' }}>
-                  <span className="pro-calc-label">L1 (Agudos):</span>
-                  <span className="pro-calc-value">{xoverResults.hp.l1.toFixed(3)} mH</span>
+
+              {/* --- WOOFER (GRAVES) --- */}
+              <div>
+                <span style={{ fontSize: '0.74rem', fontWeight: 'bold', color: 'var(--ported-color)', display: 'block', marginBottom: '0.2rem' }}>
+                  🔉 {t("Vía de Graves")}
+                </span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
+                  {xoverResults.lp.l1 !== null && (
+                    <div className="pro-calc-row" style={{ flex: '1 1 45%' }}>
+                      <span className="pro-calc-label">L1 (Graves):</span>
+                      <span className="pro-calc-value">{xoverResults.lp.l1.toFixed(3)} mH</span>
+                    </div>
+                  )}
+                  {(xoverResults.lp as any).l2 && (
+                    <div className="pro-calc-row" style={{ flex: '1 1 45%' }}>
+                      <span className="pro-calc-label">L2 (Graves):</span>
+                      <span className="pro-calc-value">{(xoverResults.lp as any).l2.toFixed(3)} mH</span>
+                    </div>
+                  )}
+                  {xoverResults.lp.c1 !== null && (
+                    <div className="pro-calc-row" style={{ flex: '1 1 45%' }}>
+                      <span className="pro-calc-label">C1 (Graves):</span>
+                      <span className="pro-calc-value">{xoverResults.lp.c1.toFixed(2)} µF</span>
+                    </div>
+                  )}
+                  {(xoverResults.lp as any).c2 && (
+                    <div className="pro-calc-row" style={{ flex: '1 1 45%' }}>
+                      <span className="pro-calc-label">C2 (Graves):</span>
+                      <span className="pro-calc-value">{(xoverResults.lp as any).c2.toFixed(2)} µF</span>
+                    </div>
+                  )}
                 </div>
-              )}
-              {xoverResults.lp.l1 && (
-                <div className="pro-calc-row" style={{ flex: '1 1 45%' }}>
-                  <span className="pro-calc-label">L1 (Graves):</span>
-                  <span className="pro-calc-value">{xoverResults.lp.l1.toFixed(3)} mH</span>
-                </div>
-              )}
-              {xoverResults.lp.c1 && (
-                <div className="pro-calc-row" style={{ flex: '1 1 45%' }}>
-                  <span className="pro-calc-label">C1 (Graves):</span>
-                  <span className="pro-calc-value">{xoverResults.lp.c1.toFixed(2)} µF</span>
-                </div>
-              )}
+              </div>
+
             </div>
           </div>
         )}
@@ -1157,33 +1294,82 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({
                         📣 {t("Banda de Paso (Mid)")}
                       </strong>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.8rem' }}>
-                        {((xoverResults as any).bp.c_hp !== undefined || (xoverResults as any).bp.c1_hp !== undefined) && (
-                          <div>
-                            <span style={{ color: 'var(--text-muted)' }}>C1 ({t("Serie")}):</span>{' '}
-                            <strong style={{ color: 'var(--text-main)' }}>
-                              {((xoverResults as any).bp.c_hp || (xoverResults as any).bp.c1_hp).toFixed(2)} µF
-                            </strong>
-                          </div>
-                        )}
-                        {((xoverResults as any).bp.l_lp !== undefined || (xoverResults as any).bp.l1_lp !== undefined) && (
-                          <div>
-                            <span style={{ color: 'var(--text-muted)' }}>L1 ({t("Serie")}):</span>{' '}
-                            <strong style={{ color: 'var(--text-main)' }}>
-                              {((xoverResults as any).bp.l_lp || (xoverResults as any).bp.l1_lp).toFixed(3)} mH
-                            </strong>
-                          </div>
-                        )}
-                        {(xoverResults as any).bp.l_hp && (
-                          <div>
-                            <span style={{ color: 'var(--text-muted)' }}>L2 ({t("Paralelo")}):</span>{' '}
-                            <strong style={{ color: 'var(--text-main)' }}>{(xoverResults as any).bp.l_hp.toFixed(3)} mH</strong>
-                          </div>
-                        )}
-                        {(xoverResults as any).bp.c_lp && (
-                          <div>
-                            <span style={{ color: 'var(--text-muted)' }}>C2 ({t("Paralelo")}):</span>{' '}
-                            <strong style={{ color: 'var(--text-main)' }}>{(xoverResults as any).bp.c_lp.toFixed(2)} µF</strong>
-                          </div>
+                        {crossoverType === '4th_lr' ? (
+                          <>
+                            {/* Sección Paso Alto (HP) del Bandpass */}
+                            <div style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)', paddingBottom: '0.3rem', marginBottom: '0.3rem' }}>
+                              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', fontWeight: 600 }}>{t("Sección Paso Alto (Filtro fL)")}:</span>
+                              <div>
+                                <span style={{ color: 'var(--text-muted)' }}>C1_HP ({t("Serie")}):</span>{' '}
+                                <strong style={{ color: 'var(--text-main)' }}>{(xoverResults as any).bp.c1_hp.toFixed(2)} µF</strong>
+                              </div>
+                              <div>
+                                <span style={{ color: 'var(--text-muted)' }}>C2_HP ({t("Serie")}):</span>{' '}
+                                <strong style={{ color: 'var(--text-main)' }}>{(xoverResults as any).bp.c2_hp.toFixed(2)} µF</strong>
+                              </div>
+                              <div>
+                                <span style={{ color: 'var(--text-muted)' }}>L1_HP ({t("Paralelo")}):</span>{' '}
+                                <strong style={{ color: 'var(--text-main)' }}>{(xoverResults as any).bp.l1_hp.toFixed(3)} mH</strong>
+                              </div>
+                              <div>
+                                <span style={{ color: 'var(--text-muted)' }}>L2_HP ({t("Paralelo")}):</span>{' '}
+                                <strong style={{ color: 'var(--text-main)' }}>{(xoverResults as any).bp.l2_hp.toFixed(3)} mH</strong>
+                              </div>
+                            </div>
+                            
+                            {/* Sección Paso Bajo (LP) del Bandpass */}
+                            <div>
+                              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', fontWeight: 600 }}>{t("Sección Paso Bajo (Filtro fH)")}:</span>
+                              <div>
+                                <span style={{ color: 'var(--text-muted)' }}>L1_LP ({t("Serie")}):</span>{' '}
+                                <strong style={{ color: 'var(--text-main)' }}>{(xoverResults as any).bp.l1_lp.toFixed(3)} mH</strong>
+                              </div>
+                              <div>
+                                <span style={{ color: 'var(--text-muted)' }}>L2_LP ({t("Serie")}):</span>{' '}
+                                <strong style={{ color: 'var(--text-main)' }}>{(xoverResults as any).bp.l2_lp.toFixed(3)} mH</strong>
+                              </div>
+                              <div>
+                                <span style={{ color: 'var(--text-muted)' }}>C1_LP ({t("Paralelo")}):</span>{' '}
+                                <strong style={{ color: 'var(--text-main)' }}>{(xoverResults as any).bp.c1_lp.toFixed(2)} µF</strong>
+                              </div>
+                              <div>
+                                <span style={{ color: 'var(--text-muted)' }}>C2_LP ({t("Paralelo")}):</span>{' '}
+                                <strong style={{ color: 'var(--text-main)' }}>{(xoverResults as any).bp.c2_lp.toFixed(2)} µF</strong>
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            {/* Componentes para 1er y 2do Orden */}
+                            {((xoverResults as any).bp.c_hp !== undefined || (xoverResults as any).bp.c1_hp !== undefined) && (
+                              <div>
+                                <span style={{ color: 'var(--text-muted)' }}>C_HP ({t("Serie")}):</span>{' '}
+                                <strong style={{ color: 'var(--text-main)' }}>
+                                  {((xoverResults as any).bp.c_hp || (xoverResults as any).bp.c1_hp).toFixed(2)} µF
+                                </strong>
+                              </div>
+                            )}
+                            {((xoverResults as any).bp.l_lp !== undefined || (xoverResults as any).bp.l1_lp !== undefined) && (
+                              <div>
+                                <span style={{ color: 'var(--text-muted)' }}>L_LP ({t("Serie")}):</span>{' '}
+                                <strong style={{ color: 'var(--text-main)' }}>
+                                  {((xoverResults as any).bp.l_lp || (xoverResults as any).bp.l1_lp).toFixed(3)} mH
+                                </strong>
+                              </div>
+                            )}
+                            {(xoverResults as any).bp.l_hp && (
+                              <div>
+                                <span style={{ color: 'var(--text-muted)' }}>L_HP ({t("Paralelo")}):</span>{' '}
+                                <strong style={{ color: 'var(--text-main)' }}>{(xoverResults as any).bp.l_hp.toFixed(3)} mH</strong>
+                              </div>
+                            )}
+                            {(xoverResults as any).bp.c_lp && (
+                              <div>
+                                <span style={{ color: 'var(--text-muted)' }}>C_LP ({t("Paralelo")}):</span>{' '}
+                                <strong style={{ color: 'var(--text-main)' }}>{(xoverResults as any).bp.c_lp.toFixed(2)} µF</strong>
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>

@@ -376,23 +376,28 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
 
   return (
     <aside className="panel" style={{ borderLeft: 'none' }}>
-      {/* Título de Diseño */}
-      <h3 className="panel-title">{t("Diseño")}</h3>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem', borderBottom: '1px solid var(--card-border)', paddingBottom: '0.25rem' }}>
+        <h3 className="panel-title" style={{ marginBottom: 0, borderBottom: 'none', paddingBottom: 0, fontSize: '12px', fontWeight: 700 }}>{t("Diseño")}</h3>
+      </div>
 
       {/* EBP Status Bar */}
-      <div className={`ebp-badge-card ${ebpValue ? (ebpValue < 50 ? 'ebp-sealed' : ebpValue > 90 ? 'ebp-ported' : 'ebp-normal') : 'ebp-normal'}`}>
-        <span style={{ fontSize: '0.82rem', fontWeight: 700 }}>EBP: {ebpValue ? ebpValue.toFixed(1) : 'N/A'}</span>
-        <span style={{ fontSize: '0.74rem', opacity: 0.85, fontWeight: 500 }}>
+      <div 
+        className={`ebp-badge-card ${ebpValue ? (ebpValue < 50 ? 'ebp-sealed' : ebpValue > 90 ? 'ebp-ported' : 'ebp-normal') : 'ebp-normal'}`}
+        style={{ padding: '0.3rem 0.65rem', marginBottom: '0.5rem' }}
+      >
+        <span style={{ fontSize: '0.78rem', fontWeight: 700 }}>EBP: {ebpValue ? ebpValue.toFixed(1) : 'N/A'}</span>
+        <span style={{ fontSize: '0.72rem', opacity: 0.85, fontWeight: 500 }}>
           {getEbpRecommendation()}
         </span>
       </div>
 
       {/* Segmented Control de Tipo de Caja */}
-      <div className="segmented-control" style={{ marginBottom: '1.25rem' }}>
+      <div className="segmented-control" style={{ marginBottom: '0.6rem', padding: '2px' }}>
         <button
           type="button"
           className={boxType === 'sealed' ? 'active' : ''}
           onClick={() => setBoxType('sealed')}
+          style={{ padding: '0.35rem 0.25rem' }}
         >
           {t("Sellada")}
         </button>
@@ -400,6 +405,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
           type="button"
           className={boxType === 'ported' ? 'active' : ''}
           onClick={() => setBoxType('ported')}
+          style={{ padding: '0.35rem 0.25rem' }}
         >
           {t("Ventilada")}
         </button>
@@ -407,17 +413,19 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
           type="button"
           className={boxType === 'bandpass' ? 'active' : ''}
           onClick={() => setBoxType('bandpass')}
+          style={{ padding: '0.35rem 0.25rem' }}
         >
           {t("Paso Banda")}
         </button>
       </div>
 
       {/* Pestañas de Control Central */}
-      <div className="sub-tabs-header">
+      <div className="sub-tabs-header" style={{ marginBottom: '0.6rem', padding: '2px' }}>
         <button
           type="button"
           onClick={() => setActiveTab('wood')}
           className={activeTab === 'wood' ? 'active' : ''}
+          style={{ padding: '0.3rem 0.2rem' }}
         >
           {t("Medidas")}
         </button>
@@ -425,13 +433,15 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
           type="button"
           onClick={() => setActiveTab('damping')}
           className={activeTab === 'damping' ? 'active' : ''}
+          style={{ padding: '0.3rem 0.2rem' }}
         >
-          {t("Absorbente")}
+          {t("Damping")}
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('crossover')}
           className={activeTab === 'crossover' ? 'active' : ''}
+          style={{ padding: '0.3rem 0.2rem' }}
         >
           {t("Divisor (Xover)")}
         </button>
@@ -442,12 +452,12 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
         {activeTab === 'wood' && (
           <>
             {/* Modo de Medidas (Calcular / Ingresar) */}
-            <div className="segmented-control" style={{ marginBottom: '0.85rem', padding: '2px', borderRadius: '10px' }}>
+            <div className="segmented-control" style={{ marginBottom: '0.5rem', padding: '2px', borderRadius: '10px' }}>
               <button
                 type="button"
                 className={woodMode === 'calc' ? 'active' : ''}
                 onClick={() => setWoodMode('calc')}
-                style={{ padding: '0.45rem 0.25rem', fontSize: '0.72rem', borderRadius: '7px' }}
+                style={{ padding: '0.3rem 0.25rem', fontSize: '0.72rem', borderRadius: '7px' }}
               >
                 {t("Calcular (Vb)")}
               </button>
@@ -455,7 +465,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 type="button"
                 className={woodMode === 'input' ? 'active' : ''}
                 onClick={() => setWoodMode('input')}
-                style={{ padding: '0.45rem 0.25rem', fontSize: '0.72rem', borderRadius: '7px' }}
+                style={{ padding: '0.3rem 0.25rem', fontSize: '0.72rem', borderRadius: '7px' }}
               >
                 {t("Medidas Manuales")}
               </button>
@@ -487,15 +497,15 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
             {/* Si es Modo Calcular: proporciones y bloqueos */}
             {woodMode === 'calc' && (
               <div className="premium-form-card">
-                <div className="form-subsection-title" style={{ marginTop: 0 }}>{t("Configuración de Cálculo")}</div>
+                <div className="form-subsection-title" style={{ marginTop: 0, marginBottom: '0.35rem' }}>{t("Configuración de Cálculo")}</div>
                 {woodShape === 'rectangular' && (
-                  <div className="input-group" style={{ marginBottom: '0.75rem' }}>
+                  <div className="input-group" style={{ marginBottom: '0.45rem' }}>
                     <label>{t("Bloqueo de Dimensiones")}</label>
                     <select
                       value={woodConstraint}
                       onChange={(e) => setWoodConstraint(e.target.value)}
                       className="input-select"
-                      style={{ width: '100%', height: '34px' }}
+                      style={{ width: '100%', height: '30px', padding: '0.2rem 2.2rem 0.2rem 0.55rem', fontSize: '0.76rem' }}
                     >
                       <option value="none">{t("Proporciones Libres")}</option>
                       <option value="lock_h_d">{t("Fijar Alto y Profundidad")}</option>
@@ -506,13 +516,13 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 )}
 
                 {woodConstraint === 'none' && woodShape === 'rectangular' && (
-                  <div className="input-group" style={{ marginBottom: '0.75rem' }}>
+                  <div className="input-group" style={{ marginBottom: '0.45rem' }}>
                     <label>{t("Proporción Acústica")}</label>
                     <select
                       value={woodRatio}
                       onChange={(e) => setWoodRatio(e.target.value as any)}
                       className="input-select"
-                      style={{ width: '100%', height: '34px' }}
+                      style={{ width: '100%', height: '30px', padding: '0.2rem 2.2rem 0.2rem 0.55rem', fontSize: '0.76rem' }}
                     >
                       <option value="golden">{t("Aurea (1.618 : 1 : 0.618)")}</option>
                       <option value="classic">{t("Clásica (1.400 : 1 : 0.800)")}</option>
@@ -582,7 +592,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                   </button>
                 </div>
                 {woodShape === 'rectangular' ? (
-                  <div className="input-grid">
+                  <div className="input-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
                     <div className="input-group">
                       <label>{t("Alto Externo")}</label>
                       <div className="input-wrapper">
@@ -676,8 +686,8 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
             )}
 
             {/* Inputs comunes de ebanistería */}
-            <div className="premium-form-card">
-              <div className="form-subsection-title" style={{ marginTop: 0 }}>{t("Propiedades de la Madera")}</div>
+            <div className="premium-form-card" style={{ marginBottom: '0.5rem' }}>
+              <div className="form-subsection-title" style={{ marginTop: 0, marginBottom: '0.35rem' }}>{t("Propiedades de la Madera")}</div>
               <div className="input-grid">
                 <div className="input-group">
                   <label>{t("Espesor madera")}</label>
@@ -687,6 +697,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       value={displayVal(woodThickness, 'length_small')}
                       onChange={(e) => handleInputChange(e.target.value, setWoodThickness, 'length_small')}
                       step="any"
+                      style={{ height: '30px', padding: '0.2rem 2rem 0.2rem 0.55rem', fontSize: '0.78rem' }}
                     />
                     <span className="unit-badge">{getUnitLabel('length_small', unitSystem)}</span>
                   </div>
@@ -699,6 +710,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       value={displayVal(woodExtra, 'volume')}
                       onChange={(e) => handleInputChange(e.target.value, setWoodExtra, 'volume')}
                       step="any"
+                      style={{ height: '30px', padding: '0.2rem 2rem 0.2rem 0.55rem', fontSize: '0.78rem' }}
                     />
                     <span className="unit-badge">{getUnitLabel('volume', unitSystem)}</span>
                   </div>

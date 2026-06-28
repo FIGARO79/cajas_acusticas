@@ -169,29 +169,68 @@ export function generateReportHTML(
       const hp = xoverResults.hp || {};
       const bp = xoverResults.bp || {};
       const lp = xoverResults.lp || {};
+      
+      let hpList = '';
+      let bpList = '';
+      let lpList = '';
+
+      if (crossoverType === '4th_lr') {
+        hpList = `
+          ${hp.c1 !== undefined && hp.c1 !== null ? `<li>C1: <strong>${formatNum(hp.c1, 2)} µF</strong></li>` : ''}
+          ${hp.c2 !== undefined && hp.c2 !== null ? `<li>C2: <strong>${formatNum(hp.c2, 2)} µF</strong></li>` : ''}
+          ${hp.l1 !== undefined && hp.l1 !== null ? `<li>L1: <strong>${formatNum(hp.l1, 3)} mH</strong></li>` : ''}
+          ${hp.l2 !== undefined && hp.l2 !== null ? `<li>L2: <strong>${formatNum(hp.l2, 3)} mH</strong></li>` : ''}
+        `;
+        bpList = `
+          <li style="list-style: none; font-weight: bold; margin: 3px 0; font-size: 0.85em; opacity: 0.85;">— ${t("Sección Paso Alto (fL)")} —</li>
+          ${bp.c1_hp !== undefined && bp.c1_hp !== null ? `<li>C1_HP: <strong>${formatNum(bp.c1_hp, 2)} µF</strong></li>` : ''}
+          ${bp.c2_hp !== undefined && bp.c2_hp !== null ? `<li>C2_HP: <strong>${formatNum(bp.c2_hp, 2)} µF</strong></li>` : ''}
+          ${bp.l1_hp !== undefined && bp.l1_hp !== null ? `<li>L1_HP: <strong>${formatNum(bp.l1_hp, 3)} mH</strong></li>` : ''}
+          ${bp.l2_hp !== undefined && bp.l2_hp !== null ? `<li>L2_HP: <strong>${formatNum(bp.l2_hp, 3)} mH</strong></li>` : ''}
+          
+          <li style="list-style: none; font-weight: bold; margin: 8px 0 3px 0; font-size: 0.85em; opacity: 0.85;">— ${t("Sección Paso Bajo (fH)")} —</li>
+          ${bp.l1_lp !== undefined && bp.l1_lp !== null ? `<li>L1_LP: <strong>${formatNum(bp.l1_lp, 3)} mH</strong></li>` : ''}
+          ${bp.l2_lp !== undefined && bp.l2_lp !== null ? `<li>L2_LP: <strong>${formatNum(bp.l2_lp, 3)} mH</strong></li>` : ''}
+          ${bp.c1_lp !== undefined && bp.c1_lp !== null ? `<li>C1_LP: <strong>${formatNum(bp.c1_lp, 2)} µF</strong></li>` : ''}
+          ${bp.c2_lp !== undefined && bp.c2_lp !== null ? `<li>C2_LP: <strong>${formatNum(bp.c2_lp, 2)} µF</strong></li>` : ''}
+        `;
+        lpList = `
+          ${lp.l1 !== undefined && lp.l1 !== null ? `<li>L1: <strong>${formatNum(lp.l1, 3)} mH</strong></li>` : ''}
+          ${lp.l2 !== undefined && lp.l2 !== null ? `<li>L2: <strong>${formatNum(lp.l2, 3)} mH</strong></li>` : ''}
+          ${lp.c1 !== undefined && lp.c1 !== null ? `<li>C1: <strong>${formatNum(lp.c1, 2)} µF</strong></li>` : ''}
+          ${lp.c2 !== undefined && lp.c2 !== null ? `<li>C2: <strong>${formatNum(lp.c2, 2)} µF</strong></li>` : ''}
+        `;
+      } else {
+        hpList = `
+          ${hp.c1 !== undefined && hp.c1 !== null ? `<li>C1: <strong>${formatNum(hp.c1, 2)} µF</strong></li>` : ''}
+          ${hp.l1 !== undefined && hp.l1 !== null ? `<li>L1: <strong>${formatNum(hp.l1, 3)} mH</strong></li>` : ''}
+        `;
+        bpList = `
+          ${bp.c_hp !== undefined && bp.c_hp !== null ? `<li>C_HP (Serie): <strong>${formatNum(bp.c_hp, 2)} µF</strong></li>` : ''}
+          ${bp.c1_hp !== undefined && bp.c1_hp !== null ? `<li>C1_HP (Serie): <strong>${formatNum(bp.c1_hp, 2)} µF</strong></li>` : ''}
+          ${bp.l_lp !== undefined && bp.l_lp !== null ? `<li>L_LP (Serie): <strong>${formatNum(bp.l_lp, 3)} mH</strong></li>` : ''}
+          ${bp.l1_lp !== undefined && bp.l1_lp !== null ? `<li>L1_LP (Serie): <strong>${formatNum(bp.l1_lp, 3)} mH</strong></li>` : ''}
+          ${bp.l_hp !== undefined && bp.l_hp !== null ? `<li>L_HP (Paralelo): <strong>${formatNum(bp.l_hp, 3)} mH</strong></li>` : ''}
+          ${bp.c_lp !== undefined && bp.c_lp !== null ? `<li>C_LP (Paralelo): <strong>${formatNum(bp.c_lp, 2)} µF</strong></li>` : ''}
+        `;
+        lpList = `
+          ${lp.l1 !== undefined && lp.l1 !== null ? `<li>L1: <strong>${formatNum(lp.l1, 3)} mH</strong></li>` : ''}
+          ${lp.c1 !== undefined && lp.c1 !== null ? `<li>C1: <strong>${formatNum(lp.c1, 2)} µF</strong></li>` : ''}
+        `;
+      }
+
       xoverDetails = `
         <div class="xover-box">
           <h4>${t("Vía de Agudos (High Pass)")}</h4>
-          <ul>
-            ${hp.c1 !== undefined && hp.c1 !== null ? `<li>C1: <strong>${formatNum(hp.c1, 2)} µF</strong></li>` : ''}
-            ${hp.l1 !== undefined && hp.l1 !== null ? `<li>L1: <strong>${formatNum(hp.l1, 3)} mH</strong></li>` : ''}
-          </ul>
+          <ul>${hpList}</ul>
         </div>
         <div class="xover-box">
           <h4>${t("Vía de Medios (Band Pass)")}</h4>
-          <ul>
-            ${(bp.c_hp !== undefined && bp.c_hp !== null) || (bp.c1_hp !== undefined && bp.c1_hp !== null) ? `<li>C_hp: <strong>${formatNum(bp.c_hp || bp.c1_hp, 2)} µF</strong></li>` : ''}
-            ${(bp.l_lp !== undefined && bp.l_lp !== null) || (bp.l1_lp !== undefined && bp.l1_lp !== null) ? `<li>L_lp: <strong>${formatNum(bp.l_lp || bp.l1_lp, 3)} mH</strong></li>` : ''}
-            ${bp.l_hp !== undefined && bp.l_hp !== null ? `<li>L_hp: <strong>${formatNum(bp.l_hp, 3)} mH</strong></li>` : ''}
-            ${bp.c_lp !== undefined && bp.c_lp !== null ? `<li>C_lp: <strong>${formatNum(bp.c_lp, 2)} µF</strong></li>` : ''}
-          </ul>
+          <ul>${bpList}</ul>
         </div>
         <div class="xover-box">
           <h4>${t("Vía de Graves (Low Pass)")}</h4>
-          <ul>
-            ${lp.l1 !== undefined && lp.l1 !== null ? `<li>L1: <strong>${formatNum(lp.l1, 3)} mH</strong></li>` : ''}
-            ${lp.c1 !== undefined && lp.c1 !== null ? `<li>C1: <strong>${formatNum(lp.c1, 2)} µF</strong></li>` : ''}
-          </ul>
+          <ul>${lpList}</ul>
         </div>
       `;
     }
