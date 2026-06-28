@@ -441,8 +441,20 @@ export const PortedBoxTab: React.FC<PortedBoxTabProps> = ({
 
               <div className="input-group" style={{ gridColumn: portShape === 'rectangular' ? 'span 1' : 'span 1' }}>
                 <label>{t("Longitud calculada")}</label>
-                <div style={{ height: '34px', display: 'flex', alignItems: 'center', fontWeight: 'bold', color: 'var(--ported-color)' }}>
-                  {portLength}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                  <input 
+                    type="text" 
+                    value={portLength} 
+                    readOnly 
+                    className="input-select"
+                    style={{ 
+                      width: '100%', 
+                      height: '34px', 
+                      color: 'var(--ported-color)',
+                      cursor: 'default',
+                      fontWeight: 'normal'
+                    }}
+                  />
                 </div>
               </div>
             </div>

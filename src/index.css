@@ -1154,7 +1154,8 @@ html[data-theme="light"] .tab-btn:hover {
   text-align: left;
 }
 
-.search-item:hover {
+.search-item:hover,
+.search-item.active {
   background-color: var(--primary, #3b82f6);
   color: #ffffff;
 }
@@ -1185,7 +1186,8 @@ html[data-theme="light"] .search-item {
   border-bottom-color: rgba(0, 0, 0, 0.05);
 }
 
-html[data-theme="light"] .search-item:hover {
+html[data-theme="light"] .search-item:hover,
+html[data-theme="light"] .search-item.active {
   background-color: #1d4ed8;
   color: #ffffff;
 }

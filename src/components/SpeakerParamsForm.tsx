@@ -50,6 +50,8 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const searchRef = React.useRef<HTMLDivElement>(null);
+  const [activeIndex, setActiveIndex] = useState<number>(-1);
+  const activeRef = React.useRef<HTMLLIElement | null>(null);
 
   // Computar brandsList dinámicamente combinando marcas oficiales y personalizadas
   const brandsList = React.useMemo(() => {
@@ -114,6 +116,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
 
   // Estado para la pestaña de driver activa (estilo Chrome)
   const [driverTab, setDriverTab] = useState<'view' | 'edit'>('view');
@@ -335,11 +338,49 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
     return results;
   }, [driversDb, searchQuery, selectedBrand, customDrivers]);
 
+  // Resetear index activo cuando cambia la lista filtrada
+  useEffect(() => {
+    setActiveIndex(-1);
+  }, [filteredDrivers]);
+
+  // Hacer scroll automático al elemento activo
+  useEffect(() => {
+    if (activeIndex >= 0 && activeRef.current) {
+      activeRef.current.scrollIntoView({ block: 'nearest' });
+    }
+  }, [activeIndex]);
+
+
   const handleSelectDriver = (item: { driver: any; brand: string; displayName: string }) => {
     const mapped = mapDriverToSpeakerParams(item.driver);
     onPresetChange(item.driver.ID.toString(), mapped);
     setSearchQuery(item.displayName);
     setShowDropdown(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showDropdown || filteredDrivers.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIndex(prev => {
+        const nextIndex = prev + 1;
+        return nextIndex < filteredDrivers.length ? nextIndex : 0;
+      });
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIndex(prev => {
+        const nextIndex = prev - 1;
+        return nextIndex >= 0 ? nextIndex : filteredDrivers.length - 1;
+      });
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (activeIndex >= 0 && activeIndex < filteredDrivers.length) {
+        handleSelectDriver(filteredDrivers[activeIndex]);
+      }
+    } else if (e.key === 'Escape') {
+      setShowDropdown(false);
+    }
   };
 
   // Sincronizar input si el preset cambia a vacío desde fuera (como al limpiar parámetros)
@@ -485,6 +526,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
                   setShowDropdown(true);
                 }}
                 onFocus={() => setShowDropdown(true)}
+                onKeyDown={handleKeyDown}
                 placeholder={
                   loadingDb 
                     ? t("Cargando base de datos (27 MB)...") 
@@ -503,11 +545,12 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
               )}
               {showDropdown && filteredDrivers.length > 0 && (
                 <ul className="search-dropdown">
-                  {filteredDrivers.map((item) => (
+                  {filteredDrivers.map((item, index) => (
                     <li
                       key={item.driver.ID}
                       onClick={() => handleSelectDriver(item)}
-                      className="search-item"
+                      className={`search-item ${index === activeIndex ? 'active' : ''}`}
+                      ref={index === activeIndex ? activeRef : null}
                     >
                       {item.displayName}
                     </li>

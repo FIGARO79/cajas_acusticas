@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { type Lang, translate } from '../utils/translations';
 import { type UnitSystem, convertTo, convertFrom, getUnitLabel } from '../utils/units';
 import type { CalculatedPorted, CalculatedSealed, CalculatedBandpass, SpeakerParams } from '../types';
+import { suggestPortConfig } from '../utils/acousticMath';
 
 interface BoxParamsFormProps {
   lang: Lang;
@@ -116,6 +117,86 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
   prMasaAnadidaG,
 }) => {
   const t = (text: string) => translate(text, lang);
+
+  // Estados para sugerencias de puerto y velocidad del aire
+  const [suggestions, setSuggestions] = useState<ReturnType<typeof suggestPortConfig> | null>(null);
+  const [vPeak, setVPeak] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (portedData.valid && portedData.Vb > 0 && portedData.Fb > 0) {
+      setSuggestions(suggestPortConfig(portedData.Vb, portedData.Fb, params));
+    } else {
+      setSuggestions(null);
+    }
+  }, [portedData, params]);
+
+  useEffect(() => {
+    const pCount = typeof portCount === 'number' ? portCount : 0;
+    if (pCount > 0 && portedData.Vb > 0) {
+      let pDia = 0;
+      if (portShape === 'round') {
+        pDia = portDiameter || 0;
+      } else {
+        const w = portWidth || 0;
+        const h = portHeight || 0;
+        pDia = 2 * Math.sqrt((w * h) / Math.PI); // Diámetro equivalente
+      }
+
+      if (pDia > 0) {
+        if (params.sd && params.xmax) {
+          const peak = (0.008 * portedData.Fb * params.sd * params.xmax) / (pCount * Math.pow(pDia, 2));
+          setVPeak(peak);
+        } else {
+          setVPeak(null);
+        }
+      } else {
+        setVPeak(null);
+      }
+    } else {
+      setVPeak(null);
+    }
+  }, [portCount, portDiameter, portShape, portWidth, portHeight, portedData, params]);
+
+  const handleApplyPort = (num: number, dia: number) => {
+    setPortShape('round');
+    setPortCount(num);
+    setPortDiameter(dia);
+  };
+
+  const handleApplyRectangularPort = (num: number, width: number, height: number) => {
+    setPortShape('rectangular');
+    setPortCount(num);
+    setPortWidth(width);
+    setPortHeight(height);
+  };
+
+  const getPortVelocityAlert = () => {
+    if (vPeak === null) {
+      return {
+        className: 'alert-box info',
+        html: `<strong>${t("Falta Sd/Xmax:")}</strong> ${t("Ingresa el área del cono y excursión en 'Parámetros Físicos Básicos' para estimar la velocidad del aire y prevenir turbulencias.")}`
+      };
+    }
+    
+    if (vPeak < 10.0) {
+      return {
+        className: 'alert-box success',
+        html: `<strong>${t("Velocidad de aire excelente")} (${vPeak.toFixed(1)} m/s):</strong> ${t("Puerto libre de ruidos de turbulencia. Operación silenciosa.")}`
+      };
+    } else if (vPeak >= 10.0 && vPeak <= 17.0) {
+      return {
+        className: 'alert-box warn',
+        html: `<strong>${t("Velocidad moderada")} (${vPeak.toFixed(1)} m/s):</strong> ${t("Aceptable para la mayoría de aplicaciones. Se recomienda usar extremos redondeados (flared) para evitar soplidos leves.")}`
+      };
+    } else {
+      return {
+        className: 'alert-box danger',
+        html: `<strong>${t("¡Velocidad crítica!")} (${vPeak.toFixed(1)} m/s):</strong> ${t("Flujo ruidoso. El puerto producirá soplidos (\"chuffing\"). Aumenta el diámetro o la cantidad de puertos.")}`
+      };
+    }
+  };
+
+  const portVelocityAlert = getPortVelocityAlert();
 
   // Silenciar variables no usadas de puerto personalizado para satisfacer la verificación estricta de compilación
   if (portArea !== undefined || typeof setPortArea === 'function' || params.fs || customPorted) {
@@ -332,7 +413,11 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                   </select>
                 </div>
 
-                <div className="input-grid">
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: portShape === 'rectangular' ? '1fr 1fr 1fr 1.2fr' : '1fr 1fr 1.2fr',
+                  gap: '0.45rem'
+                }}>
                   <div className="input-group">
                     <label>{t("Cantidad")}</label>
                     <div className="input-wrapper">
@@ -345,18 +430,35 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                   </div>
 
                   {portShape === 'round' ? (
-                    <div className="input-group">
-                      <label>{t("Diámetro")}</label>
-                      <div className="input-wrapper">
-                        <input 
-                          type="number" 
-                          value={portDiameter} 
-                          onChange={(e) => setPortDiameter(e.target.value === '' ? '' : Math.max(0.1, parseFloat(e.target.value) || 0))} 
-                          step="any"
-                        />
-                        <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
+                    <>
+                      <div className="input-group">
+                        <label>{t("Diámetro")}</label>
+                        <div className="input-wrapper">
+                          <input 
+                            type="number" 
+                            value={portDiameter} 
+                            onChange={(e) => setPortDiameter(e.target.value === '' ? '' : Math.max(0.1, parseFloat(e.target.value) || 0))} 
+                            step="any"
+                          />
+                          <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
+                        </div>
                       </div>
-                    </div>
+                      <div className="input-group">
+                        <label>{t("Longitud (Lv)")}</label>
+                        <div className="input-wrapper">
+                          <input 
+                            type="text" 
+                            value={portLength} 
+                            readOnly 
+                            style={{ 
+                              color: 'var(--ported-color)', 
+                              cursor: 'default',
+                              fontWeight: 'normal'
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </>
                   ) : (
                     <>
                       <div className="input-group">
@@ -383,15 +485,99 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                           <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                         </div>
                       </div>
+                      <div className="input-group">
+                        <label>{t("Longitud (Lv)")}</label>
+                        <div className="input-wrapper">
+                          <input 
+                            type="text" 
+                            value={portLength} 
+                            readOnly 
+                            style={{ 
+                              color: 'var(--ported-color)', 
+                              cursor: 'default',
+                              fontWeight: 'normal'
+                            }}
+                          />
+                        </div>
+                      </div>
                     </>
                   )}
                 </div>
 
-                <div className="input-group input-group-full" style={{ marginTop: '0.25rem' }}>
-                  <label>{t("Longitud Requerida (Lv)")}</label>
-                  <div style={{ height: '34px', display: 'flex', alignItems: 'center', fontWeight: 'bold', color: 'var(--ported-color)', fontSize: '0.95rem' }}>
-                    {portLength}
-                  </div>
+                {/* AVISO DE VELOCIDAD DEL AIRE Y SUGERENCIAS DE PUERTO */}
+                <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <div className={portVelocityAlert.className} style={{ fontSize: '0.78rem', padding: '0.5rem 0.75rem', borderRadius: '6px' }} dangerouslySetInnerHTML={{ __html: portVelocityAlert.html }} />
+                  
+                  {suggestions && suggestions.valid ? (
+                    <div className="wood-note" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', padding: '0.6rem 0.8rem', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--card-border)', borderRadius: '6px' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                        {t("Sugerencias de Puertos")}
+                      </span>
+                      <p style={{ margin: '0 0 0.25rem 0', fontSize: '0.72rem', lineHeight: '1.35', color: 'var(--text-muted)' }}>
+                        {t("Para evitar soplidos se requiere un diámetro redondo mínimo de")}{' '}
+                        <strong>{convertTo(suggestions.dMin || 0, 'length', unitSystem).toFixed(2)} {getUnitLabel('length', unitSystem)}</strong>.
+                      </p>
+                      <table className="wood-table" style={{ fontSize: '0.7rem', width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr>
+                            <th>{portShape === 'rectangular' ? t('Dimensiones') : t('Diámetro')}</th>
+                            <th>{t('Longitud')}</th>
+                            <th>{t('Simular')}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {suggestions.options?.slice(0, 3).map((opt: any, idx: number) => {
+                            const displayOptDia = convertTo(opt.diameter, 'length', unitSystem);
+                            const displayOptLen = convertTo(opt.length, 'length', unitSystem);
+                            const unitLabel = getUnitLabel('length', unitSystem);
+                            const lengthText = opt.length > 0 ? `${displayOptLen.toFixed(1)} ${unitLabel}` : t("Inviable");
+                            
+                            let sugText = '';
+                            let applyFn = () => {};
+
+                            if (portShape === 'rectangular') {
+                              const area = Math.PI * Math.pow(opt.diameter / 2, 2);
+                              let hCm = 5.0;
+                              if (opt.diameter <= 5.0) hCm = 4.0;
+                              else if (opt.diameter > 5.0 && opt.diameter <= 7.5) hCm = 5.0;
+                              else if (opt.diameter > 7.5 && opt.diameter <= 10.0) hCm = 7.0;
+                              else hCm = 10.0;
+
+                              const wCm = area / hCm;
+                              const displayW = convertTo(wCm, 'length', unitSystem);
+                              const displayH = convertTo(hCm, 'length', unitSystem);
+                              sugText = `${opt.numPorts}x de ${displayW.toFixed(1)}x${displayH.toFixed(1)}`;
+                              applyFn = () => handleApplyRectangularPort(opt.numPorts, wCm, hCm);
+                            } else {
+                              sugText = `${opt.numPorts}x Ø ${displayOptDia.toFixed(2)}`;
+                              applyFn = () => handleApplyPort(opt.numPorts, opt.diameter);
+                            }
+
+                            return (
+                              <tr key={idx}>
+                                <td><strong>{sugText}</strong></td>
+                                <td>{lengthText}</td>
+                                <td>
+                                  <button 
+                                    onClick={applyFn} 
+                                    className="preset-select" 
+                                    style={{ padding: '0.15rem 0.35rem', fontSize: '0.68rem', background: 'var(--primary)', border: '1px solid var(--primary)', color: '#ffffff', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
+                                    type="button"
+                                  >
+                                    {t('Aplicar')}
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : suggestions && (
+                    <div className="alert-box info" style={{ fontSize: '0.72rem', padding: '0.5rem 0.75rem', marginTop: '0.25rem' }}>
+                      {t("Ingresa Sd y Xmax en parámetros físicos para ver sugerencias de puertos.")}
+                    </div>
+                  )}
                 </div>
               </>
             ) : (
