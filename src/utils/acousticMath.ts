@@ -86,10 +86,10 @@ export function calculateSuggestedPorted(params: SpeakerParams) {
   const qts = params.qts;
   const fs = params.fs;
   const vas = params.vas;
-  let Vb = 0;
-  let Fb = 0;
-  let F3 = 0;
-  let alignmentName = '';
+  let Vb: number;
+  let Fb: number;
+  let F3: number;
+  let alignmentName: string;
 
   if (qts < 0.35) {
     // SBB4 (Sub-Butterworth de 4.º Orden)

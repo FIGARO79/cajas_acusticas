@@ -26,6 +26,16 @@ ChartJS.register(
   Filler
 );
 
+// Frequency points to evaluate (static)
+const frequencies = (() => {
+  const freqs: number[] = [];
+  for (let i = 0; i <= 100; i++) {
+    const f = 10 * Math.pow(500 / 10, i / 100);
+    freqs.push(Math.round(f * 10) / 10);
+  }
+  return freqs;
+})();
+
 interface SimulationChartProps {
   lang: Lang;
   theme: 'dark' | 'light';
@@ -45,16 +55,6 @@ export const SimulationChart: React.FC<SimulationChartProps> = ({
 }) => {
   const t = (text: string) => translate(text, lang);
 
-  // Frequency points to evaluate
-  const frequencies = (() => {
-    const freqs: number[] = [];
-    for (let i = 0; i <= 100; i++) {
-      const f = 10 * Math.pow(500 / 10, i / 100);
-      freqs.push(Math.round(f * 10) / 10);
-    }
-    return freqs;
-  })();
-
   // State for curve points
   const [sealedPoints, setSealedPoints] = useState<{x:number,y:number}[]>([]);
   const [portedPoints, setPortedPoints] = useState<{x:number,y:number}[]>([]);
@@ -71,7 +71,9 @@ export const SimulationChart: React.FC<SimulationChartProps> = ({
         }
       });
     } else {
-      setSealedPoints([]);
+      setTimeout(() => {
+        if (!cancelled) setSealedPoints([]);
+      }, 0);
     }
     if (portedData) {
       calcPortedCurve(portedData, params).then(vals => {
@@ -81,7 +83,9 @@ export const SimulationChart: React.FC<SimulationChartProps> = ({
         }
       });
     } else {
-      setPortedPoints([]);
+      setTimeout(() => {
+        if (!cancelled) setPortedPoints([]);
+      }, 0);
     }
     if (bandpassData && bandpassData.valid) {
       if (bandpassData.order === 4) {
@@ -100,7 +104,9 @@ export const SimulationChart: React.FC<SimulationChartProps> = ({
         });
       }
     } else {
-      setBandpassPoints([]);
+      setTimeout(() => {
+        if (!cancelled) setBandpassPoints([]);
+      }, 0);
     }
     return () => { cancelled = true; };
   }, [sealedData, portedData, bandpassData, params]);

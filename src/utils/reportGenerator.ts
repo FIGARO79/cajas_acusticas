@@ -141,7 +141,7 @@ export function generateReportHTML(
   if (xoverData && xoverData.xoverResults) {
     const { crossoverWays, crossoverType, fc, fcLow, fcHigh, enableZobel, enableLPad, xoverResults, zobelResults, lpadResults } = xoverData;
     
-    let xoverDetails = '';
+    let xoverDetails: string;
     if (crossoverWays === '2way') {
       const hp = xoverResults.hp || {};
       const lp = xoverResults.lp || {};

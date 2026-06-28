@@ -5,32 +5,81 @@ import { getWasm } from '../wasm/index.ts';
 interface CrossoverTabProps {
   lang: Lang;
   onRegisterExporter?: (exporter: () => any) => void;
+  readOnly?: boolean;
+  crossoverWaysProp?: '2way' | '3way';
+  crossoverTypeProp?: '1st_order' | '2nd_butter' | '2nd_lr' | '4th_lr';
+  fcProp?: number;
+  fcLowProp?: number;
+  fcHighProp?: number;
+  zTweeterProp?: number;
+  zMidrangeProp?: number;
+  zWooferProp?: number;
+  enableZobelProp?: boolean;
+  reProp?: number;
+  leProp?: number;
+  enableLPadProp?: boolean;
+  attenuationProp?: number;
+  zLoadProp?: number;
 }
 
-export const CrossoverTab: React.FC<CrossoverTabProps> = ({ lang, onRegisterExporter }) => {
+export const CrossoverTab: React.FC<CrossoverTabProps> = ({
+  lang,
+  onRegisterExporter,
+  readOnly = false,
+  crossoverWaysProp,
+  crossoverTypeProp,
+  fcProp,
+  fcLowProp,
+  fcHighProp,
+  zTweeterProp,
+  zMidrangeProp,
+  zWooferProp,
+  enableZobelProp,
+  reProp,
+  leProp,
+  enableLPadProp,
+  attenuationProp,
+  zLoadProp
+}) => {
   const t = (text: string) => translate(text, lang);
 
   // 1. Crossover Way Mode
-  const [crossoverWays, setCrossoverWays] = useState<'2way' | '3way'>('2way');
+  const [crossoverWaysLocal, setCrossoverWays] = useState<'2way' | '3way'>('2way');
 
   // 2. Crossover Inputs
-  const [fc, setFc] = useState<number | ''>(2500); // For 2-way
-  const [fcLow, setFcLow] = useState<number | ''>(500); // For 3-way Low-Mid
-  const [fcHigh, setFcHigh] = useState<number | ''>(4000); // For 3-way Mid-High
-  const [zTweeter, setZTweeter] = useState<number>(8);
-  const [zMidrange, setZMidrange] = useState<number>(8);
-  const [zWoofer, setZWoofer] = useState<number>(8);
-  const [crossoverType, setCrossoverType] = useState<'1st_order' | '2nd_butter' | '2nd_lr' | '4th_lr'>('2nd_lr');
+  const [fcLocal, setFc] = useState<number | ''>(2500); // For 2-way
+  const [fcLowLocal, setFcLow] = useState<number | ''>(500); // For 3-way Low-Mid
+  const [fcHighLocal, setFcHigh] = useState<number | ''>(4000); // For 3-way Mid-High
+  const [zTweeterLocal, setZTweeter] = useState<number>(8);
+  const [zMidrangeLocal, setZMidrange] = useState<number>(8);
+  const [zWooferLocal, setZWoofer] = useState<number>(8);
+  const [crossoverTypeLocal, setCrossoverType] = useState<'1st_order' | '2nd_butter' | '2nd_lr' | '4th_lr'>('2nd_lr');
 
   // 3. Zobel Network Inputs
-  const [enableZobel, setEnableZobel] = useState<boolean>(false);
-  const [re, setRe] = useState<number>(5.8);
-  const [le, setLe] = useState<number>(0.6); // mH
+  const [enableZobelLocal, setEnableZobel] = useState<boolean>(false);
+  const [reLocal, setRe] = useState<number>(5.8);
+  const [leLocal, setLe] = useState<number>(0.6); // mH
 
   // 4. L-Pad Attenuator Inputs
-  const [enableLPad, setEnableLPad] = useState<boolean>(false);
-  const [attenuation, setAttenuation] = useState<number>(3); // dB
-  const [zLoad, setZLoad] = useState<number>(8);
+  const [enableLPadLocal, setEnableLPad] = useState<boolean>(false);
+  const [attenuationLocal, setAttenuation] = useState<number>(3); // dB
+  const [zLoadLocal, setZLoad] = useState<number>(8);
+
+  // Resolver valores activos
+  const crossoverWays = readOnly ? (crossoverWaysProp || '2way') : crossoverWaysLocal;
+  const crossoverType = readOnly ? (crossoverTypeProp || '2nd_lr') : crossoverTypeLocal;
+  const fc = readOnly ? (fcProp || 2500) : fcLocal;
+  const fcLow = readOnly ? (fcLowProp || 500) : fcLowLocal;
+  const fcHigh = readOnly ? (fcHighProp || 4000) : fcHighLocal;
+  const zTweeter = readOnly ? (zTweeterProp ?? 8) : zTweeterLocal;
+  const zMidrange = readOnly ? (zMidrangeProp ?? 8) : zMidrangeLocal;
+  const zWoofer = readOnly ? (zWooferProp ?? 8) : zWooferLocal;
+  const enableZobel = readOnly ? (enableZobelProp ?? false) : enableZobelLocal;
+  const re = readOnly ? (reProp ?? 5.8) : reLocal;
+  const le = readOnly ? (leProp ?? 0.6) : leLocal;
+  const enableLPad = readOnly ? (enableLPadProp ?? false) : enableLPadLocal;
+  const attenuation = readOnly ? (attenuationProp ?? 3) : attenuationLocal;
+  const zLoad = readOnly ? (zLoadProp ?? 8) : zLoadLocal;
 
   // --- CROSSOVER CALCULATIONS ---
   const calculateCrossover = () => {
@@ -838,6 +887,82 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({ lang, onRegisterExpo
   };
 
 
+
+  if (readOnly) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%', boxSizing: 'border-box' }}>
+        {/* Componentes Calculados */}
+        {xoverResults && (
+          <div className="pro-calc-panel" style={{ marginTop: '0rem' }}>
+            <span className="pro-calc-title">{t("Componentes del Filtro")} ({crossoverWays === '2way' ? '2 Vías' : '3 Vías'}, {crossoverType === '2nd_lr' ? 'L-R' : crossoverType === '2nd_butter' ? 'Butterworth' : crossoverType === '1st_order' ? '1er Orden' : '4to Orden'})</span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: '0.25rem' }}>
+              {xoverResults.hp.c1 && (
+                <div className="pro-calc-row" style={{ flex: '1 1 45%' }}>
+                  <span className="pro-calc-label">C1 (Agudos):</span>
+                  <span className="pro-calc-value">{xoverResults.hp.c1.toFixed(2)} µF</span>
+                </div>
+              )}
+              {xoverResults.hp.l1 && (
+                <div className="pro-calc-row" style={{ flex: '1 1 45%' }}>
+                  <span className="pro-calc-label">L1 (Agudos):</span>
+                  <span className="pro-calc-value">{xoverResults.hp.l1.toFixed(3)} mH</span>
+                </div>
+              )}
+              {xoverResults.lp.l1 && (
+                <div className="pro-calc-row" style={{ flex: '1 1 45%' }}>
+                  <span className="pro-calc-label">L1 (Graves):</span>
+                  <span className="pro-calc-value">{xoverResults.lp.l1.toFixed(3)} mH</span>
+                </div>
+              )}
+              {xoverResults.lp.c1 && (
+                <div className="pro-calc-row" style={{ flex: '1 1 45%' }}>
+                  <span className="pro-calc-label">C1 (Graves):</span>
+                  <span className="pro-calc-value">{xoverResults.lp.c1.toFixed(2)} µF</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Zobel y L-Pad */}
+        {(enableZobel || enableLPad) && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+            {enableZobel && zobelResults && (
+              <div className="pro-calc-panel" style={{ marginTop: '0rem' }}>
+                <span className="pro-calc-title">{t("Red Zobel")}</span>
+                <div className="pro-calc-row">
+                  <span className="pro-calc-label">Rz:</span>
+                  <span className="pro-calc-value">{zobelResults.rz.toFixed(1)} Ω</span>
+                </div>
+                <div className="pro-calc-row">
+                  <span className="pro-calc-label">Cz:</span>
+                  <span className="pro-calc-value">{zobelResults.cz.toFixed(2)} µF</span>
+                </div>
+              </div>
+            )}
+            {enableLPad && lpadResults && (
+              <div className="pro-calc-panel" style={{ marginTop: '0rem' }}>
+                <span className="pro-calc-title">{t("Atenuador L-Pad")}</span>
+                <div className="pro-calc-row">
+                  <span className="pro-calc-label">R_ser:</span>
+                  <span className="pro-calc-value">{lpadResults.r1.toFixed(2)} Ω</span>
+                </div>
+                <div className="pro-calc-row">
+                  <span className="pro-calc-label">R_par:</span>
+                  <span className="pro-calc-value">{lpadResults.r2.toFixed(2)} Ω</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Esquema de conexión */}
+        <div style={{ width: '100%', marginTop: '0.25rem' }}>
+          {renderSchematic()}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="tab-content active" id="tab-crossover" style={{ padding: '1.5rem' }}>

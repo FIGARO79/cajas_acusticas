@@ -1585,3 +1585,237 @@ html[data-theme="light"] .dashboard-main::-webkit-scrollbar-thumb:hover {
     background: #f8fafc;
   }
 }
+
+/* ==========================================================================
+   PREMIUM ENCLOSURE PANEL REFINEMENTS (BoxParamsForm)
+   ========================================================================== */
+
+/* Segmented Control Switcher */
+.segmented-control {
+  display: flex;
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 3px;
+  gap: 3px;
+  position: relative;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.segmented-control button {
+  flex: 1;
+  padding: 0.55rem 0.35rem;
+  border-radius: 9px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.segmented-control button:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.segmented-control button.active {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+/* Light theme support */
+html[data-theme="light"] .segmented-control {
+  background: rgba(241, 245, 249, 0.85);
+  border-color: rgba(0, 0, 0, 0.06);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+html[data-theme="light"] .segmented-control button {
+  color: #64748b;
+}
+
+html[data-theme="light"] .segmented-control button:hover {
+  color: #0f172a;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+html[data-theme="light"] .segmented-control button.active {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #ffffff;
+  box-shadow: 0 3px 8px rgba(59, 130, 246, 0.2);
+}
+
+/* Sub-tabs header capsule style */
+.sub-tabs-header {
+  display: flex;
+  background: rgba(15, 23, 42, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  padding: 2px;
+  gap: 2px;
+  margin-bottom: 1.25rem;
+}
+
+.sub-tabs-header button {
+  flex: 1;
+  padding: 0.45rem 0.25rem;
+  border-radius: 8px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  transition: all 0.2s ease;
+}
+
+.sub-tabs-header button:hover {
+  color: var(--text-main);
+}
+
+.sub-tabs-header button.active {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-main);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+html[data-theme="light"] .sub-tabs-header {
+  background: rgba(241, 245, 249, 0.6);
+  border-color: rgba(0, 0, 0, 0.04);
+}
+
+html[data-theme="light"] .sub-tabs-header button.active {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* Premium EBP Badge Cards */
+.ebp-badge-card {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 10px;
+  margin-bottom: 1.25rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: rgba(13, 19, 33, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.ebp-badge-card.ebp-sealed {
+  border-color: rgba(14, 165, 233, 0.3);
+  box-shadow: 0 4px 20px rgba(14, 165, 233, 0.06), inset 0 1px 0 rgba(14, 165, 233, 0.05);
+}
+.ebp-badge-card.ebp-sealed span:first-child {
+  color: #0ea5e9;
+  text-shadow: 0 0 8px rgba(14, 165, 233, 0.4);
+}
+
+.ebp-badge-card.ebp-ported {
+  border-color: rgba(16, 185, 129, 0.3);
+  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.06), inset 0 1px 0 rgba(16, 185, 129, 0.05);
+}
+.ebp-badge-card.ebp-ported span:first-child {
+  color: #10b981;
+  text-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+}
+
+.ebp-badge-card.ebp-normal {
+  border-color: rgba(245, 158, 11, 0.3);
+  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.06), inset 0 1px 0 rgba(245, 158, 11, 0.05);
+}
+.ebp-badge-card.ebp-normal span:first-child {
+  color: #f59e0b;
+  text-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+}
+
+html[data-theme="light"] .ebp-badge-card {
+  background: rgba(248, 250, 252, 0.85);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+html[data-theme="light"] .ebp-badge-card.ebp-sealed {
+  background: rgba(224, 242, 254, 0.45);
+  border-color: rgba(14, 165, 233, 0.2);
+}
+html[data-theme="light"] .ebp-badge-card.ebp-ported {
+  background: rgba(209, 250, 229, 0.45);
+  border-color: rgba(16, 185, 129, 0.2);
+}
+html[data-theme="light"] .ebp-badge-card.ebp-normal {
+  background: rgba(254, 243, 199, 0.45);
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+/* Premium Card Panels */
+.premium-form-card {
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.premium-form-card:hover {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.55);
+}
+
+html[data-theme="light"] .premium-form-card {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+html[data-theme="light"] .premium-form-card:hover {
+  background: #ffffff;
+  border-color: #cbd5e1;
+}
+
+/* Premium Buttons inside panels */
+.premium-panel-btn {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0.55rem 1rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-main);
+  transition: all 0.2s ease;
+}
+
+.premium-panel-btn:hover {
+  background: var(--primary-gradient);
+  border-color: transparent;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+}
+
+.premium-panel-btn.active-primary {
+  background: var(--primary-gradient);
+  border-color: transparent;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+}
+
+html[data-theme="light"] .premium-panel-btn {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #0f172a;
+}
+html[data-theme="light"] .premium-panel-btn:hover {
+  background: var(--primary-gradient);
+  color: #ffffff;
+  border-color: transparent;
+}

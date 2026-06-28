@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { type Lang, translate } from '../utils/translations';
 import type { CalculatedSealed, CalculatedPorted, CalculatedBandpass, SpeakerParams, WoodCabinetData, WoodCutPiece } from '../types';
 import { type UnitSystem, convertTo, convertFrom, getUnitLabel } from '../utils/units';
+import { CabinetDiagram } from './CabinetDiagram';
 
 interface CabinetTabProps {
   lang: Lang;
@@ -56,6 +57,7 @@ interface CabinetTabProps {
   portArea: number | '';
   dampingFactor: number;
   onCabinetDataChange?: (data: any) => void;
+  readOnly?: boolean;
 }
 
 export const CabinetTab: React.FC<CabinetTabProps> = ({
@@ -105,7 +107,8 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
   portHeight,
   portArea,
   dampingFactor,
-  onCabinetDataChange
+  onCabinetDataChange,
+  readOnly = false
 }) => {
   const t = (text: string) => translate(text, lang);
   const [cabinetData, setCabinetData] = useState<WoodCabinetData | null>(null);
@@ -470,6 +473,94 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
       }
     }
   };
+
+  if (readOnly) {
+    let numericPortLength = 0;
+    if (woodSource === 'ported' && portedData.valid && cabinetData?.valid) {
+      const pCount = typeof portCount === 'number' ? portCount : 0;
+      let pDia = 0;
+      if (portShape === 'round') {
+        pDia = portDiameter || 0;
+      } else if (portShape === 'custom') {
+        pDia = 2 * Math.sqrt((portArea || 0) / Math.PI);
+      } else {
+        pDia = 2 * Math.sqrt(((portWidth || 0) * (portHeight || 0)) / Math.PI);
+      }
+      if (pDia > 0 && pCount > 0) {
+        const rPort = pDia / 2;
+        const Lv = ((23562.5 * Math.pow(pDia, 2) * pCount) / (portedData.Fb * portedData.Fb * cabinetData.vNeto)) - (1.46 * rPort);
+        numericPortLength = Lv > 0 ? Lv : 0;
+      }
+    }
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%', boxSizing: 'border-box' }}>
+        {/* Resultados de Ebanistería */}
+        <div className="results-summary" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', marginBottom: '0rem' }}>
+          <div className="result-tile" style={{ padding: '0.5rem' }}>
+            <span className="result-tile-label" style={{ fontSize: '0.68rem' }}>{t("Volumen Neto Resultante")}</span>
+            <span className="result-tile-value" style={{ fontSize: '0.85rem' }}>
+              {cabinetData?.valid 
+                ? `${convertTo(cabinetData.vNeto, 'volume', unitSystem).toFixed(2)} ${getUnitLabel('volume', unitSystem)}` 
+                : 'N/A'}
+            </span>
+          </div>
+          <div className="result-tile" style={{ padding: '0.5rem' }}>
+            <span className="result-tile-label" style={{ fontSize: '0.68rem' }}>{t("Dimensiones Internas")}</span>
+            <span className="result-tile-value" style={{ fontSize: '0.72rem', fontWeight: 600, marginTop: '0.15rem' }}>
+              {cabinetData?.valid ? (
+                woodShape === 'rectangular' 
+                  ? `${convertTo(cabinetData.hInt, 'length', unitSystem).toFixed(1)}x${convertTo(cabinetData.wInt, 'length', unitSystem).toFixed(1)}x${convertTo(cabinetData.dInt, 'length', unitSystem).toFixed(1)}`
+                  : `${convertTo(cabinetData.hInt, 'length', unitSystem).toFixed(1)}x${convertTo(cabinetData.wInt, 'length', unitSystem).toFixed(1)}xd`
+              ) : 'N/A'}
+            </span>
+          </div>
+          <div className="result-tile" style={{ padding: '0.5rem' }}>
+            <span className="result-tile-label" style={{ fontSize: '0.68rem' }}>{t("Dimensiones Externas")}</span>
+            <span className="result-tile-value" style={{ fontSize: '0.72rem', fontWeight: 600, marginTop: '0.15rem' }}>
+              {cabinetData?.valid ? (
+                woodShape === 'rectangular'
+                  ? `${convertTo(cabinetData.hExt, 'length', unitSystem).toFixed(1)}x${convertTo(cabinetData.wExt, 'length', unitSystem).toFixed(1)}x${convertTo(cabinetData.dExt, 'length', unitSystem).toFixed(1)}`
+                  : `${convertTo(cabinetData.hExt, 'length', unitSystem).toFixed(1)}x${convertTo(cabinetData.wExt, 'length', unitSystem).toFixed(1)}xd`
+              ) : 'N/A'}
+            </span>
+          </div>
+        </div>
+
+        {/* Puerto de sintonía */}
+        {portInfo && (
+          <div className="pro-calc-panel" style={{ marginTop: '0rem', padding: '0.65rem' }}>
+            <span className="pro-calc-title" style={{ fontSize: '0.78rem' }}>{t("Puerto(s) de Sintonía para este Diseño")}</span>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.25rem 0.75rem', marginTop: '0.2rem' }}>
+              <div className="pro-calc-row" style={{ border: 'none', padding: 0 }}>
+                <span className="pro-calc-label" style={{ fontSize: '0.72rem' }}>{t("Cantidad:")}</span>
+                <span className="pro-calc-value" style={{ fontSize: '0.72rem' }}>{portInfo.qtySize}</span>
+              </div>
+              <div className="pro-calc-row" style={{ border: 'none', padding: 0 }}>
+                <span className="pro-calc-label" style={{ fontSize: '0.72rem' }}>{t("Longitud Requerida:")}</span>
+                <span className="pro-calc-value" style={{ fontSize: '0.72rem' }}>{portInfo.length}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Diagrama dinámico Corte A-A */}
+        <CabinetDiagram
+          lang={lang}
+          unitSystem={unitSystem}
+          shape={woodShape}
+          cabinetData={cabinetData}
+          boxType={woodSource}
+          portShape={portShape}
+          portDiameter={typeof portDiameter === 'number' ? portDiameter : 0}
+          portWidth={typeof portWidth === 'number' ? portWidth : 0}
+          portHeight={typeof portHeight === 'number' ? portHeight : 0}
+          portLength={numericPortLength}
+          portCount={typeof portCount === 'number' ? portCount : 0}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="tab-content active" id="tab-wood">

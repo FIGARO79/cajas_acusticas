@@ -59,6 +59,81 @@ interface BoxParamsFormProps {
   setPrMms: (m: number) => void;
   prFbNatural: number;
   prMasaAnadidaG: number;
+
+  // SUBPESTAÑAS DE CONTROL CENTRAL
+  activeTab: 'wood' | 'damping' | 'crossover';
+  setActiveTab: (tab: 'wood' | 'damping' | 'crossover') => void;
+
+  // Ebanistería (Woodworking)
+  woodMode: 'calc' | 'input';
+  setWoodMode: (mode: 'calc' | 'input') => void;
+  woodShape: 'rectangular' | 'trapezoidal';
+  setWoodShape: (shape: 'rectangular' | 'trapezoidal') => void;
+  woodConstraint: string;
+  setWoodConstraint: (constraint: string) => void;
+  woodRatio: 'golden' | 'classic' | 'cube';
+  setWoodRatio: (ratio: 'golden' | 'classic' | 'cube') => void;
+  woodThickness: number | '';
+  setWoodThickness: (val: number | '') => void;
+  woodExtra: number | '';
+  setWoodExtra: (val: number | '') => void;
+  // Locks/Fijaciones
+  woodLockVal1: number | '';
+  setWoodLockVal1: (v: number | '') => void;
+  woodLockVal2: number | '';
+  setWoodLockVal2: (v: number | '') => void;
+  woodLockVal3: number | '';
+  setWoodLockVal3: (v: number | '') => void;
+  // Manual Rectangular
+  woodExtHeight: number | '';
+  setWoodExtHeight: (v: number | '') => void;
+  woodExtWidth: number | '';
+  setWoodExtWidth: (v: number | '') => void;
+  woodExtDepth: number | '';
+  setWoodExtDepth: (v: number | '') => void;
+  // Manual Trapezoidal
+  woodTrapExtHeight: number | '';
+  setWoodTrapExtHeight: (v: number | '') => void;
+  woodTrapExtWidth: number | '';
+  setWoodTrapExtWidth: (v: number | '') => void;
+  woodTrapExtDepthTop: number | '';
+  setWoodTrapExtDepthTop: (v: number | '') => void;
+  woodTrapExtDepthBot: number | '';
+  setWoodTrapExtDepthBot: (v: number | '') => void;
+
+  // Damping
+  dampingType: 'none' | 'light' | 'moderate' | 'heavy';
+  setDampingType: (type: 'none' | 'light' | 'moderate' | 'heavy') => void;
+
+  // Crossover
+  crossoverWays: number;
+  setCrossoverWays: (val: number) => void;
+  crossoverType: '1st_order' | '2nd_butter' | '2nd_lr' | '4th_lr';
+  setCrossoverType: (val: '1st_order' | '2nd_butter' | '2nd_lr' | '4th_lr') => void;
+  fc: number;
+  setFc: (val: number) => void;
+  fcLow: number;
+  setFcLow: (val: number) => void;
+  fcHigh: number;
+  setFcHigh: (val: number) => void;
+  zTweeter: number;
+  setZTweeter: (val: number) => void;
+  zMidrange: number;
+  setZMidrange: (val: number) => void;
+  zWoofer: number;
+  setZWoofer: (val: number) => void;
+  enableZobel: boolean;
+  setEnableZobel: (val: boolean) => void;
+  zobelRe: number;
+  setZobelRe: (val: number) => void;
+  zobelLe: number;
+  setZobelLe: (val: number) => void;
+  enableLPad: boolean;
+  setEnableLPad: (val: boolean) => void;
+  lpadAttenuation: number;
+  setLpadAttenuation: (val: number) => void;
+  lpadZLoad: number;
+  setLpadZLoad: (val: number) => void;
 }
 
 export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
@@ -70,7 +145,6 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
   setCustomVb,
   customFb,
   setCustomFb,
-  customPorted,
   setCustomPorted,
   params,
   portedData,
@@ -87,7 +161,6 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
   bandpassA,
   setBandpassA,
 
-  // Puerto
   portCount,
   setPortCount,
   portDiameter,
@@ -98,11 +171,8 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
   setPortWidth,
   portHeight,
   setPortHeight,
-  portArea,
-  setPortArea,
   portLength,
 
-  // Radiador Pasivo
   prTuning,
   setPrTuning,
   prDia,
@@ -115,10 +185,77 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
   setPrMms,
   prFbNatural,
   prMasaAnadidaG,
+
+  activeTab,
+  setActiveTab,
+
+  woodMode,
+  setWoodMode,
+  woodShape,
+  setWoodShape,
+  woodConstraint,
+  setWoodConstraint,
+  woodRatio,
+  setWoodRatio,
+  woodThickness,
+  setWoodThickness,
+  woodExtra,
+  setWoodExtra,
+  woodLockVal1,
+  setWoodLockVal1,
+  woodLockVal2,
+  setWoodLockVal2,
+  woodLockVal3,
+  setWoodLockVal3,
+  woodExtHeight,
+  setWoodExtHeight,
+  woodExtWidth,
+  setWoodExtWidth,
+  woodExtDepth,
+  setWoodExtDepth,
+  woodTrapExtHeight,
+  setWoodTrapExtHeight,
+  woodTrapExtWidth,
+  setWoodTrapExtWidth,
+  woodTrapExtDepthTop,
+  setWoodTrapExtDepthTop,
+  woodTrapExtDepthBot,
+  setWoodTrapExtDepthBot,
+
+  dampingType,
+  setDampingType,
+
+  crossoverWays,
+  setCrossoverWays,
+  crossoverType,
+  setCrossoverType,
+  fc,
+  setFc,
+  fcLow,
+  setFcLow,
+  fcHigh,
+  setFcHigh,
+  zTweeter,
+  setZTweeter,
+  zMidrange,
+  setZMidrange,
+  zWoofer,
+  setZWoofer,
+  enableZobel,
+  setEnableZobel,
+  zobelRe,
+  setZobelRe,
+  zobelLe,
+  setZobelLe,
+  enableLPad,
+  setEnableLPad,
+  lpadAttenuation,
+  setLpadAttenuation,
+  lpadZLoad,
+  setLpadZLoad,
 }) => {
   const t = (text: string) => translate(text, lang);
 
-  // Estados para sugerencias de puerto y velocidad del aire
   const [suggestions, setSuggestions] = useState<ReturnType<typeof suggestPortConfig> | null>(null);
   const [vPeak, setVPeak] = useState<number | null>(null);
 
@@ -139,16 +276,12 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
       } else {
         const w = portWidth || 0;
         const h = portHeight || 0;
-        pDia = 2 * Math.sqrt((w * h) / Math.PI); // Diámetro equivalente
+        pDia = 2 * Math.sqrt((w * h) / Math.PI);
       }
 
-      if (pDia > 0) {
-        if (params.sd && params.xmax) {
-          const peak = (0.008 * portedData.Fb * params.sd * params.xmax) / (pCount * Math.pow(pDia, 2));
-          setVPeak(peak);
-        } else {
-          setVPeak(null);
-        }
+      if (pDia > 0 && params.sd && params.xmax) {
+        const peak = (0.008 * portedData.Fb * params.sd * params.xmax) / (pCount * Math.pow(pDia, 2));
+        setVPeak(peak);
       } else {
         setVPeak(null);
       }
@@ -163,510 +296,869 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
     setPortDiameter(dia);
   };
 
-  const handleApplyRectangularPort = (num: number, width: number, height: number) => {
-    setPortShape('rectangular');
-    setPortCount(num);
-    setPortWidth(width);
-    setPortHeight(height);
+  const displayVal = (val: number | '', type: 'length' | 'length_small' | 'volume') => {
+    if (val === '' || val === undefined || val === null) return '';
+    const converted = convertTo(val, type, unitSystem);
+    return (Math.round(converted * 1000) / 1000).toString();
   };
 
-  const getPortVelocityAlert = () => {
-    if (vPeak === null) {
-      return {
-        className: 'alert-box info',
-        html: `<strong>${t("Falta Sd/Xmax:")}</strong> ${t("Ingresa el área del cono y excursión en 'Parámetros Físicos Básicos' para estimar la velocidad del aire y prevenir turbulencias.")}`
-      };
+  const handleInputChange = (valStr: string, setter: (v: number | '') => void, type: 'length' | 'length_small' | 'volume') => {
+    if (valStr === '') {
+      setter('');
+      return;
     }
-    
-    if (vPeak < 10.0) {
-      return {
-        className: 'alert-box success',
-        html: `<strong>${t("Velocidad de aire excelente")} (${vPeak.toFixed(1)} m/s):</strong> ${t("Puerto libre de ruidos de turbulencia. Operación silenciosa.")}`
-      };
-    } else if (vPeak >= 10.0 && vPeak <= 17.0) {
-      return {
-        className: 'alert-box warn',
-        html: `<strong>${t("Velocidad moderada")} (${vPeak.toFixed(1)} m/s):</strong> ${t("Aceptable para la mayoría de aplicaciones. Se recomienda usar extremos redondeados (flared) para evitar soplidos leves.")}`
-      };
+    let num = parseFloat(valStr) || 0;
+    num = convertFrom(num, type, unitSystem);
+    setter(num);
+  };
+
+  const handleApplySuggestedCabinet = () => {
+    let netVol = 0;
+    if (boxType === 'sealed' && sealedData.valid) {
+      netVol = sealedData.Vb;
+    } else if (boxType === 'ported' && portedData.valid) {
+      netVol = portedData.Vb;
+    } else if (boxType === 'bandpass' && bandpassData.valid) {
+      netVol = bandpassData.Vf + bandpassData.Vr;
+    }
+
+    if (netVol <= 0) return;
+
+    const thicknessVal = (typeof woodThickness === 'number' ? woodThickness : 0) / 10;
+    const extraVal = typeof woodExtra === 'number' ? woodExtra : 0;
+    const totalVol = netVol + extraVal;
+    const volCm3 = totalVol * 1000;
+
+    if (woodShape === 'rectangular') {
+      let r_h = 1.618, r_d = 0.618;
+      if (woodRatio === 'classic') { r_h = 1.4; r_d = 0.8; }
+      else if (woodRatio === 'cube') { r_h = 1.0; r_d = 1.0; }
+
+      const factor = r_h * r_d;
+      const wInt = Math.pow(volCm3 / factor, 1 / 3);
+      const hInt = r_h * wInt;
+      const dInt = r_d * wInt;
+
+      setWoodExtHeight(Math.round((hInt + 2 * thicknessVal) * 10) / 10);
+      setWoodExtWidth(Math.round((wInt + 2 * thicknessVal) * 10) / 10);
+      setWoodExtDepth(Math.round((dInt + 2 * thicknessVal) * 10) / 10);
     } else {
-      return {
-        className: 'alert-box danger',
-        html: `<strong>${t("¡Velocidad crítica!")} (${vPeak.toFixed(1)} m/s):</strong> ${t("Flujo ruidoso. El puerto producirá soplidos (\"chuffing\"). Aumenta el diámetro o la cantidad de puertos.")}`
-      };
+      const valH = typeof woodLockVal1 === 'number' ? woodLockVal1 : 40;
+      const valW = typeof woodLockVal2 === 'number' ? woodLockVal2 : 45;
+      const valD1 = typeof woodLockVal3 === 'number' ? woodLockVal3 : 18;
+
+      const hInt = valH - (2 * thicknessVal);
+      const wInt = valW - (2 * thicknessVal);
+      const d1Int = Math.max(0, valD1 - (2 * thicknessVal));
+
+      if (hInt > 0 && wInt > 0 && d1Int > 0) {
+        const dAvg = volCm3 / (hInt * wInt);
+        const d2Int = (2 * dAvg) - d1Int;
+        const d2Ext = d2Int + (2 * thicknessVal);
+
+        setWoodTrapExtHeight(valH);
+        setWoodTrapExtWidth(valW);
+        setWoodTrapExtDepthTop(valD1);
+        setWoodTrapExtDepthBot(Math.round(d2Ext * 10) / 10);
+      }
     }
   };
 
-  const portVelocityAlert = getPortVelocityAlert();
+  const getEbpRecommendation = () => {
+    const ebp = params.qes ? (params.fs / params.qes) : 0;
+    if (ebp === 0) return '';
+    if (ebp < 50) return t("Sugerencia: Caja Sellada (Sealed).");
+    if (ebp > 90) return t("Sugerencia: Caja Ventilada (Ported).");
+    return t("Sugerencia: Apta para Sellada o Ventilada.");
+  };
 
-  // Silenciar variables no usadas de puerto personalizado para satisfacer la verificación estricta de compilación
-  if (portArea !== undefined || typeof setPortArea === 'function' || params.fs || customPorted) {
-    // No-op
-  }
+  const ebpValue = params.qes ? (params.fs / params.qes) : null;
 
   return (
     <aside className="panel" style={{ borderLeft: 'none' }}>
-      {/* Selector de Tipo de Caja (Menú de Texto Plano con el mismo estilo de Cargar Altavoz) */}
-      <div className="box-menu-links" style={{ display: 'flex', gap: '1.25rem', marginBottom: '0.65rem', borderBottom: '1px solid var(--card-border)', paddingBottom: '0.4rem' }}>
-        <button 
+      {/* Título de Diseño */}
+      <h3 className="panel-title">{t("Diseño")}</h3>
+
+      {/* EBP Status Bar */}
+      <div className={`ebp-badge-card ${ebpValue ? (ebpValue < 50 ? 'ebp-sealed' : ebpValue > 90 ? 'ebp-ported' : 'ebp-normal') : 'ebp-normal'}`} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '0.75rem', padding: '0.4rem 0.75rem', borderRadius: '6px', marginBottom: '1rem', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: '0.82rem', fontWeight: 700 }}>EBP: {ebpValue ? ebpValue.toFixed(1) : 'N/A'}</span>
+        <span style={{ fontSize: '0.74rem', opacity: 0.85, fontWeight: 500 }}>
+          {getEbpRecommendation()}
+        </span>
+      </div>
+
+      {/* Selector de Tipo de Caja */}
+      <div className="input-group input-group-full" style={{ marginBottom: '1rem' }}>
+        <select
+          value={boxType}
+          onChange={(e) => setBoxType(e.target.value as any)}
+          className="input-select"
+          style={{ width: '100%', height: '38px', borderRadius: '8px' }}
+        >
+          <option value="sealed">{t("Caja Sellada")}</option>
+          <option value="ported">{t("Caja Ventilada")}</option>
+          <option value="bandpass">{t("Caja Paso Banda")}</option>
+        </select>
+      </div>
+
+      {/* Pestañas de Control Central */}
+      <div className="tabs-header" style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', borderBottom: '1px solid var(--card-border)', paddingBottom: '0.5rem' }}>
+        <button
           type="button"
-          onClick={() => setBoxType('sealed')}
-          style={{ 
-            background: 'none', 
-            border: 'none', 
-            padding: 0, 
-            margin: 0, 
-            color: boxType === 'sealed' ? 'var(--text-main)' : 'var(--text-muted)', 
-            fontWeight: boxType === 'sealed' ? 'bold' : 'normal', 
-            fontSize: '0.82rem',
+          onClick={() => setActiveTab('wood')}
+          className={`tab-btn ${activeTab === 'wood' ? 'active' : ''}`}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: activeTab === 'wood' ? 'var(--text-main)' : 'var(--text-muted)',
+            fontWeight: activeTab === 'wood' ? 'bold' : 'normal',
+            fontSize: '0.8rem',
             cursor: 'pointer',
-            fontFamily: 'var(--font-sans)',
-            outline: 'none',
-            letterSpacing: '0.02em',
-            transition: 'color 0.15s ease'
+            paddingBottom: '0.2rem',
+            borderBottom: activeTab === 'wood' ? '2px solid var(--primary)' : 'none'
           }}
         >
-          {t("Caja Sellada")}
+          {t("Dimensiones de la caja")}
         </button>
-        <button 
+        <button
           type="button"
-          onClick={() => setBoxType('ported')}
-          style={{ 
-            background: 'none', 
-            border: 'none', 
-            padding: 0, 
-            margin: 0, 
-            color: boxType === 'ported' ? 'var(--text-main)' : 'var(--text-muted)', 
-            fontWeight: boxType === 'ported' ? 'bold' : 'normal', 
-            fontSize: '0.82rem',
+          onClick={() => setActiveTab('damping')}
+          className={`tab-btn ${activeTab === 'damping' ? 'active' : ''}`}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: activeTab === 'damping' ? 'var(--text-main)' : 'var(--text-muted)',
+            fontWeight: activeTab === 'damping' ? 'bold' : 'normal',
+            fontSize: '0.8rem',
             cursor: 'pointer',
-            fontFamily: 'var(--font-sans)',
-            outline: 'none',
-            letterSpacing: '0.02em',
-            transition: 'color 0.15s ease'
+            paddingBottom: '0.2rem',
+            borderBottom: activeTab === 'damping' ? '2px solid var(--primary)' : 'none'
           }}
         >
-          {t("Caja Ventilada")}
+          {t("Relleno Acústico")}
         </button>
-        <button 
+        <button
           type="button"
-          onClick={() => setBoxType('bandpass')}
-          style={{ 
-            background: 'none', 
-            border: 'none', 
-            padding: 0, 
-            margin: 0, 
-            color: boxType === 'bandpass' ? 'var(--text-main)' : 'var(--text-muted)', 
-            fontWeight: boxType === 'bandpass' ? 'bold' : 'normal', 
-            fontSize: '0.82rem',
+          onClick={() => setActiveTab('crossover')}
+          className={`tab-btn ${activeTab === 'crossover' ? 'active' : ''}`}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: activeTab === 'crossover' ? 'var(--text-main)' : 'var(--text-muted)',
+            fontWeight: activeTab === 'crossover' ? 'bold' : 'normal',
+            fontSize: '0.8rem',
             cursor: 'pointer',
-            fontFamily: 'var(--font-sans)',
-            outline: 'none',
-            letterSpacing: '0.02em',
-            transition: 'color 0.15s ease'
+            paddingBottom: '0.2rem',
+            borderBottom: activeTab === 'crossover' ? '2px solid var(--primary)' : 'none'
           }}
         >
-          {t("Caja Paso Banda")}
+          {t("Divisores de Frecuencia")}
         </button>
       </div>
 
       <div className="form-section">
-
-        {/* AJUSTES DE VOLUMEN Y SINTONÍA GLOBALES */}
-        <div className="form-subsection-title">{t("Dimensionamiento y Alineación")}</div>
-
-        {isLinkedToCabinet && (
-          <div className="alert-box warn" style={{ padding: '0.5rem 0.75rem', fontSize: '0.75rem', marginBottom: '0.5rem' }}>
-            <span>
-              <strong>{t("Volumen Vinculado")}:</strong> {t("Determinado por la pestaña Woodworking.")}
-            </span>
-          </div>
-        )}
-
-        <div className="input-grid">
-          {/* Volumen Vb */}
-          <div className="input-group">
-            <label>{t("Volumen Neto (Vb)")}</label>
-            <div className="input-wrapper">
-              <input 
-                type="number" 
-                value={Number(convertTo(boxType === 'sealed' ? (sealedData.valid ? sealedData.Vb : customVb) : boxType === 'ported' ? (portedData.valid ? portedData.Vb : customVb) : (bandpassData.valid ? (bandpassData.Vf + bandpassData.Vr) : customVb), 'volume', unitSystem).toFixed(2))}
-                onChange={(e) => {
-                  const valLitres = convertFrom(parseFloat(e.target.value) || 0, 'volume', unitSystem);
-                  setCustomVb(valLitres);
-                  setCustomPorted(true);
-                }}
-                disabled={isLinkedToCabinet}
-                step="any"
-              />
-              <span className="unit-badge">{getUnitLabel('volume', unitSystem)}</span>
+        {/* PESTAÑA A: DIMENSIONES / MEDIDAS DE LA CAJA */}
+        {activeTab === 'wood' && (
+          <>
+            {/* Modo de Medidas (Calcular / Ingresar) */}
+            <div className="wood-mode-selector-container" style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+              <button
+                type="button"
+                className={`preset-select ${woodMode === 'calc' ? 'active' : ''}`}
+                onClick={() => setWoodMode('calc')}
+                style={{ flex: 1, padding: '0.45rem', fontSize: '0.75rem', cursor: 'pointer', background: woodMode === 'calc' ? 'var(--primary)' : 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '6px', color: '#fff' }}
+              >
+                {t("Calcular desde Vb")}
+              </button>
+              <button
+                type="button"
+                className={`preset-select ${woodMode === 'input' ? 'active' : ''}`}
+                onClick={() => setWoodMode('input')}
+                style={{ flex: 1, padding: '0.45rem', fontSize: '0.75rem', cursor: 'pointer', background: woodMode === 'input' ? 'var(--primary)' : 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '6px', color: '#fff' }}
+              >
+                {t("Ingresar Medidas")}
+              </button>
             </div>
-          </div>
 
-          {/* Frecuencia de Sintonía (si no es sellada) */}
-          {boxType !== 'sealed' && (
+            {/* Forma de la caja */}
             <div className="input-group">
-              <label>{boxType === 'bandpass' ? t("Sintonía Frontal (Fb)") : t("Sintonía (Fb)")}</label>
-              <div className="input-wrapper">
-                <input 
-                  type="number" 
-                  value={Number((boxType === 'ported' ? (portedData.valid ? portedData.Fb : customFb) : (bandpassData.valid ? bandpassData.Fb : customFb)).toFixed(1))}
-                  onChange={(e) => {
-                    setCustomFb(parseFloat(e.target.value) || 0);
-                    setCustomPorted(true);
-                  }}
-                  step="any"
-                />
-                <span className="unit-badge">Hz</span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {boxType === 'sealed' && (
-          <div className="input-grid" style={{ marginTop: '0.25rem' }}>
-            <div className="input-group">
-              <label>{t("Q del Sistema Objetivo (Qtc)")}</label>
-              <div className="input-wrapper">
-                <input 
-                  type="number" 
-                  value={targetQtc} 
-                  onChange={(e) => setTargetQtc(parseFloat(e.target.value) || 0.707)} 
-                  step="0.01"
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {boxType === 'bandpass' && (
-          <div className="input-grid" style={{ marginTop: '0.25rem' }}>
-            <div className="input-group">
-              <label>{t("Orden del Filtro")}</label>
-              <select 
-                value={bandpassOrder} 
-                onChange={(e) => setBandpassOrder(parseInt(e.target.value) as any)} 
+              <label>{t("Forma de caja")}</label>
+              <select
+                value={woodShape}
+                onChange={(e) => setWoodShape(e.target.value as any)}
                 className="input-select"
                 style={{ width: '100%', height: '34px' }}
               >
-                <option value={4}>{t("4.º Orden")}</option>
-                <option value={6}>{t("6.º Orden (Paralelo)")}</option>
+                <option value="rectangular">{t("Rectangular")}</option>
+                <option value="trapezoidal">{t("Trapezoidal")}</option>
               </select>
             </div>
-            {bandpassOrder === 4 ? (
+
+            {/* Si es Modo Calcular: proporciones y bloqueos */}
+            {woodMode === 'calc' && (
+              <>
+                {woodShape === 'rectangular' && (
+                  <div className="input-group">
+                    <label>{t("Bloqueo de Dimensiones")}</label>
+                    <select
+                      value={woodConstraint}
+                      onChange={(e) => setWoodConstraint(e.target.value)}
+                      className="input-select"
+                      style={{ width: '100%', height: '34px' }}
+                    >
+                      <option value="none">{t("Proporciones Libres")}</option>
+                      <option value="lock_h_d">{t("Fijar Alto y Profundidad")}</option>
+                      <option value="lock_h_w">{t("Fijar Alto y Ancho")}</option>
+                      <option value="lock_w_d">{t("Fijar Ancho y Profundidad")}</option>
+                    </select>
+                  </div>
+                )}
+
+                {woodConstraint === 'none' && woodShape === 'rectangular' && (
+                  <div className="input-group">
+                    <label>{t("Proporción Acústica")}</label>
+                    <select
+                      value={woodRatio}
+                      onChange={(e) => setWoodRatio(e.target.value as any)}
+                      className="input-select"
+                      style={{ width: '100%', height: '34px' }}
+                    >
+                      <option value="golden">{t("Aurea (1.618 : 1 : 0.618)")}</option>
+                      <option value="classic">{t("Clásica (1.400 : 1 : 0.800)")}</option>
+                      <option value="cube">{t("Cubo (1.000 : 1 : 1.000)")}</option>
+                    </select>
+                  </div>
+                )}
+
+                {/* Dimensiones bloqueadas */}
+                {(woodConstraint !== 'none' || woodShape === 'trapezoidal') && (
+                  <div className="input-grid" style={{ marginTop: '0.25rem' }}>
+                    <div className="input-group">
+                      <label>{woodShape === 'trapezoidal' ? t("Alto Externo") : t("Alto Fijo")}</label>
+                      <div className="input-wrapper">
+                        <input
+                          type="number"
+                          value={displayVal(woodLockVal1, 'length')}
+                          onChange={(e) => handleInputChange(e.target.value, setWoodLockVal1, 'length')}
+                          step="any"
+                        />
+                        <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
+                      </div>
+                    </div>
+                    <div className="input-group">
+                      <label>{woodShape === 'trapezoidal' ? t("Ancho Externo") : t("Ancho Fijo")}</label>
+                      <div className="input-wrapper">
+                        <input
+                          type="number"
+                          value={displayVal(woodLockVal2, 'length')}
+                          onChange={(e) => handleInputChange(e.target.value, setWoodLockVal2, 'length')}
+                          step="any"
+                        />
+                        <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
+                      </div>
+                    </div>
+                    {woodShape === 'trapezoidal' && (
+                      <div className="input-group">
+                        <label>{t("Prof. Superior (D1)")}</label>
+                        <div className="input-wrapper">
+                          <input
+                            type="number"
+                            value={displayVal(woodLockVal3, 'length')}
+                            onChange={(e) => handleInputChange(e.target.value, setWoodLockVal3, 'length')}
+                            step="any"
+                          />
+                          <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Si es Modo Ingresar Medidas: inputs manuales */}
+            {woodMode === 'input' && (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.4rem' }}>
+                  <button
+                    type="button"
+                    onClick={handleApplySuggestedCabinet}
+                    className="preset-select"
+                    style={{ padding: '0.35rem 0.7rem', fontSize: '0.75rem', background: 'var(--primary)', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer' }}
+                  >
+                    {t("Cargar Cajón Sugerido")}
+                  </button>
+                </div>
+                {woodShape === 'rectangular' ? (
+                  <div className="input-grid">
+                    <div className="input-group">
+                      <label>{t("Alto Externo")}</label>
+                      <div className="input-wrapper">
+                        <input
+                          type="number"
+                          value={displayVal(woodExtHeight, 'length')}
+                          onChange={(e) => handleInputChange(e.target.value, setWoodExtHeight, 'length')}
+                          step="any"
+                        />
+                        <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
+                      </div>
+                    </div>
+                    <div className="input-group">
+                      <label>{t("Ancho Externo")}</label>
+                      <div className="input-wrapper">
+                        <input
+                          type="number"
+                          value={displayVal(woodExtWidth, 'length')}
+                          onChange={(e) => handleInputChange(e.target.value, setWoodExtWidth, 'length')}
+                          step="any"
+                        />
+                        <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
+                      </div>
+                    </div>
+                    <div className="input-group">
+                      <label>{t("Profundidad")}</label>
+                      <div className="input-wrapper">
+                        <input
+                          type="number"
+                          value={displayVal(woodExtDepth, 'length')}
+                          onChange={(e) => handleInputChange(e.target.value, setWoodExtDepth, 'length')}
+                          step="any"
+                        />
+                        <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="input-grid">
+                    <div className="input-group">
+                      <label>{t("Alto Externo")}</label>
+                      <div className="input-wrapper">
+                        <input
+                          type="number"
+                          value={displayVal(woodTrapExtHeight, 'length')}
+                          onChange={(e) => handleInputChange(e.target.value, setWoodTrapExtHeight, 'length')}
+                          step="any"
+                        />
+                        <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
+                      </div>
+                    </div>
+                    <div className="input-group">
+                      <label>{t("Ancho Externo")}</label>
+                      <div className="input-wrapper">
+                        <input
+                          type="number"
+                          value={displayVal(woodTrapExtWidth, 'length')}
+                          onChange={(e) => handleInputChange(e.target.value, setWoodTrapExtWidth, 'length')}
+                          step="any"
+                        />
+                        <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
+                      </div>
+                    </div>
+                    <div className="input-group">
+                      <label>{t("Prof. Sup. (D1)")}</label>
+                      <div className="input-wrapper">
+                        <input
+                          type="number"
+                          value={displayVal(woodTrapExtDepthTop, 'length')}
+                          onChange={(e) => handleInputChange(e.target.value, setWoodTrapExtDepthTop, 'length')}
+                          step="any"
+                        />
+                        <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
+                      </div>
+                    </div>
+                    <div className="input-group">
+                      <label>{t("Prof. Inf. (D2)")}</label>
+                      <div className="input-wrapper">
+                        <input
+                          type="number"
+                          value={displayVal(woodTrapExtDepthBot, 'length')}
+                          onChange={(e) => handleInputChange(e.target.value, setWoodTrapExtDepthBot, 'length')}
+                          step="any"
+                        />
+                        <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Inputs comunes de ebanistería */}
+            <div className="input-grid" style={{ marginTop: '0.5rem' }}>
               <div className="input-group">
-                <label>{t("Factor de Calidad (S)")}</label>
+                <label>{t("Espesor madera")}</label>
                 <div className="input-wrapper">
-                  <input 
-                    type="number" 
-                    value={bandpassS} 
-                    onChange={(e) => setBandpassS(parseFloat(e.target.value) || 0.707)} 
-                    step="0.05"
+                  <input
+                    type="number"
+                    value={displayVal(woodThickness, 'length_small')}
+                    onChange={(e) => handleInputChange(e.target.value, setWoodThickness, 'length_small')}
+                    step="any"
                   />
+                  <span className="unit-badge">{getUnitLabel('length_small', unitSystem)}</span>
                 </div>
               </div>
-            ) : (
               <div className="input-group">
-                <label>{t("Ganancia (A)")}</label>
+                <label>{t("Vol extra")}</label>
                 <div className="input-wrapper">
-                  <input 
-                    type="number" 
-                    value={bandpassA} 
-                    onChange={(e) => setBandpassA(parseFloat(e.target.value) || 2.0)} 
-                    step="0.1"
+                  <input
+                    type="number"
+                    value={displayVal(woodExtra, 'volume')}
+                    onChange={(e) => handleInputChange(e.target.value, setWoodExtra, 'volume')}
+                    step="any"
+                  />
+                  <span className="unit-badge">{getUnitLabel('volume', unitSystem)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Dimensionamiento y alineación acústica del cajón */}
+            <div className="form-subsection-title" style={{ marginTop: '1rem' }}>{t("Dimensionamiento y Alineación")}</div>
+
+            <div className="input-grid">
+              <div className="input-group">
+                <label>{t("Volumen Neto (Vb)")}</label>
+                <div className="input-wrapper">
+                  <input
+                    type="number"
+                    value={Number(convertTo(boxType === 'sealed' ? (sealedData.valid ? sealedData.Vb : customVb) : boxType === 'ported' ? (portedData.valid ? portedData.Vb : customVb) : (bandpassData.valid ? (bandpassData.Vf + bandpassData.Vr) : customVb), 'volume', unitSystem).toFixed(2))}
+                    onChange={(e) => {
+                      const valLitres = convertFrom(parseFloat(e.target.value) || 0, 'volume', unitSystem);
+                      setCustomVb(valLitres);
+                      setCustomPorted(true);
+                    }}
+                    disabled={isLinkedToCabinet}
+                    step="any"
+                  />
+                  <span className="unit-badge">{getUnitLabel('volume', unitSystem)}</span>
+                </div>
+              </div>
+
+              {boxType !== 'sealed' && (
+                <div className="input-group">
+                  <label>{boxType === 'bandpass' ? t("Sintonía Frontal (Fb)") : t("Sintonía (Fb)")}</label>
+                  <div className="input-wrapper">
+                    <input
+                      type="number"
+                      value={Number((boxType === 'ported' ? (portedData.valid ? portedData.Fb : customFb) : (bandpassData.valid ? bandpassData.Fb : customFb)).toFixed(1))}
+                      onChange={(e) => {
+                        setCustomFb(parseFloat(e.target.value) || 0);
+                        setCustomPorted(true);
+                      }}
+                      step="any"
+                    />
+                    <span className="unit-badge">Hz</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {boxType === 'sealed' && (
+              <div className="input-group">
+                <label>{t("Q del Sistema Objetivo (Qtc)")}</label>
+                <div className="input-wrapper">
+                  <input
+                    type="number"
+                    value={targetQtc}
+                    onChange={(e) => setTargetQtc(parseFloat(e.target.value) || 0.707)}
+                    step="0.01"
                   />
                 </div>
               </div>
             )}
-          </div>
-        )}
 
-        {/* CONTROLES ADICIONALES DE CAJA VENTILADA (PUERTO Y RADIADOR) */}
-        {boxType === 'ported' && (
-          <>
-            <div className="form-subsection-title">{t("Sistema de Ventilación")}</div>
-            
-            <div className="input-group input-group-full">
-              <label>{t("Sintonización mediante")}</label>
-              <select 
-                value={prTuning} 
-                onChange={(e) => setPrTuning(e.target.value as any)} 
-                className="input-select"
-                style={{ width: '100%', height: '34px' }}
-              >
-                <option value="port">{t("Puerto / Conducto de Aire")}</option>
-                <option value="radiator">{t("Radiador Pasivo")}</option>
-              </select>
-            </div>
-
-            {prTuning === 'port' ? (
-              <>
-                <div className="input-group input-group-full">
-                  <label>{t("Forma del Puerto")}</label>
-                  <select 
-                    value={portShape} 
-                    onChange={(e) => setPortShape(e.target.value as any)} 
+            {boxType === 'bandpass' && (
+              <div className="input-grid">
+                <div className="input-group">
+                  <label>{t("Orden del Filtro")}</label>
+                  <select
+                    value={bandpassOrder}
+                    onChange={(e) => setBandpassOrder(parseInt(e.target.value) as any)}
                     className="input-select"
                     style={{ width: '100%', height: '34px' }}
                   >
-                    <option value="round">{t("Redondo / Tubo")}</option>
-                    <option value="rectangular">{t("Rectangular / Ranura")}</option>
+                    <option value={4}>{t("4.º Orden")}</option>
+                    <option value={6}>{t("6.º Orden (Paralelo)")}</option>
+                  </select>
+                </div>
+                {bandpassOrder === 4 ? (
+                  <div className="input-group">
+                    <label>{t("Factor de Calidad (S)")}</label>
+                    <div className="input-wrapper">
+                      <input
+                        type="number"
+                        value={bandpassS}
+                        onChange={(e) => setBandpassS(parseFloat(e.target.value) || 0.707)}
+                        step="0.05"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="input-group">
+                    <label>{t("Ganancia (A)")}</label>
+                    <div className="input-wrapper">
+                      <input
+                        type="number"
+                        value={bandpassA}
+                        onChange={(e) => setBandpassA(parseFloat(e.target.value) || 2.0)}
+                        step="0.1"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {boxType === 'ported' && (
+              <>
+                <div className="form-subsection-title">{t("Sintonización mediante")}</div>
+                <div className="input-group input-group-full">
+                  <select
+                    value={prTuning}
+                    onChange={(e) => setPrTuning(e.target.value as any)}
+                    className="input-select"
+                    style={{ width: '100%', height: '34px' }}
+                  >
+                    <option value="port">{t("Puerto / Conducto de Aire")}</option>
+                    <option value="radiator">{t("Radiador Pasivo")}</option>
                   </select>
                 </div>
 
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: portShape === 'rectangular' ? '1fr 1fr 1fr 1.2fr' : '1fr 1fr 1.2fr',
-                  gap: '0.45rem'
-                }}>
-                  <div className="input-group">
-                    <label>{t("Cantidad")}</label>
-                    <div className="input-wrapper">
-                      <input 
-                        type="number" 
-                        value={portCount} 
-                        onChange={(e) => setPortCount(e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value) || 1))} 
-                      />
+                {prTuning === 'port' ? (
+                  <>
+                    <div className="input-group input-group-full">
+                      <label>{t("Forma del Puerto")}</label>
+                      <select
+                        value={portShape}
+                        onChange={(e) => setPortShape(e.target.value as any)}
+                        className="input-select"
+                        style={{ width: '100%', height: '34px' }}
+                      >
+                        <option value="round">{t("Redondo")}</option>
+                        <option value="rectangular">{t("Rectangular")}</option>
+                      </select>
                     </div>
-                  </div>
 
-                  {portShape === 'round' ? (
-                    <>
+                    <div style={{ display: 'grid', gridTemplateColumns: portShape === 'rectangular' ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr', gap: '0.45rem' }}>
                       <div className="input-group">
-                        <label>{t("Diámetro")}</label>
+                        <label>{t("Cantidad")}</label>
                         <div className="input-wrapper">
-                          <input 
-                            type="number" 
-                            value={portDiameter} 
-                            onChange={(e) => setPortDiameter(e.target.value === '' ? '' : Math.max(0.1, parseFloat(e.target.value) || 0))} 
-                            step="any"
+                          <input
+                            type="number"
+                            value={portCount}
+                            onChange={(e) => setPortCount(e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value) || 1))}
                           />
+                        </div>
+                      </div>
+
+                      {portShape === 'round' ? (
+                        <>
+                          <div className="input-group">
+                            <label>{t("Diámetro")}</label>
+                            <div className="input-wrapper">
+                              <input
+                                type="number"
+                                value={portDiameter}
+                                onChange={(e) => setPortDiameter(e.target.value === '' ? '' : Math.max(0.1, parseFloat(e.target.value) || 0))}
+                                step="any"
+                              />
+                              <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
+                            </div>
+                          </div>
+                          <div className="input-group">
+                            <label>{t("Longitud")}</label>
+                            <div className="input-wrapper">
+                              <input type="text" value={portLength} disabled style={{ background: 'rgba(255,255,255,0.03)' }} />
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="input-group">
+                            <label>{t("Ancho")}</label>
+                            <div className="input-wrapper">
+                              <input
+                                type="number"
+                                value={portWidth}
+                                onChange={(e) => setPortWidth(e.target.value === '' ? '' : Math.max(0.1, parseFloat(e.target.value) || 0))}
+                                step="any"
+                              />
+                              <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
+                            </div>
+                          </div>
+                          <div className="input-group">
+                            <label>{t("Alto")}</label>
+                            <div className="input-wrapper">
+                              <input
+                                type="number"
+                                value={portHeight}
+                                onChange={(e) => setPortHeight(e.target.value === '' ? '' : Math.max(0.1, parseFloat(e.target.value) || 0))}
+                                step="any"
+                              />
+                              <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
+                            </div>
+                          </div>
+                          <div className="input-group">
+                            <label>{t("Longitud")}</label>
+                            <div className="input-wrapper">
+                              <input type="text" value={portLength} disabled style={{ background: 'rgba(255,255,255,0.03)' }} />
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Alerta de Velocidad y Sugerencias de Puerto */}
+                    <div style={{ marginTop: '0.6rem' }} className={vPeak !== null ? (vPeak < 10 ? 'alert-box success' : vPeak <= 17 ? 'alert-box warn' : 'alert-box danger') : 'alert-box info'}>
+                      <span dangerouslySetInnerHTML={{ __html: vPeak !== null ? (vPeak < 10 ? `<strong>${t("Velocidad moderada/baja")}:</strong> ${vPeak.toFixed(1)} m/s. ${t("Silencioso.")}` : vPeak <= 17 ? `<strong>${t("Velocidad moderada")}:</strong> ${vPeak.toFixed(1)} m/s. ${t("Recomendado usar extremos redondeados.")}` : `<strong>${t("¡Velocidad crítica!")}:</strong> ${vPeak.toFixed(1)} m/s. ${t("Aumenta el diámetro.")}`) : t("Ingresa Sd y Xmax para calcular la velocidad.") }} />
+                    </div>
+
+                    {suggestions && 'options' in suggestions && suggestions.options && suggestions.options.length > 0 && (
+                      <div style={{ marginTop: '0.5rem', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--card-border)', borderRadius: '6px', padding: '0.5rem' }}>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>{t("SUGERENCIAS DE PUERTOS")}:</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                          {suggestions.options.map((s: { numPorts: number; diameter: number }, idx: number) => (
+                            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.74rem' }}>
+                              <span>{s.numPorts}x Ø {s.diameter.toFixed(1)} cm</span>
+                              <button
+                                type="button"
+                                onClick={() => handleApplyPort(s.numPorts, s.diameter)}
+                                className="preset-select"
+                                style={{ padding: '0.15rem 0.4rem', fontSize: '0.68rem', cursor: 'pointer' }}
+                              >
+                                {t("Aplicar")}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  // Radiador Pasivo
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+                    <div className="input-grid">
+                      <div className="input-group">
+                        <label>{t("Diámetro PR")}</label>
+                        <div className="input-wrapper">
+                          <input type="number" value={prDia} onChange={(e) => setPrDia(parseFloat(e.target.value) || 0)} step="any" />
                           <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                         </div>
                       </div>
                       <div className="input-group">
-                        <label>{t("Longitud (Lv)")}</label>
+                        <label>{t("Vas PR")}</label>
                         <div className="input-wrapper">
-                          <input 
-                            type="text" 
-                            value={portLength} 
-                            readOnly 
-                            style={{ 
-                              color: 'var(--ported-color)', 
-                              cursor: 'default',
-                              fontWeight: 'normal'
-                            }}
-                          />
+                          <input type="number" value={prVas} onChange={(e) => setPrVas(parseFloat(e.target.value) || 0)} step="any" />
+                          <span className="unit-badge">L</span>
                         </div>
                       </div>
-                    </>
-                  ) : (
-                    <>
+                    </div>
+                    <div className="input-grid">
                       <div className="input-group">
-                        <label>{t("Ancho")}</label>
+                        <label>{t("Fs PR")}</label>
                         <div className="input-wrapper">
-                          <input 
-                            type="number" 
-                            value={portWidth} 
-                            onChange={(e) => setPortWidth(e.target.value === '' ? '' : Math.max(0.1, parseFloat(e.target.value) || 0))} 
-                            step="any"
-                          />
-                          <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
+                          <input type="number" value={prFs} onChange={(e) => setPrFs(parseFloat(e.target.value) || 0)} step="any" />
+                          <span className="unit-badge">Hz</span>
                         </div>
                       </div>
                       <div className="input-group">
-                        <label>{t("Alto")}</label>
+                        <label>{t("Mms PR (g)")}</label>
                         <div className="input-wrapper">
-                          <input 
-                            type="number" 
-                            value={portHeight} 
-                            onChange={(e) => setPortHeight(e.target.value === '' ? '' : Math.max(0.1, parseFloat(e.target.value) || 0))} 
-                            step="any"
-                          />
-                          <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
+                          <input type="number" value={prMms} onChange={(e) => setPrMms(parseFloat(e.target.value) || 0)} step="any" />
                         </div>
                       </div>
-                      <div className="input-group">
-                        <label>{t("Longitud (Lv)")}</label>
-                        <div className="input-wrapper">
-                          <input 
-                            type="text" 
-                            value={portLength} 
-                            readOnly 
-                            style={{ 
-                              color: 'var(--ported-color)', 
-                              cursor: 'default',
-                              fontWeight: 'normal'
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {/* AVISO DE VELOCIDAD DEL AIRE Y SUGERENCIAS DE PUERTO */}
-                <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <div className={portVelocityAlert.className} style={{ fontSize: '0.78rem', padding: '0.5rem 0.75rem', borderRadius: '6px' }} dangerouslySetInnerHTML={{ __html: portVelocityAlert.html }} />
-                  
-                  {suggestions && suggestions.valid ? (
-                    <div className="wood-note" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', padding: '0.6rem 0.8rem', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--card-border)', borderRadius: '6px' }}>
-                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                        {t("Sugerencias de Puertos")}
-                      </span>
-                      <p style={{ margin: '0 0 0.25rem 0', fontSize: '0.72rem', lineHeight: '1.35', color: 'var(--text-muted)' }}>
-                        {t("Para evitar soplidos se requiere un diámetro redondo mínimo de")}{' '}
-                        <strong>{convertTo(suggestions.dMin || 0, 'length', unitSystem).toFixed(2)} {getUnitLabel('length', unitSystem)}</strong>.
-                      </p>
-                      <table className="wood-table" style={{ fontSize: '0.7rem', width: '100%', borderCollapse: 'collapse' }}>
-                        <thead>
-                          <tr>
-                            <th>{portShape === 'rectangular' ? t('Dimensiones') : t('Diámetro')}</th>
-                            <th>{t('Longitud')}</th>
-                            <th>{t('Simular')}</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {suggestions.options?.slice(0, 3).map((opt: any, idx: number) => {
-                            const displayOptDia = convertTo(opt.diameter, 'length', unitSystem);
-                            const displayOptLen = convertTo(opt.length, 'length', unitSystem);
-                            const unitLabel = getUnitLabel('length', unitSystem);
-                            const lengthText = opt.length > 0 ? `${displayOptLen.toFixed(1)} ${unitLabel}` : t("Inviable");
-                            
-                            let sugText = '';
-                            let applyFn = () => {};
-
-                            if (portShape === 'rectangular') {
-                              const area = Math.PI * Math.pow(opt.diameter / 2, 2);
-                              let hCm = 5.0;
-                              if (opt.diameter <= 5.0) hCm = 4.0;
-                              else if (opt.diameter > 5.0 && opt.diameter <= 7.5) hCm = 5.0;
-                              else if (opt.diameter > 7.5 && opt.diameter <= 10.0) hCm = 7.0;
-                              else hCm = 10.0;
-
-                              const wCm = area / hCm;
-                              const displayW = convertTo(wCm, 'length', unitSystem);
-                              const displayH = convertTo(hCm, 'length', unitSystem);
-                              sugText = `${opt.numPorts}x de ${displayW.toFixed(1)}x${displayH.toFixed(1)}`;
-                              applyFn = () => handleApplyRectangularPort(opt.numPorts, wCm, hCm);
-                            } else {
-                              sugText = `${opt.numPorts}x Ø ${displayOptDia.toFixed(2)}`;
-                              applyFn = () => handleApplyPort(opt.numPorts, opt.diameter);
-                            }
-
-                            return (
-                              <tr key={idx}>
-                                <td><strong>{sugText}</strong></td>
-                                <td>{lengthText}</td>
-                                <td>
-                                  <button 
-                                    onClick={applyFn} 
-                                    className="preset-select" 
-                                    style={{ padding: '0.15rem 0.35rem', fontSize: '0.68rem', background: 'var(--primary)', border: '1px solid var(--primary)', color: '#ffffff', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
-                                    type="button"
-                                  >
-                                    {t('Aplicar')}
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
                     </div>
-                  ) : suggestions && (
-                    <div className="alert-box info" style={{ fontSize: '0.72rem', padding: '0.5rem 0.75rem', marginTop: '0.25rem' }}>
-                      {t("Ingresa Sd y Xmax en parámetros físicos para ver sugerencias de puertos.")}
-                    </div>
-                  )}
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="input-grid">
-                  <div className="input-group">
-                    <label>{t("Diámetro Radiador")}</label>
-                    <div className="input-wrapper">
-                      <input 
-                        type="number" 
-                        value={prDia} 
-                        onChange={(e) => setPrDia(Math.max(1, parseFloat(e.target.value) || 0))} 
-                      />
-                      <span className="unit-badge">cm</span>
+                    <div style={{ fontSize: '0.74rem', background: 'rgba(255,255,255,0.01)', padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--card-border)' }}>
+                      <div>{t("Frecuencia Natural (f_p):")} <strong>{prFbNatural.toFixed(1)} Hz</strong></div>
+                      <div>{t("Masa añadida aprox. para Fb:")} <strong>{prMasaAnadidaG.toFixed(1)} g</strong></div>
                     </div>
                   </div>
-                  <div className="input-group">
-                    <label>{t("Volumen Equiv. (Vas)")}</label>
-                    <div className="input-wrapper">
-                      <input 
-                        type="number" 
-                        value={prVas} 
-                        onChange={(e) => setPrVas(Math.max(1, parseFloat(e.target.value) || 0))} 
-                      />
-                      <span className="unit-badge">L</span>
-                    </div>
-                  </div>
-                  <div className="input-group">
-                    <label>{t("Resonancia (Fs)")}</label>
-                    <div className="input-wrapper">
-                      <input 
-                        type="number" 
-                        value={prFs} 
-                        onChange={(e) => setPrFs(Math.max(1, parseFloat(e.target.value) || 0))} 
-                      />
-                      <span className="unit-badge">Hz</span>
-                    </div>
-                  </div>
-                  <div className="input-group">
-                    <label>{t("Masa Móvil (Mms)")}</label>
-                    <div className="input-wrapper">
-                      <input 
-                        type="number" 
-                        value={prMms} 
-                        onChange={(e) => setPrMms(Math.max(1, parseFloat(e.target.value) || 0))} 
-                      />
-                      <span className="unit-badge">g</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="alert-box success" style={{ padding: '0.6rem 0.8rem', fontSize: '0.8rem', marginTop: '0.5rem', marginBottom: '0' }}>
-                  <span>
-                    <strong>{t("Masa Añadida:")}</strong> {prMasaAnadidaG.toFixed(1)} g <br />
-                    <small>{t("Sintonía natural sin peso:")} {prFbNatural.toFixed(1)} Hz</small>
-                  </span>
-                </div>
+                )}
               </>
             )}
           </>
         )}
 
-        {/* DETALLES DE CAJA SELLADA */}
-        {boxType === 'sealed' && sealedData.valid && (
-          <>
-            <div className="form-subsection-title">{t("Especificaciones de Respuesta")}</div>
-            <div className="alert-box info" style={{ padding: '0.6rem 0.8rem', fontSize: '0.8rem' }}>
-              <ul style={{ margin: '0 0 0 1rem', padding: 0 }}>
-                <li>Qtc (Q del sistema): <strong>{sealedData.Qtc.toFixed(2)}</strong></li>
-                <li>Fc (Resonancia sistema): <strong>{sealedData.Fc.toFixed(1)} Hz</strong></li>
-                <li>F3 (Corte -3dB): <strong>{sealedData.F3.toFixed(1)} Hz</strong></li>
-              </ul>
+        {/* PESTAÑA B: RELLENO ACÚSTICO */}
+        {activeTab === 'damping' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
+              {t("Selecciona la densidad de relleno para la caja:")}
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              {[
+                { id: 'none', label: t("Ninguno (0%) - Vacía") },
+                { id: 'light', label: t("Leve (~5%) - Paredes") },
+                { id: 'moderate', label: t("Moderado (~12%) - Fibra suelta") },
+                { id: 'heavy', label: t("Denso (~20%) - Fibra densa") }
+              ].map(opt => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setDampingType(opt.id as any)}
+                  className="preset-select"
+                  style={{
+                    padding: '0.55rem',
+                    textAlign: 'left',
+                    fontSize: '0.78rem',
+                    background: dampingType === opt.id ? 'var(--primary)' : 'var(--card-bg)',
+                    border: '1px solid ' + (dampingType === opt.id ? 'var(--primary)' : 'var(--card-border)'),
+                    color: '#fff',
+                    borderRadius: '6px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
             </div>
-          </>
+          </div>
         )}
 
-        {/* DETALLES DE PASO BANDA */}
-        {boxType === 'bandpass' && bandpassData.valid && (
-          <>
-            <div className="form-subsection-title">{t("Cámaras Paso Banda")}</div>
-            <div className="alert-box info" style={{ padding: '0.6rem 0.8rem', fontSize: '0.8rem' }}>
-              <ul style={{ margin: '0 0 0 1rem', padding: 0 }}>
-                <li>{t("Cámara trasera (Vr)")}: <strong>{bandpassData.Vr.toFixed(1)} L</strong></li>
-                <li>{t("Cámara frontal (Vf)")}: <strong>{bandpassData.Vf.toFixed(1)} L</strong></li>
-                <li>Frecuencia Central (F0): <strong>{(bandpassData.F0 || 0).toFixed(1)} Hz</strong></li>
-                <li>Ancho de Banda: <strong>{(bandpassData.Fl || 0).toFixed(0)} - {(bandpassData.Fh || 0).toFixed(0)} Hz</strong></li>
-              </ul>
+        {/* PESTAÑA C: CROSSOVER / DIVISORES DE FRECUENCIA */}
+        {activeTab === 'crossover' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+            <div className="input-grid">
+              <div className="input-group">
+                <label>{t("Vías")}</label>
+                <select
+                  value={crossoverWays}
+                  onChange={(e) => setCrossoverWays(parseInt(e.target.value))}
+                  className="input-select"
+                  style={{ width: '100%', height: '34px' }}
+                >
+                  <option value={2}>{t("2 Vías")}</option>
+                  <option value={3}>{t("3 Vías")}</option>
+                </select>
+              </div>
+
+              <div className="input-group">
+                <label>{t("Tipo Filtro")}</label>
+                <select
+                  value={crossoverType}
+                  onChange={(e) => setCrossoverType(e.target.value as any)}
+                  className="input-select"
+                  style={{ width: '100%', height: '34px' }}
+                >
+                  <option value="1st_order">{t("1er Orden (6dB)")}</option>
+                  <option value="2nd_butter">{t("Butterworth (12dB)")}</option>
+                  <option value="2nd_lr">{t("Linkwitz-Riley (12dB)")}</option>
+                  <option value="4th_lr">{t("Linkwitz-Riley (24dB)")}</option>
+                </select>
+              </div>
             </div>
-          </>
+
+            {crossoverWays === 2 ? (
+              <div className="input-group">
+                <label>{t("Frecuencia Corte (Fc)")} (Hz)</label>
+                <div className="input-wrapper">
+                  <input type="number" value={fc} onChange={(e) => setFc(parseFloat(e.target.value) || 2500)} step="50" />
+                </div>
+              </div>
+            ) : (
+              <div className="input-grid">
+                <div className="input-group">
+                  <label>{t("Fc Baja (Low)")} (Hz)</label>
+                  <div className="input-wrapper">
+                    <input type="number" value={fcLow} onChange={(e) => setFcLow(parseFloat(e.target.value) || 500)} step="50" />
+                  </div>
+                </div>
+                <div className="input-group">
+                  <label>{t("Fc Alta (High)")} (Hz)</label>
+                  <div className="input-wrapper">
+                    <input type="number" value={fcHigh} onChange={(e) => setFcHigh(parseFloat(e.target.value) || 4000)} step="50" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="form-subsection-title">{t("Impedancias de Carga")} (Ω)</div>
+            <div className="input-grid">
+              <div className="input-group">
+                <label>{t("Tweeter")}</label>
+                <div className="input-wrapper">
+                  <input type="number" value={zTweeter} onChange={(e) => setZTweeter(parseFloat(e.target.value) || 8)} />
+                </div>
+              </div>
+              {crossoverWays === 3 && (
+                <div className="input-group">
+                  <label>{t("Rango Medio")}</label>
+                  <div className="input-wrapper">
+                    <input type="number" value={zMidrange} onChange={(e) => setZMidrange(parseFloat(e.target.value) || 8)} />
+                  </div>
+                </div>
+              )}
+              <div className="input-group">
+                <label>{t("Woofer")}</label>
+                <div className="input-wrapper">
+                  <input type="number" value={zWoofer} onChange={(e) => setZWoofer(parseFloat(e.target.value) || 8)} />
+                </div>
+              </div>
+            </div>
+
+            {/* Red Zobel */}
+            <div style={{ borderTop: '1px solid var(--card-border)', paddingTop: '0.5rem', marginTop: '0.4rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                <input
+                  type="checkbox"
+                  id="chk-zobel"
+                  checked={enableZobel}
+                  onChange={(e) => setEnableZobel(e.target.checked)}
+                  style={{ width: '16px', height: '16px' }}
+                />
+                <label htmlFor="chk-zobel" style={{ fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer' }}>
+                  {t("Implementar Red Zobel")}
+                </label>
+              </div>
+              {enableZobel && (
+                <div className="input-grid">
+                  <div className="input-group">
+                    <label>Re (Ω)</label>
+                    <div className="input-wrapper">
+                      <input type="number" value={zobelRe} onChange={(e) => setZobelRe(parseFloat(e.target.value) || 6)} />
+                    </div>
+                  </div>
+                  <div className="input-group">
+                    <label>Le (mH)</label>
+                    <div className="input-wrapper">
+                      <input type="number" value={zobelLe} onChange={(e) => setZobelLe(parseFloat(e.target.value) || 0.5)} step="0.05" />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* L-Pad */}
+            <div style={{ borderTop: '1px solid var(--card-border)', paddingTop: '0.5rem', marginTop: '0.4rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                <input
+                  type="checkbox"
+                  id="chk-lpad"
+                  checked={enableLPad}
+                  onChange={(e) => setEnableLPad(e.target.checked)}
+                  style={{ width: '16px', height: '16px' }}
+                />
+                <label htmlFor="chk-lpad" style={{ fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer' }}>
+                  {t("Implementar Atenuador L-Pad")}
+                </label>
+              </div>
+              {enableLPad && (
+                <div className="input-grid">
+                  <div className="input-group">
+                    <label>{t("Atenuación (dB)")}</label>
+                    <div className="input-wrapper">
+                      <input type="number" value={lpadAttenuation} onChange={(e) => setLpadAttenuation(parseFloat(e.target.value) || 3)} step="0.5" />
+                    </div>
+                  </div>
+                  <div className="input-group">
+                    <label>{t("Impedancia Carga")}</label>
+                    <div className="input-wrapper">
+                      <input type="number" value={lpadZLoad} onChange={(e) => setLpadZLoad(parseFloat(e.target.value) || 8)} />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         )}
       </div>
     </aside>

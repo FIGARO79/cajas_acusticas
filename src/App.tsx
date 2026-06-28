@@ -17,9 +17,25 @@ function App() {
   const [lang, setLang] = useState<Lang>(() => (localStorage.getItem('lang') as Lang) || 'es');
   const [unitSystem, setUnitSystem] = useState<UnitSystem>(() => (localStorage.getItem('unitSystem') as UnitSystem) || 'metric');
   const [theme, setTheme] = useState<'dark' | 'light'>(() => (localStorage.getItem('theme') as 'dark' | 'light') || 'dark');
-  const [activeTab, setActiveTab] = useState<'sealed' | 'ported' | 'bandpass' | 'wood' | 'damping' | 'crossover'>('wood');
+  const [activeTab, setActiveTab] = useState<'wood' | 'damping' | 'crossover'>('wood');
   const [boxType, setBoxType] = useState<'sealed' | 'ported' | 'bandpass'>('sealed');
   const t = (text: string) => translate(text, lang);
+
+  // Crossover State
+  const [crossoverWays, setCrossoverWays] = useState<number>(2);
+  const [crossoverType, setCrossoverType] = useState<'1st_order' | '2nd_butter' | '2nd_lr' | '4th_lr'>('2nd_lr');
+  const [fc, setFc] = useState<number>(2500);
+  const [fcLow, setFcLow] = useState<number>(500);
+  const [fcHigh, setFcHigh] = useState<number>(4000);
+  const [zTweeter, setZTweeter] = useState<number>(8);
+  const [zMidrange, setZMidrange] = useState<number>(8);
+  const [zWoofer, setZWoofer] = useState<number>(8);
+  const [enableZobel, setEnableZobel] = useState<boolean>(false);
+  const [zobelRe, setZobelRe] = useState<number>(5.8);
+  const [zobelLe, setZobelLe] = useState<number>(0.6);
+  const [enableLPad, setEnableLPad] = useState<boolean>(false);
+  const [lpadAttenuation, setLpadAttenuation] = useState<number>(3);
+  const [lpadZLoad, setLpadZLoad] = useState<number>(8);
 
   // Bandpass State
   const [bandpassOrder, setBandpassOrder] = useState<4 | 6>(4);
@@ -216,8 +232,7 @@ function App() {
     }
   }, [params, lang]);
 
-  // EBP Calculation
-  const ebpValue = params.qes ? (params.fs / params.qes) : null;
+
 
   // Manual wood volume calculation (needed for link overrides)
   // Manual wood volume calculation (needed for link overrides)
@@ -455,20 +470,6 @@ function App() {
     }
   }, [preset, customPorted, portedData.valid]);
 
-
-
-  // Suggest EBP alignment recommendation
-  const getEbpRecommendation = () => {
-    if (ebpValue === null) return t("Qes requerido para EBP");
-    if (ebpValue < 50) {
-      return `${t("Sugerido: Sellada")} - ${t("Bobina bien amortiguada. Sugerencia: Caja Sellada (Sealed).")}`;
-    } else if (ebpValue > 90) {
-      return `${t("Sugerido: Ventilada")} - ${t("Alto control electromecánico. Sugerencia: Caja Ventilada (Ported).")}`;
-    } else {
-      return `${t("Multiuso")} - ${t("Rango medio. Sugerencia: Apta para caja sellada o ventilada.")}`;
-    }
-  };
-
   const handleExportReport = () => {
     console.log("handleExportReport: triggered");
     try {
@@ -520,7 +521,7 @@ function App() {
         lang,
         unitSystem,
         params,
-        activeTab === 'sealed' ? 'sealed' : 'ported',
+        boxType === 'sealed' ? 'sealed' : 'ported',
         sealedData,
         portedData,
         dampingType,
@@ -648,18 +649,82 @@ function App() {
           setPrMms={setPrMms}
           prFbNatural={prFbNatural}
           prMasaAnadidaG={prMasaAnadidaG}
+
+          // SUBPESTAÑAS CENTRALES
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+
+          // Ebanistería props
+          woodMode={woodMode}
+          setWoodMode={setWoodMode}
+          woodShape={woodShape}
+          setWoodShape={setWoodShape}
+          woodConstraint={woodConstraint}
+          setWoodConstraint={setWoodConstraint}
+          woodRatio={woodRatio}
+          setWoodRatio={setWoodRatio}
+          woodThickness={woodThickness}
+          setWoodThickness={setWoodThickness}
+          woodExtra={woodExtra}
+          setWoodExtra={setWoodExtra}
+          woodLockVal1={woodLockVal1}
+          setWoodLockVal1={setWoodLockVal1}
+          woodLockVal2={woodLockVal2}
+          setWoodLockVal2={setWoodLockVal2}
+          woodLockVal3={woodLockVal3}
+          setWoodLockVal3={setWoodLockVal3}
+          woodExtHeight={woodExtHeight}
+          setWoodExtHeight={setWoodExtHeight}
+          woodExtWidth={woodExtWidth}
+          setWoodExtWidth={setWoodExtWidth}
+          woodExtDepth={woodExtDepth}
+          setWoodExtDepth={setWoodExtDepth}
+          woodTrapExtHeight={woodTrapExtHeight}
+          setWoodTrapExtHeight={setWoodTrapExtHeight}
+          woodTrapExtWidth={woodTrapExtWidth}
+          setWoodTrapExtWidth={setWoodTrapExtWidth}
+          woodTrapExtDepthTop={woodTrapExtDepthTop}
+          setWoodTrapExtDepthTop={setWoodTrapExtDepthTop}
+          woodTrapExtDepthBot={woodTrapExtDepthBot}
+          setWoodTrapExtDepthBot={setWoodTrapExtDepthBot}
+
+          // Damping props
+          dampingType={dampingType}
+          setDampingType={setDampingType}
+
+          // Crossover props
+          crossoverWays={crossoverWays}
+          setCrossoverWays={setCrossoverWays}
+          crossoverType={crossoverType}
+          setCrossoverType={setCrossoverType}
+          fc={fc}
+          setFc={setFc}
+          fcLow={fcLow}
+          setFcLow={setFcLow}
+          fcHigh={fcHigh}
+          setFcHigh={setFcHigh}
+          zTweeter={zTweeter}
+          setZTweeter={setZTweeter}
+          zMidrange={zMidrange}
+          setZMidrange={setZMidrange}
+          zWoofer={zWoofer}
+          setZWoofer={setZWoofer}
+          enableZobel={enableZobel}
+          setEnableZobel={setEnableZobel}
+          zobelRe={zobelRe}
+          setZobelRe={setZobelRe}
+          zobelLe={zobelLe}
+          setZobelLe={setZobelLe}
+          enableLPad={enableLPad}
+          setEnableLPad={setEnableLPad}
+          lpadAttenuation={lpadAttenuation}
+          setLpadAttenuation={setLpadAttenuation}
+          lpadZLoad={lpadZLoad}
+          setLpadZLoad={setLpadZLoad}
         />
 
         {/* CONTENIDOS DERECHA */}
         <main className="dashboard-main">
-          {/* EBP Status Bar */}
-          <div className={`ebp-badge-card ${ebpValue ? (ebpValue < 50 ? 'ebp-sealed' : ebpValue > 90 ? 'ebp-ported' : 'ebp-normal') : 'ebp-normal'}`} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '0.75rem', padding: '0.3rem 0.75rem', borderRadius: '4px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.78rem', fontWeight: 700 }}>EBP: {ebpValue ? ebpValue.toFixed(1) : 'N/A'}</span>
-            <span style={{ fontSize: '0.68rem', opacity: 0.85, fontWeight: 500 }}>
-              {getEbpRecommendation()}
-            </span>
-          </div>
-
           {/* Gráfico */}
           <SimulationChart 
             lang={lang}
@@ -670,73 +735,10 @@ function App() {
             params={adjParams}
           />
 
-          {/* Caja Acústica Pestañas */}
-          <div className="panel">
-            {/* Tabs header */}
-            <div className="tabs-header" style={{ display: 'flex', gap: '1.25rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--card-border)', padding: '0 0 0.5rem 0', background: 'transparent' }}>
-              <button 
-                type="button"
-                onClick={() => setActiveTab('wood')}
-                style={{ 
-                  background: 'none', 
-                  border: 'none', 
-                  padding: 0, 
-                  margin: 0, 
-                  color: activeTab === 'wood' ? 'var(--text-main)' : 'var(--text-muted)', 
-                  fontWeight: activeTab === 'wood' ? 'bold' : 'normal', 
-                  fontSize: '0.82rem',
-                  cursor: 'pointer',
-                  fontFamily: 'var(--font-sans)',
-                  outline: 'none',
-                  letterSpacing: '0.02em',
-                  transition: 'color 0.15s ease'
-                }}
-              >
-                {t("Dimensiones de la caja")}
-              </button>
-              <button 
-                type="button"
-                onClick={() => setActiveTab('damping')}
-                style={{ 
-                  background: 'none', 
-                  border: 'none', 
-                  padding: 0, 
-                  margin: 0, 
-                  color: activeTab === 'damping' ? 'var(--text-main)' : 'var(--text-muted)', 
-                  fontWeight: activeTab === 'damping' ? 'bold' : 'normal', 
-                  fontSize: '0.82rem',
-                  cursor: 'pointer',
-                  fontFamily: 'var(--font-sans)',
-                  outline: 'none',
-                  letterSpacing: '0.02em',
-                  transition: 'color 0.15s ease'
-                }}
-              >
-                {t("Relleno Acústico")}
-              </button>
-              <button 
-                type="button"
-                onClick={() => setActiveTab('crossover')}
-                style={{ 
-                  background: 'none', 
-                  border: 'none', 
-                  padding: 0, 
-                  margin: 0, 
-                  color: activeTab === 'crossover' ? 'var(--text-main)' : 'var(--text-muted)', 
-                  fontWeight: activeTab === 'crossover' ? 'bold' : 'normal', 
-                  fontSize: '0.82rem',
-                  cursor: 'pointer',
-                  fontFamily: 'var(--font-sans)',
-                  outline: 'none',
-                  letterSpacing: '0.02em',
-                  transition: 'color 0.15s ease'
-                }}
-              >
-                {t("Divisores de Frecuencia")}
-              </button>
-            </div>
-
-            {activeTab === 'wood' && (
+          {/* Grilla de Resultados y Diagramas en Paralelo */}
+          <div className="results-diagrams-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
+            {/* Panel Izquierdo: Cajón y Plano Técnico */}
+            <div className="panel" style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '8px', padding: '1rem' }}>
               <CabinetTab 
                 lang={lang}
                 unitSystem={unitSystem}
@@ -785,111 +787,32 @@ function App() {
                 portArea={portArea}
                 dampingFactor={dampingFactor}
                 onCabinetDataChange={handleCabinetDataChange}
+                readOnly={true}
               />
-            )}
+            </div>
 
-            {/* Pestaña Damping */}
-            {activeTab === 'damping' && (
-              <div className="tab-content active" style={{ padding: '1.5rem' }}>
-                {/* Selector de variante */}
-                <div style={{ marginBottom: '1.25rem' }}>
-                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '0.75rem', lineHeight: '1.4' }}>
-                    {t("Relleno Acústico (Damping / Fill):")}
-                  </p>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
-                    {[
-                      { id: 'none',     label: t("Ninguno (0%)"),     desc: t("Sin Relleno (Proceso Adiabático)") },
-                      { id: 'light',    label: t("Leve (~5%)"),        desc: t("Relleno Leve (Damping de Paredes)") },
-                      { id: 'moderate', label: t("Moderado (~12%)"),  desc: t("Relleno Moderado (Fibra Suelta)") },
-                      { id: 'heavy',    label: t("Denso (~20%)"),      desc: t("Relleno Denso (Fibra Uniforme)") }
-                    ].map(opt => (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        onClick={() => setDampingType(opt.id as any)}
-                        style={{
-                          padding: '0.5rem 1rem',
-                          fontSize: '0.82rem',
-                          borderRadius: '8px',
-                          border: '2px solid ' + (dampingType === opt.id ? 'var(--primary)' : 'var(--card-border)'),
-                          background: dampingType === opt.id ? 'var(--primary)' : 'var(--card-bg)',
-                          color: dampingType === opt.id ? '#ffffff' : 'var(--text-main)',
-                          cursor: 'pointer',
-                          fontWeight: dampingType === opt.id ? 700 : 500,
-                          transition: 'all 0.18s ease',
-                          boxShadow: dampingType === opt.id ? '0 0 0 3px var(--primary-glow)' : 'none'
-                        }}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Panel de visualización */}
-                <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'flex-start', background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '10px', padding: '1.25rem' }}>
-                  <img
-                    src={
-                      dampingType === 'light'    ? '/damping_light.jpg' :
-                      dampingType === 'moderate' ? '/damping_moderate.jpg' :
-                      dampingType === 'heavy'    ? '/damping_heavy.jpg' :
-                      '/damping_none.jpg'
-                    }
-                    alt={t("Esquema de relleno")}
-                    style={{ width: '160px', height: '160px', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--card-border)', flexShrink: 0 }}
-                  />
-                  <div style={{ flex: 1, minWidth: '180px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <strong style={{ fontSize: '1rem', color: 'var(--primary)' }}>
-                      {dampingType === 'none'     && t("Sin Relleno (Proceso Adiabático)")}
-                      {dampingType === 'light'    && t("Relleno Leve (Damping de Paredes)")}
-                      {dampingType === 'moderate' && t("Relleno Moderado (Fibra Suelta)")}
-                      {dampingType === 'heavy'    && t("Relleno Denso (Fibra Uniforme)")}
-                    </strong>
-                    <p style={{ fontSize: '0.82rem', lineHeight: '1.5', margin: 0, color: 'var(--text-main)', opacity: 0.9 }}>
-                      {dampingType === 'none'     && t("Caja completamente vacía. El aire se comprime sin absorber calor. Ideal para simulaciones de referencia o cuando no se utiliza ningún material absorbente.")}
-                      {dampingType === 'light'    && t("Se cubren únicamente las paredes internas con una capa delgada de unos 2 a 3 cm. Ayuda a atenuar rebotes y ondas estacionarias de alta frecuencia sin alterar significativamente el volumen virtual.")}
-                      {dampingType === 'moderate' && t("Se rellena la caja de forma suelta y esponjosa ocupando gran parte del espacio, sin compactarla. Logra un aumento virtual del volumen acústico del ~12%, ideal para compactar el diseño del bafle conservando buenos graves.")}
-                      {dampingType === 'heavy'    && t("Se rellena la caja con fibra uniforme y más densa, cubriendo casi todo el volumen interior pero sin comprimir a presión. Maximiza el aumento de volumen virtual hasta un ~20%, ideal para cajas muy compactas.")}
-                    </p>
-                    <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                        <span style={{ fontWeight: 700, color: 'var(--primary)' }}>
-                          {dampingType === 'none' ? '0%' : dampingType === 'light' ? '+5%' : dampingType === 'moderate' ? '+12%' : '+20%'}
-                        </span>{' '}{t("Vol. virtual (Vb aparente)")}
-                      </div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                        <span style={{ fontWeight: 700, color: dampingType === 'none' ? 'var(--text-muted)' : 'var(--success)' }}>
-                          {dampingType === 'none' ? t("Adiabático") : t("Isotérmico")}
-                        </span>{' '}{t("Proceso térmico")}
-                      </div>
-                    </div>
-                    <div style={{ marginTop: '0.85rem', paddingTop: '0.85rem', borderTop: '1px solid var(--card-border)' }}>
-                      <strong style={{ fontSize: '0.78rem', color: 'var(--text-main)', display: 'block', marginBottom: '0.4rem' }}>
-                        {t("Los materiales más utilizados son:")}
-                      </strong>
-                      <ul style={{ fontSize: '0.78rem', lineHeight: '1.45', margin: 0, paddingLeft: '1.1rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                        <li>
-                          <strong>{t("Delcrón o guata:")}</strong> {t("Es el material más común (aspecto de algodón sintético) usado en almohadas; es económico y muy eficiente para absorber el sonido.")}
-                        </li>
-                        <li>
-                          <strong>{t("Lana de roca o fibra de vidrio:")}</strong> {t("Materiales aislantes clásicos. Son muy efectivos acústicamente, aunque se debe manipular con cuidado para evitar que el polvo ingrese al cono del parlante.")}
-                        </li>
-                        <li>
-                          <strong>{t("Espuma acústica:")}</strong> {t("Se utiliza en forma de planchas en las paredes internas o como aros alrededor del parlante para evitar fugas de aire.")}
-                        </li>
-                        <li>
-                          <strong>{t("Algodón natural:")}</strong> {t("Otra alternativa económica que ayuda a disipar el calor interno y controlar las resonancias.")}
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-            {activeTab === 'crossover' && (
-              <CrossoverTab lang={lang} onRegisterExporter={handleRegisterCrossover} />
-            )}
-
+            {/* Panel Derecho: Crossover y Circuito */}
+            <div className="panel" style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '8px', padding: '1rem' }}>
+              <CrossoverTab 
+                lang={lang} 
+                onRegisterExporter={handleRegisterCrossover}
+                readOnly={true}
+                crossoverWaysProp={crossoverWays === 2 ? '2way' : '3way'}
+                crossoverTypeProp={crossoverType}
+                fcProp={fc}
+                fcLowProp={fcLow}
+                fcHighProp={fcHigh}
+                zTweeterProp={zTweeter}
+                zMidrangeProp={zMidrange}
+                zWooferProp={zWoofer}
+                enableZobelProp={enableZobel}
+                reProp={zobelRe}
+                leProp={zobelLe}
+                enableLPadProp={enableLPad}
+                attenuationProp={lpadAttenuation}
+                zLoadProp={lpadZLoad}
+              />
+            </div>
           </div>
         </main>
       </div>
