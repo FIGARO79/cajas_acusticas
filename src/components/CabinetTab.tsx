@@ -154,15 +154,15 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
 
     let portVol = 0;
     if (woodSource === 'ported' && portedData.valid && portedData.Fb > 0 && portedData.Vb > 0) {
-      const pCount = typeof portCount === 'number' ? portCount : 0;
+      const pCount = Number(portCount) || 0;
       if (pCount > 0) {
         let pDia = 0;
         let isRect = portShape === 'rectangular';
         if (portShape === 'round') {
-          pDia = typeof portDiameter === 'number' ? portDiameter : 0;
+          pDia = Number(portDiameter) || 0;
         } else if (portShape === 'rectangular') {
-          const w = typeof portWidth === 'number' ? portWidth : 0;
-          const h = typeof portHeight === 'number' ? portHeight : 0;
+          const w = Number(portWidth) || 0;
+          const h = Number(portHeight) || 0;
           pDia = 2 * Math.sqrt((w * h) / Math.PI);
         }
 
@@ -171,8 +171,8 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
           const Lv = ((23562.5 * Math.pow(pDia, 2) * pCount) / (portedData.Fb * portedData.Fb * portedData.Vb)) - (kCorrection * pDia);
           if (Lv > 0) {
             if (isRect) {
-              const w = typeof portWidth === 'number' ? portWidth : 0;
-              const h = typeof portHeight === 'number' ? portHeight : 0;
+              const w = Number(portWidth) || 0;
+              const h = Number(portHeight) || 0;
               portVol = (pCount * w * h * Lv) / 1000;
             } else {
               portVol = (pCount * Math.PI * Math.pow(pDia / 2, 2) * Lv) / 1000;
@@ -387,14 +387,14 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
   const [portInfo, setPortInfo] = useState<{ qtySize: string, length: string, velocity: string } | null>(null);
 
   useEffect(() => {
-    const pCount = typeof portCount === 'number' ? portCount : 0;
+    const pCount = Number(portCount) || 0;
     if (woodSource === 'ported' && portedData.valid && pCount > 0 && cabinetData?.valid) {
       let pDia = 0;
       let areaLabel = '';
       const uLabel = getUnitLabel('length', unitSystem);
 
       if (portShape === 'round') {
-        pDia = portDiameter || 0;
+        pDia = Number(portDiameter) || 0;
         const displayPDia = convertTo(pDia, 'length', unitSystem);
         areaLabel = `${displayPDia.toFixed(2)} ${uLabel} (${t("Diámetro")})`;
       } else if (portShape === 'custom') {
@@ -512,12 +512,12 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
   if (readOnly) {
     let numericPortLength = 0;
     if (woodSource === 'ported' && portedData.valid && cabinetData?.valid) {
-      const pCount = typeof portCount === 'number' ? portCount : 0;
+      const pCount = Number(portCount) || 0;
       let pDia = 0;
       if (portShape === 'round') {
-        pDia = portDiameter || 0;
+        pDia = Number(portDiameter) || 0;
       } else if (portShape === 'custom') {
-        pDia = 2 * Math.sqrt((portArea || 0) / Math.PI);
+        pDia = 2 * Math.sqrt((Number(portArea) || 0) / Math.PI);
       } else {
         pDia = 2 * Math.sqrt(((portWidth || 0) * (portHeight || 0)) / Math.PI);
       }
@@ -534,17 +534,17 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%', boxSizing: 'border-box' }}>
         {/* Resultados de Ebanistería */}
         <div className="results-summary" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', marginBottom: '0rem' }}>
-          <div className="result-tile" style={{ padding: '0.5rem' }}>
-            <span className="result-tile-label" style={{ fontSize: '0.68rem' }}>{t("Volumen Neto Resultante")}</span>
-            <span className="result-tile-value" style={{ fontSize: '0.85rem' }}>
+          <div className="result-tile" style={{ padding: '0.25rem' }}>
+            <span className="result-tile-label" style={{ fontSize: '0.65rem' }}>{t("Volumen Neto Resultante")}</span>
+            <span className="result-tile-value" style={{ fontSize: '0.65rem' }}>
               {cabinetData?.valid 
                 ? `${convertTo(cabinetData.vNeto, 'volume', unitSystem).toFixed(2)} ${getUnitLabel('volume', unitSystem)}` 
                 : 'N/A'}
             </span>
           </div>
-          <div className="result-tile" style={{ padding: '0.5rem' }}>
-            <span className="result-tile-label" style={{ fontSize: '0.68rem' }}>{t("Dimensiones Internas")}</span>
-            <span className="result-tile-value" style={{ fontSize: '0.72rem', fontWeight: 600, marginTop: '0.15rem' }}>
+          <div className="result-tile" style={{ padding: '0.25rem' }}>
+            <span className="result-tile-label" style={{ fontSize: '0.65rem' }}>{t("Dimensiones Internas")}</span>
+            <span className="result-tile-value" style={{ fontSize: '0.65rem', fontWeight: 600, marginTop: '0.15rem' }}>
               {cabinetData?.valid ? (
                 woodShape === 'rectangular' 
                   ? `${convertTo(cabinetData.hInt, 'length', unitSystem).toFixed(1)}x${convertTo(cabinetData.wInt, 'length', unitSystem).toFixed(1)}x${convertTo(cabinetData.dInt, 'length', unitSystem).toFixed(1)}`
@@ -552,9 +552,9 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
               ) : 'N/A'}
             </span>
           </div>
-          <div className="result-tile" style={{ padding: '0.5rem' }}>
-            <span className="result-tile-label" style={{ fontSize: '0.68rem' }}>{t("Dimensiones Externas")}</span>
-            <span className="result-tile-value" style={{ fontSize: '0.72rem', fontWeight: 600, marginTop: '0.15rem' }}>
+          <div className="result-tile" style={{ padding: '0.25rem' }}>
+            <span className="result-tile-label" style={{ fontSize: '0.65rem' }}>{t("Dimensiones Externas")}</span>
+            <span className="result-tile-value" style={{ fontSize: '0.65rem', fontWeight: 600, marginTop: '0.15rem' }}>
               {cabinetData?.valid ? (
                 woodShape === 'rectangular'
                   ? `${convertTo(cabinetData.hExt, 'length', unitSystem).toFixed(1)}x${convertTo(cabinetData.wExt, 'length', unitSystem).toFixed(1)}x${convertTo(cabinetData.dExt, 'length', unitSystem).toFixed(1)}`
@@ -589,11 +589,11 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
           cabinetData={cabinetData}
           boxType={woodSource}
           portShape={portShape}
-          portDiameter={typeof portDiameter === 'number' ? portDiameter : 0}
-          portWidth={typeof portWidth === 'number' ? portWidth : 0}
-          portHeight={typeof portHeight === 'number' ? portHeight : 0}
+          portDiameter={Number(portDiameter) || 0}
+          portWidth={Number(portWidth) || 0}
+          portHeight={Number(portHeight) || 0}
           portLength={numericPortLength}
-          portCount={typeof portCount === 'number' ? portCount : 0}
+          portCount={Number(portCount) || 0}
         />
       </div>
     );

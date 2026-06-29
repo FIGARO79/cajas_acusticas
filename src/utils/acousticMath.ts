@@ -154,7 +154,6 @@ export function suggestPortConfig(Vb: number, Fb: number, params: SpeakerParams,
   const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
 
   // Theoretical exact min option
-  const rMin = dMin / 2;
   const lvMin = ((23562.5 * Math.pow(dMin, 2)) / (Fb * Fb * Vb)) - (kCorrection * dMin);
   options.push({
     numPorts: 1,
@@ -167,7 +166,6 @@ export function suggestPortConfig(Vb: number, Fb: number, params: SpeakerParams,
   standardSizes.forEach(size => {
     const numPorts = Math.ceil(Math.pow(dMin / size, 2));
     if (numPorts > 0 && numPorts <= 4) {
-      const rPort = size / 2;
       const lv = ((23562.5 * Math.pow(size, 2) * numPorts) / (Fb * Fb * Vb)) - (kCorrection * size);
       options.push({
         numPorts: numPorts,

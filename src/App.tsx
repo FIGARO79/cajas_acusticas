@@ -283,16 +283,16 @@ function App() {
       }
     }
 
-    const pCount = typeof portCount === 'number' ? portCount : 0;
+    const pCount = Number(portCount) || 0;
     let portVol = 0;
     if (pCount > 0 && boxType === 'ported' && targetVb > 0) {
       let pDia = 0;
       let isRect = portShape === 'rectangular';
       if (portShape === 'round') {
-        pDia = typeof portDiameter === 'number' ? portDiameter : 0;
+        pDia = Number(portDiameter) || 0;
       } else {
-        const w = typeof portWidth === 'number' ? portWidth : 0;
-        const h = typeof portHeight === 'number' ? portHeight : 0;
+        const w = Number(portWidth) || 0;
+        const h = Number(portHeight) || 0;
         pDia = 2 * Math.sqrt((w * h) / Math.PI);
       }
 
@@ -301,8 +301,8 @@ function App() {
         const Lv = ((23562.5 * Math.pow(pDia, 2) * pCount) / (targetFb * targetFb * targetVb)) - (kCorrection * pDia);
         if (Lv > 0) {
           if (isRect) {
-            const w = typeof portWidth === 'number' ? portWidth : 0;
-            const h = typeof portHeight === 'number' ? portHeight : 0;
+            const w = Number(portWidth) || 0;
+            const h = Number(portHeight) || 0;
             portVol = (pCount * w * h * Lv) / 1000;
           } else {
             portVol = (pCount * Math.PI * Math.pow(pDia / 2, 2) * Lv) / 1000;
@@ -450,14 +450,14 @@ function App() {
 
   // --- CÁLCULO SÍNCRONO DE LONGITUD DE PUERTO ---
   const getPortLengthCalculation = () => {
-    const pCount = typeof portCount === 'number' ? portCount : 0;
+    const pCount = Number(portCount) || 0;
     if (pCount > 0 && portedData.Vb > 0) {
       let pDia = 0;
       if (portShape === 'round') {
-        pDia = typeof portDiameter === 'number' ? portDiameter : 0;
+        pDia = Number(portDiameter) || 0;
       } else {
-        const w = typeof portWidth === 'number' ? portWidth : 0;
-        const h = typeof portHeight === 'number' ? portHeight : 0;
+        const w = Number(portWidth) || 0;
+        const h = Number(portHeight) || 0;
         pDia = 2 * Math.sqrt((w * h) / Math.PI);
       }
 
@@ -533,11 +533,11 @@ function App() {
       // Longitud del puerto, diámetro equivalente, velocidad del aire
       let pLen = 'N/A';
       let vp: number | null = null;
-      const pCount = typeof portCount === 'number' ? portCount : 0;
+      const pCount = Number(portCount) || 0;
       if (pCount > 0 && portedData.valid && portedData.Vb > 0) {
         let pDia = 0;
         if (portShape === 'round') {
-          pDia = portDiameter || 0;
+          pDia = Number(portDiameter) || 0;
         } else if (portShape === 'custom') {
           const a = portArea || 0;
           pDia = 2 * Math.sqrt(a / Math.PI);
