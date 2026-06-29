@@ -984,19 +984,24 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       <div style={{ marginTop: '0.5rem', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--card-border)', borderRadius: '6px', padding: '0.5rem' }}>
                         <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>{t("SUGERENCIAS DE PUERTOS")}:</span>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                          {suggestions.options.map((s: { numPorts: number; diameter: number }, idx: number) => (
-                            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.74rem' }}>
-                              <span>{s.numPorts}x Ø {s.diameter.toFixed(1)} cm</span>
-                              <button
-                                type="button"
-                                onClick={() => handleApplyPort(s.numPorts, s.diameter)}
-                                className="preset-select"
-                                style={{ padding: '0.15rem 0.4rem', fontSize: '0.68rem', cursor: 'pointer' }}
-                              >
-                                {t("Aplicar")}
-                              </button>
-                            </div>
-                          ))}
+                          {suggestions.options.map((s: { numPorts: number; diameter: number; length: number }, idx: number) => {
+                            const displayOptDia = convertTo(s.diameter, 'length', unitSystem);
+                            const displayOptLen = convertTo(s.length, 'length', unitSystem);
+                            const unitLabel = getUnitLabel('length', unitSystem);
+                            return (
+                              <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.74rem' }}>
+                                <span>{s.numPorts}x Ø {displayOptDia.toFixed(1)} {unitLabel} (L: {displayOptLen.toFixed(1)} {unitLabel})</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleApplyPort(s.numPorts, s.diameter)}
+                                  className="preset-select"
+                                  style={{ padding: '0.15rem 0.4rem', fontSize: '0.68rem', cursor: 'pointer' }}
+                                >
+                                  {t("Aplicar")}
+                                </button>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     )}

@@ -155,24 +155,28 @@ export function suggestPortConfig(Vb: number, Fb: number, params: SpeakerParams,
 
   // Theoretical exact min option
   const lvMin = ((23562.5 * Math.pow(dMin, 2)) / (Fb * Fb * Vb)) - (kCorrection * dMin);
-  options.push({
-    numPorts: 1,
-    diameter: dMin,
-    length: lvMin > 0 ? lvMin : 0,
-    isCustom: false
-  });
+  if (lvMin > 0) {
+    options.push({
+      numPorts: 1,
+      diameter: dMin,
+      length: lvMin,
+      isCustom: false
+    });
+  }
 
   // Commercial options
   standardSizes.forEach(size => {
     const numPorts = Math.ceil(Math.pow(dMin / size, 2));
     if (numPorts > 0 && numPorts <= 4) {
       const lv = ((23562.5 * Math.pow(size, 2) * numPorts) / (Fb * Fb * Vb)) - (kCorrection * size);
-      options.push({
-        numPorts: numPorts,
-        diameter: size,
-        length: lv > 0 ? lv : 0,
-        isCustom: true
-      });
+      if (lv > 0) {
+        options.push({
+          numPorts: numPorts,
+          diameter: size,
+          length: lv,
+          isCustom: true
+        });
+      }
     }
   });
 
