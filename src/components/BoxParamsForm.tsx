@@ -45,6 +45,8 @@ interface BoxParamsFormProps {
   portArea: number | '';
   setPortArea: (a: number | '') => void;
   portLength: string;
+  flaredEnds: 0 | 1 | 2;
+  setFlaredEnds: (val: 0 | 1 | 2) => void;
 
   // Radiador Pasivo
   prTuning: 'port' | 'radiator';
@@ -172,6 +174,8 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
   portHeight,
   setPortHeight,
   portLength,
+  flaredEnds,
+  setFlaredEnds,
 
   prTuning,
   setPrTuning,
@@ -261,11 +265,11 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
 
   useEffect(() => {
     if (portedData.valid && portedData.Vb > 0 && portedData.Fb > 0) {
-      setSuggestions(suggestPortConfig(portedData.Vb, portedData.Fb, params));
+      setSuggestions(suggestPortConfig(portedData.Vb, portedData.Fb, params, flaredEnds));
     } else {
       setSuggestions(null);
     }
-  }, [portedData, params]);
+  }, [portedData, params, flaredEnds]);
 
   useEffect(() => {
     const pCount = typeof portCount === 'number' ? portCount : 0;
@@ -289,6 +293,19 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
       setVPeak(null);
     }
   }, [portCount, portDiameter, portShape, portWidth, portHeight, portedData, params]);
+
+  const handlePortCountChange = (valStr: string) => {
+    if (valStr === '') {
+      setPortCount('');
+      return;
+    }
+    const newCount = Math.max(1, parseInt(valStr) || 1);
+    setPortCount(newCount);
+    if (portShape === 'round' && suggestions && suggestions.valid && suggestions.dMin) {
+      const suggestedDia = suggestions.dMin / Math.sqrt(newCount);
+      setPortDiameter(Number(suggestedDia.toFixed(1)));
+    }
+  };
 
   const handleApplyPort = (num: number, dia: number) => {
     setPortShape('round');
@@ -872,7 +889,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                           <input
                             type="number"
                             value={portCount}
-                            onChange={(e) => setPortCount(e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value) || 1))}
+                            onChange={(e) => handlePortCountChange(e.target.value)}
                           />
                         </div>
                       </div>
@@ -932,6 +949,30 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                           </div>
                         </>
                       )}
+                    </div>
+
+                    <div className="input-group" style={{ marginBottom: '0.5rem' }}>
+                      <label>{t("Extremos Redondeados (Flared)")}</label>
+                      <div className="input-wrapper">
+                        <select
+                          value={flaredEnds}
+                          onChange={(e) => setFlaredEnds(parseInt(e.target.value) as 0 | 1 | 2)}
+                          style={{
+                            width: '100%',
+                            height: '34px',
+                            background: 'rgba(255, 255, 255, 0.03)',
+                            color: 'var(--text-main)',
+                            border: '1px solid var(--card-border)',
+                            borderRadius: '6px',
+                            padding: '0 0.5rem',
+                            fontSize: '0.78rem'
+                          }}
+                        >
+                          <option value={0} style={{ background: 'var(--card-bg)' }}>{t("Ninguno (Rectos)")}</option>
+                          <option value={1} style={{ background: 'var(--card-bg)' }}>{t("1 Extremo Redondeado")}</option>
+                          <option value={2} style={{ background: 'var(--card-bg)' }}>{t("Ambos Extremos Redondeados")}</option>
+                        </select>
+                      </div>
                     </div>
 
                     {/* Alerta de Velocidad y Sugerencias de Puerto */}

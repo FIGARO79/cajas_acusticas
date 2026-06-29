@@ -56,6 +56,7 @@ interface CabinetTabProps {
   portHeight: number | '';
   portArea: number | '';
   dampingFactor: number;
+  flaredEnds?: 0 | 1 | 2;
   onCabinetDataChange?: (data: any) => void;
   readOnly?: boolean;
 }
@@ -107,6 +108,7 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
   portHeight,
   portArea,
   dampingFactor,
+  flaredEnds = 0,
   onCabinetDataChange,
   readOnly = false
 }) => {
@@ -150,6 +152,36 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
 
     const extraVal = typeof woodExtra === 'number' ? woodExtra : 0;
 
+    let portVol = 0;
+    if (woodSource === 'ported' && portedData.valid && portedData.Fb > 0 && portedData.Vb > 0) {
+      const pCount = typeof portCount === 'number' ? portCount : 0;
+      if (pCount > 0) {
+        let pDia = 0;
+        let isRect = portShape === 'rectangular';
+        if (portShape === 'round') {
+          pDia = typeof portDiameter === 'number' ? portDiameter : 0;
+        } else if (portShape === 'rectangular') {
+          const w = typeof portWidth === 'number' ? portWidth : 0;
+          const h = typeof portHeight === 'number' ? portHeight : 0;
+          pDia = 2 * Math.sqrt((w * h) / Math.PI);
+        }
+
+        if (pDia > 0) {
+          const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
+          const Lv = ((23562.5 * Math.pow(pDia, 2) * pCount) / (portedData.Fb * portedData.Fb * portedData.Vb)) - (kCorrection * pDia);
+          if (Lv > 0) {
+            if (isRect) {
+              const w = typeof portWidth === 'number' ? portWidth : 0;
+              const h = typeof portHeight === 'number' ? portHeight : 0;
+              portVol = (pCount * w * h * Lv) / 1000;
+            } else {
+              portVol = (pCount * Math.PI * Math.pow(pDia / 2, 2) * Lv) / 1000;
+            }
+          }
+        }
+      }
+    }
+
     if (woodMode === 'calc') {
       // Source volume (ajustado por damping para obtener el volumen físico que se construirá)
       let reqNetVol = 0;
@@ -163,7 +195,7 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
       netVol = reqNetVol / dampingFactor;
 
       if (netVol > 0) {
-        totalVol = netVol + extraVal;
+        totalVol = netVol + extraVal + portVol;
         const volCm3 = totalVol * 1000;
 
         if (woodShape === 'rectangular') {
@@ -252,7 +284,7 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
           if (hInt > 0 && wInt > 0 && dInt > 0) {
             const vBruto = (hInt * wInt * dInt) / 1000;
             totalVol = vBruto;
-            netVol = Math.max(0, vBruto - extraVal);
+            netVol = Math.max(0, vBruto - (extraVal + portVol)) * dampingFactor;
             valid = true;
           }
         }
@@ -273,7 +305,7 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
             const dAvgInt = (dTrapTopInt + dTrapBotInt) / 2;
             const vBruto = (hInt * wInt * dAvgInt) / 1000;
             totalVol = vBruto;
-            netVol = Math.max(0, vBruto - extraVal);
+            netVol = Math.max(0, vBruto - (extraVal + portVol)) * dampingFactor;
             valid = true;
           }
         }
@@ -333,7 +365,7 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
         valid: true,
         vNeto: netVol,
         vTotal: totalVol,
-        vExtra: woodExtra || 0,
+        vExtra: (woodExtra || 0) + portVol,
         hInt, wInt, dInt,
         dTrapTopInt, dTrapBotInt,
         hExt, wExt, dExt,
@@ -345,9 +377,10 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
       setCabinetData(null);
     }
   }, [
-    lang, unitSystem, params, sealedData, portedData, woodMode, woodShape, woodConstraint, woodSource, woodRatio,
+    lang, unitSystem, params, sealedData, portedData, bandpassData, dampingFactor, flaredEnds, woodMode, woodShape, woodConstraint, woodSource, woodRatio,
     woodLockVal1, woodLockVal2, woodLockVal3, woodExtHeight, woodExtWidth, woodExtDepth,
-    woodTrapExtHeight, woodTrapExtWidth, woodTrapExtDepthTop, woodTrapExtDepthBot, woodThickness, woodExtra
+    woodTrapExtHeight, woodTrapExtWidth, woodTrapExtDepthTop, woodTrapExtDepthBot, woodThickness, woodExtra,
+    portCount, portDiameter, portShape, portWidth, portHeight, portArea
   ]);
 
   // Port tuning details for woodworking tab
@@ -381,8 +414,10 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
       }
 
       if (pDia > 0) {
-        const rPort = pDia / 2;
-        const Lv = ((23562.5 * Math.pow(pDia, 2) * pCount) / (portedData.Fb * portedData.Fb * cabinetData.vNeto)) - (1.46 * rPort);
+        const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
+        const Lv = cabinetData.vNeto > 0 
+          ? ((23562.5 * Math.pow(pDia, 2) * pCount) / (portedData.Fb * portedData.Fb * cabinetData.vNeto)) - (kCorrection * pDia)
+          : 0;
         
         const displayLv = convertTo(Lv, 'length', unitSystem);
 
@@ -420,7 +455,7 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
     } else {
       setPortInfo(null);
     }
-  }, [woodSource, portedData, portCount, portDiameter, portShape, portWidth, portHeight, cabinetData, params, lang, unitSystem]);
+  }, [woodSource, portedData, portCount, portDiameter, portShape, portWidth, portHeight, flaredEnds, cabinetData, params, lang, unitSystem]);
 
   const handleApplySuggestedCabinet = () => {
     let netVol = 0;
@@ -487,8 +522,10 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
         pDia = 2 * Math.sqrt(((portWidth || 0) * (portHeight || 0)) / Math.PI);
       }
       if (pDia > 0 && pCount > 0) {
-        const rPort = pDia / 2;
-        const Lv = ((23562.5 * Math.pow(pDia, 2) * pCount) / (portedData.Fb * portedData.Fb * cabinetData.vNeto)) - (1.46 * rPort);
+        const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
+        const Lv = cabinetData.vNeto > 0
+          ? ((23562.5 * Math.pow(pDia, 2) * pCount) / (portedData.Fb * portedData.Fb * cabinetData.vNeto)) - (kCorrection * pDia)
+          : 0;
         numericPortLength = Lv > 0 ? Lv : 0;
       }
     }

@@ -1824,3 +1824,9 @@ html[data-theme="light"] .premium-panel-btn:hover {
   color: #ffffff;
   border-color: transparent;
 }
+html[data-theme="light"] .premium-panel-btn.active-primary {
+  background: var(--primary-gradient);
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+}

@@ -95,6 +95,7 @@ function App() {
   const [portWidth, setPortWidth] = useState<number | ''>(10);
   const [portHeight, setPortHeight] = useState<number | ''>(5);
   const [portArea, setPortArea] = useState<number | ''>(50);
+  const [flaredEnds, setFlaredEnds] = useState<0 | 1 | 2>(0);
 
   // Radiador Pasivo
   const [prTuning, setPrTuning] = useState<'port' | 'radiator'>('port');
@@ -239,6 +240,7 @@ function App() {
   const getManualWoodNetVolume = () => {
     const thickness = (woodThickness || 0) / 10;
     const extra = woodExtra || 0;
+    let bruto = 0;
     if (woodShape === 'rectangular') {
       const hExt = woodExtHeight || 0;
       const wExt = woodExtWidth || 0;
@@ -246,8 +248,9 @@ function App() {
       const hInt = hExt - (2 * thickness);
       const wInt = wExt - (2 * thickness);
       const dInt = dExt - (2 * thickness);
-      if (hInt <= 0 || wInt <= 0 || dInt <= 0) return 0;
-      return Math.max(0, ((hInt * wInt * dInt) / 1000) - extra);
+      if (hInt > 0 && wInt > 0 && dInt > 0) {
+        bruto = (hInt * wInt * dInt) / 1000;
+      }
     } else {
       const hExt = woodTrapExtHeight || 0;
       const wExt = woodTrapExtWidth || 0;
@@ -257,10 +260,58 @@ function App() {
       const wInt = wExt - (2 * thickness);
       const d1Int = Math.max(0, d1Ext - (2 * thickness));
       const d2Int = Math.max(0, d2Ext - (2 * thickness));
-      if (hInt <= 0 || wInt <= 0 || d1Int <= 0 || d2Int <= 0) return 0;
-      const dAvgInt = (d1Int + d2Int) / 2;
-      return Math.max(0, ((hInt * wInt * dAvgInt) / 1000) - extra);
+      if (hInt > 0 && wInt > 0 && d1Int > 0 && d2Int > 0) {
+        const dAvgInt = (d1Int + d2Int) / 2;
+        bruto = (hInt * wInt * dAvgInt) / 1000;
+      }
     }
+
+    if (bruto <= 0) return 0;
+
+    let targetVb = customVb;
+    let targetFb = customFb;
+    if (!customPorted) {
+      try {
+        const wasm = getWasm();
+        if (wasm && adjParams.fs && adjParams.vas && adjParams.qts) {
+          const result = wasm.calc_alineacion_ventilada(adjParams.fs, adjParams.vas, adjParams.qts, "QB3");
+          targetVb = result.vb;
+          targetFb = result.fb;
+        }
+      } catch (e) {
+        console.warn("Could not calculate optimal Vb/Fb from Wasm:", e);
+      }
+    }
+
+    const pCount = typeof portCount === 'number' ? portCount : 0;
+    let portVol = 0;
+    if (pCount > 0 && boxType === 'ported' && targetVb > 0) {
+      let pDia = 0;
+      let isRect = portShape === 'rectangular';
+      if (portShape === 'round') {
+        pDia = typeof portDiameter === 'number' ? portDiameter : 0;
+      } else {
+        const w = typeof portWidth === 'number' ? portWidth : 0;
+        const h = typeof portHeight === 'number' ? portHeight : 0;
+        pDia = 2 * Math.sqrt((w * h) / Math.PI);
+      }
+
+      if (pDia > 0) {
+        const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
+        const Lv = ((23562.5 * Math.pow(pDia, 2) * pCount) / (targetFb * targetFb * targetVb)) - (kCorrection * pDia);
+        if (Lv > 0) {
+          if (isRect) {
+            const w = typeof portWidth === 'number' ? portWidth : 0;
+            const h = typeof portHeight === 'number' ? portHeight : 0;
+            portVol = (pCount * w * h * Lv) / 1000;
+          } else {
+            portVol = (pCount * Math.PI * Math.pow(pDia / 2, 2) * Lv) / 1000;
+          }
+        }
+      }
+    }
+
+    return Math.max(0, bruto - (extra + portVol));
   };
 
   const manualNetVol = getManualWoodNetVolume();
@@ -411,8 +462,8 @@ function App() {
       }
 
       if (pDia > 0) {
-        const rPort = pDia / 2;
-        const Lv = ((23562.5 * Math.pow(pDia, 2) * pCount) / (portedData.Fb * portedData.Fb * portedData.Vb)) - (1.46 * rPort);
+        const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
+        const Lv = ((23562.5 * Math.pow(pDia, 2) * pCount) / (portedData.Fb * portedData.Fb * portedData.Vb)) - (kCorrection * pDia);
         
         const displayLv = convertTo(Lv, 'length', unitSystem);
         const unitLabel = getUnitLabel('length', unitSystem);
@@ -497,8 +548,8 @@ function App() {
         }
         
         if (pDia > 0) {
-          const rPort = pDia / 2;
-          const Lv = ((23562.5 * Math.pow(pDia, 2) * pCount) / (portedData.Fb * portedData.Fb * (cabinetRef.current?.vNeto || portedData.Vb))) - (1.46 * rPort);
+          const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
+          const Lv = ((23562.5 * Math.pow(pDia, 2) * pCount) / (portedData.Fb * portedData.Fb * (cabinetRef.current?.vNeto || portedData.Vb))) - (kCorrection * pDia);
           if (Lv <= 0) {
             pLen = t("Excesivamente corto");
           } else {
@@ -636,6 +687,8 @@ function App() {
           portArea={portArea}
           setPortArea={setPortArea}
           portLength={portLength}
+          flaredEnds={flaredEnds}
+          setFlaredEnds={setFlaredEnds}
 
           prTuning={prTuning}
           setPrTuning={setPrTuning}
@@ -786,6 +839,7 @@ function App() {
                 portHeight={portHeight}
                 portArea={portArea}
                 dampingFactor={dampingFactor}
+                flaredEnds={flaredEnds}
                 onCabinetDataChange={handleCabinetDataChange}
                 readOnly={true}
               />

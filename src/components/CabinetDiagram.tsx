@@ -25,8 +25,10 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
   boxType,
   portShape,
   portDiameter,
+  portWidth,
   portHeight,
   portLength,
+  portCount,
 }) => {
   const t = (text: string) => translate(text, lang);
 
@@ -331,7 +333,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
         </g>
         <text
           x={offsetX + tScale + 15}
-          y={offsetY + plotHeight / 2 + 15}
+          y={offsetY + tScale + 25}
           fill="#10b981"
           fontSize="10"
           fontWeight="500"

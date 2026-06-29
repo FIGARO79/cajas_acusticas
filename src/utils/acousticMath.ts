@@ -142,7 +142,7 @@ export function estimateF3(fs: number, qts: number, Vb: number, Fb: number, vas:
   return (low + high) / 2;
 }
 
-export function suggestPortConfig(Vb: number, Fb: number, params: SpeakerParams) {
+export function suggestPortConfig(Vb: number, Fb: number, params: SpeakerParams, flaredEnds: 0 | 1 | 2 = 0) {
   if (!params.sd || !params.xmax) {
     return { valid: false, reason: "Ingresa el área del cono (Sd) y excursión (Xmax) en la barra lateral para recibir sugerencias de puertos sin ruido de viento." };
   }
@@ -151,9 +151,11 @@ export function suggestPortConfig(Vb: number, Fb: number, params: SpeakerParams)
   const standardSizes = [5.0, 7.5, 10.0, 15.0];
   const options = [];
 
+  const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
+
   // Theoretical exact min option
   const rMin = dMin / 2;
-  const lvMin = ((23562.5 * Math.pow(dMin, 2)) / (Fb * Fb * Vb)) - (1.46 * rMin);
+  const lvMin = ((23562.5 * Math.pow(dMin, 2)) / (Fb * Fb * Vb)) - (kCorrection * dMin);
   options.push({
     numPorts: 1,
     diameter: dMin,
@@ -166,7 +168,7 @@ export function suggestPortConfig(Vb: number, Fb: number, params: SpeakerParams)
     const numPorts = Math.ceil(Math.pow(dMin / size, 2));
     if (numPorts > 0 && numPorts <= 4) {
       const rPort = size / 2;
-      const lv = ((23562.5 * Math.pow(size, 2) * numPorts) / (Fb * Fb * Vb)) - (1.46 * rPort);
+      const lv = ((23562.5 * Math.pow(size, 2) * numPorts) / (Fb * Fb * Vb)) - (kCorrection * size);
       options.push({
         numPorts: numPorts,
         diameter: size,
