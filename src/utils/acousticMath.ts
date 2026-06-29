@@ -142,7 +142,7 @@ export function estimateF3(fs: number, qts: number, Vb: number, Fb: number, vas:
   return (low + high) / 2;
 }
 
-export function suggestPortConfig(Vb: number, Fb: number, params: SpeakerParams, flaredEnds: 0 | 1 | 2 = 0) {
+export function suggestPortConfig(Vb: number, Fb: number, params: SpeakerParams, flaredEnds: 0 | 1 | 2 = 0, minLength = 0) {
   if (!params.sd || !params.xmax) {
     return { valid: false, reason: "Ingresa el área del cono (Sd) y excursión (Xmax) en la barra lateral para recibir sugerencias de puertos sin ruido de viento." };
   }
@@ -155,7 +155,7 @@ export function suggestPortConfig(Vb: number, Fb: number, params: SpeakerParams,
 
   // Theoretical exact min option
   const lvMin = ((23562.5 * Math.pow(dMin, 2)) / (Fb * Fb * Vb)) - (kCorrection * dMin);
-  if (lvMin > 0) {
+  if (lvMin >= minLength) {
     options.push({
       numPorts: 1,
       diameter: dMin,
@@ -169,7 +169,7 @@ export function suggestPortConfig(Vb: number, Fb: number, params: SpeakerParams,
     const numPorts = Math.ceil(Math.pow(dMin / size, 2));
     if (numPorts > 0 && numPorts <= 4) {
       const lv = ((23562.5 * Math.pow(size, 2) * numPorts) / (Fb * Fb * Vb)) - (kCorrection * size);
-      if (lv > 0) {
+      if (lv >= minLength) {
         options.push({
           numPorts: numPorts,
           diameter: size,

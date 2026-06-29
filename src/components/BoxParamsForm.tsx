@@ -47,6 +47,10 @@ interface BoxParamsFormProps {
   portLength: string;
   flaredEnds: 0 | 1 | 2;
   setFlaredEnds: (val: 0 | 1 | 2) => void;
+  useCustomPortLength: boolean;
+  setUseCustomPortLength: (v: boolean) => void;
+  customPortLength: number | '';
+  setCustomPortLength: (v: number | '') => void;
 
   // Radiador Pasivo
   prTuning: 'port' | 'radiator';
@@ -176,6 +180,10 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
   portLength,
   flaredEnds,
   setFlaredEnds,
+  useCustomPortLength,
+  setUseCustomPortLength,
+  customPortLength,
+  setCustomPortLength,
 
   prTuning,
   setPrTuning,
@@ -265,11 +273,12 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
 
   useEffect(() => {
     if (portedData.valid && portedData.Vb > 0 && portedData.Fb > 0) {
-      setSuggestions(suggestPortConfig(portedData.Vb, portedData.Fb, params, flaredEnds));
+      const minLen = (Number(woodThickness) || 0) / 10;
+      setSuggestions(suggestPortConfig(portedData.Vb, portedData.Fb, params, flaredEnds, minLen));
     } else {
       setSuggestions(null);
     }
-  }, [portedData, params, flaredEnds]);
+  }, [portedData, params, flaredEnds, woodThickness]);
 
   useEffect(() => {
     const pCount = typeof portCount === 'number' ? portCount : 0;
@@ -910,9 +919,22 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                           </div>
                           <div className="input-group">
                             <label>{t("Longitud")}</label>
-                            <div className="input-wrapper">
-                              <input type="text" value={portLength} disabled style={{ background: 'rgba(255,255,255,0.03)' }} />
-                            </div>
+                            {useCustomPortLength ? (
+                              <div className="input-wrapper">
+                                <input
+                                  type="number"
+                                  value={displayVal(customPortLength, 'length')}
+                                  onChange={(e) => handleInputChange(e.target.value, setCustomPortLength, 'length')}
+                                  step="any"
+                                  placeholder="Auto"
+                                />
+                                <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
+                              </div>
+                            ) : (
+                              <div className="input-wrapper">
+                                <input type="text" value={portLength} disabled style={{ background: 'rgba(255,255,255,0.03)' }} />
+                              </div>
+                            )}
                           </div>
                         </>
                       ) : (
@@ -921,10 +943,10 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                             <label>{t("Ancho")}</label>
                             <div className="input-wrapper">
                               <input
-                                type="number"
-                                value={portWidth}
-                                onChange={(e) => setPortWidth(e.target.value === '' ? '' : Math.max(0.1, parseFloat(e.target.value) || 0))}
-                                step="any"
+                                  type="number"
+                                  value={portWidth}
+                                  onChange={(e) => setPortWidth(e.target.value === '' ? '' : Math.max(0.1, parseFloat(e.target.value) || 0))}
+                                  step="any"
                               />
                               <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                             </div>
@@ -933,22 +955,48 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                             <label>{t("Alto")}</label>
                             <div className="input-wrapper">
                               <input
-                                type="number"
-                                value={portHeight}
-                                onChange={(e) => setPortHeight(e.target.value === '' ? '' : Math.max(0.1, parseFloat(e.target.value) || 0))}
-                                step="any"
+                                  type="number"
+                                  value={portHeight}
+                                  onChange={(e) => setPortHeight(e.target.value === '' ? '' : Math.max(0.1, parseFloat(e.target.value) || 0))}
+                                  step="any"
                               />
                               <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                             </div>
                           </div>
                           <div className="input-group">
                             <label>{t("Longitud")}</label>
-                            <div className="input-wrapper">
-                              <input type="text" value={portLength} disabled style={{ background: 'rgba(255,255,255,0.03)' }} />
-                            </div>
+                            {useCustomPortLength ? (
+                              <div className="input-wrapper">
+                                <input
+                                  type="number"
+                                  value={displayVal(customPortLength, 'length')}
+                                  onChange={(e) => handleInputChange(e.target.value, setCustomPortLength, 'length')}
+                                  step="any"
+                                  placeholder="Auto"
+                                />
+                                <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
+                              </div>
+                            ) : (
+                              <div className="input-wrapper">
+                                <input type="text" value={portLength} disabled style={{ background: 'rgba(255,255,255,0.03)' }} />
+                              </div>
+                            )}
                           </div>
                         </>
                       )}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', marginTop: '0.1rem' }}>
+                      <input
+                        type="checkbox"
+                        id="chk-custom-port-len"
+                        checked={useCustomPortLength}
+                        onChange={(e) => setUseCustomPortLength(e.target.checked)}
+                        style={{ cursor: 'pointer', width: '15px', height: '15px', accentColor: 'var(--accent)' }}
+                      />
+                      <label htmlFor="chk-custom-port-len" style={{ fontSize: '0.74rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-main)', margin: 0, fontWeight: 500 }}>
+                        {t("Fijar longitud de puerto personalizada")}
+                      </label>
                     </div>
 
                     <div className="input-group" style={{ marginBottom: '0.5rem' }}>

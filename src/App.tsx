@@ -96,6 +96,8 @@ function App() {
   const [portHeight, setPortHeight] = useState<number | ''>(5);
   const [portArea, setPortArea] = useState<number | ''>(50);
   const [flaredEnds, setFlaredEnds] = useState<0 | 1 | 2>(0);
+  const [useCustomPortLength, setUseCustomPortLength] = useState<boolean>(false);
+  const [customPortLength, setCustomPortLength] = useState<number | ''>('');
 
   // Radiador Pasivo
   const [prTuning, setPrTuning] = useState<'port' | 'radiator'>('port');
@@ -285,11 +287,13 @@ function App() {
 
     const pCount = Number(portCount) || 0;
     let portVol = 0;
-    if (pCount > 0 && boxType === 'ported' && targetVb > 0) {
+    if (pCount > 0 && boxType === 'ported' && targetFb > 0) {
       let pDia = 0;
       let isRect = portShape === 'rectangular';
       if (portShape === 'round') {
         pDia = Number(portDiameter) || 0;
+      } else if (portShape === 'custom') {
+        pDia = 2 * Math.sqrt((Number(portArea) || 0) / Math.PI);
       } else {
         const w = Number(portWidth) || 0;
         const h = Number(portHeight) || 0;
@@ -297,15 +301,39 @@ function App() {
       }
 
       if (pDia > 0) {
-        const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
-        const Lv = ((23562.5 * Math.pow(pDia, 2) * pCount) / (targetFb * targetFb * targetVb)) - (kCorrection * pDia);
-        if (Lv > 0) {
+        if (useCustomPortLength && Number(customPortLength) > 0) {
+          const Lv = Number(customPortLength);
           if (isRect) {
             const w = Number(portWidth) || 0;
             const h = Number(portHeight) || 0;
             portVol = (pCount * w * h * Lv) / 1000;
           } else {
             portVol = (pCount * Math.PI * Math.pow(pDia / 2, 2) * Lv) / 1000;
+          }
+        } else {
+          const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
+          let currentNetVol = bruto - extra; // Initial guess of physical net volume
+          
+          // Solve the circular reference (netVol -> targetVb -> portLength -> portVol -> netVol) iteratively
+          for (let iter = 0; iter < 4; iter++) {
+            const targetVb = currentNetVol * dampingFactor;
+            if (targetVb <= 0) {
+              portVol = 0;
+              break;
+            }
+            const Lv = ((23562.5 * Math.pow(pDia, 2) * pCount) / (targetFb * targetFb * targetVb)) - (kCorrection * pDia);
+            if (Lv > 0) {
+              if (isRect) {
+                const w = Number(portWidth) || 0;
+                const h = Number(portHeight) || 0;
+                portVol = (pCount * w * h * Lv) / 1000;
+              } else {
+                portVol = (pCount * Math.PI * Math.pow(pDia / 2, 2) * Lv) / 1000;
+              }
+            } else {
+              portVol = 0;
+            }
+            currentNetVol = Math.max(0, bruto - (extra + portVol));
           }
         }
       }
@@ -394,6 +422,30 @@ function App() {
       }
     }
 
+    if (useCustomPortLength && Number(customPortLength) > 0) {
+      let pDia = 0;
+      if (portShape === 'round') {
+        pDia = Number(portDiameter) || 0;
+      } else if (portShape === 'custom') {
+        pDia = 2 * Math.sqrt((Number(portArea) || 0) / Math.PI);
+      } else {
+        const w = Number(portWidth) || 0;
+        const h = Number(portHeight) || 0;
+        pDia = 2 * Math.sqrt((w * h) / Math.PI);
+      }
+      const pCount = Number(portCount) || 1;
+      if (pDia > 0 && VbPorted > 0) {
+        const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
+        const Lv_cm = Number(customPortLength);
+        const fbCalc = Math.sqrt((23562.5 * Math.pow(pDia, 2) * pCount) / (VbPorted * (Lv_cm + kCorrection * pDia)));
+        if (fbCalc > 0 && !isNaN(fbCalc) && isFinite(fbCalc)) {
+          FbPorted = fbCalc;
+          F3Ported = estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas);
+          alignmentActive = `${t("Personalizada")} (L: ${Lv_cm.toFixed(1)} cm)`;
+        }
+      }
+    }
+
     return {
       valid: true,
       Vb: VbPorted,
@@ -448,13 +500,19 @@ function App() {
 
   const bandpassData = calculateBandpass();
 
-  // --- CÁLCULO SÍNCRONO DE LONGITUD DE PUERTO ---
   const getPortLengthCalculation = () => {
+    if (useCustomPortLength && Number(customPortLength) > 0) {
+      const displayLv = convertTo(Number(customPortLength), 'length', unitSystem);
+      const unitLabel = getUnitLabel('length', unitSystem);
+      return `${displayLv.toFixed(1)} ${unitLabel} (${t("Personalizada")})`;
+    }
     const pCount = Number(portCount) || 0;
     if (pCount > 0 && portedData.Vb > 0) {
       let pDia = 0;
       if (portShape === 'round') {
         pDia = Number(portDiameter) || 0;
+      } else if (portShape === 'custom') {
+        pDia = 2 * Math.sqrt((Number(portArea) || 0) / Math.PI);
       } else {
         const w = Number(portWidth) || 0;
         const h = Number(portHeight) || 0;
@@ -689,6 +747,10 @@ function App() {
           portLength={portLength}
           flaredEnds={flaredEnds}
           setFlaredEnds={setFlaredEnds}
+          useCustomPortLength={useCustomPortLength}
+          setUseCustomPortLength={setUseCustomPortLength}
+          customPortLength={customPortLength}
+          setCustomPortLength={setCustomPortLength}
 
           prTuning={prTuning}
           setPrTuning={setPrTuning}
