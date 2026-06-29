@@ -160,6 +160,8 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
         let isRect = portShape === 'rectangular';
         if (portShape === 'round') {
           pDia = Number(portDiameter) || 0;
+        } else if (portShape === 'custom') {
+          pDia = 2 * Math.sqrt((Number(portArea) || 0) / Math.PI);
         } else if (portShape === 'rectangular') {
           const w = Number(portWidth) || 0;
           const h = Number(portHeight) || 0;
@@ -523,8 +525,9 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
       }
       if (pDia > 0 && pCount > 0) {
         const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
-        const Lv = cabinetData.vNeto > 0
-          ? ((23562.5 * Math.pow(pDia, 2) * pCount) / (portedData.Fb * portedData.Fb * cabinetData.vNeto)) - (kCorrection * pDia)
+        const targetVol = cabinetData.vNeto > 0 ? cabinetData.vNeto : portedData.Vb;
+        const Lv = targetVol > 0
+          ? ((23562.5 * Math.pow(pDia, 2) * pCount) / (portedData.Fb * portedData.Fb * targetVol)) - (kCorrection * pDia)
           : 0;
         numericPortLength = Lv > 0 ? Lv : 0;
       }

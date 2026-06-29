@@ -137,44 +137,6 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
   }
   const portY = offsetY + plotHeight - tScale - pHeightScale - 10;
 
-  // Puertos en Vista Frontal
-  const pCount = Number(portCount) || 1;
-  const frontPorts: React.JSX.Element[] = [];
-  if (boxType === 'ported' && portLength > 0) {
-    const portYCenter = portY + pHeightScale / 2;
-    const innerWidth = plotWidthFront - 2 * tScale;
-    const step = innerWidth / (pCount + 1);
-
-    for (let i = 1; i <= pCount; i++) {
-      const cx = offsetXFront + tScale + step * i;
-      if (portShape === 'round' || portShape === 'custom') {
-        const r = pHeightScale / 2;
-        frontPorts.push(
-          <g key={`front-port-${i}`}>
-            <circle cx={cx} cy={portYCenter} r={r} fill="none" stroke="#000000" strokeWidth="1.75" />
-            <circle cx={cx} cy={portYCenter} r={r - 2} fill="none" stroke="#64748b" strokeWidth="0.75" strokeDasharray="2 2" opacity="0.5" />
-            {/* Center crosshair */}
-            <line x1={cx - 5} y1={portYCenter} x2={cx + 5} y2={portYCenter} stroke="#10b981" strokeWidth="0.75" strokeDasharray="5 2" opacity="0.5" />
-            <line x1={cx} y1={portYCenter - 5} x2={cx} y2={portYCenter + 5} stroke="#10b981" strokeWidth="0.75" strokeDasharray="5 2" opacity="0.5" />
-          </g>
-        );
-      } else {
-        const w = portWidth * scale;
-        const h = pHeightScale;
-        const rx = cx - w / 2;
-        const ry = portYCenter - h / 2;
-        frontPorts.push(
-          <g key={`front-port-${i}`}>
-            <rect x={rx} y={ry} width={w} height={h} fill="none" stroke="#000000" strokeWidth="1.75" />
-            {/* Center crosshair */}
-            <line x1={cx - 5} y1={portYCenter} x2={cx + 5} y2={portYCenter} stroke="#10b981" strokeWidth="0.75" strokeDasharray="5 2" opacity="0.5" />
-            <line x1={cx} y1={portYCenter - 5} x2={cx} y2={portYCenter + 5} stroke="#10b981" strokeWidth="0.75" strokeDasharray="5 2" opacity="0.5" />
-          </g>
-        );
-      }
-    }
-  }
-
   // --- VISTA LATERAL (SECCIÓN CORTE) ---
   let extPath = '';
   let intPath = '';
@@ -240,8 +202,9 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
 
   // Puerto de perfil
   let portElement = null;
-  if (boxType === 'ported' && portLength > 0) {
-    const pLenScale = portLength * scale;
+  if (boxType === 'ported') {
+    const effectivePortLength = portLength > 0 ? portLength : 15; // 15 cm fallback
+    const pLenScale = effectivePortLength * scale;
     portElement = (
       <g>
         {/* Erase wood wall inside port opening */}
@@ -266,7 +229,9 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
           fontWeight="bold"
           textAnchor="middle"
         >
-          Lv: {convertTo(portLength, 'length', unitSystem).toFixed(1)}{uLabel}
+          {portLength > 0 
+            ? `Lv: ${convertTo(portLength, 'length', unitSystem).toFixed(1)}${uLabel}` 
+            : 'Lv: N/A'}
         </text>
       </g>
     );
@@ -288,6 +253,43 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
   const distPortBotDisp = convertTo(distPortBot / scale, 'length', unitSystem).toFixed(1);
 
   const midX = offsetXSide - 35; // Altura cota central
+
+  // Puertos en Vista Frontal
+  const pCount = Number(portCount) || 1;
+  const frontPorts: React.JSX.Element[] = [];
+  if (boxType === 'ported') {
+    const innerWidth = plotWidthFront - 2 * tScale;
+    const step = innerWidth / (pCount + 1);
+
+    for (let i = 1; i <= pCount; i++) {
+      const cx = offsetXFront + tScale + step * i;
+      if (portShape === 'round' || portShape === 'custom') {
+        const r = pHeightScale / 2;
+        frontPorts.push(
+          <g key={`front-port-${i}`}>
+            <circle cx={cx} cy={portYCenter} r={r} fill="none" stroke="#000000" strokeWidth="1.75" />
+            <circle cx={cx} cy={portYCenter} r={r - 2} fill="none" stroke="#64748b" strokeWidth="0.75" strokeDasharray="2 2" opacity="0.5" />
+            {/* Center crosshair */}
+            <line x1={cx - 5} y1={portYCenter} x2={cx + 5} y2={portYCenter} stroke="#10b981" strokeWidth="0.75" strokeDasharray="5 2" opacity="0.5" />
+            <line x1={cx} y1={portYCenter - 5} x2={cx} y2={portYCenter + 5} stroke="#10b981" strokeWidth="0.75" strokeDasharray="5 2" opacity="0.5" />
+          </g>
+        );
+      } else {
+        const w = portWidth * scale;
+        const h = pHeightScale;
+        const rx = cx - w / 2;
+        const ry = portYCenter - h / 2;
+        frontPorts.push(
+          <g key={`front-port-${i}`}>
+            <rect x={rx} y={ry} width={w} height={h} fill="none" stroke="#000000" strokeWidth="1.75" />
+            {/* Center crosshair */}
+            <line x1={cx - 5} y1={portYCenter} x2={cx + 5} y2={portYCenter} stroke="#10b981" strokeWidth="0.75" strokeDasharray="5 2" opacity="0.5" />
+            <line x1={cx} y1={portYCenter - 5} x2={cx} y2={portYCenter + 5} stroke="#10b981" strokeWidth="0.75" strokeDasharray="5 2" opacity="0.5" />
+          </g>
+        );
+      }
+    }
+  }
 
   return (
     <div style={{
@@ -487,7 +489,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
           </text>
 
           {/* Cota Altura Centro Puerto desde Abajo (si aplica) */}
-          {boxType === 'ported' && portLength > 0 && (
+          {boxType === 'ported' && (
             <>
               <line x1={offsetXFront - 30} y1={portYCenter} x2={offsetXFront - 15} y2={portYCenter} />
               <line x1={offsetXFront - 30} y1={offsetY + plotHeight} x2={offsetXFront - 15} y2={offsetY + plotHeight} />
