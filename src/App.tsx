@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useDeferredValue } from 'react';
 import { Header } from './components/Header';
 import { SpeakerParamsForm } from './components/SpeakerParamsForm';
 import { BoxParamsForm } from './components/BoxParamsForm';
@@ -141,6 +141,9 @@ function App() {
   const [woodThickness, setWoodThickness] = useState<number | ''>(15);
   const [woodExtra, setWoodExtra] = useState<number | ''>(3.5);
 
+  const [speakerYPct, setSpeakerYPct] = useState<number>(50);
+  const [portYPct, setPortYPct] = useState<number>(85);
+
   // Shared state for technical report exporting
   const cabinetRef = useRef<any>(null);
   const handleCabinetDataChange = useCallback((data: any) => {
@@ -270,14 +273,12 @@ function App() {
 
     if (bruto <= 0) return 0;
 
-    let targetVb = customVb;
     let targetFb = customFb;
     if (!customPorted) {
       try {
         const wasm = getWasm();
         if (wasm && adjParams.fs && adjParams.vas && adjParams.qts) {
           const result = wasm.calc_alineacion_ventilada(adjParams.fs, adjParams.vas, adjParams.qts, "QB3");
-          targetVb = result.vb;
           targetFb = result.fb;
         }
       } catch (e) {
@@ -499,6 +500,11 @@ function App() {
   };
 
   const bandpassData = calculateBandpass();
+
+  const deferredSealedData = useDeferredValue(sealedData);
+  const deferredPortedData = useDeferredValue(portedData);
+  const deferredBandpassData = useDeferredValue(bandpassData);
+  const deferredAdjParams = useDeferredValue(adjParams);
 
   const getPortLengthCalculation = () => {
     if (useCustomPortLength && Number(customPortLength) > 0) {
@@ -836,6 +842,10 @@ function App() {
           setLpadAttenuation={setLpadAttenuation}
           lpadZLoad={lpadZLoad}
           setLpadZLoad={setLpadZLoad}
+          speakerYPct={speakerYPct}
+          setSpeakerYPct={setSpeakerYPct}
+          portYPct={portYPct}
+          setPortYPct={setPortYPct}
         />
 
         {/* CONTENIDOS DERECHA */}
@@ -844,10 +854,15 @@ function App() {
           <SimulationChart 
             lang={lang}
             theme={theme}
-            sealedData={boxType === 'sealed' && sealedData.valid ? sealedData : null}
-            portedData={boxType === 'ported' && portedData.valid ? portedData : null}
-            bandpassData={boxType === 'bandpass' && bandpassData.valid ? bandpassData : null}
-            params={adjParams}
+            sealedData={boxType === 'sealed' && sealedData.valid ? deferredSealedData : null}
+            portedData={boxType === 'ported' && portedData.valid ? deferredPortedData : null}
+            bandpassData={boxType === 'bandpass' && bandpassData.valid ? deferredBandpassData : null}
+            params={deferredAdjParams}
+            crossoverWays={crossoverWays}
+            crossoverType={crossoverType}
+            fc={fc}
+            fcLow={fcLow}
+            fcHigh={fcHigh}
           />
 
           {/* Grilla de Resultados y Diagramas en Paralelo */}
@@ -904,6 +919,8 @@ function App() {
                 flaredEnds={flaredEnds}
                 onCabinetDataChange={handleCabinetDataChange}
                 readOnly={true}
+                speakerYPct={speakerYPct}
+                portYPct={portYPct}
               />
             </div>
 

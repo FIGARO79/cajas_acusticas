@@ -140,6 +140,10 @@ interface BoxParamsFormProps {
   setLpadAttenuation: (val: number) => void;
   lpadZLoad: number;
   setLpadZLoad: (val: number) => void;
+  speakerYPct: number;
+  setSpeakerYPct: (val: number) => void;
+  portYPct: number;
+  setPortYPct: (val: number) => void;
 }
 
 export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
@@ -265,6 +269,10 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
   setLpadAttenuation,
   lpadZLoad,
   setLpadZLoad,
+  speakerYPct,
+  setSpeakerYPct,
+  portYPct,
+  setPortYPct,
 }) => {
   const t = (text: string) => translate(text, lang);
 
@@ -1096,6 +1104,47 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 )}
               </div>
             )}
+
+            {/* Distribución en Bafle Frontal (Ubicación de Woofer y Puerto) */}
+            <div className="premium-form-card" style={{ marginTop: '0.5rem' }}>
+              <div className="form-subsection-title" style={{ marginTop: 0, marginBottom: '0.35rem' }}>{t("Distribución en Bafle Frontal")}</div>
+              
+              <div className="input-group" style={{ marginBottom: '0.5rem' }}>
+                <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem' }}>
+                  <span>{t("Posición Vertical Woofer")}</span>
+                  <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{speakerYPct}%</span>
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input
+                    type="range"
+                    min="15"
+                    max="85"
+                    value={speakerYPct}
+                    onChange={(e) => setSpeakerYPct(parseInt(e.target.value))}
+                    style={{ flex: 1, accentColor: 'var(--accent)', cursor: 'pointer' }}
+                  />
+                </div>
+              </div>
+
+              {boxType === 'ported' && prTuning === 'port' && (
+                <div className="input-group" style={{ marginBottom: '0.25rem' }}>
+                  <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem' }}>
+                    <span>{t("Posición Vertical Puerto(s)")}</span>
+                    <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{portYPct}%</span>
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <input
+                      type="range"
+                      min="15"
+                      max="85"
+                      value={portYPct}
+                      onChange={(e) => setPortYPct(parseInt(e.target.value))}
+                      style={{ flex: 1, accentColor: 'var(--accent)', cursor: 'pointer' }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
           </>
         )}
 

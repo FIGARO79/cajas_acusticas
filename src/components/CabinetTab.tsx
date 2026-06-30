@@ -59,6 +59,8 @@ interface CabinetTabProps {
   flaredEnds?: 0 | 1 | 2;
   onCabinetDataChange?: (data: any) => void;
   readOnly?: boolean;
+  speakerYPct?: number;
+  portYPct?: number;
 }
 
 export const CabinetTab: React.FC<CabinetTabProps> = ({
@@ -110,10 +112,13 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
   dampingFactor,
   flaredEnds = 0,
   onCabinetDataChange,
-  readOnly = false
+  readOnly = false,
+  speakerYPct = 50,
+  portYPct = 85,
 }) => {
   const t = (text: string) => translate(text, lang);
   const [cabinetData, setCabinetData] = useState<WoodCabinetData | null>(null);
+  const [hoveredPieceIndex, setHoveredPieceIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (onCabinetDataChange) {
@@ -334,6 +339,13 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
           qty: 2,
           dimensions: `${displayVal(hInt, 'length')} x ${displayVal(wInt, 'length')} ${uLabel}`
         });
+        if (woodSource === 'bandpass') {
+          pieces.push({
+            name: t("Divisor Interno (Bafle de Montaje)"),
+            qty: 1,
+            dimensions: `${displayVal(hInt, 'length')} x ${displayVal(wInt, 'length')} ${uLabel}`
+          });
+        }
       } else {
         const hSlant = Math.sqrt(Math.pow(hInt, 2) + Math.pow(Math.abs(dTrapBotInt - dTrapTopInt), 2));
         pieces.push({
@@ -361,6 +373,13 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
           qty: 1,
           dimensions: `${displayVal(hSlant, 'length')} ${uLabel} (${t("inclinado")}) x ${displayVal(wInt, 'length')} ${uLabel}`
         });
+        if (woodSource === 'bandpass') {
+          pieces.push({
+            name: t("Divisor Interno (Bafle de Montaje)"),
+            qty: 1,
+            dimensions: `${displayVal(hInt, 'length')} x ${displayVal(wInt, 'length')} ${uLabel}`
+          });
+        }
       }
 
       setCabinetData({
@@ -535,6 +554,28 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%', boxSizing: 'border-box' }}>
+        {/* Diagrama dinámico Corte A-A (Alineado arriba bajo la gráfica) */}
+        <CabinetDiagram
+          lang={lang}
+          unitSystem={unitSystem}
+          shape={woodShape}
+          cabinetData={cabinetData}
+          boxType={woodSource}
+          portShape={portShape}
+          portDiameter={Number(portDiameter) || 0}
+          portWidth={Number(portWidth) || 0}
+          portHeight={Number(portHeight) || 0}
+          portLength={numericPortLength}
+          portCount={Number(portCount) || 0}
+          hoveredPieceIndex={hoveredPieceIndex}
+          speakerYPct={speakerYPct}
+          portYPct={portYPct}
+          bandpassOrder={bandpassData?.order}
+          bandpassRatio={bandpassData && bandpassData.valid ? bandpassData.Vr / (bandpassData.Vf + bandpassData.Vr) : 0.5}
+          bandpassVf={bandpassData?.Vf}
+          bandpassVr={bandpassData?.Vr}
+        />
+
         {/* Resultados de Ebanistería */}
         <div className="results-summary" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', marginBottom: '0rem' }}>
           <div className="result-tile" style={{ padding: '0.25rem' }}>
@@ -584,20 +625,50 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
           </div>
         )}
 
-        {/* Diagrama dinámico Corte A-A */}
-        <CabinetDiagram
-          lang={lang}
-          unitSystem={unitSystem}
-          shape={woodShape}
-          cabinetData={cabinetData}
-          boxType={woodSource}
-          portShape={portShape}
-          portDiameter={Number(portDiameter) || 0}
-          portWidth={Number(portWidth) || 0}
-          portHeight={Number(portHeight) || 0}
-          portLength={numericPortLength}
-          portCount={Number(portCount) || 0}
-        />
+        {/* Lista de corte interactiva bajo el diagrama en el panel lateral */}
+        <div style={{ marginTop: '0.25rem' }}>
+          <span className="control-title" style={{ fontSize: '0.85rem', color: 'var(--text-main)', marginBottom: '0.4rem', fontWeight: 600, display: 'block' }}>
+            {t("Lista de Corte Sugerida")} ({t("Grosor:")} {convertTo(cabinetData?.valid ? cabinetData.thickness : (typeof woodThickness === 'number' ? woodThickness : 0), 'length_small', unitSystem).toFixed(1)}{getUnitLabel('length_small', unitSystem)})
+          </span>
+          <table className="wood-table" style={{ fontSize: '0.78rem' }}>
+            <thead>
+              <tr>
+                <th style={{ padding: '4px 8px' }}>{t("Pieza")}</th>
+                <th style={{ padding: '4px 8px', textAlign: 'center' }}>{t("Cant.")}</th>
+                <th style={{ padding: '4px 8px' }}>{t("Dimensión de Corte")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cabinetData?.valid ? (
+                cabinetData.pieces.map((piece, idx) => (
+                  <tr 
+                    key={idx}
+                    onMouseEnter={() => setHoveredPieceIndex(idx)}
+                    onMouseLeave={() => setHoveredPieceIndex(null)}
+                    style={{ 
+                      cursor: 'help', 
+                      background: hoveredPieceIndex === idx ? 'rgba(245, 158, 11, 0.12)' : 'transparent',
+                      transition: 'background 0.2s ease'
+                    }}
+                  >
+                    <td style={{ padding: '4px 8px' }}><strong>{piece.name}</strong></td>
+                    <td style={{ padding: '4px 8px', textAlign: 'center' }}>{piece.qty}</td>
+                    <td style={{ padding: '4px 8px', fontWeight: 500 }}>{piece.dimensions}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={3} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '8px' }}>
+                    {t("Sin datos para calcular.")}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '0.4rem', textAlign: 'left', fontStyle: 'italic' }}>
+            * {t("Pasa el cursor sobre una pieza para verla resaltada en el plano técnico.")}
+          </div>
+        </div>
       </div>
     );
   }
@@ -940,9 +1011,18 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
             <tbody>
               {cabinetData?.valid ? (
                 cabinetData.pieces.map((piece, idx) => (
-                  <tr key={idx}>
+                  <tr 
+                    key={idx}
+                    onMouseEnter={() => setHoveredPieceIndex(idx)}
+                    onMouseLeave={() => setHoveredPieceIndex(null)}
+                    style={{ 
+                      cursor: 'help', 
+                      background: hoveredPieceIndex === idx ? 'rgba(245, 158, 11, 0.12)' : 'transparent',
+                      transition: 'background 0.2s ease'
+                    }}
+                  >
                     <td><strong>{piece.name}</strong></td>
-                    <td>{piece.qty}</td>
+                    <td style={{ textAlign: 'center' }}>{piece.qty}</td>
                     <td style={{ fontWeight: 500 }}>{piece.dimensions}</td>
                   </tr>
                 ))
