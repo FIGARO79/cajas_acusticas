@@ -144,6 +144,18 @@ interface BoxParamsFormProps {
   setSpeakerYPct: (val: number) => void;
   portYPct: number;
   setPortYPct: (val: number) => void;
+  portLocation: 'front' | 'rear';
+  setPortLocation: (val: 'front' | 'rear') => void;
+
+  // Midrange Parameters
+  midFs: number;
+  setMidFs: (val: number) => void;
+  midVas: number;
+  setMidVas: (val: number) => void;
+  midQts: number;
+  setMidQts: (val: number) => void;
+  midTargetQtc: number;
+  setMidTargetQtc: (val: number) => void;
 }
 
 export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
@@ -273,6 +285,15 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
   setSpeakerYPct,
   portYPct,
   setPortYPct,
+  portLocation,
+  setPortLocation,
+  customPorted,
+  midFs,
+  setMidFs,
+  midVas,
+  setMidVas,
+  midQts,
+  setMidQts,
 }) => {
   const t = (text: string) => translate(text, lang);
 
@@ -754,7 +775,27 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
 
             {/* Dimensionamiento y alineación acústica del cajón */}
             <div className="premium-form-card">
-              <div className="form-subsection-title" style={{ marginTop: 0 }}>{t("Alineación Acústica (Vb/Fb)")}</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                <div className="form-subsection-title" style={{ margin: 0 }}>{t("Alineación Acústica (Vb/Fb)")}</div>
+                {customPorted && (
+                  <button
+                    type="button"
+                    onClick={() => setCustomPorted(false)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--accent)',
+                      fontSize: '0.7rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      textDecoration: 'underline',
+                      padding: 0
+                    }}
+                  >
+                    {t("Restablecer Óptima")}
+                  </button>
+                )}
+              </div>
               <div className="input-grid">
                 <div className="input-group">
                   <label>{t("Volumen Neto (Vb)")}</label>
@@ -1127,22 +1168,37 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
               </div>
 
               {boxType === 'ported' && prTuning === 'port' && (
-                <div className="input-group" style={{ marginBottom: '0.25rem' }}>
-                  <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem' }}>
-                    <span>{t("Posición Vertical Puerto(s)")}</span>
-                    <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{portYPct}%</span>
-                  </label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <input
-                      type="range"
-                      min="15"
-                      max="85"
-                      value={portYPct}
-                      onChange={(e) => setPortYPct(parseInt(e.target.value))}
-                      style={{ flex: 1, accentColor: 'var(--accent)', cursor: 'pointer' }}
-                    />
+                <>
+                  <div className="input-group" style={{ marginBottom: '0.5rem' }}>
+                    <label>{t("Ubicación del Puerto")}</label>
+                    <select 
+                      value={portLocation} 
+                      onChange={(e) => setPortLocation(e.target.value as 'front' | 'rear')}
+                      className="input-select"
+                      style={{ width: '100%', height: '34px' }}
+                    >
+                      <option value="front">{t("Frente")}</option>
+                      <option value="rear">{t("Atrás")}</option>
+                    </select>
                   </div>
-                </div>
+
+                  <div className="input-group" style={{ marginBottom: '0.25rem' }}>
+                    <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem' }}>
+                      <span>{t("Posición Vertical Puerto(s)")}</span>
+                      <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{portYPct}%</span>
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <input
+                        type="range"
+                        min="15"
+                        max="85"
+                        value={portYPct}
+                        onChange={(e) => setPortYPct(parseInt(e.target.value))}
+                        style={{ flex: 1, accentColor: 'var(--accent)', cursor: 'pointer' }}
+                      />
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           </>
@@ -1271,6 +1327,32 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 </div>
               </div>
             </div>
+
+            {crossoverWays === 3 && (
+              <div className="premium-form-card">
+                <div className="form-subsection-title" style={{ marginTop: 0 }}>{t("Parámetros del Rango Medio")}</div>
+                <div className="input-grid">
+                  <div className="input-group">
+                    <label>Fs ({t("Medios")}) (Hz)</label>
+                    <div className="input-wrapper">
+                      <input type="number" value={midFs} onChange={(e) => setMidFs(parseFloat(e.target.value) || 120)} />
+                    </div>
+                  </div>
+                  <div className="input-group">
+                    <label>Vas ({t("Medios")}) (L)</label>
+                    <div className="input-wrapper">
+                      <input type="number" value={midVas} onChange={(e) => setMidVas(parseFloat(e.target.value) || 5)} />
+                    </div>
+                  </div>
+                  <div className="input-group">
+                    <label>Qts ({t("Medios")})</label>
+                    <div className="input-wrapper">
+                      <input type="number" value={midQts} onChange={(e) => setMidQts(parseFloat(e.target.value) || 0.45)} step="0.01" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Red Zobel y L-Pad agrupadas en una tarjeta */}
             <div className="premium-form-card">

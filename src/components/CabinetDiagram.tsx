@@ -22,6 +22,14 @@ interface CabinetDiagramProps {
   bandpassRatio?: number;
   bandpassVf?: number;
   bandpassVr?: number;
+
+  crossoverWays?: number;
+  driverConfig?: string;
+  midFs?: number;
+  midVas?: number;
+  midQts?: number;
+  midTargetQtc?: number;
+  portLocation?: 'front' | 'rear';
 }
 
 export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
@@ -41,6 +49,9 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
   portYPct = 85,
   bandpassOrder = 4,
   bandpassRatio = 0.5,
+  crossoverWays = 2,
+  driverConfig = 'single',
+  portLocation = 'front',
 }) => {
   const t = (text: string) => translate(text, lang);
 
@@ -119,16 +130,115 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
   const frontExtPath = `M ${offsetXFront},${offsetY} L ${offsetXFront + plotWidthFront},${offsetY} L ${offsetXFront + plotWidthFront},${offsetY + plotHeight} L ${offsetXFront},${offsetY + plotHeight} Z`;
   const frontIntPath = `M ${offsetXFront + tScale},${offsetY + tScale} L ${offsetXFront + plotWidthFront - tScale},${offsetY + tScale} L ${offsetXFront + plotWidthFront - tScale},${offsetY + plotHeight - tScale} L ${offsetXFront + tScale},${offsetY + plotHeight - tScale} Z`;
 
+  // Define dynamic driver layout for multi-way and multi-woofer configurations
+  const getDriverLayout = () => {
+    const list: Array<{
+      type: 'tweeter' | 'midrange' | 'woofer';
+      label: string;
+      yCenter: number;
+      rOuter: number;
+      color: string;
+    }> = [];
+
+    const is3Way = crossoverWays === 3;
+    const has2Woofers = driverConfig === 'parallel_2' || driverConfig === 'series_2' || driverConfig === 'dual_isolated';
+    const yStart = offsetY + tScale;
+    const hActive = innerHeightScale;
+
+    // Standard heights and spacings based on radii
+    const rW = Math.min(hActive * 0.12, 32);
+    const rM = Math.min(hActive * 0.08, 22);
+    const rT = Math.min(hActive * 0.06, 16);
+
+    const dWW = rW * 2 + 12; // woofer to woofer spacing
+    const dWM = rW + rM + 12; // woofer to midrange spacing
+    const dMT = rM + rT + 12; // midrange to tweeter spacing
+
+    const Y_base = yStart + (speakerYPct / 100) * hActive;
+
+    if (is3Way && has2Woofers) {
+      // Stack is: Tweeter (top), Midrange, Woofer 1, Woofer 2 (bottom)
+      // Clamp Y_base so the top of Tweeter and bottom of Woofer 2 stay inside box limits
+      const topOffset = dWW / 2 + dWM + dMT + rT + 8;
+      const botOffset = dWW / 2 + rW + 8;
+      const minY = yStart + topOffset;
+      const maxY = yStart + hActive - botOffset;
+      const Y_clamped = Math.min(maxY, Math.max(minY, Y_base));
+
+      const yW1 = Y_clamped - dWW / 2;
+      const yW2 = Y_clamped + dWW / 2;
+      const yM = yW1 - dWM;
+      const yT = yM - dMT;
+
+      list.push({ type: 'tweeter', label: t("Tweeter"), yCenter: yT, rOuter: rT, color: '#a855f7' });
+      list.push({ type: 'midrange', label: t("Medio"), yCenter: yM, rOuter: rM, color: '#eab308' });
+      list.push({ type: 'woofer', label: `${t("Woofer")} 1`, yCenter: yW1, rOuter: rW, color: '#38bdf8' });
+      list.push({ type: 'woofer', label: `${t("Woofer")} 2`, yCenter: yW2, rOuter: rW, color: '#38bdf8' });
+    } else if (is3Way && !has2Woofers) {
+      // Stack is: Tweeter (top), Midrange, Woofer (bottom)
+      const rWoofer = Math.min(hActive * 0.14, 36);
+      const dWooferMid = rWoofer + rM + 12;
+      const topOffset = dWooferMid + dMT + rT + 8;
+      const botOffset = rWoofer + 8;
+      const minY = yStart + topOffset;
+      const maxY = yStart + hActive - botOffset;
+      const Y_clamped = Math.min(maxY, Math.max(minY, Y_base));
+
+      const yW = Y_clamped;
+      const yM = yW - dWooferMid;
+      const yT = yM - dMT;
+
+      list.push({ type: 'tweeter', label: t("Tweeter"), yCenter: yT, rOuter: rT, color: '#a855f7' });
+      list.push({ type: 'midrange', label: t("Medio"), yCenter: yM, rOuter: rM, color: '#eab308' });
+      list.push({ type: 'woofer', label: t("Woofer"), yCenter: yW, rOuter: rWoofer, color: '#38bdf8' });
+    } else if (!is3Way && has2Woofers) {
+      // Stack is: Tweeter (top), Woofer 1, Woofer 2 (bottom)
+      const rWoofer = Math.min(hActive * 0.14, 36);
+      const dWooferWoofer = rWoofer * 2 + 12;
+      const dWooferTweeter = rWoofer + rT + 12;
+      const topOffset = dWooferWoofer / 2 + dWooferTweeter + rT + 8;
+      const botOffset = dWooferWoofer / 2 + rWoofer + 8;
+      const minY = yStart + topOffset;
+      const maxY = yStart + hActive - botOffset;
+      const Y_clamped = Math.min(maxY, Math.max(minY, Y_base));
+
+      const yW1 = Y_clamped - dWooferWoofer / 2;
+      const yW2 = Y_clamped + dWooferWoofer / 2;
+      const yT = yW1 - dWooferTweeter;
+
+      list.push({ type: 'tweeter', label: t("Tweeter"), yCenter: yT, rOuter: rT, color: '#a855f7' });
+      list.push({ type: 'woofer', label: `${t("Woofer")} 1`, yCenter: yW1, rOuter: rWoofer, color: '#38bdf8' });
+      list.push({ type: 'woofer', label: `${t("Woofer")} 2`, yCenter: yW2, rOuter: rWoofer, color: '#38bdf8' });
+    } else {
+      // Standard single woofer with Tweeter above it
+      const rWoofer = Math.min(hActive * 0.16, 40);
+      const dWooferTweeter = rWoofer + rT + 12;
+      const topOffset = dWooferTweeter + rT + 8;
+      const botOffset = rWoofer + 8;
+      const minY = yStart + topOffset;
+      const maxY = yStart + hActive - botOffset;
+      const Y_clamped = Math.min(maxY, Math.max(minY, Y_base));
+
+      const yW = Y_clamped;
+      const yT = yW - dWooferTweeter;
+
+      list.push({ type: 'tweeter', label: t("Tweeter"), yCenter: yT, rOuter: rT, color: '#a855f7' });
+      list.push({ type: 'woofer', label: t("Woofer"), yCenter: yW, rOuter: rWoofer, color: '#38bdf8' });
+    }
+    return list;
+  };
+
+  const layout = getDriverLayout();
+
   // Altavoz en Vista Frontal (Woofer)
   const wooferH = Math.min(plotHeight * 0.5, 80); // Alto del altavoz en el dibujo
   const rOuter = wooferH / 2;
   const rInner = rOuter * 0.8;
   const rCap = rOuter * 0.25;
 
-  // Clamp speaker vertical position to stay inside internal limits
-  const minSpeakerY = offsetY + tScale + rOuter;
-  const maxSpeakerY = offsetY + plotHeight - tScale - rOuter;
-  const wooferYCenter = Math.min(maxSpeakerY, Math.max(minSpeakerY, offsetY + tScale + (speakerYPct / 100) * innerHeightScale));
+  const wooferYCenter = isBandpass 
+    ? (offsetY + tScale + innerHeightScale / 2) 
+    : (layout.find(d => d.type === 'woofer')?.yCenter ?? (offsetY + tScale + (speakerYPct / 100) * innerHeightScale));
   const wooferY = wooferYCenter - rOuter;
   const wooferX = offsetXFront + plotWidthFront / 2;
 
@@ -240,36 +350,120 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
   const wooferYSide = isBandpass ? wooferYCenterSide - wooferH / 2 : wooferY;
 
   // Altavoz de perfil para cajas standard (sellada o ventilada)
-  const wooferDepth = Math.min(plotWidthSide * 0.4, 50);
   const speakerConeStandard = !isBandpass ? (
-    <path
-      d={`M ${offsetXSide + tScale},${wooferY} 
-          Q ${offsetXSide + tScale + wooferDepth * 0.1},${wooferY + wooferH * 0.15} ${offsetXSide + tScale + wooferDepth * 0.6},${wooferY + wooferH * 0.35}
-          L ${offsetXSide + tScale + wooferDepth * 0.6},${wooferY + wooferH * 0.65}
-          Q ${offsetXSide + tScale + wooferDepth * 0.1},${wooferY + wooferH * 0.85} ${offsetXSide + tScale},${wooferY + wooferH}
-          L ${offsetXSide + tScale},${wooferY + wooferH - 5}
-          Q ${offsetXSide + tScale + wooferDepth * 0.15},${wooferY + wooferH * 0.8} ${offsetXSide + tScale + wooferDepth * 0.55},${wooferY + wooferH * 0.6}
-          L ${offsetXSide + tScale + wooferDepth * 0.55},${wooferY + wooferH * 0.4}
-          Q ${offsetXSide + tScale + wooferDepth * 0.15},${wooferY + wooferH * 0.2} ${offsetXSide + tScale},${wooferY + 5} Z`}
-      fill="#38bdf8"
-      opacity="0.85"
-    />
+    <g>
+      {layout.map((d, idx) => {
+        const hDriver = d.rOuter * 2;
+        const dDriver = d.type === 'tweeter' ? 12 : d.type === 'midrange' ? 20 : 35; // depth scale in pixels
+        const yTop = d.yCenter - d.rOuter;
+        return (
+          <g key={idx}>
+            {/* Cone */}
+            <path
+              d={`M ${offsetXSide + tScale},${yTop} 
+                  Q ${offsetXSide + tScale + dDriver * 0.15},${yTop + hDriver * 0.15} ${offsetXSide + tScale + dDriver * 0.6},${yTop + hDriver * 0.35}
+                  L ${offsetXSide + tScale + dDriver * 0.6},${yTop + hDriver * 0.65}
+                  Q ${offsetXSide + tScale + dDriver * 0.15},${yTop + hDriver * 0.85} ${offsetXSide + tScale},${yTop + hDriver}
+                  L ${offsetXSide + tScale},${yTop + hDriver - 3}
+                  Q ${offsetXSide + tScale + dDriver * 0.20},${yTop + hDriver * 0.8} ${offsetXSide + tScale + dDriver * 0.55},${yTop + hDriver * 0.6}
+                  L ${offsetXSide + tScale + dDriver * 0.55},${yTop + hDriver * 0.4}
+                  Q ${offsetXSide + tScale + dDriver * 0.20},${yTop + hDriver * 0.2} ${offsetXSide + tScale},${yTop + 3} Z`}
+              fill={d.color}
+              opacity="0.85"
+              stroke="#000000"
+              strokeWidth="1.2"
+            />
+            {/* Magnet */}
+            <line x1={offsetXSide + tScale + dDriver * 0.55} y1={yTop + hDriver * 0.4} x2={offsetXSide + tScale + dDriver * 0.85} y2={yTop + hDriver * 0.45} stroke="#000000" strokeWidth="1.5" />
+            <line x1={offsetXSide + tScale + dDriver * 0.55} y1={yTop + hDriver * 0.6} x2={offsetXSide + tScale + dDriver * 0.85} y2={yTop + hDriver * 0.55} stroke="#000000" strokeWidth="1.5" />
+            <rect
+              x={offsetXSide + tScale + dDriver * 0.8}
+              y={yTop + hDriver * 0.42}
+              width={dDriver * 0.25}
+              height={hDriver * 0.16}
+              fill="#475569"
+              stroke="#000000"
+              strokeWidth="1.2"
+              rx="2"
+            />
+          </g>
+        );
+      })}
+    </g>
   ) : null;
 
-  const speakerMagnetStandard = !isBandpass ? (
+  const speakerMagnetStandard = null;
+
+  const internalPartitions = !isBandpass ? (
     <g>
-      <line x1={offsetXSide + tScale + wooferDepth * 0.55} y1={wooferY + wooferH * 0.4} x2={offsetXSide + tScale + wooferDepth * 0.85} y2={wooferY + wooferH * 0.45} stroke="#000000" strokeWidth="2" />
-      <line x1={offsetXSide + tScale + wooferDepth * 0.55} y1={wooferY + wooferH * 0.6} x2={offsetXSide + tScale + wooferDepth * 0.85} y2={wooferY + wooferH * 0.55} stroke="#000000" strokeWidth="2" />
-      <rect
-        x={offsetXSide + tScale + wooferDepth * 0.8}
-        y={wooferY + wooferH * 0.42}
-        width={wooferDepth * 0.25}
-        height={wooferH * 0.16}
-        fill="#475569"
-        stroke="#000000"
-        strokeWidth="1.5"
-        rx="2"
-      />
+      {/* Partition for Midrange Chamber */}
+      {crossoverWays === 3 && (() => {
+        const midDriver = layout.find(d => d.type === 'midrange');
+        const topWoofer = layout.find(d => d.type === 'woofer');
+        if (midDriver && topWoofer) {
+          const yPart = (midDriver.yCenter + topWoofer.yCenter) / 2 - tScale / 2;
+          return (
+            <g>
+              <rect 
+                x={offsetXSide + tScale} 
+                y={yPart} 
+                width={plotWidthSide - 2 * tScale} 
+                height={tScale} 
+                fill="#eab308" 
+                stroke="#000000" 
+                strokeWidth="1.2" 
+                opacity="0.65" 
+              />
+              <text 
+                x={offsetXSide + plotWidthSide / 2} 
+                y={yPart - 4} 
+                fill="#eab308" 
+                fontSize="8.5" 
+                fontWeight="bold" 
+                textAnchor="middle" 
+                opacity="0.95"
+              >
+                {t("Cámara Medios")}
+              </text>
+            </g>
+          );
+        }
+        return null;
+      })()}
+
+      {/* Partition for Isolated Woofer Chambers */}
+      {driverConfig === 'dual_isolated' && (() => {
+        const woofers = layout.filter(d => d.type === 'woofer');
+        if (woofers.length === 2) {
+          const yPart = (woofers[0].yCenter + woofers[1].yCenter) / 2 - tScale / 2;
+          return (
+            <g>
+              <rect 
+                x={offsetXSide + tScale} 
+                y={yPart} 
+                width={plotWidthSide - 2 * tScale} 
+                height={tScale} 
+                fill="#38bdf8" 
+                stroke="#000000" 
+                strokeWidth="1.2" 
+                opacity="0.65" 
+              />
+              <text 
+                x={offsetXSide + plotWidthSide / 2} 
+                y={yPart - 4} 
+                fill="#38bdf8" 
+                fontSize="8.5" 
+                fontWeight="bold" 
+                textAnchor="middle" 
+                opacity="0.95"
+              >
+                {t("Tabique Woofer")}
+              </text>
+            </g>
+          );
+        }
+        return null;
+      })()}
     </g>
   ) : null;
 
@@ -339,7 +533,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
     </g>
   ) : null;
 
-  // Puerto de perfil izquierdo (Vf / Vb1) - Ubicado abajo en la base de la caja
+  // Puerto de perfil (Vf / Vb1) - Ubicado dinámicamente en el frente o atrás
   let portElement = null;
   if (boxType === 'ported' || boxType === 'bandpass') {
     const effectivePortLength = portLength > 0 ? portLength : (isBandpass ? 12 : 15);
@@ -348,19 +542,36 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
       ? offsetY + plotHeight - tScale - pHeightScale - 12 
       : portY;
 
-    portElement = (
-      <g>
-        <rect x={offsetXSide - 1} y={portYSide + 0.5} width={tScale + 2} height={pHeightScale - 1} fill="var(--card-bg)" />
-        <line x1={offsetXSide} y1={portYSide} x2={offsetXSide + tScale + pLenScale} y2={portYSide} stroke="#000000" strokeWidth="2" />
-        <line x1={offsetXSide} y1={portYSide + pHeightScale} x2={offsetXSide + tScale + pLenScale} y2={portYSide + pHeightScale} stroke="#000000" strokeWidth="2" />
-        <line x1={offsetXSide + tScale + pLenScale} y1={portYSide} x2={offsetXSide + tScale + pLenScale} y2={portYSide + pHeightScale} stroke="#000000" strokeWidth="1.5" strokeDasharray="3 3" />
-        <text x={offsetXSide + tScale + pLenScale / 2} y={portYSide - 5} fill="#10b981" stroke="none" fontSize="9.5" fontWeight="normal" textAnchor="middle">
-          {isBandpass 
-            ? `Lv1: ${convertTo(effectivePortLength, 'length', unitSystem).toFixed(1)}${uLabel}` 
-            : `Lv: ${portLength > 0 ? convertTo(portLength, 'length', unitSystem).toFixed(1) : 'N/A'}${uLabel}`}
-        </text>
-      </g>
-    );
+    if (portLocation === 'front' || isBandpass) {
+      portElement = (
+        <g>
+          <rect x={offsetXSide - 1} y={portYSide + 0.5} width={tScale + 2} height={pHeightScale - 1} fill="var(--card-bg)" />
+          <line x1={offsetXSide} y1={portYSide} x2={offsetXSide + tScale + pLenScale} y2={portYSide} stroke="#000000" strokeWidth="2" />
+          <line x1={offsetXSide} y1={portYSide + pHeightScale} x2={offsetXSide + tScale + pLenScale} y2={portYSide + pHeightScale} stroke="#000000" strokeWidth="2" />
+          <line x1={offsetXSide + tScale + pLenScale} y1={portYSide} x2={offsetXSide + tScale + pLenScale} y2={portYSide + pHeightScale} stroke="#000000" strokeWidth="1.5" strokeDasharray="3 3" />
+          <text x={offsetXSide + tScale + pLenScale / 2} y={portYSide - 5} fill="#10b981" stroke="none" fontSize="9.5" fontWeight="normal" textAnchor="middle">
+            {isBandpass 
+              ? `Lv1: ${convertTo(effectivePortLength, 'length', unitSystem).toFixed(1)}${uLabel}` 
+              : `Lv: ${portLength > 0 ? convertTo(portLength, 'length', unitSystem).toFixed(1) : 'N/A'}${uLabel}`}
+          </text>
+        </g>
+      );
+    } else {
+      // Rear Port (drawn on the right side of sectional view)
+      const xStart = offsetXSide + plotWidthSide;
+      const xInnerEnd = offsetXSide + plotWidthSide - tScale - pLenScale;
+      portElement = (
+        <g>
+          <rect x={xStart - tScale - 1} y={portYSide + 0.5} width={tScale + 2} height={pHeightScale - 1} fill="var(--card-bg)" />
+          <line x1={xStart} y1={portYSide} x2={xInnerEnd} y2={portYSide} stroke="#000000" strokeWidth="2" />
+          <line x1={xStart} y1={portYSide + pHeightScale} x2={xInnerEnd} y2={portYSide + pHeightScale} stroke="#000000" strokeWidth="2" />
+          <line x1={xInnerEnd} y1={portYSide} x2={xInnerEnd} y2={portYSide + pHeightScale} stroke="#000000" strokeWidth="1.5" strokeDasharray="3 3" />
+          <text x={xStart - tScale - pLenScale / 2} y={portYSide - 5} fill="#10b981" stroke="none" fontSize="9.5" fontWeight="normal" textAnchor="middle">
+            {`Lv: ${portLength > 0 ? convertTo(portLength, 'length', unitSystem).toFixed(1) : 'N/A'}${uLabel}`}
+          </text>
+        </g>
+      );
+    }
   }
 
   // Puerto de perfil derecho (Vr / Vb2, 6º Orden) - Ubicado abajo a la derecha
@@ -412,11 +623,14 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
         const r = pHeightScale / 2;
         frontPorts.push(
           <g key={`front-port-${i}`}>
-            <circle cx={cx} cy={portYCenter} r={r} fill="none" stroke="#000000" strokeWidth="1.75" />
-            <circle cx={cx} cy={portYCenter} r={r - 2} fill="none" stroke="#64748b" strokeWidth="0.75" strokeDasharray="2 2" opacity="0.5" />
+            <circle cx={cx} cy={portYCenter} r={r} fill="none" stroke="#000000" strokeWidth="1.75" strokeDasharray={portLocation === 'rear' ? "3 3" : "none"} opacity={portLocation === 'rear' ? 0.4 : 1.0} />
+            <circle cx={cx} cy={portYCenter} r={r - 2} fill="none" stroke="#64748b" strokeWidth="0.75" strokeDasharray="2 2" opacity={portLocation === 'rear' ? 0.25 : 0.5} />
             {/* Center crosshair */}
-            <line x1={cx - 5} y1={portYCenter} x2={cx + 5} y2={portYCenter} stroke="#10b981" strokeWidth="0.75" strokeDasharray="5 2" opacity="0.5" />
-            <line x1={cx} y1={portYCenter - 5} x2={cx} y2={portYCenter + 5} stroke="#10b981" strokeWidth="0.75" strokeDasharray="5 2" opacity="0.5" />
+            <line x1={cx - 5} y1={portYCenter} x2={cx + 5} y2={portYCenter} stroke="#10b981" strokeWidth="0.75" strokeDasharray={portLocation === 'rear' ? "2 2" : "5 2"} opacity={portLocation === 'rear' ? 0.25 : 0.5} />
+            <line x1={cx} y1={portYCenter - 5} x2={cx} y2={portYCenter + 5} stroke="#10b981" strokeWidth="0.75" strokeDasharray={portLocation === 'rear' ? "2 2" : "5 2"} opacity={portLocation === 'rear' ? 0.25 : 0.5} />
+            {portLocation === 'rear' && (
+              <text x={cx} y={portYCenter + 2.5} fill="var(--text-muted)" fontSize="7" fontWeight="bold" textAnchor="middle" opacity="0.6">{t("Atrás")}</text>
+            )}
           </g>
         );
       } else {
@@ -426,10 +640,13 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
         const ry = portYCenter - h / 2;
         frontPorts.push(
           <g key={`front-port-${i}`}>
-            <rect x={rx} y={ry} width={w} height={h} fill="none" stroke="#000000" strokeWidth="1.75" />
+            <rect x={rx} y={ry} width={w} height={h} fill="none" stroke="#000000" strokeWidth="1.75" strokeDasharray={portLocation === 'rear' ? "3 3" : "none"} opacity={portLocation === 'rear' ? 0.4 : 1.0} />
             {/* Center crosshair */}
-            <line x1={cx - 5} y1={portYCenter} x2={cx + 5} y2={portYCenter} stroke="#10b981" strokeWidth="0.75" strokeDasharray="5 2" opacity="0.5" />
-            <line x1={cx} y1={portYCenter - 5} x2={cx} y2={portYCenter + 5} stroke="#10b981" strokeWidth="0.75" strokeDasharray="5 2" opacity="0.5" />
+            <line x1={cx - 5} y1={portYCenter} x2={cx + 5} y2={portYCenter} stroke="#10b981" strokeWidth="0.75" strokeDasharray={portLocation === 'rear' ? "2 2" : "5 2"} opacity={portLocation === 'rear' ? 0.25 : 0.5} />
+            <line x1={cx} y1={portYCenter - 5} x2={cx} y2={portYCenter + 5} stroke="#10b981" strokeWidth="0.75" strokeDasharray={portLocation === 'rear' ? "2 2" : "5 2"} opacity={portLocation === 'rear' ? 0.25 : 0.5} />
+            {portLocation === 'rear' && (
+              <text x={cx} y={portYCenter + 2.5} fill="var(--text-muted)" fontSize="7" fontWeight="bold" textAnchor="middle" opacity="0.6">{t("Atrás")}</text>
+            )}
           </g>
         );
       }
@@ -465,7 +682,31 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
         <path d={`${frontExtPath} ${frontIntPath}`} fill="rgba(245, 158, 11, 0.08)" fillRule="evenodd" />
         <path d={frontExtPath} stroke="#000000" strokeWidth="3" strokeLinejoin="round" fill="none" />
         <path d={frontIntPath} stroke="#000000" strokeWidth="1.5" strokeLinejoin="round" fill="none" />
-        {frontSpeaker}
+        {isBandpass ? frontSpeaker : (
+          <g>
+            {layout.map((d, idx) => (
+              <g key={idx}>
+                {/* Flange / Suspensión externa */}
+                <circle cx={wooferX} cy={d.yCenter} r={d.rOuter} fill="none" stroke={speakerStroke} strokeWidth="1.75" opacity={speakerOpacity} />
+                <circle cx={wooferX} cy={d.yCenter} r={d.rOuter - 2.5} fill="none" stroke="#64748b" strokeWidth="0.75" opacity={0.6} />
+                
+                {/* Cono */}
+                <circle cx={wooferX} cy={d.yCenter} r={d.rOuter * 0.8} fill={d.color} opacity={0.12} stroke={d.color} strokeWidth="0.75" />
+                <circle cx={wooferX} cy={d.yCenter} r={d.rOuter * 0.8 - 2.5} fill="none" stroke="#64748b" strokeWidth="0.6" opacity={0.8} />
+                
+                {/* Cubrepolvo */}
+                <circle cx={wooferX} cy={d.yCenter} r={d.rOuter * 0.25} fill="none" stroke={speakerStroke} strokeWidth="1.25" opacity={speakerOpacity} />
+
+                {/* Ejes técnicos */}
+                <line x1={wooferX - d.rOuter - 3} y1={d.yCenter} x2={wooferX + d.rOuter + 3} y2={d.yCenter} stroke="#10b981" strokeWidth="0.6" strokeDasharray="3 2" opacity="0.45" />
+                <line x1={wooferX} y1={d.yCenter - d.rOuter - 3} x2={wooferX} y2={d.yCenter + d.rOuter + 3} stroke="#10b981" strokeWidth="0.6" strokeDasharray="3 2" opacity="0.45" />
+
+                {/* Etiqueta */}
+                <text x={wooferX} y={d.yCenter + 2.5} fill="var(--text-muted)" fontSize="7" fontWeight="bold" textAnchor="middle" opacity="0.75">{d.label}</text>
+              </g>
+            ))}
+          </g>
+        )}
         {frontPorts}
 
         {/* --- DIBUJO SECCIÓN LATERAL --- */}
@@ -479,6 +720,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
         {speakerMagnetBP}
         {portElement}
         {portElementVr}
+        {internalPartitions}
 
         {/* Volumen interior etiqueta (Vb o Vf/Vr en círculos) */}
         {!isBandpass ? (

@@ -54,13 +54,23 @@ interface CabinetTabProps {
   portShape: 'round' | 'rectangular' | 'custom';
   portWidth: number | '';
   portHeight: number | '';
-  portArea: number | '';
+  portArea?: number | '';
+  setPortArea?: (a: number | '') => void;
   dampingFactor: number;
   flaredEnds?: 0 | 1 | 2;
   onCabinetDataChange?: (data: any) => void;
   readOnly?: boolean;
   speakerYPct?: number;
   portYPct?: number;
+  portLocation?: 'front' | 'rear';
+
+  // New 3-way and dual-woofer props
+  crossoverWays?: number;
+  driverConfig?: string;
+  midFs?: number;
+  midVas?: number;
+  midQts?: number;
+  midTargetQtc?: number;
 }
 
 export const CabinetTab: React.FC<CabinetTabProps> = ({
@@ -115,6 +125,13 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
   readOnly = false,
   speakerYPct = 50,
   portYPct = 85,
+  crossoverWays = 2,
+  driverConfig = 'single',
+  midFs = 120,
+  midVas = 5,
+  midQts = 0.45,
+  midTargetQtc = 0.707,
+  portLocation = 'front',
 }) => {
   const t = (text: string) => translate(text, lang);
   const [cabinetData, setCabinetData] = useState<WoodCabinetData | null>(null);
@@ -189,6 +206,18 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
       }
     }
 
+    // Midrange Chamber Volume Calculation (vMid)
+    let vMid = 0;
+    if (crossoverWays === 3) {
+      vMid = 3.0; // default 3 Liters
+      const mVas = midVas ?? 5;
+      const mQts = midQts ?? 0.45;
+      const mTargetQtc = midTargetQtc ?? 0.707;
+      if (mQts > 0 && mQts < mTargetQtc && mVas > 0) {
+        vMid = mVas / (Math.pow(mTargetQtc / mQts, 2) - 1);
+      }
+    }
+
     if (woodMode === 'calc') {
       // Source volume (ajustado por damping para obtener el volumen físico que se construirá)
       let reqNetVol = 0;
@@ -202,7 +231,19 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
       netVol = reqNetVol / dampingFactor;
 
       if (netVol > 0) {
-        totalVol = netVol + extraVal + portVol;
+        // Estimate divider board volumes before we know physical dimensions
+        let vMidPartition = 0;
+        let vWooferPartition = 0;
+        let tempTotal = netVol + extraVal + portVol + vMid;
+        const estArea = Math.pow(tempTotal * 1000, 2/3); // cm^2
+        if (crossoverWays === 3) {
+          vMidPartition = (estArea * thickness) / 1000;
+        }
+        if (driverConfig === 'dual_isolated') {
+          vWooferPartition = (estArea * thickness) / 1000;
+        }
+
+        totalVol = netVol + extraVal + portVol + vMid + vMidPartition + vWooferPartition;
         const volCm3 = totalVol * 1000;
 
         if (woodShape === 'rectangular') {
@@ -319,6 +360,25 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
       }
     }
 
+    let vMidPartition = 0;
+    let vWooferPartition = 0;
+
+    if (valid && wInt > 0) {
+      const dVal = (woodShape === 'rectangular' ? dInt : (dTrapTopInt + dTrapBotInt) / 2);
+      if (crossoverWays === 3) {
+        vMidPartition = (wInt * dVal * thickness) / 1000;
+      }
+      if (driverConfig === 'dual_isolated') {
+        vWooferPartition = (wInt * dVal * thickness) / 1000;
+      }
+
+      // Re-adjust manual mode net volume to account for partitions
+      if (woodMode === 'input') {
+        const vBruto = (wInt * dVal * hInt) / 1000;
+        netVol = Math.max(0, vBruto - (extraVal + portVol + vMid + vMidPartition + vWooferPartition)) * dampingFactor;
+      }
+    }
+
     if (valid) {
       const pieces: WoodCutPiece[] = [];
       const uLabel = getUnitLabel('length', unitSystem);
@@ -344,6 +404,20 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
             name: t("Divisor Interno (Bafle de Montaje)"),
             qty: 1,
             dimensions: `${displayVal(hInt, 'length')} x ${displayVal(wInt, 'length')} ${uLabel}`
+          });
+        }
+        if (crossoverWays === 3) {
+          pieces.push({
+            name: t("Divisor Interno (Cámara de Medios)"),
+            qty: 1,
+            dimensions: `${displayVal(wInt, 'length')} x ${displayVal(dInt, 'length')} ${uLabel}`
+          });
+        }
+        if (driverConfig === 'dual_isolated') {
+          pieces.push({
+            name: t("Divisor Interno (Cámaras de Woofers)"),
+            qty: 1,
+            dimensions: `${displayVal(wInt, 'length')} x ${displayVal(dInt, 'length')} ${uLabel}`
           });
         }
       } else {
@@ -380,13 +454,28 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
             dimensions: `${displayVal(hInt, 'length')} x ${displayVal(wInt, 'length')} ${uLabel}`
           });
         }
+        const dAvgInt = (dTrapTopInt + dTrapBotInt) / 2;
+        if (crossoverWays === 3) {
+          pieces.push({
+            name: t("Divisor Interno (Cámara de Medios)"),
+            qty: 1,
+            dimensions: `${displayVal(wInt, 'length')} x ${displayVal(dAvgInt, 'length')} ${uLabel}`
+          });
+        }
+        if (driverConfig === 'dual_isolated') {
+          pieces.push({
+            name: t("Divisor Interno (Cámaras de Woofers)"),
+            qty: 1,
+            dimensions: `${displayVal(wInt, 'length')} x ${displayVal(dAvgInt, 'length')} ${uLabel}`
+          });
+        }
       }
 
       setCabinetData({
         valid: true,
         vNeto: netVol,
         vTotal: totalVol,
-        vExtra: (woodExtra || 0) + portVol,
+        vExtra: (woodExtra || 0) + portVol + vMid + vMidPartition + vWooferPartition,
         hInt, wInt, dInt,
         dTrapTopInt, dTrapBotInt,
         hExt, wExt, dExt,
@@ -401,7 +490,7 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
     lang, unitSystem, params, sealedData, portedData, bandpassData, dampingFactor, flaredEnds, woodMode, woodShape, woodConstraint, woodSource, woodRatio,
     woodLockVal1, woodLockVal2, woodLockVal3, woodExtHeight, woodExtWidth, woodExtDepth,
     woodTrapExtHeight, woodTrapExtWidth, woodTrapExtDepthTop, woodTrapExtDepthBot, woodThickness, woodExtra,
-    portCount, portDiameter, portShape, portWidth, portHeight, portArea
+    portCount, portDiameter, portShape, portWidth, portHeight, portArea, crossoverWays, driverConfig, midFs, midVas, midQts, midTargetQtc
   ]);
 
   // Port tuning details for woodworking tab
@@ -570,10 +659,17 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
           hoveredPieceIndex={hoveredPieceIndex}
           speakerYPct={speakerYPct}
           portYPct={portYPct}
+          portLocation={portLocation}
           bandpassOrder={bandpassData?.order}
           bandpassRatio={bandpassData && bandpassData.valid ? bandpassData.Vr / (bandpassData.Vf + bandpassData.Vr) : 0.5}
           bandpassVf={bandpassData?.Vf}
           bandpassVr={bandpassData?.Vr}
+          crossoverWays={crossoverWays}
+          driverConfig={driverConfig}
+          midFs={midFs}
+          midVas={midVas}
+          midQts={midQts}
+          midTargetQtc={midTargetQtc}
         />
 
         {/* Resultados de Ebanistería */}

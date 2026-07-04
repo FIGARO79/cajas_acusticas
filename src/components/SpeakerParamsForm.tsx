@@ -666,19 +666,20 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
             <option value="single">{t("Un Altavoz (Estándar)")}</option>
             <option value="parallel_2">{t("2 Altavoces en Paralelo (2x Vb)")}</option>
             <option value="series_2">{t("2 Altavoces en Serie (2x Vb)")}</option>
+            <option value="dual_isolated">{t("2 Woofers con Cámaras Aisladas (2x Vb)")}</option>
             <option value="isobaric">{t("Isobárica / Push-Pull (0.5x Vb)")}</option>
           </select>
         </div>
-
+ 
         {driverConfig !== 'single' && (
           <div className="alert-box info" style={{ padding: '0.6rem 0.8rem', fontSize: '0.8rem', marginBottom: '1rem', borderLeftColor: 'var(--primary)' }}>
             <span>
               <strong>{t("Configuración Equivalente:")}</strong>
               <ul style={{ margin: '0.3rem 0 0 1rem', padding: 0 }}>
                 <li>{t("Volumen equivalente (Vas_eq):")} <strong>{driverConfig === 'isobaric' ? (params.vas ? (params.vas / 2).toFixed(1) : 0) : (params.vas ? (params.vas * 2).toFixed(1) : 0)} L</strong></li>
-                <li>{t("Impedancia nominal equivalente:")} <strong>{driverConfig === 'parallel_2' ? (params.zNominal ? (params.zNominal / 2).toFixed(1) : 4) : driverConfig === 'series_2' ? (params.zNominal ? (params.zNominal * 2).toFixed(1) : 16) : (params.zNominal ?? 8)} Ω</strong></li>
+                <li>{t("Impedancia nominal equivalente:")} <strong>{driverConfig === 'parallel_2' || driverConfig === 'dual_isolated' ? (params.zNominal ? (params.zNominal / 2).toFixed(1) : 4) : driverConfig === 'series_2' ? (params.zNominal ? (params.zNominal * 2).toFixed(1) : 16) : (params.zNominal ?? 8)} Ω</strong></li>
                 <li>{t("Frecuencia de resonancia propia:")} <strong>{params.fs ?? 0} Hz</strong></li>
-                <li>{t("Sensibilidad resultante:")} <strong>{driverConfig === 'parallel_2' ? (params.sens ? (params.sens + 3).toFixed(1) : 92) : driverConfig === 'isobaric' ? (params.sens ? (params.sens - 3).toFixed(1) : 86) : (params.sens ?? 89)} dB (1W/1m)</strong></li>
+                <li>{t("Sensibilidad resultante:")} <strong>{driverConfig === 'parallel_2' || driverConfig === 'dual_isolated' ? (params.sens ? (params.sens + 3).toFixed(1) : 92) : driverConfig === 'isobaric' ? (params.sens ? (params.sens - 3).toFixed(1) : 86) : (params.sens ?? 89)} dB (1W/1m)</strong></li>
               </ul>
             </span>
           </div>

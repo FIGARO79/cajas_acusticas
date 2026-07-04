@@ -9,7 +9,7 @@ import { type Lang, translate } from './utils/translations';
 import { type UnitSystem, convertTo, getUnitLabel } from './utils/units';
 import type { SpeakerParams, CalculatedSealed, CalculatedPorted, CalculatedBandpass, CustomDriver } from './types';
 import { estimateF3 } from './utils/acousticMath';
-import { getWasm, initWasm } from './wasm/index.ts';
+import { getWasm, initWasm, isWasmReady } from './wasm/index.ts';
 import { generateReportHTML } from './utils/reportGenerator';
 
 function App() {
@@ -19,6 +19,7 @@ function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => (localStorage.getItem('theme') as 'dark' | 'light') || 'dark');
   const [activeTab, setActiveTab] = useState<'wood' | 'damping' | 'crossover'>('wood');
   const [boxType, setBoxType] = useState<'sealed' | 'ported' | 'bandpass'>('sealed');
+  const [wasmLoaded, setWasmLoaded] = useState<boolean>(false);
   const t = (text: string) => translate(text, lang);
 
   // Crossover State
@@ -36,6 +37,12 @@ function App() {
   const [enableLPad, setEnableLPad] = useState<boolean>(false);
   const [lpadAttenuation, setLpadAttenuation] = useState<number>(3);
   const [lpadZLoad, setLpadZLoad] = useState<number>(8);
+
+  // Midrange Parameters for 3-way chamber calculations
+  const [midFs, setMidFs] = useState<number>(120);
+  const [midVas, setMidVas] = useState<number>(5);
+  const [midQts, setMidQts] = useState<number>(0.45);
+  const [midTargetQtc, setMidTargetQtc] = useState<number>(0.707);
 
   // Bandpass State
   const [bandpassOrder, setBandpassOrder] = useState<4 | 6>(4);
@@ -143,6 +150,7 @@ function App() {
 
   const [speakerYPct, setSpeakerYPct] = useState<number>(50);
   const [portYPct, setPortYPct] = useState<number>(85);
+  const [portLocation, setPortLocation] = useState<'front' | 'rear'>('front');
 
   // Shared state for technical report exporting
   const cabinetRef = useRef<any>(null);
@@ -176,7 +184,9 @@ function App() {
 
   // Initialize WASM module on component mount
   useEffect(() => {
-    initWasm().catch(err => console.error('WASM init error:', err));
+    initWasm()
+      .then(() => setWasmLoaded(true))
+      .catch(err => console.error('WASM init error:', err));
   }, []);
 
   const toggleTheme = () => {
@@ -185,6 +195,7 @@ function App() {
 
   const handlePresetChange = (presetId: string, newParams: SpeakerParams | null) => {
     setPreset(presetId);
+    setCustomPorted(false); // Reset to optimal tuning when preset changes
     if (newParams) {
       // Compute Qts automatically if Qms and Qes are provided but Qts is missing
       const updatedParams: SpeakerParams = { ...newParams };
@@ -222,6 +233,8 @@ function App() {
       adj.vas = params.vas * 2;
     } else if (driverConfig === 'isobaric') {
       adj.vas = params.vas * 0.5;
+    } else if (driverConfig === 'dual_isolated') {
+      adj.vas = params.vas * 2;
     }
     return adj;
   };
@@ -347,44 +360,49 @@ function App() {
 
   // --- CALCULAR CAJA SELLADA ---
   const calculateSealed = (): CalculatedSealed => {
-    if (validationError || !adjParams.fs || !adjParams.vas || !adjParams.qts) {
+    if (validationError || !adjParams.fs || !adjParams.vas || !adjParams.qts || !isWasmReady()) {
       return { valid: false, Vb: 0, Fc: 0, Qtc: targetQtc, F3: 0 };
     }
 
-    const wasm = getWasm();
+    try {
+      const wasm = getWasm();
 
-    if (woodMode === 'input' && manualNetVol > 0) {
-      let sealedVb = manualNetVol * dampingFactor;
-      let alpha = adjParams.vas / sealedVb;
-      let sealedQtc = adjParams.qts * Math.sqrt(alpha + 1);
-      
-      // We calculate Fc and F3 correctly using Wasm by passing the resulting vb
-      const result = wasm.calc_caja_sellada(adjParams.fs, adjParams.vas, adjParams.qts, sealedVb, targetQtc);
-      return {
-        valid: true,
-        Vb: sealedVb,
-        Fc: result.fc,
-        Qtc: sealedQtc,
-        F3: result.f3
-      };
-    } else {
-      if (adjParams.qts >= targetQtc) {
-        return { valid: false, Vb: 0, Fc: 0, Qtc: targetQtc, F3: 0 };
+      if (woodMode === 'input' && manualNetVol > 0) {
+        let sealedVb = manualNetVol * dampingFactor;
+        let alpha = adjParams.vas / sealedVb;
+        let sealedQtc = adjParams.qts * Math.sqrt(alpha + 1);
+        
+        // We calculate Fc and F3 correctly using Wasm by passing the resulting vb
+        const result = wasm.calc_caja_sellada(adjParams.fs, adjParams.vas, adjParams.qts, sealedVb, targetQtc);
+        return {
+          valid: true,
+          Vb: sealedVb,
+          Fc: result.fc,
+          Qtc: sealedQtc,
+          F3: result.f3
+        };
+      } else {
+        if (adjParams.qts >= targetQtc) {
+          return { valid: false, Vb: 0, Fc: 0, Qtc: targetQtc, F3: 0 };
+        }
+        
+        // To get optimal vb from Qtc, we can pass a dummy vb_target and read vb_optimo
+        const tempResult = wasm.calc_caja_sellada(adjParams.fs, adjParams.vas, adjParams.qts, 10.0, targetQtc);
+        let optimalVb = tempResult.vb_optimo;
+        
+        const result = wasm.calc_caja_sellada(adjParams.fs, adjParams.vas, adjParams.qts, optimalVb, targetQtc);
+
+        return {
+          valid: true,
+          Vb: optimalVb,
+          Fc: result.fc,
+          Qtc: result.qtc,
+          F3: result.f3
+        };
       }
-      
-      // To get optimal vb from Qtc, we can pass a dummy vb_target and read vb_optimo
-      const tempResult = wasm.calc_caja_sellada(adjParams.fs, adjParams.vas, adjParams.qts, 10.0, targetQtc);
-      let optimalVb = tempResult.vb_optimo;
-      
-      const result = wasm.calc_caja_sellada(adjParams.fs, adjParams.vas, adjParams.qts, optimalVb, targetQtc);
-
-      return {
-        valid: true,
-        Vb: optimalVb,
-        Fc: result.fc,
-        Qtc: result.qtc,
-        F3: result.f3
-      };
+    } catch (e) {
+      console.warn("Sealed calculation error:", e);
+      return { valid: false, Vb: 0, Fc: 0, Qtc: targetQtc, F3: 0 };
     }
   };
 
@@ -392,84 +410,87 @@ function App() {
 
   // --- CALCULAR CAJA VENTILADA ---
   const calculatePorted = (): CalculatedPorted => {
-    if (validationError || !adjParams.fs || !adjParams.vas || !adjParams.qts) {
+    if (validationError || !adjParams.fs || !adjParams.vas || !adjParams.qts || !isWasmReady()) {
       return { valid: false, Vb: 0, Fb: 0, F3: 0, Fs: adjParams.fs || 0, Qts: adjParams.qts || 0, Vas: adjParams.vas || 0, alignment: '' };
     }
 
-    let VbPorted = 0;
-    let FbPorted = 0;
-    let F3Ported = 0;
-    let alignmentActive = '';
+    try {
+      const wasm = getWasm();
+      let VbPorted = 0;
+      let FbPorted = 0;
+      let F3Ported = 0;
+      let alignmentActive = '';
 
-    const wasm = getWasm();
-
-    if (woodMode === 'input' && manualNetVol > 0) {
-      VbPorted = manualNetVol * dampingFactor;
-      FbPorted = customFb;
-      F3Ported = estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas);
-      alignmentActive = 'Manual';
-    } else {
-      if (customPorted) {
-        VbPorted = customVb;
+      if (woodMode === 'input' && manualNetVol > 0) {
+        VbPorted = manualNetVol * dampingFactor;
         FbPorted = customFb;
         F3Ported = estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas);
         alignmentActive = 'Manual';
       } else {
-        const result = wasm.calc_alineacion_ventilada(adjParams.fs, adjParams.vas, adjParams.qts, "QB3");
-        VbPorted = result.vb;
-        FbPorted = result.fb;
-        F3Ported = result.f3;
-        alignmentActive = 'Óptima (QB3 Wasm)';
-      }
-    }
-
-    if (useCustomPortLength && Number(customPortLength) > 0) {
-      let pDia = 0;
-      if (portShape === 'round') {
-        pDia = Number(portDiameter) || 0;
-      } else if (portShape === 'custom') {
-        pDia = 2 * Math.sqrt((Number(portArea) || 0) / Math.PI);
-      } else {
-        const w = Number(portWidth) || 0;
-        const h = Number(portHeight) || 0;
-        pDia = 2 * Math.sqrt((w * h) / Math.PI);
-      }
-      const pCount = Number(portCount) || 1;
-      if (pDia > 0 && VbPorted > 0) {
-        const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
-        const Lv_cm = Number(customPortLength);
-        const fbCalc = Math.sqrt((23562.5 * Math.pow(pDia, 2) * pCount) / (VbPorted * (Lv_cm + kCorrection * pDia)));
-        if (fbCalc > 0 && !isNaN(fbCalc) && isFinite(fbCalc)) {
-          FbPorted = fbCalc;
+        if (customPorted) {
+          VbPorted = customVb;
+          FbPorted = customFb;
           F3Ported = estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas);
-          alignmentActive = `${t("Personalizada")} (L: ${Lv_cm.toFixed(1)} cm)`;
+          alignmentActive = 'Manual';
+        } else {
+          const result = wasm.calc_alineacion_ventilada(adjParams.fs, adjParams.vas, adjParams.qts, "QB3");
+          VbPorted = result.vb;
+          FbPorted = result.fb;
+          F3Ported = result.f3;
+          alignmentActive = 'Óptima (QB3 Wasm)';
         }
       }
-    }
 
-    return {
-      valid: true,
-      Vb: VbPorted,
-      Fb: FbPorted,
-      F3: F3Ported,
-      Fs: adjParams.fs,
-      Qts: adjParams.qts,
-      Vas: adjParams.vas,
-      alignment: alignmentActive
-    };
+      if (useCustomPortLength && Number(customPortLength) > 0) {
+        let pDia = 0;
+        if (portShape === 'round') {
+          pDia = Number(portDiameter) || 0;
+        } else if (portShape === 'custom') {
+          pDia = 2 * Math.sqrt((Number(portArea) || 0) / Math.PI);
+        } else {
+          const w = Number(portWidth) || 0;
+          const h = Number(portHeight) || 0;
+          pDia = 2 * Math.sqrt((w * h) / Math.PI);
+        }
+        const pCount = Number(portCount) || 1;
+        if (pDia > 0 && VbPorted > 0) {
+          const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
+          const Lv_cm = Number(customPortLength);
+          const fbCalc = Math.sqrt((23562.5 * Math.pow(pDia, 2) * pCount) / (VbPorted * (Lv_cm + kCorrection * pDia)));
+          if (fbCalc > 0 && !isNaN(fbCalc) && isFinite(fbCalc)) {
+            FbPorted = fbCalc;
+            F3Ported = estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas);
+            alignmentActive = `${t("Personalizada")} (L: ${Lv_cm.toFixed(1)} cm)`;
+          }
+        }
+      }
+
+      return {
+        valid: true,
+        Vb: VbPorted,
+        Fb: FbPorted,
+        F3: F3Ported,
+        Fs: adjParams.fs,
+        Qts: adjParams.qts,
+        Vas: adjParams.vas,
+        alignment: alignmentActive
+      };
+    } catch (e) {
+      console.warn("Ported calculation error:", e);
+      return { valid: false, Vb: 0, Fb: 0, F3: 0, Fs: adjParams.fs || 0, Qts: adjParams.qts || 0, Vas: adjParams.vas || 0, alignment: '' };
+    }
   };
 
   const portedData = calculatePorted();
 
   // --- CALCULAR CAJA PASO BANDA (BANDPASS) ---
   const calculateBandpass = (): CalculatedBandpass => {
-    if (validationError || !adjParams.fs || !adjParams.vas || !adjParams.qts) {
+    if (validationError || !adjParams.fs || !adjParams.vas || !adjParams.qts || !isWasmReady()) {
       return { valid: false, order: bandpassOrder, Vf: 0, Vr: 0, Fb: 0, F0: 0, delta_f: 0, Fl: 0, Fh: 0 };
     }
 
-    const wasm = getWasm();
-
     try {
+      const wasm = getWasm();
       if (bandpassOrder === 4) {
         const res = wasm.calc_bandpass_4(adjParams.fs, adjParams.vas, adjParams.qts, bandpassS);
         return {
@@ -513,7 +534,12 @@ function App() {
       return `${displayLv.toFixed(1)} ${unitLabel} (${t("Personalizada")})`;
     }
     const pCount = Number(portCount) || 0;
-    if (pCount > 0 && portedData.Vb > 0) {
+    
+    // Choose active Vb and Fb depending on boxType
+    const activeVb = boxType === 'bandpass' ? bandpassData.Vf : portedData.Vb;
+    const activeFb = boxType === 'bandpass' ? (bandpassData.Fb > 0 ? bandpassData.Fb : customFb) : portedData.Fb;
+
+    if (pCount > 0 && activeVb > 0 && activeFb > 0) {
       let pDia = 0;
       if (portShape === 'round') {
         pDia = Number(portDiameter) || 0;
@@ -527,7 +553,7 @@ function App() {
 
       if (pDia > 0) {
         const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
-        const Lv = ((23562.5 * Math.pow(pDia, 2) * pCount) / (portedData.Fb * portedData.Fb * portedData.Vb)) - (kCorrection * pDia);
+        const Lv = ((23562.5 * Math.pow(pDia, 2) * pCount) / (activeFb * activeFb * activeVb)) - (kCorrection * pDia);
         
         const displayLv = convertTo(Lv, 'length', unitSystem);
         const unitLabel = getUnitLabel('length', unitSystem);
@@ -583,7 +609,7 @@ function App() {
       setCustomVb(Math.round(portedData.Vb * 10) / 10);
       setCustomFb(Math.round(portedData.Fb * 10) / 10);
     }
-  }, [preset, customPorted, portedData.valid]);
+  }, [preset, customPorted, portedData.valid, portedData.Vb, portedData.Fb, wasmLoaded]);
 
   const handleExportReport = () => {
     console.log("handleExportReport: triggered");
@@ -812,7 +838,6 @@ function App() {
           // Damping props
           dampingType={dampingType}
           setDampingType={setDampingType}
-
           // Crossover props
           crossoverWays={crossoverWays}
           setCrossoverWays={setCrossoverWays}
@@ -846,8 +871,18 @@ function App() {
           setSpeakerYPct={setSpeakerYPct}
           portYPct={portYPct}
           setPortYPct={setPortYPct}
+          portLocation={portLocation}
+          setPortLocation={setPortLocation}
+          midFs={midFs}
+          setMidFs={setMidFs}
+          midVas={midVas}
+          setMidVas={setMidVas}
+          midQts={midQts}
+          setMidQts={setMidQts}
+          midTargetQtc={midTargetQtc}
+          setMidTargetQtc={setMidTargetQtc}
         />
-
+ 
         {/* CONTENIDOS DERECHA */}
         <main className="dashboard-main">
           {/* Gráfico */}
@@ -864,7 +899,7 @@ function App() {
             fcLow={fcLow}
             fcHigh={fcHigh}
           />
-
+ 
           {/* Grilla de Resultados y Diagramas en Paralelo */}
           <div className="results-diagrams-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '0px', marginTop: '0px' }}>
             {/* Panel Izquierdo: Cajón y Plano Técnico */}
@@ -921,6 +956,13 @@ function App() {
                 readOnly={true}
                 speakerYPct={speakerYPct}
                 portYPct={portYPct}
+                portLocation={portLocation}
+                crossoverWays={crossoverWays}
+                driverConfig={driverConfig}
+                midFs={midFs}
+                midVas={midVas}
+                midQts={midQts}
+                midTargetQtc={midTargetQtc}
               />
             </div>
 

@@ -16,6 +16,10 @@ export function getWasm() {
   return wasmInstance;
 }
 
+export function isWasmReady(): boolean {
+  return wasmInstance !== null;
+}
+
 // -----------------------
 // New wrappers for Rust functions
 // -----------------------
