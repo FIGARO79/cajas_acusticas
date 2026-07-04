@@ -50,10 +50,12 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
         background: 'var(--card-bg)',
         border: '1px solid var(--card-border)',
         borderRadius: '12px',
-        padding: '2rem',
+        padding: '3rem 2rem',
         textAlign: 'center',
         color: 'var(--text-muted)',
-        fontSize: '0.85rem'
+        fontSize: '0.9rem',
+        backdropFilter: 'blur(16px)',
+        boxShadow: '0 4px 30px rgba(0, 0, 0, 0.2)'
       }}>
         {t("Ingresa dimensiones válidas para visualizar el plano técnico.")}
       </div>
@@ -437,17 +439,16 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
   return (
     <div style={{
       background: 'var(--card-bg)',
-      border: '1px solid var(--card-border)',
       borderRadius: '12px',
-      padding: '0.75rem',
+      padding: '1.5rem',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      marginTop: '1rem',
       width: '100%',
-      boxSizing: 'border-box'
+      boxSizing: 'border-box',
+      backdropFilter: 'blur(16px)'
     }}>
-      <span className="control-title" style={{ alignSelf: 'flex-start', fontSize: '12px', color: 'var(--text-main)', marginBottom: '0.5rem', fontWeight: 'normal' }}>
+      <span className="control-title" style={{ alignSelf: 'flex-start', fontSize: '1rem', color: 'var(--text-main)', marginBottom: '1.25rem', fontWeight: 600 }}>
         {t("Plano de Fabricación de la Cabina")}
       </span>
 
