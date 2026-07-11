@@ -302,7 +302,16 @@ export const TRANSLATIONS: Record<Exclude<Lang, 'es'>, Record<string, string>> =
     "Sistema de Unidades": "Unit System",
     "Imperial": "Imperial",
     "Restablecer Configuración": "Reset Configuration",
-    "¿Restablecer toda la configuración a los valores predeterminados?": "Reset all configuration to default values?"
+    "¿Restablecer toda la configuración a los valores predeterminados?": "Reset all configuration to default values?",
+    "2 Woofers con Cámaras Aisladas (2x Vb)": "2 Woofers with Isolated Chambers (2x Vb)",
+    "Divisor Interno (Cámara de Medios)": "Internal Divider (Midrange Chamber)",
+    "Divisor Interno (Cámaras de Woofers)": "Internal Divider (Woofer Chambers)",
+    "Parámetros del Rango Medio": "Midrange Parameters",
+    "Medios": "Midrange",
+    "Cámara Medios": "Midrange Chamber",
+    "Tabique Woofer": "Woofer Partition",
+    "Ubicación del Puerto": "Port Location",
+    "Restablecer Óptima": "Reset to Optimal"
   },
   pt: {
     "Completa los parámetros mínimos del altavoz (Fs, Vas, Qts).": "Insira os parâmetros mínimos do alto-falante (Fs, Vas, Qts).",
