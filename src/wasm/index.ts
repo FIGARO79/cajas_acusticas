@@ -120,7 +120,7 @@ export async function calcSealedCurve(sealed: CalculatedSealed, params: SpeakerP
     sealed.valid
   );
   const arr: number[] = [];
-  res.forEach((v: any) => arr.push(v as number));
+  res.forEach((v: number) => arr.push(v));
   return arr;
 }
 
@@ -136,7 +136,7 @@ export async function calcPortedCurve(ported: CalculatedPorted, params: SpeakerP
     ported.valid
   );
   const arr: number[] = [];
-  res.forEach((v: any) => arr.push(v as number));
+  res.forEach((v: number) => arr.push(v));
   return arr;
 }
 
@@ -167,7 +167,7 @@ export async function calcBandpass4Curve(vf: number, vr: number, fb: number, par
     vf > 0 && vr > 0 && fb > 0
   );
   const arr: number[] = [];
-  res.forEach((v: any) => arr.push(v as number));
+  res.forEach((v: number) => arr.push(v));
   return arr;
 }
 
@@ -185,7 +185,7 @@ export async function calcBandpass6Curve(vf: number, vr: number, fl: number, fh:
     vf > 0 && vr > 0 && fl > 0 && fh > 0
   );
   const arr: number[] = [];
-  res.forEach((v: any) => arr.push(v as number));
+  res.forEach((v: number) => arr.push(v));
   return arr;
 }
 

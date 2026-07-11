@@ -7,7 +7,7 @@ import { CabinetTab } from './components/CabinetTab';
 import { CrossoverTab } from './components/CrossoverTab';
 import { type Lang, translate } from './utils/translations';
 import { type UnitSystem, convertTo, getUnitLabel } from './utils/units';
-import type { SpeakerParams, CalculatedSealed, CalculatedPorted, CalculatedBandpass, CustomDriver } from './types';
+import type { SpeakerParams, CalculatedSealed, CalculatedPorted, CalculatedBandpass, CustomDriver, WoodCabinetData, CrossoverExportData } from './types';
 import { estimateF3 } from './utils/acousticMath';
 import { getWasm, initWasm } from './wasm/index.ts';
 import { generateReportHTML } from './utils/reportGenerator';
@@ -84,8 +84,8 @@ function App() {
 
   // Sliders and tuning overrides
   const [targetQtc, setTargetQtc] = useState<number>(0.707);
-  const [customVb, setCustomVb] = useState<number>(45);
-  const [customFb, setCustomFb] = useState<number>(38);
+  const [customVbState, setCustomVbState] = useState<number | null>(null);
+  const [customFbState, setCustomFbState] = useState<number | null>(null);
   const [customPorted, setCustomPorted] = useState<boolean>(false);
 
   // Ports configuration
@@ -145,17 +145,16 @@ function App() {
   const [portYPct, setPortYPct] = useState<number>(85);
 
   // Shared state for technical report exporting
-  const cabinetRef = useRef<any>(null);
-  const handleCabinetDataChange = useCallback((data: any) => {
+  const cabinetRef = useRef<WoodCabinetData | null>(null);
+  const handleCabinetDataChange = useCallback((data: WoodCabinetData) => {
     cabinetRef.current = data;
   }, []);
-  const crossoverRef = useRef<(() => any) | null>(null);
-  const handleRegisterCrossover = useCallback((exp: () => any) => {
+  const crossoverRef = useRef<(() => CrossoverExportData) | null>(null);
+  const handleRegisterCrossover = useCallback((exp: () => CrossoverExportData) => {
     crossoverRef.current = exp;
   }, []);
 
-  // Validation
-  const [validationError, setValidationError] = useState<string | null>(null);
+
 
   // Sync theme to document element
   useEffect(() => {
@@ -185,6 +184,9 @@ function App() {
 
   const handlePresetChange = (presetId: string, newParams: SpeakerParams | null) => {
     setPreset(presetId);
+    setCustomVbState(null);
+    setCustomFbState(null);
+    setCustomPorted(false);
     if (newParams) {
       // Compute Qts automatically if Qms and Qes are provided but Qts is missing
       const updatedParams: SpeakerParams = { ...newParams };
@@ -229,14 +231,9 @@ function App() {
   const adjParams = getAdjustedParams();
 
   // Validate parameters
-  useEffect(() => {
-    const t = (text: string) => translate(text, lang);
-    if (!params.fs || !params.vas || !params.qts) {
-      setValidationError(t("Completa los parámetros mínimos del altavoz (Fs, Vas, Qts)."));
-    } else {
-      setValidationError(null);
-    }
-  }, [params, lang]);
+  const validationError = (!params.fs || !params.vas || !params.qts)
+    ? translate("Completa los parámetros mínimos del altavoz (Fs, Vas, Qts).", lang)
+    : null;
 
 
 
@@ -289,17 +286,12 @@ function App() {
     const pCount = Number(portCount) || 0;
     let portVol = 0;
     if (pCount > 0 && boxType === 'ported' && targetFb > 0) {
-      let pDia = 0;
-      let isRect = portShape === 'rectangular';
-      if (portShape === 'round') {
-        pDia = Number(portDiameter) || 0;
-      } else if (portShape === 'custom') {
-        pDia = 2 * Math.sqrt((Number(portArea) || 0) / Math.PI);
-      } else {
-        const w = Number(portWidth) || 0;
-        const h = Number(portHeight) || 0;
-        pDia = 2 * Math.sqrt((w * h) / Math.PI);
-      }
+      const isRect = portShape === 'rectangular';
+      const pDia = portShape === 'round'
+        ? (Number(portDiameter) || 0)
+        : portShape === 'custom'
+          ? (2 * Math.sqrt((Number(portArea) || 0) / Math.PI))
+          : (2 * Math.sqrt(((Number(portWidth) || 0) * (Number(portHeight) || 0)) / Math.PI));
 
       if (pDia > 0) {
         if (useCustomPortLength && Number(customPortLength) > 0) {
@@ -354,9 +346,9 @@ function App() {
     const wasm = getWasm();
 
     if (woodMode === 'input' && manualNetVol > 0) {
-      let sealedVb = manualNetVol * dampingFactor;
-      let alpha = adjParams.vas / sealedVb;
-      let sealedQtc = adjParams.qts * Math.sqrt(alpha + 1);
+      const sealedVb = manualNetVol * dampingFactor;
+      const alpha = adjParams.vas / sealedVb;
+      const sealedQtc = adjParams.qts * Math.sqrt(alpha + 1);
       
       // We calculate Fc and F3 correctly using Wasm by passing the resulting vb
       const result = wasm.calc_caja_sellada(adjParams.fs, adjParams.vas, adjParams.qts, sealedVb, targetQtc);
@@ -374,7 +366,7 @@ function App() {
       
       // To get optimal vb from Qtc, we can pass a dummy vb_target and read vb_optimo
       const tempResult = wasm.calc_caja_sellada(adjParams.fs, adjParams.vas, adjParams.qts, 10.0, targetQtc);
-      let optimalVb = tempResult.vb_optimo;
+      const optimalVb = tempResult.vb_optimo;
       
       const result = wasm.calc_caja_sellada(adjParams.fs, adjParams.vas, adjParams.qts, optimalVb, targetQtc);
 
@@ -396,10 +388,10 @@ function App() {
       return { valid: false, Vb: 0, Fb: 0, F3: 0, Fs: adjParams.fs || 0, Qts: adjParams.qts || 0, Vas: adjParams.vas || 0, alignment: '' };
     }
 
-    let VbPorted = 0;
-    let FbPorted = 0;
-    let F3Ported = 0;
-    let alignmentActive = '';
+    let VbPorted: number;
+    let FbPorted: number;
+    let F3Ported: number;
+    let alignmentActive: string;
 
     const wasm = getWasm();
 
@@ -424,16 +416,11 @@ function App() {
     }
 
     if (useCustomPortLength && Number(customPortLength) > 0) {
-      let pDia = 0;
-      if (portShape === 'round') {
-        pDia = Number(portDiameter) || 0;
-      } else if (portShape === 'custom') {
-        pDia = 2 * Math.sqrt((Number(portArea) || 0) / Math.PI);
-      } else {
-        const w = Number(portWidth) || 0;
-        const h = Number(portHeight) || 0;
-        pDia = 2 * Math.sqrt((w * h) / Math.PI);
-      }
+      const pDia = portShape === 'round'
+        ? (Number(portDiameter) || 0)
+        : portShape === 'custom'
+          ? (2 * Math.sqrt((Number(portArea) || 0) / Math.PI))
+          : (2 * Math.sqrt(((Number(portWidth) || 0) * (Number(portHeight) || 0)) / Math.PI));
       const pCount = Number(portCount) || 1;
       if (pDia > 0 && VbPorted > 0) {
         const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
@@ -460,6 +447,26 @@ function App() {
   };
 
   const portedData = calculatePorted();
+
+  const customVb = customPorted ? (customVbState ?? Math.round((portedData.Vb || 45) * 10) / 10) : Math.round((portedData.Vb || 45) * 10) / 10;
+  const customFb = customPorted ? (customFbState ?? Math.round((portedData.Fb || 38) * 10) / 10) : Math.round((portedData.Fb || 38) * 10) / 10;
+
+  const optimalVb = portedData.Vb;
+  const optimalFb = portedData.Fb;
+
+  const setCustomVb = (val: number | ((prev: number) => number)) => {
+    setCustomVbState(prev => {
+      const current = prev ?? Math.round((optimalVb || 45) * 10) / 10;
+      return typeof val === 'function' ? val(current) : val;
+    });
+  };
+
+  const setCustomFb = (val: number | ((prev: number) => number)) => {
+    setCustomFbState(prev => {
+      const current = prev ?? Math.round((optimalFb || 38) * 10) / 10;
+      return typeof val === 'function' ? val(current) : val;
+    });
+  };
 
   // --- CALCULAR CAJA PASO BANDA (BANDPASS) ---
   const calculateBandpass = (): CalculatedBandpass => {
@@ -514,16 +521,11 @@ function App() {
     }
     const pCount = Number(portCount) || 0;
     if (pCount > 0 && portedData.Vb > 0) {
-      let pDia = 0;
-      if (portShape === 'round') {
-        pDia = Number(portDiameter) || 0;
-      } else if (portShape === 'custom') {
-        pDia = 2 * Math.sqrt((Number(portArea) || 0) / Math.PI);
-      } else {
-        const w = Number(portWidth) || 0;
-        const h = Number(portHeight) || 0;
-        pDia = 2 * Math.sqrt((w * h) / Math.PI);
-      }
+      const pDia = portShape === 'round'
+        ? (Number(portDiameter) || 0)
+        : portShape === 'custom'
+          ? (2 * Math.sqrt((Number(portArea) || 0) / Math.PI))
+          : (2 * Math.sqrt(((Number(portWidth) || 0) * (Number(portHeight) || 0)) / Math.PI));
 
       if (pDia > 0) {
         const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
@@ -577,19 +579,19 @@ function App() {
   const { prFbNatural, prMasaAnadidaG } = getRadiadorPasivoCalculations();
 
 
-  // Auto update slider values when preset changes
-  useEffect(() => {
-    if (!customPorted && portedData.valid) {
-      setCustomVb(Math.round(portedData.Vb * 10) / 10);
-      setCustomFb(Math.round(portedData.Fb * 10) / 10);
+  const handleCustomPortedChange = useCallback((val: boolean) => {
+    setCustomPorted(val);
+    if (!val) {
+      setCustomVbState(null);
+      setCustomFbState(null);
     }
-  }, [preset, customPorted, portedData.valid]);
+  }, []);
 
   const handleExportReport = () => {
     console.log("handleExportReport: triggered");
     try {
       // Recopilar datos del crossover si está registrado
-      let xoverData: any = {};
+      let xoverData: CrossoverExportData | null = null;
       if (crossoverRef.current) {
         xoverData = crossoverRef.current();
       }
@@ -599,17 +601,11 @@ function App() {
       let vp: number | null = null;
       const pCount = Number(portCount) || 0;
       if (pCount > 0 && portedData.valid && portedData.Vb > 0) {
-        let pDia = 0;
-        if (portShape === 'round') {
-          pDia = Number(portDiameter) || 0;
-        } else if (portShape === 'custom') {
-          const a = portArea || 0;
-          pDia = 2 * Math.sqrt(a / Math.PI);
-        } else {
-          const w = portWidth || 0;
-          const h = portHeight || 0;
-          pDia = 2 * Math.sqrt((w * h) / Math.PI);
-        }
+        const pDia = portShape === 'round'
+          ? (Number(portDiameter) || 0)
+          : portShape === 'custom'
+            ? (2 * Math.sqrt((portArea || 0) / Math.PI))
+            : (2 * Math.sqrt(((portWidth || 0) * (portHeight || 0)) / Math.PI));
         
         if (pDia > 0) {
           const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
@@ -678,9 +674,10 @@ function App() {
       } else {
         alert(t("El navegador bloqueó la ventana emergente. Por favor, permite las ventanas emergentes para este sitio web para descargar el PDF."));
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("handleExportReport: error", e);
-      alert(t("Ocurrió un error al generar el reporte: ") + e.message);
+      const errMsg = e instanceof Error ? e.message : String(e);
+      alert(t("Ocurrió un error al generar el reporte: ") + errMsg);
     }
   };
 
@@ -723,7 +720,7 @@ function App() {
           customFb={customFb}
           setCustomFb={setCustomFb}
           customPorted={customPorted}
-          setCustomPorted={setCustomPorted}
+          setCustomPorted={handleCustomPortedChange}
           params={adjParams}
           portedData={portedData}
           sealedData={sealedData}

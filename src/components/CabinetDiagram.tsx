@@ -207,8 +207,8 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
   const portY = portYCenter - pHeightScale / 2;
 
   // --- VISTA LATERAL (SECCIÓN CORTE) ---
-  let extPath = '';
-  let intPath = '';
+  let extPath: string;
+  let intPath: string;
 
   if (shape === 'rectangular') {
     const x0 = offsetXSide;

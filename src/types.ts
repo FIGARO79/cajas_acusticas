@@ -90,3 +90,98 @@ export interface CustomDriver {
   isCustom: boolean;
 }
 
+export interface PortSuggestionOption {
+  numPorts: number;
+  diameter: number;
+  length: number;
+  isCustom: boolean;
+}
+
+export type PortSuggestions = {
+  valid: false;
+  reason: string;
+} | {
+  valid: true;
+  dMin: number;
+  options: PortSuggestionOption[];
+};
+
+export interface FilterComponents2Way {
+  c1: number | null;
+  l1: number | null;
+  c2?: number;
+  l2?: number;
+}
+
+export interface FilterComponents3WayBP {
+  c_hp?: number | null;
+  l_hp?: number | null;
+  l_lp?: number | null;
+  c_lp?: number | null;
+  c1_hp?: number;
+  c2_hp?: number;
+  l1_hp?: number;
+  l2_hp?: number;
+  c1_lp?: number;
+  c2_lp?: number;
+  l1_lp?: number;
+  l2_lp?: number;
+}
+
+export type CrossoverResult = {
+  ways: '2way';
+  type: string;
+  hp: FilterComponents2Way;
+  lp: FilterComponents2Way;
+} | {
+  ways: '3way';
+  type: string;
+  hp: FilterComponents2Way;
+  bp: FilterComponents3WayBP;
+  lp: FilterComponents2Way;
+};
+
+export interface CrossoverExportData {
+  crossoverWays: '2way' | '3way';
+  crossoverType: string;
+  fc: number;
+  fcLow: number;
+  fcHigh: number;
+  zTweeter: number;
+  zMidrange: number;
+  zWoofer: number;
+  enableZobel: boolean;
+  re: number;
+  le: number;
+  enableLPad: boolean;
+  attenuation: number;
+  zLoad: number;
+  xoverResults: CrossoverResult | null;
+  zobelResults: { rz: number; cz: number } | null;
+  lpadResults: { r1: number; r2: number } | null;
+}
+
+export interface DatabaseWoofer {
+  ID?: number;
+  Model?: string;
+  "Company ID": number;
+  Vas?: number;
+  Sd?: number;
+  Xlin?: number;
+  Le?: number;
+  Mms?: number;
+  Cms?: number;
+  Xmech?: number;
+  "Dimen A1"?: number;
+  "P-Vd"?: number;
+  Fs?: number;
+  Qms?: number;
+  Qes?: number;
+  Qts?: number;
+  Re?: number;
+  Pe?: number;
+  _isCustom?: boolean;
+  _customBrand?: string;
+}
+
+

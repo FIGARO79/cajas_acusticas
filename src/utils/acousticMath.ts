@@ -1,4 +1,4 @@
-import type { SpeakerParams, CalculatedSealed, CalculatedPorted } from '../types';
+import type { SpeakerParams, CalculatedSealed, CalculatedPorted, PortSuggestions } from '../types';
 
 export const QL_LOSSES = 7.0;
 
@@ -142,7 +142,7 @@ export function estimateF3(fs: number, qts: number, Vb: number, Fb: number, vas:
   return (low + high) / 2;
 }
 
-export function suggestPortConfig(Vb: number, Fb: number, params: SpeakerParams, flaredEnds: 0 | 1 | 2 = 0, minLength = 0) {
+export function suggestPortConfig(Vb: number, Fb: number, params: SpeakerParams, flaredEnds: 0 | 1 | 2 = 0, minLength = 0): PortSuggestions {
   if (!params.sd || !params.xmax) {
     return { valid: false, reason: "Ingresa el área del cono (Sd) y excursión (Xmax) en la barra lateral para recibir sugerencias de puertos sin ruido de viento." };
   }

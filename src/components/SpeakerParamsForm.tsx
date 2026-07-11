@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { SpeakerParams, CustomDriver } from '../types';
+import type { SpeakerParams, CustomDriver, DatabaseWoofer } from '../types';
 import { type Lang, translate } from '../utils/translations';
 import { calcAutoParams } from '../wasm/index.ts';
 import { type UnitSystem, convertTo, convertFrom, getUnitLabel } from '../utils/units';
@@ -44,7 +44,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
   const [proMode, setProMode] = useState(false);
 
   // Lógica de base de datos de altavoces
-  const [driversDb, setDriversDb] = useState<{ companies: Record<number, string>; woofers: any[] } | null>(null);
+  const [driversDb, setDriversDb] = useState<{ companies: Record<number, string>; woofers: DatabaseWoofer[] } | null>(null);
   const [loadingDb, setLoadingDb] = useState(false);
   const [selectedBrand, setSelectedBrand] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -59,7 +59,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
     
     // Añadir marcas oficiales
     if (driversDb) {
-      driversDb.woofers.forEach((w: any) => {
+      driversDb.woofers.forEach((w: DatabaseWoofer) => {
         const brand = driversDb.companies[w["Company ID"]];
         if (brand) brandsSet.add(brand);
       });
@@ -84,13 +84,13 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
         
         const companiesMap: Record<number, string> = {};
         if (data.companies) {
-          data.companies.forEach((c: any) => {
+          data.companies.forEach((c: { ID: number; Company: string }) => {
             companiesMap[c.ID] = c.Company;
           });
         }
         
-        const validWoofers = (data.woofers || []).filter((w: any) => 
-          w.Model && w.Model.trim() && w.Fs > 0 && w.Vas > 0 && w.Qts > 0
+        const validWoofers = (data.woofers || []).filter((w: DatabaseWoofer) => 
+          w.Model && w.Model.trim() && w.Fs && w.Fs > 0 && w.Vas && w.Vas > 0 && w.Qts && w.Qts > 0
         );
         
         setDriversDb({
@@ -213,7 +213,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
   };
 
   // Mapear campos de la base de datos a SpeakerParams
-  const mapDriverToSpeakerParams = (driver: any): SpeakerParams => {
+  const mapDriverToSpeakerParams = (driver: DatabaseWoofer): SpeakerParams => {
     return {
       fs: driver.Fs || 0,
       vas: (driver.Vas || 0) * 1000, // m³ a litros
@@ -273,7 +273,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
     // Normalizar la consulta de búsqueda dividiéndola en palabras y limpiando guiones/barras
     const queryTokens = searchQuery
       .toLowerCase()
-      .replace(/[-\/]/g, ' ')
+      .replace(/[-/]/g, ' ')
       .split(/\s+/)
       .filter(Boolean);
       
@@ -309,7 +309,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
       if (queryTokens.length > 0) {
         const targetText = `${brand} ${model}`
           .toLowerCase()
-          .replace(/[-\/]/g, ' ');
+          .replace(/[-/]/g, ' ');
           
         const matchesAll = queryTokens.every(token => {
           // Permitir coincidencia flexible para terminaciones comunes como "10a" -> "10" si no hay coincidencia exacta
@@ -351,9 +351,9 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
   }, [activeIndex]);
 
 
-  const handleSelectDriver = (item: { driver: any; brand: string; displayName: string }) => {
+  const handleSelectDriver = (item: { driver: DatabaseWoofer; brand: string; displayName: string }) => {
     const mapped = mapDriverToSpeakerParams(item.driver);
-    onPresetChange(item.driver.ID.toString(), mapped);
+    onPresetChange(item.driver.ID ? item.driver.ID.toString() : '', mapped);
     setSearchQuery(item.displayName);
     setShowDropdown(false);
   };

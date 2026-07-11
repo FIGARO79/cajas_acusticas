@@ -1,7 +1,7 @@
 import { getWasm } from '../wasm/index';
 import { type Lang, translate } from './translations';
 import { type UnitSystem, getUnitLabel } from './units';
-import type { SpeakerParams, CalculatedSealed, CalculatedPorted } from '../types';
+import type { SpeakerParams, CalculatedSealed, CalculatedPorted, WoodCabinetData, CrossoverExportData } from '../types';
 
 export function generateReportHTML(
   lang: Lang,
@@ -11,8 +11,8 @@ export function generateReportHTML(
   sealedData: CalculatedSealed,
   portedData: CalculatedPorted,
   dampingType: 'none' | 'light' | 'moderate' | 'heavy',
-  cabinetData: any,
-  xoverData: any,
+  cabinetData: WoodCabinetData | null,
+  xoverData: CrossoverExportData | null,
   portCount: number,
   portShape: 'round' | 'rectangular' | 'custom',
   portDiameter: number,
@@ -24,24 +24,24 @@ export function generateReportHTML(
 ): string {
   const t = (text: string) => translate(text, lang);
   
-  const formatNum = (val: any, decimals: number = 2, fallback: string = 'N/A'): string => {
-    if (val === undefined || val === null || isNaN(val)) return fallback;
+  const formatNum = (val: number | string | null | undefined, decimals: number = 2, fallback: string = 'N/A'): string => {
+    if (val === undefined || val === null || (typeof val === 'number' && isNaN(val))) return fallback;
     const num = typeof val === 'number' ? val : parseFloat(val);
     return isNaN(num) ? fallback : num.toFixed(decimals);
   };
   
   // 1. Obtener curvas mediante WASM síncrono si está disponible
-  let sealedCurve: number[] = [];
-  let portedCurve: number[] = [];
+  const sealedCurve: number[] = [];
+  const portedCurve: number[] = [];
   try {
     const wasm = getWasm();
     if (sealedData && sealedData.valid) {
       const res = wasm.calc_sealed_curve(params.fs, params.qts, params.vas, sealedData.Vb, true);
-      res.forEach((v: any) => sealedCurve.push(v as number));
+      res.forEach((v: number) => sealedCurve.push(v));
     }
     if (portedData && portedData.valid) {
       const res = wasm.calc_ported_curve(params.fs, params.qts, params.vas, portedData.Vb, portedData.Fb, true);
-      res.forEach((v: any) => portedCurve.push(v as number));
+      res.forEach((v: number) => portedCurve.push(v));
     }
   } catch (e) {
     console.error("WASM curves calculation error for report:", e);
@@ -170,9 +170,9 @@ export function generateReportHTML(
       const bp = xoverResults.bp || {};
       const lp = xoverResults.lp || {};
       
-      let hpList = '';
-      let bpList = '';
-      let lpList = '';
+      let hpList: string;
+      let bpList: string;
+      let lpList: string;
 
       if (crossoverType === '4th_lr') {
         hpList = `

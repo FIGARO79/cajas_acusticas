@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { type Lang, translate } from '../utils/translations';
 import type { CalculatedSealed, CalculatedPorted, CalculatedBandpass, SpeakerParams, WoodCabinetData, WoodCutPiece } from '../types';
 import { type UnitSystem, convertTo, convertFrom, getUnitLabel } from '../utils/units';
@@ -57,7 +57,7 @@ interface CabinetTabProps {
   portArea: number | '';
   dampingFactor: number;
   flaredEnds?: 0 | 1 | 2;
-  onCabinetDataChange?: (data: any) => void;
+  onCabinetDataChange?: (data: WoodCabinetData | null) => void;
   readOnly?: boolean;
   speakerYPct?: number;
   portYPct?: number;
@@ -116,22 +116,17 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
   speakerYPct = 50,
   portYPct = 85,
 }) => {
-  const t = (text: string) => translate(text, lang);
-  const [cabinetData, setCabinetData] = useState<WoodCabinetData | null>(null);
+  const t = React.useCallback((text: string) => translate(text, lang), [lang]);
   const [hoveredPieceIndex, setHoveredPieceIndex] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (onCabinetDataChange) {
-      onCabinetDataChange(cabinetData);
-    }
-  }, [cabinetData, onCabinetDataChange]);
+
 
   // Helper to read values converted to UI unit system
-  const displayVal = (val: number | '', type: 'length' | 'length_small' | 'volume') => {
+  const displayVal = React.useCallback((val: number | '', type: 'length' | 'length_small' | 'volume') => {
     if (val === '' || val === undefined || val === null) return '';
     const converted = convertTo(val, type, unitSystem);
     return (Math.round(converted * 1000) / 1000).toString();
-  };
+  }, [unitSystem]);
 
   // Helper to handle input changes converting from UI unit system to metric
   const handleInputChange = (valStr: string, setter: (v: number | '') => void, type: 'length' | 'length_small' | 'volume') => {
@@ -145,7 +140,7 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
   };
 
   // Perform cabinet calculations
-  useEffect(() => {
+  const cabinetData = useMemo<WoodCabinetData | null>(() => {
     const thickness = (typeof woodThickness === 'number' ? woodThickness : 0) / 10; // mm to cm
     let hInt = 0, wInt = 0, dInt = 0;
     let hExt = 0, wExt = 0, dExt = 0;
@@ -161,17 +156,12 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
     if (woodSource === 'ported' && portedData.valid && portedData.Fb > 0 && portedData.Vb > 0) {
       const pCount = Number(portCount) || 0;
       if (pCount > 0) {
-        let pDia = 0;
-        let isRect = portShape === 'rectangular';
-        if (portShape === 'round') {
-          pDia = Number(portDiameter) || 0;
-        } else if (portShape === 'custom') {
-          pDia = 2 * Math.sqrt((Number(portArea) || 0) / Math.PI);
-        } else if (portShape === 'rectangular') {
-          const w = Number(portWidth) || 0;
-          const h = Number(portHeight) || 0;
-          pDia = 2 * Math.sqrt((w * h) / Math.PI);
-        }
+        const isRect = portShape === 'rectangular';
+        const pDia = portShape === 'round'
+          ? (Number(portDiameter) || 0)
+          : portShape === 'custom'
+            ? (2 * Math.sqrt((Number(portArea) || 0) / Math.PI))
+            : (2 * Math.sqrt(((Number(portWidth) || 0) * (Number(portHeight) || 0)) / Math.PI));
 
         if (pDia > 0) {
           const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
@@ -382,7 +372,7 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
         }
       }
 
-      setCabinetData({
+      return {
         valid: true,
         vNeto: netVol,
         vTotal: totalVol,
@@ -393,44 +383,48 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
         dTrapTopExt, dTrapBotExt,
         thickness: woodThickness || 0,
         pieces
-      });
+      };
     } else {
-      setCabinetData(null);
+      return null;
     }
   }, [
-    lang, unitSystem, params, sealedData, portedData, bandpassData, dampingFactor, flaredEnds, woodMode, woodShape, woodConstraint, woodSource, woodRatio,
+    unitSystem, sealedData, portedData, bandpassData, dampingFactor, flaredEnds, woodMode, woodShape, woodConstraint, woodSource, woodRatio,
     woodLockVal1, woodLockVal2, woodLockVal3, woodExtHeight, woodExtWidth, woodExtDepth,
     woodTrapExtHeight, woodTrapExtWidth, woodTrapExtDepthTop, woodTrapExtDepthBot, woodThickness, woodExtra,
-    portCount, portDiameter, portShape, portWidth, portHeight, portArea
+    portCount, portDiameter, portShape, portWidth, portHeight, portArea, t, displayVal
   ]);
 
-  // Port tuning details for woodworking tab
-  const [portInfo, setPortInfo] = useState<{ qtySize: string, length: string, velocity: string } | null>(null);
-
   useEffect(() => {
+    if (onCabinetDataChange) {
+      onCabinetDataChange(cabinetData);
+    }
+  }, [cabinetData, onCabinetDataChange]);
+
+  // Port tuning details for woodworking tab
+  const portInfo = useMemo(() => {
     const pCount = Number(portCount) || 0;
     if (woodSource === 'ported' && portedData.valid && pCount > 0 && cabinetData?.valid) {
-      let pDia = 0;
-      let areaLabel = '';
       const uLabel = getUnitLabel('length', unitSystem);
 
+      const pDia = portShape === 'round'
+        ? (Number(portDiameter) || 0)
+        : portShape === 'custom'
+          ? (2 * Math.sqrt((Number(portArea) || 0) / Math.PI))
+          : (2 * Math.sqrt(((Number(portWidth) || 0) * (Number(portHeight) || 0)) / Math.PI));
+
+      let areaLabel: string;
       if (portShape === 'round') {
-        pDia = Number(portDiameter) || 0;
         const displayPDia = convertTo(pDia, 'length', unitSystem);
         areaLabel = `${displayPDia.toFixed(2)} ${uLabel} (${t("Diámetro")})`;
       } else if (portShape === 'custom') {
         const a = portArea || 0;
-        pDia = 2 * Math.sqrt(a / Math.PI);
-        const displayArea = convertTo(a, 'area', unitSystem);
+        const displayArea = convertTo(Number(a), 'area', unitSystem);
         areaLabel = `${displayArea.toFixed(1)} ${getUnitLabel('area', unitSystem)} (${t("Área libre")})`;
       } else {
         const w = portWidth || 0;
         const h = portHeight || 0;
-        const singleArea = w * h;
-        pDia = 2 * Math.sqrt(singleArea / Math.PI); // Diámetro equivalente
-        
-        const displayW = convertTo(w, 'length', unitSystem);
-        const displayH = convertTo(h, 'length', unitSystem);
+        const displayW = convertTo(Number(w), 'length', unitSystem);
+        const displayH = convertTo(Number(h), 'length', unitSystem);
         areaLabel = `${displayW.toFixed(1)}x${displayH.toFixed(1)} ${uLabel} (${t("Rectangular")})`;
       }
 
@@ -443,7 +437,7 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
         const displayLv = convertTo(Lv, 'length', unitSystem);
 
         const qtySize = `${pCount}x ${t("Puerto(s) de")} ${areaLabel}`;
-        let length = 'N/A';
+        let length: string;
         if (Lv <= 0) {
           length = t("Excesivamente corto");
         } else if (Lv > 120) {
@@ -452,7 +446,7 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
           length = `${displayLv.toFixed(1)} ${uLabel}`;
         }
 
-        let velocity = 'N/A';
+        let velocity: string;
         if (params.sd && params.xmax) {
           const vPeak = (0.008 * portedData.Fb * params.sd * params.xmax) / (pCount * Math.pow(pDia, 2));
           let color = "var(--success)";
@@ -469,14 +463,11 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
           velocity = t("Sd y Xmax requeridos");
         }
 
-        setPortInfo({ qtySize, length, velocity });
-      } else {
-        setPortInfo(null);
+        return { qtySize, length, velocity };
       }
-    } else {
-      setPortInfo(null);
     }
-  }, [woodSource, portedData, portCount, portDiameter, portShape, portWidth, portHeight, flaredEnds, cabinetData, params, lang, unitSystem]);
+    return null;
+  }, [woodSource, portedData, portCount, portDiameter, portShape, portWidth, portHeight, portArea, flaredEnds, cabinetData, params, unitSystem, t]);
 
   const handleApplySuggestedCabinet = () => {
     let netVol = 0;
@@ -534,14 +525,11 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
     let numericPortLength = 0;
     if (woodSource === 'ported' && portedData.valid && cabinetData?.valid) {
       const pCount = Number(portCount) || 0;
-      let pDia = 0;
-      if (portShape === 'round') {
-        pDia = Number(portDiameter) || 0;
-      } else if (portShape === 'custom') {
-        pDia = 2 * Math.sqrt((Number(portArea) || 0) / Math.PI);
-      } else {
-        pDia = 2 * Math.sqrt(((portWidth || 0) * (portHeight || 0)) / Math.PI);
-      }
+      const pDia = portShape === 'round'
+        ? (Number(portDiameter) || 0)
+        : portShape === 'custom'
+          ? (2 * Math.sqrt((Number(portArea) || 0) / Math.PI))
+          : (2 * Math.sqrt(((Number(portWidth) || 0) * (Number(portHeight) || 0)) / Math.PI));
       if (pDia > 0 && pCount > 0) {
         const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
         const targetVol = cabinetData.vNeto > 0 ? cabinetData.vNeto : portedData.Vb;
@@ -701,7 +689,7 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
             <label>{t("Forma de la Caja")}</label>
             <select 
               value={woodShape} 
-              onChange={(e) => setWoodShape(e.target.value as any)} 
+              onChange={(e) => setWoodShape(e.target.value as 'rectangular' | 'trapezoidal')} 
               className="input-select"
               style={{ width: '100%', height: '38px' }}
             >
@@ -741,7 +729,7 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
                   <label>{t("Proporción Acústica")}</label>
                   <select 
                     value={woodRatio} 
-                    onChange={(e) => setWoodRatio(e.target.value as any)} 
+                    onChange={(e) => setWoodRatio(e.target.value as 'golden' | 'classic' | 'cube')} 
                     className="input-select"
                     style={{ width: '100%', height: '38px' }}
                   >

@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { type Lang, translate } from '../utils/translations';
 import { type UnitSystem, convertTo, convertFrom, getUnitLabel } from '../utils/units';
-import type { CalculatedPorted, CalculatedSealed, CalculatedBandpass, SpeakerParams } from '../types';
+import type { CalculatedPorted, CalculatedSealed, CalculatedBandpass, SpeakerParams, PortSuggestions } from '../types';
 import { suggestPortConfig } from '../utils/acousticMath';
 
 interface BoxParamsFormProps {
@@ -276,39 +276,26 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
 }) => {
   const t = (text: string) => translate(text, lang);
 
-  const [suggestions, setSuggestions] = useState<ReturnType<typeof suggestPortConfig> | null>(null);
-  const [vPeak, setVPeak] = useState<number | null>(null);
-
-  useEffect(() => {
+  const suggestions = useMemo<PortSuggestions | null>(() => {
     if (portedData.valid && portedData.Vb > 0 && portedData.Fb > 0) {
       const minLen = (Number(woodThickness) || 0) / 10;
-      setSuggestions(suggestPortConfig(portedData.Vb, portedData.Fb, params, flaredEnds, minLen));
-    } else {
-      setSuggestions(null);
+      return suggestPortConfig(portedData.Vb, portedData.Fb, params, flaredEnds, minLen);
     }
+    return null;
   }, [portedData, params, flaredEnds, woodThickness]);
 
-  useEffect(() => {
+  const vPeak = useMemo(() => {
     const pCount = typeof portCount === 'number' ? portCount : 0;
     if (pCount > 0 && portedData.Vb > 0) {
-      let pDia = 0;
-      if (portShape === 'round') {
-        pDia = portDiameter || 0;
-      } else {
-        const w = portWidth || 0;
-        const h = portHeight || 0;
-        pDia = 2 * Math.sqrt((w * h) / Math.PI);
-      }
+      const pDia = portShape === 'round'
+        ? (portDiameter || 0)
+        : 2 * Math.sqrt(((portWidth || 0) * (portHeight || 0)) / Math.PI);
 
       if (pDia > 0 && params.sd && params.xmax) {
-        const peak = (0.008 * portedData.Fb * params.sd * params.xmax) / (pCount * Math.pow(pDia, 2));
-        setVPeak(peak);
-      } else {
-        setVPeak(null);
+        return (0.008 * portedData.Fb * params.sd * params.xmax) / (pCount * Math.pow(pDia, 2));
       }
-    } else {
-      setVPeak(null);
     }
+    return null;
   }, [portCount, portDiameter, portShape, portWidth, portHeight, portedData, params]);
 
   const handlePortCountChange = (valStr: string) => {
@@ -554,7 +541,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     <label>{t("Proporción Acústica")}</label>
                     <select
                       value={woodRatio}
-                      onChange={(e) => setWoodRatio(e.target.value as any)}
+                      onChange={(e) => setWoodRatio(e.target.value as 'golden' | 'classic' | 'cube')}
                       className="input-select"
                       style={{ width: '100%', height: '30px', padding: '0.2rem 2.2rem 0.2rem 0.55rem', fontSize: '0.76rem' }}
                     >
@@ -813,7 +800,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     <label>{t("Orden del Filtro")}</label>
                     <select
                       value={bandpassOrder}
-                      onChange={(e) => setBandpassOrder(parseInt(e.target.value) as any)}
+                      onChange={(e) => setBandpassOrder(parseInt(e.target.value) as 4 | 6)}
                       className="input-select"
                       style={{ width: '100%', height: '34px' }}
                     >
@@ -1164,7 +1151,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 <button
                   key={opt.id}
                   type="button"
-                  onClick={() => setDampingType(opt.id as any)}
+                  onClick={() => setDampingType(opt.id as 'none' | 'light' | 'moderate' | 'heavy')}
                   className={`premium-panel-btn ${dampingType === opt.id ? 'active-primary' : ''}`}
                   style={{
                     padding: '0.65rem 0.85rem',
@@ -1210,7 +1197,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 <label>{t("Tipo Filtro")}</label>
                 <select
                   value={crossoverType}
-                  onChange={(e) => setCrossoverType(e.target.value as any)}
+                  onChange={(e) => setCrossoverType(e.target.value as '1st_order' | '2nd_butter' | '2nd_lr' | '4th_lr')}
                   className="input-select"
                   style={{ width: '100%', height: '34px' }}
                 >
