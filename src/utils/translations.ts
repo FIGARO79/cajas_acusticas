@@ -1,6 +1,6 @@
 export type Lang = 'es' | 'en' | 'pt';
 
-export const TRANSLATIONS: Record<Exclude<Lang, 'es'>, Record<string, string>> = {
+const TRANSLATIONS: Record<Exclude<Lang, 'es'>, Record<string, string>> = {
   en: {
     "Completa los parámetros mínimos del altavoz (Fs, Vas, Qts).": "Complete the minimum speaker parameters (Fs, Vas, Qts).",
     "Qes requerido para EBP": "Qes required for EBP",

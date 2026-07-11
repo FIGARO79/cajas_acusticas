@@ -90,7 +90,7 @@ export interface CustomDriver {
   isCustom: boolean;
 }
 
-export interface PortSuggestionOption {
+interface PortSuggestionOption {
   numPorts: number;
   diameter: number;
   length: number;
@@ -106,14 +106,14 @@ export type PortSuggestions = {
   options: PortSuggestionOption[];
 };
 
-export interface FilterComponents2Way {
+interface FilterComponents2Way {
   c1: number | null;
   l1: number | null;
   c2?: number;
   l2?: number;
 }
 
-export interface FilterComponents3WayBP {
+interface FilterComponents3WayBP {
   c_hp?: number | null;
   l_hp?: number | null;
   l_lp?: number | null;
@@ -162,7 +162,7 @@ export interface CrossoverExportData {
 }
 
 export interface DatabaseWoofer {
-  ID?: number;
+  ID?: number | string;
   Model?: string;
   "Company ID": number;
   Vas?: number;
@@ -180,6 +180,9 @@ export interface DatabaseWoofer {
   Qts?: number;
   Re?: number;
   Pe?: number;
+  BL?: number;
+  Z?: number;
+  SPL1?: number;
   _isCustom?: boolean;
   _customBrand?: string;
 }

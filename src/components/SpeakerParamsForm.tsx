@@ -300,7 +300,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
     const results = [];
     for (const w of brandWoofers) {
       const isCustom = w._isCustom;
-      const brand = isCustom ? w._customBrand : (driversDb ? driversDb.companies[w["Company ID"]] : 'Genérico');
+      const brand = (isCustom ? w._customBrand : (driversDb ? driversDb.companies[w["Company ID"]] : 'Genérico')) || 'Genérico';
       const model = w.Model || '';
       // Nombre limpio sin etiquetas
       const displayName = selectedBrand ? model : `${brand} ${model}`;

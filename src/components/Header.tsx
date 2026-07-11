@@ -55,7 +55,11 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <div className="top-navbar">
       <div className="logo-area-nav">
-        <h1>Acoustic<span className="logo-highlight">LAB</span></h1>
+        <div className="logo-mark">A</div>
+        <div>
+          <h1>Acoustic<span className="logo-highlight">LAB</span></h1>
+          <div className="logo-badge">Premium acoustics</div>
+        </div>
       </div>
 
       {/* Menu bar */}

@@ -224,7 +224,7 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
         // Estimate divider board volumes before we know physical dimensions
         let vMidPartition = 0;
         let vWooferPartition = 0;
-        let tempTotal = netVol + extraVal + portVol + vMid;
+        const tempTotal = netVol + extraVal + portVol + vMid;
         const estArea = Math.pow(tempTotal * 1000, 2/3); // cm^2
         if (crossoverWays === 3) {
           vMidPartition = (estArea * thickness) / 1000;
@@ -480,7 +480,8 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
     unitSystem, sealedData, portedData, bandpassData, dampingFactor, flaredEnds, woodMode, woodShape, woodConstraint, woodSource, woodRatio,
     woodLockVal1, woodLockVal2, woodLockVal3, woodExtHeight, woodExtWidth, woodExtDepth,
     woodTrapExtHeight, woodTrapExtWidth, woodTrapExtDepthTop, woodTrapExtDepthBot, woodThickness, woodExtra,
-    portCount, portDiameter, portShape, portWidth, portHeight, portArea, crossoverWays, driverConfig, midFs, midVas, midQts, midTargetQtc
+    portCount, portDiameter, portShape, portWidth, portHeight, portArea, crossoverWays, driverConfig, midVas, midQts, midTargetQtc,
+    displayVal, t
   ]);
 
   useEffect(() => {

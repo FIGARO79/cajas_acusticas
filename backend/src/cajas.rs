@@ -1,7 +1,5 @@
 use wasm_bindgen::prelude::*;
 
-const SPEED_OF_SOUND_M_S: f64 = 343.0;
-const AIR_DENSITY_KG_M3: f64 = 1.205;
 
 #[wasm_bindgen]
 pub struct SealedResult {
@@ -62,27 +60,26 @@ pub struct VentedAlignment {
 
 #[wasm_bindgen]
 pub fn calc_alineacion_ventilada(fs: f64, vas: f64, qts: f64, tipo: &str) -> VentedAlignment {
-    let mut vb = 0.0;
-    let mut fb = 0.0;
-    let mut f3 = 0.0;
-
-    match tipo {
+    let (vb, fb, f3) = match tipo {
         "SBB4" => {
-            vb = 11.0 * qts.powf(2.87) * vas;
-            fb = 0.38 * qts.powf(-0.95) * fs;
-            f3 = 0.38 * qts.powf(-0.95) * fs;
+            let vb = 11.0 * qts.powf(2.87) * vas;
+            let fb = 0.38 * qts.powf(-0.95) * fs;
+            let f3 = 0.38 * qts.powf(-0.95) * fs;
+            (vb, fb, f3)
         },
         "B4" => {
-            vb = 0.25 * qts.powf(-2.0) * vas;
-            fb = fs;
-            f3 = fs;
+            let vb = 0.25 * qts.powf(-2.0) * vas;
+            let fb = fs;
+            let f3 = fs;
+            (vb, fb, f3)
         },
         "QB3" | _ => {
-            vb = 6.27 * qts.powf(1.44) * vas;
-            fb = 0.94 * qts.powf(-0.9) * fs;
-            f3 = 1.2 * qts.powf(-0.9) * fs;
+            let vb = 6.27 * qts.powf(1.44) * vas;
+            let fb = 0.94 * qts.powf(-0.9) * fs;
+            let f3 = 1.2 * qts.powf(-0.9) * fs;
+            (vb, fb, f3)
         }
-    }
+    };
 
     VentedAlignment { vb, fb, f3 }
 }

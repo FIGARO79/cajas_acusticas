@@ -10,6 +10,8 @@ import {
   Tooltip,
   Legend,
   Filler,
+  type ChartData,
+  type ChartDataset,
   type TooltipItem,
 } from 'chart.js';
 import type { CalculatedSealed, CalculatedPorted, CalculatedBandpass, SpeakerParams } from '../types';
@@ -270,10 +272,10 @@ export const SimulationChart: React.FC<SimulationChartProps> = ({
   }, [sealedData, portedData, bandpassData, params]);
 
   // Generate curves for full range if in 'full' mode
-  const fullRangeDatasets = React.useMemo(() => {
+  const fullRangeDatasets = React.useMemo<ChartDataset<'line', { x: number; y: number }[]>[]>(() => {
     if (rangeMode !== 'full') return [];
 
-    const datasets: Record<string, unknown>[] = [];
+    const datasets: ChartDataset<'line', { x: number; y: number }[]>[] = [];
     const fs = params.fs || 38;
     const qts = params.qts || 0.36;
     const vas = params.vas || 45;
@@ -591,7 +593,7 @@ export const SimulationChart: React.FC<SimulationChartProps> = ({
   const portedBorderColor = '#10b981';
   const bandpassBorderColor = '#f59e0b';
 
-  const data = {
+  const data: ChartData<'line', { x: number; y: number }[], string> = {
     datasets: rangeMode === 'bass' ? [
       ...(sealedData && sealedData.valid ? [{
         label: `${t("Caja Sellada")} (Vb ${sealedData.Vb.toFixed(1)}L, Qtc ${sealedData.Qtc.toFixed(2)})`,
@@ -694,7 +696,10 @@ export const SimulationChart: React.FC<SimulationChartProps> = ({
         borderWidth: 1,
         callbacks: {
           label: function (context: TooltipItem<'line'>) {
-            return `${context.dataset.label}: ${context.parsed.y.toFixed(1)} dB ${t('a')} ${context.parsed.x >= 1000 ? (context.parsed.x/1000).toFixed(1)+'k' : context.parsed.x} Hz`;
+            const x = context.parsed.x;
+            const y = context.parsed.y;
+            if (x == null || y == null) return '';
+            return `${context.dataset.label}: ${y.toFixed(1)} dB ${t('a')} ${x >= 1000 ? (x/1000).toFixed(1)+'k' : x} Hz`;
           },
         },
       },

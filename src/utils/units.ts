@@ -1,11 +1,11 @@
 export type UnitSystem = 'metric' | 'imperial';
 
 // Conversion constants
-export const LITERS_PER_FT3 = 28.3168466;
-export const CM_PER_INCH = 2.54;
-export const MM_PER_INCH = 25.4;
-export const CM2_PER_IN2 = 6.4516;
-export const CC_PER_CUIN = 16.387064;
+const LITERS_PER_FT3 = 28.3168466;
+const CM_PER_INCH = 2.54;
+const MM_PER_INCH = 25.4;
+const CM2_PER_IN2 = 6.4516;
+const CC_PER_CUIN = 16.387064;
 
 /**
  * Converts a value from metric to the target unit system.
@@ -47,15 +47,6 @@ export function convertFrom(val: number, type: 'volume' | 'volume_small' | 'leng
     default:
       return val;
   }
-}
-
-/**
- * Format a value with units depending on the unit system.
- */
-export function formatUnit(val: number, type: 'volume' | 'volume_small' | 'length' | 'length_small' | 'area', system: UnitSystem, decimals: number = 2): string {
-  const converted = convertTo(val, type, system);
-  const unit = getUnitLabel(type, system);
-  return `${converted.toFixed(decimals)} ${unit}`;
 }
 
 /**

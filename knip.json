@@ -1,0 +1,11 @@
+{
+  "project": ["src/**/*.ts", "src/**/*.tsx"],
+  "ignore": [
+    "src/components/BandpassBoxTab.tsx",
+    "src/components/PortedBoxTab.tsx",
+    "src/components/SealedBoxTab.tsx",
+    "src/utils/presets.ts",
+    "src/wasm/pkg/backend_bg.wasm.d.ts",
+    "src/wasm/pkg/backend.d.ts"
+  ]
+}

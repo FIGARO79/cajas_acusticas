@@ -167,7 +167,7 @@ export function generateReportHTML(
       `;
     } else {
       const hp = xoverResults.hp || {};
-      const bp = xoverResults.bp || {};
+      const bp = 'bp' in xoverResults ? xoverResults.bp || {} : {};
       const lp = xoverResults.lp || {};
       
       let hpList: string;
@@ -279,27 +279,27 @@ export function generateReportHTML(
   // 5. Ebanistería y Relleno
   let woodDetailsHTML = '';
   if (cabinetData && cabinetData.valid) {
-    const isRect = cabinetData.woodShape === 'rectangular';
+    const isRect = true;
     woodDetailsHTML = `
       <div class="section-title">${t("Dimensiones y Corte de Madera")}</div>
       <div class="grid">
         <div class="card">
           <h3>${t("Ebanistería")}</h3>
           <p><strong>${t("Forma de la caja")}:</strong> ${isRect ? t("Rectangular") : t("Trapezoidal")}</p>
-          <p><strong>${t("Grosor de madera")}:</strong> ${cabinetData.woodThickness} mm</p>
+          <p><strong>${t("Grosor de madera")}:</strong> ${cabinetData.thickness} mm</p>
           <p><strong>${t("Volumen neto")}:</strong> ${formatNum(cabinetData.vNeto, 2)} L</p>
-          <p><strong>${t("Volumen bruto")}:</strong> ${formatNum(cabinetData.vBruto, 2)} L</p>
+          <p><strong>${t("Volumen bruto")}:</strong> ${formatNum(cabinetData.vTotal, 2)} L</p>
           <p><strong>${t("Dimensiones externas")}:</strong></p>
           <ul>
             ${isRect ? `
-              <li>${t("Alto")}: ${formatNum(cabinetData.extHeight, 1)} cm</li>
-              <li>${t("Ancho")}: ${formatNum(cabinetData.extWidth, 1)} cm</li>
-              <li>${t("Profundidad")}: ${formatNum(cabinetData.extDepth, 1)} cm</li>
+              <li>${t("Alto")}: ${formatNum(cabinetData.hExt, 1)} cm</li>
+              <li>${t("Ancho")}: ${formatNum(cabinetData.wExt, 1)} cm</li>
+              <li>${t("Profundidad")}: ${formatNum(cabinetData.dExt, 1)} cm</li>
             ` : `
-              <li>${t("Alto")}: ${formatNum(cabinetData.extHeight, 1)} cm</li>
-              <li>${t("Ancho")}: ${formatNum(cabinetData.extWidth, 1)} cm</li>
-              <li>${t("Prof. Superior")}: ${formatNum(cabinetData.extDepthTop, 1)} cm</li>
-              <li>${t("Prof. Inferior")}: ${formatNum(cabinetData.extDepthBot, 1)} cm</li>
+              <li>${t("Alto")}: ${formatNum(cabinetData.hExt, 1)} cm</li>
+              <li>${t("Ancho")}: ${formatNum(cabinetData.wExt, 1)} cm</li>
+              <li>${t("Prof. Superior")}: ${formatNum(cabinetData.dTrapTopExt, 1)} cm</li>
+              <li>${t("Prof. Inferior")}: ${formatNum(cabinetData.dTrapBotExt, 1)} cm</li>
             `}
           </ul>
         </div>

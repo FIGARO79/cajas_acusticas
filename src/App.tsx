@@ -19,7 +19,6 @@ function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => (localStorage.getItem('theme') as 'dark' | 'light') || 'dark');
   const [activeTab, setActiveTab] = useState<'wood' | 'damping' | 'crossover'>('wood');
   const [boxType, setBoxType] = useState<'sealed' | 'ported' | 'bandpass'>('sealed');
-  const [wasmLoaded, setWasmLoaded] = useState<boolean>(false);
   const t = (text: string) => translate(text, lang);
 
   // Crossover State
@@ -154,7 +153,7 @@ function App() {
 
   // Shared state for technical report exporting
   const cabinetRef = useRef<WoodCabinetData | null>(null);
-  const handleCabinetDataChange = useCallback((data: WoodCabinetData) => {
+  const handleCabinetDataChange = useCallback((data: WoodCabinetData | null) => {
     cabinetRef.current = data;
   }, []);
   const crossoverRef = useRef<(() => CrossoverExportData) | null>(null);
@@ -184,7 +183,6 @@ function App() {
   // Initialize WASM module on component mount
   useEffect(() => {
     initWasm()
-      .then(() => setWasmLoaded(true))
       .catch(err => console.error('WASM init error:', err));
   }, []);
 
@@ -280,18 +278,21 @@ function App() {
 
     if (bruto <= 0) return 0;
 
-    let targetFb = customFb;
-    if (!customPorted) {
-      try {
-        const wasm = getWasm();
-        if (wasm && adjParams.fs && adjParams.vas && adjParams.qts) {
-          const result = wasm.calc_alineacion_ventilada(adjParams.fs, adjParams.vas, adjParams.qts, "QB3");
-          targetFb = result.fb;
+    let suggestedFb = 38;
+    if (adjParams.fs && adjParams.vas && adjParams.qts) {
+      if (isWasmReady()) {
+        try {
+          const wasm = getWasm();
+          suggestedFb = wasm.calc_alineacion_ventilada(adjParams.fs, adjParams.vas, adjParams.qts, "QB3").fb;
+        } catch (e) {
+          console.warn("Could not calculate optimal Vb/Fb from Wasm:", e);
+          suggestedFb = 0.94 * Math.pow(adjParams.qts, -0.9) * adjParams.fs;
         }
-      } catch (e) {
-        console.warn("Could not calculate optimal Vb/Fb from Wasm:", e);
+      } else {
+        suggestedFb = 0.94 * Math.pow(adjParams.qts, -0.9) * adjParams.fs;
       }
     }
+    const targetFb = customPorted ? (customFbState ?? suggestedFb) : suggestedFb;
 
     const pCount = Number(portCount) || 0;
     let portVol = 0;
@@ -349,49 +350,90 @@ function App() {
 
   // --- CALCULAR CAJA SELLADA ---
   const calculateSealed = (): CalculatedSealed => {
-    if (validationError || !adjParams.fs || !adjParams.vas || !adjParams.qts || !isWasmReady()) {
+    if (validationError || !adjParams.fs || !adjParams.vas || !adjParams.qts) {
       return { valid: false, Vb: 0, Fc: 0, Qtc: targetQtc, F3: 0 };
     }
 
-    try {
-      const wasm = getWasm();
+    if (isWasmReady()) {
+      try {
+        const wasm = getWasm();
 
-      if (woodMode === 'input' && manualNetVol > 0) {
-        let sealedVb = manualNetVol * dampingFactor;
-        let alpha = adjParams.vas / sealedVb;
-        let sealedQtc = adjParams.qts * Math.sqrt(alpha + 1);
-        
-        // We calculate Fc and F3 correctly using Wasm by passing the resulting vb
-        const result = wasm.calc_caja_sellada(adjParams.fs, adjParams.vas, adjParams.qts, sealedVb, targetQtc);
-        return {
-          valid: true,
-          Vb: sealedVb,
-          Fc: result.fc,
-          Qtc: sealedQtc,
-          F3: result.f3
-        };
-      } else {
-        if (adjParams.qts >= targetQtc) {
-          return { valid: false, Vb: 0, Fc: 0, Qtc: targetQtc, F3: 0 };
+        if (woodMode === 'input' && manualNetVol > 0) {
+          const sealedVb = manualNetVol * dampingFactor;
+          const alpha = adjParams.vas / sealedVb;
+          const sealedQtc = adjParams.qts * Math.sqrt(alpha + 1);
+          // We calculate Fc and F3 correctly using Wasm by passing the resulting vb
+          const result = wasm.calc_caja_sellada(adjParams.fs, adjParams.vas, adjParams.qts, sealedVb, targetQtc);
+          return {
+            valid: true,
+            Vb: sealedVb,
+            Fc: result.fc,
+            Qtc: sealedQtc,
+            F3: result.f3
+          };
+        } else {
+          if (adjParams.qts >= targetQtc) {
+            return { valid: false, Vb: 0, Fc: 0, Qtc: targetQtc, F3: 0 };
+          }
+          
+          // To get optimal vb from Qtc, we can pass a dummy vb_target and read vb_optimo
+          const tempResult = wasm.calc_caja_sellada(adjParams.fs, adjParams.vas, adjParams.qts, 10.0, targetQtc);
+          const optimalVb = tempResult.vb_optimo;
+          
+          const result = wasm.calc_caja_sellada(adjParams.fs, adjParams.vas, adjParams.qts, optimalVb, targetQtc);
+
+          return {
+            valid: true,
+            Vb: optimalVb,
+            Fc: result.fc,
+            Qtc: result.qtc,
+            F3: result.f3
+          };
         }
-        
-        // To get optimal vb from Qtc, we can pass a dummy vb_target and read vb_optimo
-        const tempResult = wasm.calc_caja_sellada(adjParams.fs, adjParams.vas, adjParams.qts, 10.0, targetQtc);
-        let optimalVb = tempResult.vb_optimo;
-        
-        const result = wasm.calc_caja_sellada(adjParams.fs, adjParams.vas, adjParams.qts, optimalVb, targetQtc);
-
-        return {
-          valid: true,
-          Vb: optimalVb,
-          Fc: result.fc,
-          Qtc: result.qtc,
-          F3: result.f3
-        };
+      } catch (e) {
+        console.warn("Sealed calculation error in WASM, falling back to JS:", e);
       }
-    } catch (e) {
-      console.warn("Sealed calculation error:", e);
-      return { valid: false, Vb: 0, Fc: 0, Qtc: targetQtc, F3: 0 };
+    }
+
+    // JS Fallback
+    const fs = adjParams.fs;
+    const vas = adjParams.vas;
+    const qts = adjParams.qts;
+
+    if (woodMode === 'input' && manualNetVol > 0) {
+      const sealedVb = manualNetVol * dampingFactor;
+      if (sealedVb <= 0) return { valid: false, Vb: 0, Fc: 0, Qtc: targetQtc, F3: 0 };
+      const alpha = vas / sealedVb;
+      const sealedQtc = qts * Math.sqrt(alpha + 1);
+      const fc = fs * Math.sqrt(alpha + 1);
+      const f3_term = 1.0 / Math.pow(sealedQtc, 2) - 2.0;
+      const f3 = fc * Math.sqrt((f3_term + Math.sqrt(Math.pow(f3_term, 2) + 4.0)) / 2.0);
+
+      return {
+        valid: true,
+        Vb: sealedVb,
+        Fc: fc,
+        Qtc: sealedQtc,
+        F3: f3
+      };
+    } else {
+      if (qts >= targetQtc) {
+        return { valid: false, Vb: 0, Fc: 0, Qtc: targetQtc, F3: 0 };
+      }
+      const optimalVb = vas / (Math.pow(targetQtc / qts, 2) - 1.0);
+      if (optimalVb <= 0) return { valid: false, Vb: 0, Fc: 0, Qtc: targetQtc, F3: 0 };
+      const alpha = vas / optimalVb;
+      const fc = fs * Math.sqrt(alpha + 1);
+      const f3_term = 1.0 / Math.pow(targetQtc, 2) - 2.0;
+      const f3 = fc * Math.sqrt((f3_term + Math.sqrt(Math.pow(f3_term, 2) + 4.0)) / 2.0);
+
+      return {
+        valid: true,
+        Vb: optimalVb,
+        Fc: fc,
+        Qtc: targetQtc,
+        F3: f3
+      };
     }
   };
 
@@ -399,75 +441,86 @@ function App() {
 
   // --- CALCULAR CAJA VENTILADA ---
   const calculatePorted = (): CalculatedPorted => {
-    if (validationError || !adjParams.fs || !adjParams.vas || !adjParams.qts || !isWasmReady()) {
+    if (validationError || !adjParams.fs || !adjParams.vas || !adjParams.qts) {
       return { valid: false, Vb: 0, Fb: 0, F3: 0, Fs: adjParams.fs || 0, Qts: adjParams.qts || 0, Vas: adjParams.vas || 0, alignment: '' };
     }
 
-    try {
-      const wasm = getWasm();
-      let VbPorted = 0;
-      let FbPorted = 0;
-      let F3Ported = 0;
-      let alignmentActive = '';
+    let VbPorted: number;
+    let FbPorted: number;
+    let F3Ported: number;
+    let alignmentActive = 'Óptima (QB3)';
 
-      if (woodMode === 'input' && manualNetVol > 0) {
-        VbPorted = manualNetVol * dampingFactor;
-        FbPorted = customFb;
+    let suggestedVb: number;
+    let suggestedFb: number;
+    let suggestedF3: number;
+
+    if (isWasmReady()) {
+      try {
+        const wasm = getWasm();
+        const result = wasm.calc_alineacion_ventilada(adjParams.fs, adjParams.vas, adjParams.qts, "QB3");
+        suggestedVb = result.vb;
+        suggestedFb = result.fb;
+        suggestedF3 = result.f3;
+        alignmentActive = 'Óptima (QB3 Wasm)';
+      } catch (e) {
+        console.warn("Could not calculate optimal alignment from WASM, using JS fallback:", e);
+        suggestedVb = 6.27 * Math.pow(adjParams.qts, 1.44) * adjParams.vas;
+        suggestedFb = 0.94 * Math.pow(adjParams.qts, -0.9) * adjParams.fs;
+        suggestedF3 = 1.2 * Math.pow(adjParams.qts, -0.9) * adjParams.fs;
+      }
+    } else {
+      suggestedVb = 6.27 * Math.pow(adjParams.qts, 1.44) * adjParams.vas;
+      suggestedFb = 0.94 * Math.pow(adjParams.qts, -0.9) * adjParams.fs;
+      suggestedF3 = 1.2 * Math.pow(adjParams.qts, -0.9) * adjParams.fs;
+    }
+
+    if (woodMode === 'input' && manualNetVol > 0) {
+      VbPorted = manualNetVol * dampingFactor;
+      FbPorted = customPorted ? (customFbState ?? suggestedFb) : suggestedFb;
+      F3Ported = estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas);
+      alignmentActive = 'Manual';
+    } else {
+      if (customPorted) {
+        VbPorted = customVbState ?? suggestedVb;
+        FbPorted = customFbState ?? suggestedFb;
         F3Ported = estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas);
         alignmentActive = 'Manual';
       } else {
-        if (customPorted) {
-          VbPorted = customVb;
-          FbPorted = customFb;
-          F3Ported = estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas);
-          alignmentActive = 'Manual';
-        } else {
-          const result = wasm.calc_alineacion_ventilada(adjParams.fs, adjParams.vas, adjParams.qts, "QB3");
-          VbPorted = result.vb;
-          FbPorted = result.fb;
-          F3Ported = result.f3;
-          alignmentActive = 'Óptima (QB3 Wasm)';
-        }
+        VbPorted = suggestedVb;
+        FbPorted = suggestedFb;
+        F3Ported = suggestedF3;
       }
-
-      if (useCustomPortLength && Number(customPortLength) > 0) {
-        let pDia = 0;
-        if (portShape === 'round') {
-          pDia = Number(portDiameter) || 0;
-        } else if (portShape === 'custom') {
-          pDia = 2 * Math.sqrt((Number(portArea) || 0) / Math.PI);
-        } else {
-          const w = Number(portWidth) || 0;
-          const h = Number(portHeight) || 0;
-          pDia = 2 * Math.sqrt((w * h) / Math.PI);
-        }
-        const pCount = Number(portCount) || 1;
-        if (pDia > 0 && VbPorted > 0) {
-          const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
-          const Lv_cm = Number(customPortLength);
-          const fbCalc = Math.sqrt((23562.5 * Math.pow(pDia, 2) * pCount) / (VbPorted * (Lv_cm + kCorrection * pDia)));
-          if (fbCalc > 0 && !isNaN(fbCalc) && isFinite(fbCalc)) {
-            FbPorted = fbCalc;
-            F3Ported = estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas);
-            alignmentActive = `${t("Personalizada")} (L: ${Lv_cm.toFixed(1)} cm)`;
-          }
-        }
-      }
-
-      return {
-        valid: true,
-        Vb: VbPorted,
-        Fb: FbPorted,
-        F3: F3Ported,
-        Fs: adjParams.fs,
-        Qts: adjParams.qts,
-        Vas: adjParams.vas,
-        alignment: alignmentActive
-      };
-    } catch (e) {
-      console.warn("Ported calculation error:", e);
-      return { valid: false, Vb: 0, Fb: 0, F3: 0, Fs: adjParams.fs || 0, Qts: adjParams.qts || 0, Vas: adjParams.vas || 0, alignment: '' };
     }
+
+    if (useCustomPortLength && Number(customPortLength) > 0) {
+      const pDia = portShape === 'round'
+        ? (Number(portDiameter) || 0)
+        : portShape === 'custom'
+          ? (2 * Math.sqrt((Number(portArea) || 0) / Math.PI))
+          : (2 * Math.sqrt(((Number(portWidth) || 0) * (Number(portHeight) || 0)) / Math.PI));
+      const pCount = Number(portCount) || 1;
+      if (pDia > 0 && VbPorted > 0) {
+        const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
+        const Lv_cm = Number(customPortLength);
+        const fbCalc = Math.sqrt((23562.5 * Math.pow(pDia, 2) * pCount) / (VbPorted * (Lv_cm + kCorrection * pDia)));
+        if (fbCalc > 0 && !isNaN(fbCalc) && isFinite(fbCalc)) {
+          FbPorted = fbCalc;
+          F3Ported = estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas);
+          alignmentActive = `${t("Personalizada")} (L: ${Lv_cm.toFixed(1)} cm)`;
+        }
+      }
+    }
+
+    return {
+      valid: true,
+      Vb: VbPorted,
+      Fb: FbPorted,
+      F3: F3Ported,
+      Fs: adjParams.fs,
+      Qts: adjParams.qts,
+      Vas: adjParams.vas,
+      alignment: alignmentActive
+    };
   };
 
   const portedData = calculatePorted();
@@ -494,38 +547,79 @@ function App() {
 
   // --- CALCULAR CAJA PASO BANDA (BANDPASS) ---
   const calculateBandpass = (): CalculatedBandpass => {
-    if (validationError || !adjParams.fs || !adjParams.vas || !adjParams.qts || !isWasmReady()) {
+    if (validationError || !adjParams.fs || !adjParams.vas || !adjParams.qts) {
       return { valid: false, order: bandpassOrder, Vf: 0, Vr: 0, Fb: 0, F0: 0, delta_f: 0, Fl: 0, Fh: 0 };
     }
 
-    try {
-      const wasm = getWasm();
-      if (bandpassOrder === 4) {
-        const res = wasm.calc_bandpass_4(adjParams.fs, adjParams.vas, adjParams.qts, bandpassS);
-        return {
-          valid: true,
-          order: 4,
-          Vf: res.vf,
-          Vr: res.vr,
-          Fb: res.fb,
-          F0: res.f0,
-          delta_f: res.delta_f
-        };
-      } else {
-        const res = wasm.calc_bandpass_6(adjParams.fs, adjParams.vas, adjParams.qts, bandpassA);
-        return {
-          valid: true,
-          order: 6,
-          Vf: res.vf,
-          Vr: res.vr,
-          Fb: 0,
-          Fl: res.fl,
-          Fh: res.fh
-        };
+    if (isWasmReady()) {
+      try {
+        const wasm = getWasm();
+        if (bandpassOrder === 4) {
+          const res = wasm.calc_bandpass_4(adjParams.fs, adjParams.vas, adjParams.qts, bandpassS);
+          return {
+            valid: true,
+            order: 4,
+            Vf: res.vf,
+            Vr: res.vr,
+            Fb: res.fb,
+            F0: res.f0,
+            delta_f: res.delta_f
+          };
+        } else {
+          const res = wasm.calc_bandpass_6(adjParams.fs, adjParams.vas, adjParams.qts, bandpassA);
+          return {
+            valid: true,
+            order: 6,
+            Vf: res.vf,
+            Vr: res.vr,
+            Fb: 0,
+            Fl: res.fl,
+            Fh: res.fh
+          };
+        }
+      } catch (e) {
+        console.error("Bandpass calculation error in WASM, falling back to JS:", e);
       }
-    } catch (e) {
-      console.error("Bandpass calculation error:", e);
-      return { valid: false, order: bandpassOrder, Vf: 0, Vr: 0, Fb: 0, F0: 0, delta_f: 0, Fl: 0, Fh: 0 };
+    }
+
+    // JS Fallback
+    const fs = adjParams.fs;
+    const vas = adjParams.vas;
+    const qts = adjParams.qts;
+
+    if (bandpassOrder === 4) {
+      const s = bandpassS;
+      const term = s / qts;
+      const vf = vas / (Math.pow(term, 2) - 1.0);
+      const vr = 2.0 * Math.pow(s, 2) * Math.pow(qts, 2) * vas;
+      const fb = fs * term;
+      const f0 = fs * term;
+      const delta_f = (fs / qts) * s;
+
+      return {
+        valid: true,
+        order: 4,
+        Vf: Math.max(0, vf),
+        Vr: Math.max(0, vr),
+        Fb: fb,
+        F0: f0,
+        delta_f: delta_f
+      };
+    } else {
+      const a = bandpassA;
+      const fh = fs * Math.sqrt((1.0 + a) / 2.0);
+      const fl = fs * Math.sqrt(1.0 / (2.0 * (1.0 + a)));
+      const vol = vas * qts * Math.sqrt(2.0 * a);
+
+      return {
+        valid: true,
+        order: 6,
+        Vf: Math.max(0, vol),
+        Vr: Math.max(0, vol),
+        Fb: 0,
+        Fl: fl,
+        Fh: fh
+      };
     }
   };
 
@@ -549,16 +643,11 @@ function App() {
     const activeFb = boxType === 'bandpass' ? (bandpassData.Fb > 0 ? bandpassData.Fb : customFb) : portedData.Fb;
 
     if (pCount > 0 && activeVb > 0 && activeFb > 0) {
-      let pDia = 0;
-      if (portShape === 'round') {
-        pDia = Number(portDiameter) || 0;
-      } else if (portShape === 'custom') {
-        pDia = 2 * Math.sqrt((Number(portArea) || 0) / Math.PI);
-      } else {
-        const w = Number(portWidth) || 0;
-        const h = Number(portHeight) || 0;
-        pDia = 2 * Math.sqrt((w * h) / Math.PI);
-      }
+      const pDia = portShape === 'round'
+        ? (Number(portDiameter) || 0)
+        : portShape === 'custom'
+          ? (2 * Math.sqrt((Number(portArea) || 0) / Math.PI))
+          : (2 * Math.sqrt(((Number(portWidth) || 0) * (Number(portHeight) || 0)) / Math.PI));
 
       if (pDia > 0) {
         const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
@@ -618,16 +707,13 @@ function App() {
       setCustomVbState(null);
       setCustomFbState(null);
     }
-  }, [preset, customPorted, portedData.valid, portedData.Vb, portedData.Fb, wasmLoaded]);
+  }, []);
 
   const handleExportReport = () => {
     console.log("handleExportReport: triggered");
     try {
       // Recopilar datos del crossover si está registrado
-      let xoverData: CrossoverExportData | null = null;
-      if (crossoverRef.current) {
-        xoverData = crossoverRef.current();
-      }
+      const xoverData = crossoverRef.current ? crossoverRef.current() : null;
 
       // Longitud del puerto, diámetro equivalente, velocidad del aire
       let pLen = 'N/A';
@@ -670,7 +756,7 @@ function App() {
         portedData,
         dampingType,
         cabinetRef.current,
-        crossoverRef.current ? {
+        xoverData ? {
           crossoverWays: xoverData.crossoverWays,
           crossoverType: xoverData.crossoverType,
           fc: xoverData.fc,
