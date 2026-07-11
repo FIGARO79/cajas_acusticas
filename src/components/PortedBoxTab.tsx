@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { type Lang, translate } from '../utils/translations';
-import type { CalculatedPorted, SpeakerParams } from '../types';
+import type { CalculatedPorted, SpeakerParams, PortSuggestions } from '../types';
 import { suggestPortConfig } from '../utils/acousticMath';
 import { calcSuggestedPorted } from '../wasm/index';
 
@@ -59,7 +59,7 @@ export const PortedBoxTab: React.FC<PortedBoxTabProps> = ({
   isLinkedToCabinet,
   onExportReport
 }) => {
-  const t = (text: string) => translate(text, lang);
+  const t = React.useCallback((text: string) => translate(text, lang), [lang]);
 
   // Silenciar variables no usadas de puerto personalizado para satisfacer la verificación estricta de compilación
   if (portArea !== undefined || typeof setPortArea === 'function') {
@@ -72,10 +72,7 @@ export const PortedBoxTab: React.FC<PortedBoxTabProps> = ({
   const [prVas, setPrVas] = useState<number>(params.vas || 45); // L
   const [prFs, setPrFs] = useState<number>(25); // Hz
   const [prMms, setPrMms] = useState<number>(35); // g
-  const [prFbNatural, setPrFbNatural] = useState<number>(0);
-  const [prMasaAnadidaG, setPrMasaAnadidaG] = useState<number>(0);
-
-  useEffect(() => {
+  const { prFbNatural, prMasaAnadidaG } = useMemo(() => {
     if (portedData.valid && portedData.Vb > 0) {
       const rho = 1.205;
       const c = 343.0;
@@ -92,7 +89,6 @@ export const PortedBoxTab: React.FC<PortedBoxTabProps> = ({
 
       // Sintonía natural (Hz)
       const fbNat = (1.0 / (2.0 * Math.PI)) * Math.sqrt(1.0 / (mp_propia * (cap + cab)));
-      setPrFbNatural(fbNat);
 
       // Masa acústica total requerida para sintonizar a la frecuencia objetivo de la caja (portedData.Fb)
       const targetFb = portedData.Fb;
@@ -101,36 +97,29 @@ export const PortedBoxTab: React.FC<PortedBoxTabProps> = ({
 
       // Masa mecánica añadida en gramos
       const masaMecG = mp_ad_req * sd_m2 * sd_m2 * 1000;
-      setPrMasaAnadidaG(Math.max(0, masaMecG));
+      return {
+        prFbNatural: fbNat,
+        prMasaAnadidaG: Math.max(0, masaMecG)
+      };
     }
-  }, [prDia, prVas, prFs, prMms, portedData, params]);
+    return { prFbNatural: 0, prMasaAnadidaG: 0 };
+  }, [prDia, prVas, prMms, portedData]);
 
   // Suggested commercial port sizes
-  const [suggestions, setSuggestions] = useState<ReturnType<typeof suggestPortConfig> | null>(null);
-
-  useEffect(() => {
+  const suggestions = useMemo<PortSuggestions | null>(() => {
     if (portedData.valid && portedData.Vb > 0 && portedData.Fb > 0) {
-      setSuggestions(suggestPortConfig(portedData.Vb, portedData.Fb, params));
-    } else {
-      setSuggestions(null);
+      return suggestPortConfig(portedData.Vb, portedData.Fb, params);
     }
+    return null;
   }, [portedData, params]);
 
-  // Port length Lv
-  const [portLength, setPortLength] = useState<string>('N/A');
-  const [vPeak, setVPeak] = useState<number | null>(null);
-
-  useEffect(() => {
+  // Port length Lv and Peak air velocity
+  const { portLength, vPeak } = useMemo(() => {
     const pCount = typeof portCount === 'number' ? portCount : 0;
     if (pCount > 0 && portedData.Vb > 0) {
-      let pDia = 0;
-      if (portShape === 'round') {
-        pDia = portDiameter || 0;
-      } else {
-        const w = portWidth || 0;
-        const h = portHeight || 0;
-        pDia = 2 * Math.sqrt((w * h) / Math.PI); // Diámetro equivalente
-      }
+      const pDia = portShape === 'round'
+        ? (portDiameter || 0)
+        : 2 * Math.sqrt(((portWidth || 0) * (portHeight || 0)) / Math.PI); // Diámetro equivalente
 
       if (pDia > 0) {
         const rPort = pDia / 2;
@@ -139,29 +128,24 @@ export const PortedBoxTab: React.FC<PortedBoxTabProps> = ({
         const displayLv = convertTo(Lv, 'length', unitSystem);
         const unitLabel = getUnitLabel('length', unitSystem);
 
+        let lenStr: string;
         if (Lv <= 0) {
-          setPortLength(t("Excesivamente corto"));
+          lenStr = t("Excesivamente corto");
         } else if (Lv > 120) {
-          setPortLength(`${displayLv.toFixed(1)} ${unitLabel} (${t("Excede caja")})`);
+          lenStr = `${displayLv.toFixed(1)} ${unitLabel} (${t("Excede caja")})`;
         } else {
-          setPortLength(`${displayLv.toFixed(1)} ${unitLabel}`);
+          lenStr = `${displayLv.toFixed(1)} ${unitLabel}`;
         }
 
-        if (params.sd && params.xmax) {
-          const peak = (0.008 * portedData.Fb * params.sd * params.xmax) / (pCount * Math.pow(pDia, 2));
-          setVPeak(peak);
-        } else {
-          setVPeak(null);
-        }
-      } else {
-        setPortLength('N/A');
-        setVPeak(null);
+        const peak = (params.sd && params.xmax)
+          ? (0.008 * portedData.Fb * params.sd * params.xmax) / (pCount * Math.pow(pDia, 2))
+          : null;
+
+        return { portLength: lenStr, vPeak: peak };
       }
-    } else {
-      setPortLength('N/A');
-      setVPeak(null);
     }
-  }, [portCount, portDiameter, portShape, portWidth, portHeight, portedData, params, lang, unitSystem]);
+    return { portLength: 'N/A', vPeak: null };
+  }, [portCount, portDiameter, portShape, portWidth, portHeight, portedData, params, unitSystem, t]);
 
   const handleApplyPort = (num: number, dia: number) => {
     setPortShape('round');
@@ -481,7 +465,7 @@ export const PortedBoxTab: React.FC<PortedBoxTabProps> = ({
                       </tr>
                     </thead>
                     <tbody>
-                      {suggestions.options?.map((opt: any, idx: number) => {
+                      {suggestions.options?.map((opt, idx) => {
                         const typeText = !opt.isCustom 
                           ? t("Mínimo Teórico") 
                           : `${t("Comercial")} ${opt.diameter === 5 ? '2"' : opt.diameter === 7.5 ? '3"' : opt.diameter === 10 ? '4"' : '6"'}`;
@@ -492,8 +476,8 @@ export const PortedBoxTab: React.FC<PortedBoxTabProps> = ({
 
                         const lengthText = opt.length > 0 ? `${displayOptLen.toFixed(1)} ${unitLabel}` : t("Inviable");
                         
-                        let sugText = '';
-                        let applyFn = () => {};
+                        let sugText: string;
+                        let applyFn: () => void;
 
                         if (portShape === 'rectangular') {
                           const area = Math.PI * Math.pow(opt.diameter / 2, 2);

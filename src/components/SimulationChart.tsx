@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -10,6 +10,7 @@ import {
   Tooltip,
   Legend,
   Filler,
+  type TooltipItem,
 } from 'chart.js';
 import type { CalculatedSealed, CalculatedPorted, CalculatedBandpass, SpeakerParams } from '../types';
 import { type Lang, translate } from '../utils/translations';
@@ -123,14 +124,26 @@ const getFilterGain = (f: number, fcPoint: number, type: string, passType: 'LP' 
 };
 
 // Custom annotation plugin for vertical reference lines
+interface AnnotationOption {
+  value: number;
+  borderColor?: string;
+  borderWidth?: number;
+  borderDash?: number[];
+  label?: string;
+  labelBgColor?: string;
+  labelTextColor?: string;
+}
+
 const lineAnnotationPlugin = {
   id: 'lineAnnotation',
-  afterDraw: (chart: any) => {
+  afterDraw: (chart: ChartJS) => {
     const { ctx, scales: { x, y } } = chart;
-    const annotations = chart.options.plugins?.lineAnnotation?.annotations || [];
+    const plugins = chart.options.plugins as Record<string, unknown> | undefined;
+    const lineAnn = plugins?.lineAnnotation as Record<string, unknown> | undefined;
+    const annotations = (lineAnn?.annotations as AnnotationOption[]) || [];
     
     ctx.save();
-    annotations.forEach((ann: any) => {
+    annotations.forEach((ann: AnnotationOption) => {
       const xVal = ann.value;
       if (xVal < x.min || xVal > x.max) return;
       
@@ -194,7 +207,7 @@ export const SimulationChart: React.FC<SimulationChartProps> = ({
   fcLow = 500,
   fcHigh = 4000,
 }) => {
-  const t = (text: string) => translate(text, lang);
+  const t = useCallback((text: string) => translate(text, lang), [lang]);
 
   // Range and Annotation modes
   const [rangeMode, setRangeMode] = useState<'bass' | 'full'>('bass');
@@ -260,7 +273,7 @@ export const SimulationChart: React.FC<SimulationChartProps> = ({
   const fullRangeDatasets = React.useMemo(() => {
     if (rangeMode !== 'full') return [];
 
-    const datasets: any[] = [];
+    const datasets: Record<string, unknown>[] = [];
     const fs = params.fs || 38;
     const qts = params.qts || 0.36;
     const vas = params.vas || 45;
@@ -426,12 +439,12 @@ export const SimulationChart: React.FC<SimulationChartProps> = ({
     }
 
     return datasets;
-  }, [rangeMode, params, sealedData, portedData, bandpassData, crossoverWays, crossoverType, fc, fcLow, fcHigh, lang]);
+  }, [rangeMode, params, sealedData, portedData, bandpassData, crossoverWays, crossoverType, fc, fcLow, fcHigh, t]);
 
   // Construct reference line annotations
   const annotations = React.useMemo(() => {
     if (!showRefLines) return [];
-    const list: any[] = [];
+    const list: AnnotationOption[] = [];
 
     if (rangeMode === 'bass') {
       if (sealedData && sealedData.valid) {
@@ -559,7 +572,7 @@ export const SimulationChart: React.FC<SimulationChartProps> = ({
     ...sealedPoints.map(p => p.y),
     ...portedPoints.map(p => p.y),
     ...bandpassPoints.map(p => p.y)
-  ] : fullRangeDatasets.flatMap(d => d.data.map((p: any) => p.y));
+  ] : fullRangeDatasets.flatMap(d => (d.data as { x: number, y: number }[]).map(p => p.y));
 
   const highestY = allYValues.length > 0 ? Math.max(...allYValues) : 0;
   const lowestY = allYValues.length > 0 ? Math.min(...allYValues) : -24;
@@ -633,12 +646,13 @@ export const SimulationChart: React.FC<SimulationChartProps> = ({
         ticks: {
           color: chartTextColor,
           font: { family: 'Inter', size: 10 },
-          callback: function (value: any) {
+           callback: function (value: string | number) {
             const targets = rangeMode === 'bass'
               ? [10, 20, 30, 50, 70, 100, 200, 300, 500]
               : [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000];
-            if (targets.includes(value)) {
-              return value >= 1000 ? (value / 1000) + 'k Hz' : value + ' Hz';
+            const numVal = Number(value);
+            if (targets.includes(numVal)) {
+              return numVal >= 1000 ? (numVal / 1000) + 'k Hz' : numVal + ' Hz';
             }
             return null;
           },
@@ -679,7 +693,7 @@ export const SimulationChart: React.FC<SimulationChartProps> = ({
         borderColor: chartTooltipBorder,
         borderWidth: 1,
         callbacks: {
-          label: function (context: any) {
+          label: function (context: TooltipItem<'line'>) {
             return `${context.dataset.label}: ${context.parsed.y.toFixed(1)} dB ${t('a')} ${context.parsed.x >= 1000 ? (context.parsed.x/1000).toFixed(1)+'k' : context.parsed.x} Hz`;
           },
         },
