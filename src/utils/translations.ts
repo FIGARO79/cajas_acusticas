@@ -217,7 +217,10 @@ const TRANSLATIONS: Record<Exclude<Lang, 'es'>, Record<string, string>> = {
     "Espesor de Madera": "Wood Thickness",
     "Vol. Extra": "Extra Vol.",
     "(Altavoz/Ducto/Ref.)": "(Speaker/Port/Braces)",
+    "Refuerzos Internos": "Internal Bracing",
+    "Mostrar Bracing": "Show Bracing",
     "Dimensiones Internas": "Internal Dimensions",
+
     "Alto x Ancho x Profundidad": "Height x Width x Depth",
     "Dimensiones Externas": "External Dimensions",
     "Puerto(s) de Sintonía para este Diseño": "Tuning Port(s) for this Design",
@@ -529,7 +532,10 @@ const TRANSLATIONS: Record<Exclude<Lang, 'es'>, Record<string, string>> = {
     "Espesor de Madera": "Espessura da Madeira",
     "Vol. Extra": "Vol. Extra",
     "(Altavoz/Ducto/Ref.)": "(Alto-falante/Duto/Reforços)",
+    "Refuerzos Internos": "Reforços Internos",
+    "Mostrar Bracing": "Mostrar Bracing",
     "Dimensiones Internas": "Dimensões Internas",
+
     "Alto x Ancho x Profundidad": "Altura x Largura x Profundidade",
     "Puerto(s) de Sintonía para este Diseño": "Duto(s) de Sintonia para este Design",
     "Cantidad e Instalación:": "Quantidade e Instalação:",

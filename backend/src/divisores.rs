@@ -25,16 +25,21 @@ pub struct Filter2ndOrder {
 #[wasm_bindgen]
 pub fn calc_filtro_2do_orden_butterworth(fc: f64, r: f64) -> Filter2ndOrder {
     let sqrt2 = std::f64::consts::SQRT_2;
-    
+
     // Faradios a uF -> * 1e6
     let c_hp = (1.0 / (2.0 * PI * fc * r * sqrt2)) * 1_000_000.0;
     let c_lp = (sqrt2 / (2.0 * PI * fc * r)) * 1_000_000.0;
-    
+
     // Henrios a mH -> * 1e3
     let l_hp = (r / (2.0 * PI * fc * sqrt2)) * 1000.0;
     let l_lp = ((r * sqrt2) / (2.0 * PI * fc)) * 1000.0;
 
-    Filter2ndOrder { c_hp, l_hp, c_lp, l_lp }
+    Filter2ndOrder {
+        c_hp,
+        l_hp,
+        c_lp,
+        l_lp,
+    }
 }
 
 #[wasm_bindgen]
@@ -83,17 +88,20 @@ pub fn calc_lpad(atenuacion_db: f64, r_load: f64) -> LPadResult {
     // R1 = Z * (1 - k)
     // R2 = Z * (k / (1 - k))
     // Verifiquemos con la fórmula del texto:
-    // texto dice: R1 = R_load * k / (1-k) -> NO, el texto parece que k era otra cosa o hay un error. 
+    // texto dice: R1 = R_load * k / (1-k) -> NO, el texto parece que k era otra cosa o hay un error.
     // Usaremos la fórmula del texto tal cual: k = 10^(-A/20)
     // "R1 = (R_load * k) / (1 - k)" => pero el ejemplo A=6dB -> k=0.501
-    // R1 = 8 * 0.501 / 0.499 = 8.0 ? No, R1 = 8 * (1 - 0.5) = 4. 
-    // Ah, el texto dice: "R1 = R_load * k / (1-k) ??? No, el texto dice: 
-    // R1 = R_load * k / (1-k)? 
-    // Vamos a usar la fórmula universal: 
+    // R1 = 8 * 0.501 / 0.499 = 8.0 ? No, R1 = 8 * (1 - 0.5) = 4.
+    // Ah, el texto dice: "R1 = R_load * k / (1-k) ??? No, el texto dice:
+    // R1 = R_load * k / (1-k)?
+    // Vamos a usar la fórmula universal:
     let r1_calc = r_load * (1.0 - k);
     let r2_calc = r_load * (k / (1.0 - k));
-    
-    LPadResult { r1: r1_calc, r2: r2_calc }
+
+    LPadResult {
+        r1: r1_calc,
+        r2: r2_calc,
+    }
 }
 
 #[wasm_bindgen]

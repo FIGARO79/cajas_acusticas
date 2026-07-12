@@ -3,17 +3,17 @@
 
 use wasm_bindgen::prelude::*;
 
+pub mod auto_params;
 pub mod cajas;
 pub mod curves;
 pub mod divisores;
-pub mod radiador;
 pub mod isobaric;
-pub mod auto_params;
+pub mod radiador;
 
-pub use crate::radiador::*;
-pub use crate::isobaric::*;
 pub use crate::auto_params::*;
 pub use crate::curves::*;
+pub use crate::isobaric::*;
+pub use crate::radiador::*;
 
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]

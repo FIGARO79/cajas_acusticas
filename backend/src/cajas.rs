@@ -1,6 +1,5 @@
 use wasm_bindgen::prelude::*;
 
-
 #[wasm_bindgen]
 pub struct SealedResult {
     pub alpha: f64,
@@ -11,12 +10,18 @@ pub struct SealedResult {
 }
 
 #[wasm_bindgen]
-pub fn calc_caja_sellada(fs: f64, vas: f64, qts: f64, vb_target: f64, qtc_target: f64) -> SealedResult {
+pub fn calc_caja_sellada(
+    fs: f64,
+    vas: f64,
+    qts: f64,
+    vb_target: f64,
+    qtc_target: f64,
+) -> SealedResult {
     // Calculos con vb_target
     let alpha = vas / vb_target;
     let qtc = qts * (alpha + 1.0).sqrt();
     let fc = fs * (alpha + 1.0).sqrt();
-    
+
     // F3
     let f3_term = 1.0 / qtc.powi(2) - 2.0;
     let f3 = fc * ((f3_term + (f3_term.powi(2) + 4.0).sqrt()) / 2.0).sqrt();
@@ -44,11 +49,8 @@ pub fn calc_caja_ventilada(vb: f64, fb: f64, dv: f64) -> VentedResult {
     // dv en cm, vb en L, fb en Hz
     // Lv (cm) = (23407.2 * dv^2) / (fb^2 * vb) - 0.732 * dv
     let lv = (23407.2 * dv.powi(2)) / (fb.powi(2) * vb) - 0.732 * dv;
-    
-    VentedResult {
-        fb,
-        lv,
-    }
+
+    VentedResult { fb, lv }
 }
 
 #[wasm_bindgen]
@@ -66,13 +68,13 @@ pub fn calc_alineacion_ventilada(fs: f64, vas: f64, qts: f64, tipo: &str) -> Ven
             let fb = 0.38 * qts.powf(-0.95) * fs;
             let f3 = 0.38 * qts.powf(-0.95) * fs;
             (vb, fb, f3)
-        },
+        }
         "B4" => {
             let vb = 0.25 * qts.powf(-2.0) * vas;
             let fb = fs;
             let f3 = fs;
             (vb, fb, f3)
-        },
+        }
         "QB3" | _ => {
             let vb = 6.27 * qts.powf(1.44) * vas;
             let fb = 0.94 * qts.powf(-0.9) * fs;
@@ -102,7 +104,13 @@ pub fn calc_bandpass_4(fs: f64, vas: f64, qts: f64, s: f64) -> Bandpass4Result {
     let f0 = fs * (s / qts); // F0 se alinea con Fb en diseño ideal
     let delta_f = (fs / qts) * s;
 
-    Bandpass4Result { vf, vr, fb, f0, delta_f }
+    Bandpass4Result {
+        vf,
+        vr,
+        fb,
+        f0,
+        delta_f,
+    }
 }
 
 #[wasm_bindgen]
@@ -119,7 +127,10 @@ pub fn calc_bandpass_6(fs: f64, vas: f64, qts: f64, a: f64) -> Bandpass6Result {
     let fl = fs * (1.0 / (2.0 * (1.0 + a))).sqrt();
     let vol = vas * qts * (2.0 * a).sqrt();
 
-    Bandpass6Result { vf: vol, vr: vol, fh, fl }
+    Bandpass6Result {
+        vf: vol,
+        vr: vol,
+        fh,
+        fl,
+    }
 }
-
-

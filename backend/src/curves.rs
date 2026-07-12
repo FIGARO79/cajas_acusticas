@@ -1,6 +1,6 @@
 //! Cálculos de curvas de respuesta en frecuencia para cajas selladas y ventiladas.
-use wasm_bindgen::prelude::*;
 use js_sys::Array;
+use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 pub fn calc_sealed_curve(fs: f64, qts: f64, vas: f64, vb: f64, valid: bool) -> Array {
@@ -18,7 +18,7 @@ pub fn calc_sealed_curve(fs: f64, qts: f64, vas: f64, vb: f64, valid: bool) -> A
         let fc = fs * (alpha + 1.0).sqrt();
         let qtc = qts * (alpha + 1.0).sqrt();
         let fn_ = f / fc;
-        let response = fn_.powi(2) / (( (fn_.powi(2) - 1.0).powi(2) + (fn_ / qtc).powi(2) ).sqrt());
+        let response = fn_.powi(2) / (((fn_.powi(2) - 1.0).powi(2) + (fn_ / qtc).powi(2)).sqrt());
         let response_db = 20.0 * (response + 1e-10).log10();
         let val = (response_db * 100.0_f64).round() / 100.0_f64;
         result.push(&JsValue::from_f64(val));
@@ -56,7 +56,15 @@ pub fn calc_ported_curve(fs: f64, qts: f64, vas: f64, vb: f64, fb: f64, valid: b
 }
 
 #[wasm_bindgen]
-pub fn calc_bandpass4_curve(fs: f64, qts: f64, vas: f64, vf: f64, vr: f64, fb: f64, valid: bool) -> Array {
+pub fn calc_bandpass4_curve(
+    fs: f64,
+    qts: f64,
+    vas: f64,
+    vf: f64,
+    vr: f64,
+    fb: f64,
+    valid: bool,
+) -> Array {
     if !valid || vf <= 0.0 || vr <= 0.0 || fb <= 0.0 {
         return Array::new();
     }
@@ -86,7 +94,7 @@ pub fn calc_bandpass4_curve(fs: f64, qts: f64, vas: f64, vf: f64, vr: f64, fb: f
         // Multiplicada por un factor de escala para alinear la ganancia de la banda de paso
         let response = (y * y * alpha_f) / denom;
         let response_db = 20.0 * (response + 1e-10).log10();
-        
+
         let val = (response_db * 100.0_f64).round() / 100.0_f64;
         result.push(&JsValue::from_f64(val));
     }
@@ -94,7 +102,16 @@ pub fn calc_bandpass4_curve(fs: f64, qts: f64, vas: f64, vf: f64, vr: f64, fb: f
 }
 
 #[wasm_bindgen]
-pub fn calc_bandpass6_curve(fs: f64, qts: f64, vas: f64, vf: f64, vr: f64, fl: f64, fh: f64, valid: bool) -> Array {
+pub fn calc_bandpass6_curve(
+    _fs: f64,
+    _qts: f64,
+    vas: f64,
+    vf: f64,
+    vr: f64,
+    fl: f64,
+    fh: f64,
+    valid: bool,
+) -> Array {
     if !valid || vf <= 0.0 || vr <= 0.0 || fl <= 0.0 || fh <= 0.0 {
         return Array::new();
     }
@@ -123,11 +140,10 @@ pub fn calc_bandpass6_curve(fs: f64, qts: f64, vas: f64, vf: f64, vr: f64, fl: f
         // A escala de nivel: sumamos ganancia según el tamaño relativo de vas / (vf + vr)
         let alpha = vas / (vf + vr);
         let response = hp * lp * (1.0 + alpha).sqrt();
-        
+
         let response_db = 20.0 * (response + 1e-10).log10();
         let val = (response_db * 100.0_f64).round() / 100.0_f64;
         result.push(&JsValue::from_f64(val));
     }
     result
 }
-

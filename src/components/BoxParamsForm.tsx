@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { type Lang, translate } from '../utils/translations';
 import { type UnitSystem, convertTo, convertFrom, getUnitLabel } from '../utils/units';
-import type { CalculatedPorted, CalculatedSealed, CalculatedBandpass, SpeakerParams, PortSuggestions } from '../types';
+import type { CalculatedPorted, CalculatedSealed, CalculatedBandpass, SpeakerParams, PortSuggestions, WoodCabinetData } from '../types';
 import { suggestPortConfig } from '../utils/acousticMath';
 
 interface BoxParamsFormProps {
@@ -19,6 +19,7 @@ interface BoxParamsFormProps {
   portedData: CalculatedPorted;
   sealedData: CalculatedSealed;
   bandpassData: CalculatedBandpass;
+  cabinetData: WoodCabinetData | null;
   isLinkedToCabinet: boolean;
 
   // Ajustes de alineación
@@ -83,6 +84,9 @@ interface BoxParamsFormProps {
   setWoodThickness: (val: number | '') => void;
   woodExtra: number | '';
   setWoodExtra: (val: number | '') => void;
+  enableBracing?: boolean;
+  onEnableBracingChange?: (v: boolean) => void;
+
   // Locks/Fijaciones
   woodLockVal1: number | '';
   setWoodLockVal1: (v: number | '') => void;
@@ -156,6 +160,17 @@ interface BoxParamsFormProps {
   setMidQts: (val: number) => void;
   midTargetQtc: number;
   setMidTargetQtc: (val: number) => void;
+  useCustomMidVol: boolean;
+  setUseCustomMidVol: (val: boolean) => void;
+  customMidVol: number | '';
+  setCustomMidVol: (val: number | '') => void;
+
+  tweeterYPct: number;
+  setTweeterYPct: (val: number) => void;
+  midrangeYPct: number;
+  setMidrangeYPct: (val: number) => void;
+  midCabinetDepth: number | '';
+  setMidCabinetDepth: (val: number | '') => void;
 }
 
 export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
@@ -172,6 +187,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
   portedData,
   sealedData,
   bandpassData,
+  cabinetData,
   isLinkedToCabinet,
 
   targetQtc,
@@ -229,6 +245,9 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
   setWoodThickness,
   woodExtra,
   setWoodExtra,
+  enableBracing = false,
+  onEnableBracingChange,
+
   woodLockVal1,
   setWoodLockVal1,
   woodLockVal2,
@@ -294,6 +313,18 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
   setMidVas,
   midQts,
   setMidQts,
+  midTargetQtc,
+  setMidTargetQtc,
+  useCustomMidVol,
+  setUseCustomMidVol,
+  customMidVol,
+  setCustomMidVol,
+  tweeterYPct,
+  setTweeterYPct,
+  midrangeYPct,
+  setMidrangeYPct,
+  midCabinetDepth,
+  setMidCabinetDepth,
 }) => {
   const t = (text: string) => translate(text, lang);
 
@@ -494,12 +525,12 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
         {activeTab === 'wood' && (
           <>
             {/* Modo de Medidas (Calcular / Ingresar) */}
-            <div className="segmented-control" style={{ marginBottom: '0.5rem', padding: '2px', borderRadius: '10px' }}>
+            <div className="segmented-control" style={{ marginBottom: '0.5rem', padding: '2px', borderRadius: '0px' }}>
               <button
                 type="button"
                 className={woodMode === 'calc' ? 'active' : ''}
                 onClick={() => setWoodMode('calc')}
-                style={{ padding: '0.3rem 0.25rem', fontSize: '0.72rem', borderRadius: '7px' }}
+                style={{ padding: '0.3rem 0.25rem', fontSize: '0.72rem', borderRadius: '0px' }}
               >
                 {t("Calcular (Vb)")}
               </button>
@@ -507,7 +538,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 type="button"
                 className={woodMode === 'input' ? 'active' : ''}
                 onClick={() => setWoodMode('input')}
-                style={{ padding: '0.3rem 0.25rem', fontSize: '0.72rem', borderRadius: '7px' }}
+                style={{ padding: '0.3rem 0.25rem', fontSize: '0.72rem', borderRadius: '0px' }}
               >
                 {t("Medidas Manuales")}
               </button>
@@ -516,12 +547,12 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
             {/* Forma de la caja */}
             <div className="input-group" style={{ marginBottom: '1rem' }}>
               <label>{t("Forma de caja")}</label>
-              <div className="segmented-control" style={{ padding: '2px', borderRadius: '8px' }}>
+              <div className="segmented-control" style={{ padding: '2px', borderRadius: '0px' }}>
                 <button
                   type="button"
                   className={woodShape === 'rectangular' ? 'active' : ''}
                   onClick={() => setWoodShape('rectangular')}
-                  style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', borderRadius: '6px' }}
+                  style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', borderRadius: '0px' }}
                 >
                   {t("Rectangular")}
                 </button>
@@ -529,7 +560,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                   type="button"
                   className={woodShape === 'trapezoidal' ? 'active' : ''}
                   onClick={() => setWoodShape('trapezoidal')}
-                  style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', borderRadius: '6px' }}
+                  style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', borderRadius: '0px' }}
                 >
                   {t("Trapezoidal")}
                 </button>
@@ -628,7 +659,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     type="button"
                     onClick={handleApplySuggestedCabinet}
                     className="preset-select"
-                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', background: 'var(--primary)', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer' }}
+                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', background: 'var(--primary)', border: 'none', color: '#fff', borderRadius: '0px', cursor: 'pointer' }}
                   >
                     {t("Cargar Sugerido")}
                   </button>
@@ -757,8 +788,190 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     <span className="unit-badge">{getUnitLabel('volume', unitSystem)}</span>
                   </div>
                 </div>
+                <div className="input-group">
+                  <label>{t("Refuerzos Internos")}</label>
+                  <div className="input-wrapper" style={{ display: 'flex', alignItems: 'center', height: '30px', gap: '0.4rem' }}>
+                    <input
+                      type="checkbox"
+                      checked={enableBracing}
+                      onChange={(e) => onEnableBracingChange?.(e.target.checked)}
+                      style={{ width: '1.1rem', height: '1.1rem', cursor: 'pointer', margin: 0 }}
+                    />
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t("Mostrar Bracing")}</span>
+                  </div>
+                </div>
               </div>
             </div>
+
+
+            {/* Cámara de Medios (Solo si es diseño de 3 vías) */}
+            {crossoverWays === 3 && (
+              <div className="premium-form-card" style={{ marginBottom: '0.5rem' }}>
+                <div className="form-subsection-title" style={{ marginTop: 0, marginBottom: '0.35rem' }}>
+                  {t("Recinto de Medios (Cámara Separada)")}
+                </div>
+
+                {/* Collapsible reference panel */}
+                <details style={{
+                  background: 'rgba(15, 23, 42, 0.3)',
+                  border: '1px solid var(--card-border)',
+                  borderRadius: '6px',
+                  padding: '0.4rem 0.55rem',
+                  marginBottom: '0.75rem',
+                  fontSize: '0.68rem',
+                  color: 'var(--text-muted)'
+                }}>
+                  <summary style={{
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    color: 'var(--accent)',
+                    outline: 'none',
+                    userSelect: 'none'
+                  }}>
+                    ℹ️ {t("Guía de Diseño de Cámaras de Medios (Ver más)")}
+                  </summary>
+                  <ul style={{ paddingLeft: '1rem', marginTop: '0.3rem', marginBottom: 0, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                    <li><strong>{t("Aislamiento Hermético:")}</strong> {t("Debe ser completamente hermética para que la presión de aire del woofer no interfiera con el cono de medios.")}</li>
+                    <li><strong>{t("Evitar Formas Cúbicas:")}</strong> {t("Usa paneles traseros inclinados o dimensiones no paralelas para dispersar y romper las ondas estacionarias internas.")}</li>
+                    <li><strong>{t("Relleno de Damping:")}</strong> {t("Se recomienda rellenar la cámara generosamente con absorbente (lana, fieltro o espuma acústica) para mitigar resonancias.")}</li>
+                    <li><strong>{t("Rigidez:")}</strong> {t("Hazla sólida e integrada con el arriostramiento (bracing) del cajón principal.")}</li>
+                  </ul>
+                </details>
+
+                <div className="input-group" style={{ marginBottom: '0.75rem' }}>
+                  <label>{t("Cálculo del Volumen de Medios")}</label>
+                  <div className="segmented-control" style={{ padding: '2px', borderRadius: '0px' }}>
+                    <button
+                      type="button"
+                      className={!useCustomMidVol ? 'active' : ''}
+                      onClick={() => setUseCustomMidVol(false)}
+                      style={{ padding: '0.25rem', fontSize: '0.7rem', borderRadius: '0px' }}
+                    >
+                      {t("Calcular (T/S)")}
+                    </button>
+                    <button
+                      type="button"
+                      className={useCustomMidVol ? 'active' : ''}
+                      onClick={() => setUseCustomMidVol(true)}
+                      style={{ padding: '0.25rem', fontSize: '0.7rem', borderRadius: '0px' }}
+                    >
+                      {t("Volumen Manual")}
+                    </button>
+                  </div>
+                </div>
+
+                {!useCustomMidVol ? (
+                  <div className="input-grid" style={{ marginBottom: '0.5rem' }}>
+                    <div className="input-group">
+                      <label>Fs ({t("Medios")}) (Hz)</label>
+                      <div className="input-wrapper">
+                        <input
+                          type="number"
+                          value={midFs}
+                          onChange={(e) => setMidFs(parseFloat(e.target.value) || 120)}
+                          style={{ height: '30px', padding: '0.2rem 0.55rem', fontSize: '0.78rem' }}
+                        />
+                      </div>
+                    </div>
+                    <div className="input-group">
+                      <label>Vas ({t("Medios")}) (L)</label>
+                      <div className="input-wrapper">
+                        <input
+                          type="number"
+                          value={midVas}
+                          onChange={(e) => setMidVas(parseFloat(e.target.value) || 5)}
+                          style={{ height: '30px', padding: '0.2rem 0.55rem', fontSize: '0.78rem' }}
+                        />
+                      </div>
+                    </div>
+                    <div className="input-group">
+                      <label>Qts ({t("Medios")})</label>
+                      <div className="input-wrapper">
+                        <input
+                          type="number"
+                          value={midQts}
+                          onChange={(e) => setMidQts(parseFloat(e.target.value) || 0.45)}
+                          step="0.01"
+                          style={{ height: '30px', padding: '0.2rem 0.55rem', fontSize: '0.78rem' }}
+                        />
+                      </div>
+                    </div>
+                    <div className="input-group">
+                      <label>{t("Qtc Objetivo (Medios)")}</label>
+                      <div className="input-wrapper">
+                        <input
+                          type="number"
+                          value={midTargetQtc}
+                          onChange={(e) => setMidTargetQtc(parseFloat(e.target.value) || 0.707)}
+                          step="0.01"
+                          style={{ height: '30px', padding: '0.2rem 0.55rem', fontSize: '0.78rem' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="input-group" style={{ marginBottom: '0.5rem' }}>
+                    <label>{t("Volumen del Recinto de Medios")} (L)</label>
+                    <div className="input-wrapper">
+                      <input
+                        type="number"
+                        value={customMidVol}
+                        onChange={(e) => setCustomMidVol(parseFloat(e.target.value) || '')}
+                        placeholder="3.0"
+                        style={{ height: '30px', padding: '0.2rem 0.55rem', fontSize: '0.78rem' }}
+                      />
+                      <span className="unit-badge">L</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="input-group" style={{ marginBottom: '0.5rem' }}>
+                  <label>{t("Profundidad de la Cámara de Medios")} ({getUnitLabel('length', unitSystem)})</label>
+                  <div className="input-wrapper">
+                    <input
+                      type="number"
+                      value={displayVal(midCabinetDepth, 'length')}
+                      onChange={(e) => handleInputChange(e.target.value, setMidCabinetDepth, 'length')}
+                      style={{ height: '30px', padding: '0.2rem 2.2rem 0.2rem 0.55rem', fontSize: '0.78rem' }}
+                    />
+                    <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
+                  </div>
+                </div>
+
+                {/* Resultados del Recinto debajo de los inputs */}
+                <div style={{ borderTop: '1px solid var(--card-border)', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
+                  <label style={{ color: 'var(--accent)', fontWeight: 600, fontSize: '0.72rem', display: 'block', marginBottom: '0.15rem' }}>
+                    {t("Resultados del Recinto:")}
+                  </label>
+                  {cabinetData?.valid ? (
+                    (() => {
+                      let vMid = 3.0;
+                      if (useCustomMidVol) {
+                        vMid = Number(customMidVol) > 0 ? Number(customMidVol) : 3.0;
+                      } else {
+                        if (midQts > 0 && midQts < midTargetQtc && midVas > 0) {
+                          vMid = midVas / (Math.pow(midTargetQtc / midQts, 2) - 1);
+                        }
+                      }
+                      const wI = cabinetData.wInt;
+                      const dI = cabinetData.dMid ?? 15;
+                      const hM = cabinetData.hMid ?? 20;
+                      
+                      return (
+                        <div style={{ fontSize: '0.74rem', color: 'var(--text-main)', lineHeight: '1.25' }}>
+                          <div><strong>{t("Volumen:")}</strong> {vMid.toFixed(1)} L</div>
+                          <div style={{ marginTop: '0.15rem' }}><strong>{t("Dimensiones Internas:")}</strong> {convertTo(hM, 'length', unitSystem).toFixed(1)} x {convertTo(wI, 'length', unitSystem).toFixed(1)} x {convertTo(dI, 'length', unitSystem).toFixed(1)} {getUnitLabel('length', unitSystem)}</div>
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      {t("Ingresa dimensiones válidas en la cabina para ver las medidas del recinto.")}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Dimensionamiento y alineación acústica del cajón */}
             <div className="premium-form-card">
@@ -786,6 +999,8 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
               <div className="input-grid">
                 <div className="input-group">
                   <label>{t("Volumen Neto (Vb)")}</label>
+
+
                   <div className="input-wrapper">
                     <input
                       type="number"
@@ -805,6 +1020,8 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 {boxType !== 'sealed' && (
                   <div className="input-group">
                     <label>{boxType === 'bandpass' ? t("Sintonía Frontal (Fb)") : t("Sintonía (Fb)")}</label>
+
+
                     <div className="input-wrapper">
                       <input
                         type="number"
@@ -819,21 +1036,22 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     </div>
                   </div>
                 )}
+                {boxType === 'sealed' && (
+                  <div className="input-group">
+                    <label>{t("Q del Sistema Objetivo (Qtc)")}</label>
+
+                    <div className="input-wrapper">
+                      <input
+                        type="number"
+                        value={targetQtc}
+                        onChange={(e) => setTargetQtc(parseFloat(e.target.value) || 0.707)}
+                        step="0.01"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {boxType === 'sealed' && (
-                <div className="input-group" style={{ marginTop: '0.5rem' }}>
-                  <label>{t("Q del Sistema Objetivo (Qtc)")}</label>
-                  <div className="input-wrapper">
-                    <input
-                      type="number"
-                      value={targetQtc}
-                      onChange={(e) => setTargetQtc(parseFloat(e.target.value) || 0.707)}
-                      step="0.01"
-                    />
-                  </div>
-                </div>
-              )}
 
               {boxType === 'bandpass' && (
                 <div className="input-grid" style={{ marginTop: '0.5rem' }}>
@@ -883,12 +1101,12 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 <div className="form-subsection-title" style={{ marginTop: 0 }}>{t("Configuración del Puerto")}</div>
                 <div className="input-group" style={{ marginBottom: '0.75rem' }}>
                   <label>{t("Sintonización mediante")}</label>
-                  <div className="segmented-control" style={{ padding: '2px', borderRadius: '8px' }}>
+                  <div className="segmented-control" style={{ padding: '2px', borderRadius: '0px' }}>
                     <button
                       type="button"
                       className={prTuning === 'port' ? 'active' : ''}
                       onClick={() => setPrTuning('port')}
-                      style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', borderRadius: '6px' }}
+                      style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', borderRadius: '0px' }}
                     >
                       {t("Puerto de Aire")}
                     </button>
@@ -896,7 +1114,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       type="button"
                       className={prTuning === 'radiator' ? 'active' : ''}
                       onClick={() => setPrTuning('radiator')}
-                      style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', borderRadius: '6px' }}
+                      style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', borderRadius: '0px' }}
                     >
                       {t("Radiador Pasivo")}
                     </button>
@@ -907,12 +1125,12 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                   <>
                     <div className="input-group" style={{ marginBottom: '0.75rem' }}>
                       <label>{t("Forma del Puerto")}</label>
-                      <div className="segmented-control" style={{ padding: '2px', borderRadius: '8px' }}>
+                      <div className="segmented-control" style={{ padding: '2px', borderRadius: '0px' }}>
                         <button
                           type="button"
                           className={portShape === 'round' ? 'active' : ''}
                           onClick={() => setPortShape('round')}
-                          style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', borderRadius: '6px' }}
+                          style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', borderRadius: '0px' }}
                         >
                           {t("Redondo")}
                         </button>
@@ -920,7 +1138,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                           type="button"
                           className={portShape === 'rectangular' ? 'active' : ''}
                           onClick={() => setPortShape('rectangular')}
-                          style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', borderRadius: '6px' }}
+                          style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', borderRadius: '0px' }}
                         >
                           {t("Rectangular")}
                         </button>
@@ -1146,7 +1364,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                   <input
                     type="range"
                     min="15"
-                    max="85"
+                    max="90"
                     value={speakerYPct}
                     onChange={(e) => setSpeakerYPct(parseInt(e.target.value))}
                     style={{ flex: 1, accentColor: 'var(--accent)', cursor: 'pointer' }}
@@ -1154,15 +1372,53 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 </div>
               </div>
 
+              {crossoverWays >= 2 && (
+                <div className="input-group" style={{ marginBottom: '0.5rem' }}>
+                  <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem' }}>
+                    <span>{t("Posición Vertical Tweeter")}</span>
+                    <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{tweeterYPct}%</span>
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <input
+                      type="range"
+                      min="5"
+                      max="60"
+                      value={tweeterYPct}
+                      onChange={(e) => setTweeterYPct(parseInt(e.target.value))}
+                      style={{ flex: 1, accentColor: 'var(--accent)', cursor: 'pointer' }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {crossoverWays === 3 && (
+                <div className="input-group" style={{ marginBottom: '0.5rem' }}>
+                  <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem' }}>
+                    <span>{t("Posición Vertical Medio")}</span>
+                    <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{midrangeYPct}%</span>
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <input
+                      type="range"
+                      min="15"
+                      max="80"
+                      value={midrangeYPct}
+                      onChange={(e) => setMidrangeYPct(parseInt(e.target.value))}
+                      style={{ flex: 1, accentColor: 'var(--accent)', cursor: 'pointer' }}
+                    />
+                  </div>
+                </div>
+              )}
+
               {boxType === 'ported' && prTuning === 'port' && (
                 <>
-                  <div className="input-group" style={{ marginBottom: '0.5rem' }}>
+                  <div className="input-group" style={{ marginBottom: '0.25rem' }}>
                     <label>{t("Ubicación del Puerto")}</label>
                     <select 
                       value={portLocation} 
                       onChange={(e) => setPortLocation(e.target.value as 'front' | 'rear')}
                       className="input-select"
-                      style={{ width: '100%', height: '34px' }}
+                      style={{ width: '100%', height: '25px', padding: '0px 2rem 0px 0.55rem' }}
                     >
                       <option value="front">{t("Frente")}</option>
                       <option value="rear">{t("Atrás")}</option>
@@ -1229,12 +1485,12 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
               <div className="form-subsection-title" style={{ marginTop: 0 }}>{t("Configuración del Divisor")}</div>
               <div className="input-group" style={{ marginBottom: '0.75rem' }}>
                 <label>{t("Vías")}</label>
-                <div className="segmented-control" style={{ padding: '2px', borderRadius: '8px' }}>
+                <div className="segmented-control" style={{ padding: '2px', borderRadius: '0px' }}>
                   <button
                     type="button"
                     className={crossoverWays === 2 ? 'active' : ''}
                     onClick={() => setCrossoverWays(2)}
-                    style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', borderRadius: '6px' }}
+                    style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', borderRadius: '0px' }}
                   >
                     {t("2 Vías")}
                   </button>
@@ -1242,7 +1498,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     type="button"
                     className={crossoverWays === 3 ? 'active' : ''}
                     onClick={() => setCrossoverWays(3)}
-                    style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', borderRadius: '6px' }}
+                    style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', borderRadius: '0px' }}
                   >
                     {t("3 Vías")}
                   </button>
@@ -1315,31 +1571,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
               </div>
             </div>
 
-            {crossoverWays === 3 && (
-              <div className="premium-form-card">
-                <div className="form-subsection-title" style={{ marginTop: 0 }}>{t("Parámetros del Rango Medio")}</div>
-                <div className="input-grid">
-                  <div className="input-group">
-                    <label>Fs ({t("Medios")}) (Hz)</label>
-                    <div className="input-wrapper">
-                      <input type="number" value={midFs} onChange={(e) => setMidFs(parseFloat(e.target.value) || 120)} />
-                    </div>
-                  </div>
-                  <div className="input-group">
-                    <label>Vas ({t("Medios")}) (L)</label>
-                    <div className="input-wrapper">
-                      <input type="number" value={midVas} onChange={(e) => setMidVas(parseFloat(e.target.value) || 5)} />
-                    </div>
-                  </div>
-                  <div className="input-group">
-                    <label>Qts ({t("Medios")})</label>
-                    <div className="input-wrapper">
-                      <input type="number" value={midQts} onChange={(e) => setMidQts(parseFloat(e.target.value) || 0.45)} step="0.01" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+
 
             {/* Red Zobel y L-Pad agrupadas en una tarjeta */}
             <div className="premium-form-card">

@@ -42,6 +42,11 @@ function App() {
   const [midVas, setMidVas] = useState<number>(5);
   const [midQts, setMidQts] = useState<number>(0.45);
   const [midTargetQtc, setMidTargetQtc] = useState<number>(0.707);
+  const [useCustomMidVol, setUseCustomMidVol] = useState<boolean>(false);
+  const [customMidVol, setCustomMidVol] = useState<number | ''>('');
+  const [midCabinetDepth, setMidCabinetDepth] = useState<number | ''>(15);
+  const [tweeterYPct, setTweeterYPct] = useState<number>(25);
+  const [midrangeYPct, setMidrangeYPct] = useState<number>(50);
 
   // Bandpass State
   const [bandpassOrder, setBandpassOrder] = useState<4 | 6>(4);
@@ -146,15 +151,19 @@ function App() {
 
   const [woodThickness, setWoodThickness] = useState<number | ''>(15);
   const [woodExtra, setWoodExtra] = useState<number | ''>(3.5);
+  const [enableBracing, setEnableBracing] = useState(false);
+
 
   const [speakerYPct, setSpeakerYPct] = useState<number>(50);
   const [portYPct, setPortYPct] = useState<number>(85);
   const [portLocation, setPortLocation] = useState<'front' | 'rear'>('front');
 
   // Shared state for technical report exporting
+  const [cabinetData, setCabinetData] = useState<WoodCabinetData | null>(null);
   const cabinetRef = useRef<WoodCabinetData | null>(null);
   const handleCabinetDataChange = useCallback((data: WoodCabinetData | null) => {
     cabinetRef.current = data;
+    setCabinetData(data);
   }, []);
   const crossoverRef = useRef<(() => CrossoverExportData) | null>(null);
   const handleRegisterCrossover = useCallback((exp: () => CrossoverExportData) => {
@@ -251,13 +260,16 @@ function App() {
     const thickness = (woodThickness || 0) / 10;
     const extra = woodExtra || 0;
     let bruto = 0;
+    let hInt: number, wInt: number, dInt = 0;
+    let d1Int = 0, d2Int = 0;
+
     if (woodShape === 'rectangular') {
       const hExt = woodExtHeight || 0;
       const wExt = woodExtWidth || 0;
       const dExt = woodExtDepth || 0;
-      const hInt = hExt - (2 * thickness);
-      const wInt = wExt - (2 * thickness);
-      const dInt = dExt - (2 * thickness);
+      hInt = hExt - (2 * thickness);
+      wInt = wExt - (2 * thickness);
+      dInt = dExt - (2 * thickness);
       if (hInt > 0 && wInt > 0 && dInt > 0) {
         bruto = (hInt * wInt * dInt) / 1000;
       }
@@ -266,10 +278,10 @@ function App() {
       const wExt = woodTrapExtWidth || 0;
       const d1Ext = woodTrapExtDepthTop || 0;
       const d2Ext = woodTrapExtDepthBot || 0;
-      const hInt = hExt - (2 * thickness);
-      const wInt = wExt - (2 * thickness);
-      const d1Int = Math.max(0, d1Ext - (2 * thickness));
-      const d2Int = Math.max(0, d2Ext - (2 * thickness));
+      hInt = hExt - (2 * thickness);
+      wInt = wExt - (2 * thickness);
+      d1Int = Math.max(0, d1Ext - (2 * thickness));
+      d2Int = Math.max(0, d2Ext - (2 * thickness));
       if (hInt > 0 && wInt > 0 && d1Int > 0 && d2Int > 0) {
         const dAvgInt = (d1Int + d2Int) / 2;
         bruto = (hInt * wInt * dAvgInt) / 1000;
@@ -277,6 +289,36 @@ function App() {
     }
 
     if (bruto <= 0) return 0;
+
+    // Midrange Chamber Volume Calculation (vMid)
+    let vMid = 0;
+    let vMidPartition = 0;
+    let vWooferPartition = 0;
+    if (crossoverWays === 3) {
+      if (useCustomMidVol && Number(customMidVol) > 0) {
+        vMid = Number(customMidVol);
+      } else {
+        vMid = 3.0; // default 3 Liters
+        const mVas = midVas ?? 5;
+        const mQts = midQts ?? 0.45;
+        const mTargetQtc = midTargetQtc ?? 0.707;
+        if (mQts > 0 && mQts < mTargetQtc && mVas > 0) {
+          vMid = mVas / (Math.pow(mTargetQtc / mQts, 2) - 1);
+        }
+      }
+      
+      if (hInt > 0 && wInt > 0) {
+        const dVal = (woodShape === 'rectangular' ? dInt : (d1Int + d2Int) / 2);
+        const dMid = Math.min(midCabinetDepth || 15, dVal - 1);
+        const hM = (wInt > 0 && dMid > 0) ? (vMid * 1000) / (wInt * dMid) : 0;
+        vMidPartition = (wInt * (dMid + hM) * thickness) / 1000;
+      }
+    }
+
+    if (driverConfig === 'dual_isolated' && hInt > 0 && wInt > 0) {
+      const dVal = (woodShape === 'rectangular' ? dInt : (d1Int + d2Int) / 2);
+      vWooferPartition = (wInt * dVal * thickness) / 1000;
+    }
 
     let suggestedFb = 38;
     if (adjParams.fs && adjParams.vas && adjParams.qts) {
@@ -316,7 +358,7 @@ function App() {
           }
         } else {
           const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
-          let currentNetVol = bruto - extra; // Initial guess of physical net volume
+          let currentNetVol = bruto - (extra + vMid + vMidPartition + vWooferPartition); // Initial guess of physical net volume
           
           // Solve the circular reference (netVol -> targetVb -> portLength -> portVol -> netVol) iteratively
           for (let iter = 0; iter < 4; iter++) {
@@ -337,13 +379,13 @@ function App() {
             } else {
               portVol = 0;
             }
-            currentNetVol = Math.max(0, bruto - (extra + portVol));
+            currentNetVol = Math.max(0, bruto - (extra + portVol + vMid + vMidPartition + vWooferPartition));
           }
         }
       }
     }
 
-    return Math.max(0, bruto - (extra + portVol));
+    return Math.max(0, bruto - (extra + portVol + vMid + vMidPartition + vWooferPartition));
   };
 
   const manualNetVol = getManualWoodNetVolume();
@@ -814,164 +856,183 @@ function App() {
 
       <div className="dashboard-grid">
         {/* PARÁMETROS IZQUIERDA */}
-        <SpeakerParamsForm 
-          lang={lang}
-          unitSystem={unitSystem}
-          params={params}
-          onParamsChange={setParams}
-          driverConfig={driverConfig}
-          onDriverConfigChange={setDriverConfig}
-          validationError={validationError}
-          preset={preset}
-          onPresetChange={handlePresetChange}
-          customDrivers={customDrivers}
-          onCustomDriversChange={handleCustomDriversChange}
-        />
+        <div className="font-unified-form" style={{ display: 'contents' }}>
+          <SpeakerParamsForm 
+
+            lang={lang}
+            unitSystem={unitSystem}
+            params={params}
+            onParamsChange={setParams}
+            driverConfig={driverConfig}
+            onDriverConfigChange={setDriverConfig}
+            validationError={validationError}
+            preset={preset}
+            onPresetChange={handlePresetChange}
+            customDrivers={customDrivers}
+            onCustomDriversChange={handleCustomDriversChange}
+          />
+        </div>
 
         {/* PARÁMETROS CENTRO: CAJA DE DISEÑO */}
-        <BoxParamsForm
-          lang={lang}
-          unitSystem={unitSystem}
-          boxType={boxType}
-          setBoxType={setBoxType}
-          customVb={customVb}
-          setCustomVb={setCustomVb}
-          customFb={customFb}
-          setCustomFb={setCustomFb}
-          customPorted={customPorted}
-          setCustomPorted={handleCustomPortedChange}
-          params={adjParams}
-          portedData={portedData}
-          sealedData={sealedData}
-          bandpassData={bandpassData}
-          isLinkedToCabinet={woodMode === 'input' && manualNetVol > 0}
-          targetQtc={targetQtc}
-          setTargetQtc={setTargetQtc}
-          bandpassOrder={bandpassOrder}
-          setBandpassOrder={setBandpassOrder}
-          bandpassS={bandpassS}
-          setBandpassS={setBandpassS}
-          bandpassA={bandpassA}
-          setBandpassA={setBandpassA}
-          
-          portCount={portCount}
-          setPortCount={setPortCount}
-          portDiameter={portDiameter}
-          setPortDiameter={setPortDiameter}
-          portShape={portShape === 'custom' ? 'round' : portShape}
-          setPortShape={setPortShape}
-          portWidth={portWidth}
-          setPortWidth={setPortWidth}
-          portHeight={portHeight}
-          setPortHeight={setPortHeight}
-          portArea={portArea}
-          setPortArea={setPortArea}
-          portLength={portLength}
-          flaredEnds={flaredEnds}
-          setFlaredEnds={setFlaredEnds}
-          useCustomPortLength={useCustomPortLength}
-          setUseCustomPortLength={setUseCustomPortLength}
-          customPortLength={customPortLength}
-          setCustomPortLength={setCustomPortLength}
+        <div className="font-unified-form" style={{ display: 'contents' }}>
+          <BoxParamsForm
+            lang={lang}
+            unitSystem={unitSystem}
+            boxType={boxType}
+            setBoxType={setBoxType}
+            customVb={customVb}
+            setCustomVb={setCustomVb}
+            customFb={customFb}
+            setCustomFb={setCustomFb}
+            customPorted={customPorted}
+            setCustomPorted={handleCustomPortedChange}
+            params={adjParams}
+            portedData={portedData}
+            sealedData={sealedData}
+            bandpassData={bandpassData}
+            cabinetData={cabinetData}
+            isLinkedToCabinet={woodMode === 'input' && manualNetVol > 0}
+            targetQtc={targetQtc}
+            setTargetQtc={setTargetQtc}
+            bandpassOrder={bandpassOrder}
+            setBandpassOrder={setBandpassOrder}
+            bandpassS={bandpassS}
+            setBandpassS={setBandpassS}
+            bandpassA={bandpassA}
+            setBandpassA={setBandpassA}
+            
+            portCount={portCount}
+            setPortCount={setPortCount}
+            portDiameter={portDiameter}
+            setPortDiameter={setPortDiameter}
+            portShape={portShape === 'custom' ? 'round' : portShape}
+            setPortShape={setPortShape}
+            portWidth={portWidth}
+            setPortWidth={setPortWidth}
+            portHeight={portHeight}
+            setPortHeight={setPortHeight}
+            portArea={portArea}
+            setPortArea={setPortArea}
+            portLength={portLength}
+            flaredEnds={flaredEnds}
+            setFlaredEnds={setFlaredEnds}
+            useCustomPortLength={useCustomPortLength}
+            setUseCustomPortLength={setUseCustomPortLength}
+            customPortLength={customPortLength}
+            setCustomPortLength={setCustomPortLength}
 
-          prTuning={prTuning}
-          setPrTuning={setPrTuning}
-          prDia={prDia}
-          setPrDia={setPrDia}
-          prVas={prVas}
-          setPrVas={setPrVas}
-          prFs={prFs}
-          setPrFs={setPrFs}
-          prMms={prMms}
-          setPrMms={setPrMms}
-          prFbNatural={prFbNatural}
-          prMasaAnadidaG={prMasaAnadidaG}
+            prTuning={prTuning}
+            setPrTuning={setPrTuning}
+            prDia={prDia}
+            setPrDia={setPrDia}
+            prVas={prVas}
+            setPrVas={setPrVas}
+            prFs={prFs}
+            setPrFs={setPrFs}
+            prMms={prMms}
+            setPrMms={setPrMms}
+            prFbNatural={prFbNatural}
+            prMasaAnadidaG={prMasaAnadidaG}
 
-          // SUBPESTAÑAS CENTRALES
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
+            // SUBPESTAÑAS CENTRALES
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
 
-          // Ebanistería props
-          woodMode={woodMode}
-          setWoodMode={setWoodMode}
-          woodShape={woodShape}
-          setWoodShape={setWoodShape}
-          woodConstraint={woodConstraint}
-          setWoodConstraint={setWoodConstraint}
-          woodRatio={woodRatio}
-          setWoodRatio={setWoodRatio}
-          woodThickness={woodThickness}
-          setWoodThickness={setWoodThickness}
-          woodExtra={woodExtra}
-          setWoodExtra={setWoodExtra}
-          woodLockVal1={woodLockVal1}
-          setWoodLockVal1={setWoodLockVal1}
-          woodLockVal2={woodLockVal2}
-          setWoodLockVal2={setWoodLockVal2}
-          woodLockVal3={woodLockVal3}
-          setWoodLockVal3={setWoodLockVal3}
-          woodExtHeight={woodExtHeight}
-          setWoodExtHeight={setWoodExtHeight}
-          woodExtWidth={woodExtWidth}
-          setWoodExtWidth={setWoodExtWidth}
-          woodExtDepth={woodExtDepth}
-          setWoodExtDepth={setWoodExtDepth}
-          woodTrapExtHeight={woodTrapExtHeight}
-          setWoodTrapExtHeight={setWoodTrapExtHeight}
-          woodTrapExtWidth={woodTrapExtWidth}
-          setWoodTrapExtWidth={setWoodTrapExtWidth}
-          woodTrapExtDepthTop={woodTrapExtDepthTop}
-          setWoodTrapExtDepthTop={setWoodTrapExtDepthTop}
-          woodTrapExtDepthBot={woodTrapExtDepthBot}
-          setWoodTrapExtDepthBot={setWoodTrapExtDepthBot}
+            // Ebanistería props
+            woodMode={woodMode}
+            setWoodMode={setWoodMode}
+            woodShape={woodShape}
+            setWoodShape={setWoodShape}
+            woodConstraint={woodConstraint}
+            setWoodConstraint={setWoodConstraint}
+            woodRatio={woodRatio}
+            setWoodRatio={setWoodRatio}
+            woodThickness={woodThickness}
+            setWoodThickness={setWoodThickness}
+            woodExtra={woodExtra}
+            setWoodExtra={setWoodExtra}
+            enableBracing={enableBracing}
+            onEnableBracingChange={setEnableBracing}
+            woodLockVal1={woodLockVal1}
+            setWoodLockVal1={setWoodLockVal1}
+            woodLockVal2={woodLockVal2}
+            setWoodLockVal2={setWoodLockVal2}
+            woodLockVal3={woodLockVal3}
+            setWoodLockVal3={setWoodLockVal3}
+            woodExtHeight={woodExtHeight}
+            setWoodExtHeight={setWoodExtHeight}
+            woodExtWidth={woodExtWidth}
+            setWoodExtWidth={setWoodExtWidth}
+            woodExtDepth={woodExtDepth}
+            setWoodExtDepth={setWoodExtDepth}
+            woodTrapExtHeight={woodTrapExtHeight}
+            setWoodTrapExtHeight={setWoodTrapExtHeight}
+            woodTrapExtWidth={woodTrapExtWidth}
+            setWoodTrapExtWidth={setWoodTrapExtWidth}
+            woodTrapExtDepthTop={woodTrapExtDepthTop}
+            setWoodTrapExtDepthTop={setWoodTrapExtDepthTop}
+            woodTrapExtDepthBot={woodTrapExtDepthBot}
+            setWoodTrapExtDepthBot={setWoodTrapExtDepthBot}
 
-          // Damping props
-          dampingType={dampingType}
-          setDampingType={setDampingType}
-          // Crossover props
-          crossoverWays={crossoverWays}
-          setCrossoverWays={setCrossoverWays}
-          crossoverType={crossoverType}
-          setCrossoverType={setCrossoverType}
-          fc={fc}
-          setFc={setFc}
-          fcLow={fcLow}
-          setFcLow={setFcLow}
-          fcHigh={fcHigh}
-          setFcHigh={setFcHigh}
-          zTweeter={zTweeter}
-          setZTweeter={setZTweeter}
-          zMidrange={zMidrange}
-          setZMidrange={setZMidrange}
-          zWoofer={zWoofer}
-          setZWoofer={setZWoofer}
-          enableZobel={enableZobel}
-          setEnableZobel={setEnableZobel}
-          zobelRe={zobelRe}
-          setZobelRe={setZobelRe}
-          zobelLe={zobelLe}
-          setZobelLe={setZobelLe}
-          enableLPad={enableLPad}
-          setEnableLPad={setEnableLPad}
-          lpadAttenuation={lpadAttenuation}
-          setLpadAttenuation={setLpadAttenuation}
-          lpadZLoad={lpadZLoad}
-          setLpadZLoad={setLpadZLoad}
-          speakerYPct={speakerYPct}
-          setSpeakerYPct={setSpeakerYPct}
-          portYPct={portYPct}
-          setPortYPct={setPortYPct}
-          portLocation={portLocation}
-          setPortLocation={setPortLocation}
-          midFs={midFs}
-          setMidFs={setMidFs}
-          midVas={midVas}
-          setMidVas={setMidVas}
-          midQts={midQts}
-          setMidQts={setMidQts}
-          midTargetQtc={midTargetQtc}
-          setMidTargetQtc={setMidTargetQtc}
-        />
+            // Damping props
+            dampingType={dampingType}
+            setDampingType={setDampingType}
+            // Crossover props
+            crossoverWays={crossoverWays}
+            setCrossoverWays={setCrossoverWays}
+            crossoverType={crossoverType}
+            setCrossoverType={setCrossoverType}
+            fc={fc}
+            setFc={setFc}
+            fcLow={fcLow}
+            setFcLow={setFcLow}
+            fcHigh={fcHigh}
+            setFcHigh={setFcHigh}
+            zTweeter={zTweeter}
+            setZTweeter={setZTweeter}
+            zMidrange={zMidrange}
+            setZMidrange={setZMidrange}
+            zWoofer={zWoofer}
+            setZWoofer={setZWoofer}
+            enableZobel={enableZobel}
+            setEnableZobel={setEnableZobel}
+            zobelRe={zobelRe}
+            setZobelRe={setZobelRe}
+            zobelLe={zobelLe}
+            setZobelLe={setZobelLe}
+            enableLPad={enableLPad}
+            setEnableLPad={setEnableLPad}
+            lpadAttenuation={lpadAttenuation}
+            setLpadAttenuation={setLpadAttenuation}
+            lpadZLoad={lpadZLoad}
+            setLpadZLoad={setLpadZLoad}
+            speakerYPct={speakerYPct}
+            setSpeakerYPct={setSpeakerYPct}
+            portYPct={portYPct}
+            setPortYPct={setPortYPct}
+            portLocation={portLocation}
+            setPortLocation={setPortLocation}
+            midFs={midFs}
+            setMidFs={setMidFs}
+            midVas={midVas}
+            setMidVas={setMidVas}
+            midQts={midQts}
+            setMidQts={setMidQts}
+            midTargetQtc={midTargetQtc}
+            setMidTargetQtc={setMidTargetQtc}
+            useCustomMidVol={useCustomMidVol}
+            setUseCustomMidVol={setUseCustomMidVol}
+            customMidVol={customMidVol}
+            setCustomMidVol={setCustomMidVol}
+            tweeterYPct={tweeterYPct}
+            setTweeterYPct={setTweeterYPct}
+            midrangeYPct={midrangeYPct}
+            setMidrangeYPct={setMidrangeYPct}
+            midCabinetDepth={midCabinetDepth}
+            setMidCabinetDepth={setMidCabinetDepth}
+          />
+        </div>
+
  
         {/* CONTENIDOS DERECHA */}
         <main className="dashboard-main">
@@ -1053,6 +1114,13 @@ function App() {
                 midVas={midVas}
                 midQts={midQts}
                 midTargetQtc={midTargetQtc}
+                useCustomMidVol={useCustomMidVol}
+                customMidVol={customMidVol}
+                tweeterYPct={tweeterYPct}
+                midrangeYPct={midrangeYPct}
+                midCabinetDepth={midCabinetDepth}
+                enableBracing={enableBracing}
+                onEnableBracingChange={setEnableBracing}
               />
             </div>
 

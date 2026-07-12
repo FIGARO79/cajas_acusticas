@@ -80,6 +80,9 @@ export interface WoodCabinetData {
   dTrapBotExt?: number;
   thickness: number;
   pieces: WoodCutPiece[];
+  vMid?: number;
+  dMid?: number;
+  hMid?: number;
 }
 
 export interface CustomDriver {
