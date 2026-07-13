@@ -38,15 +38,28 @@ function App() {
   const [lpadZLoad, setLpadZLoad] = useState<number>(8);
 
   // Midrange Parameters for 3-way chamber calculations
-  const [midFs, setMidFs] = useState<number>(120);
-  const [midVas, setMidVas] = useState<number>(5);
-  const [midQts, setMidQts] = useState<number>(0.45);
+  const [midFs, setMidFs] = useState<number>(475);
+  const [midVas, setMidVas] = useState<number>(0);
+  const [midQts, setMidQts] = useState<number>(0.01);
   const [midTargetQtc, setMidTargetQtc] = useState<number>(0.707);
-  const [useCustomMidVol, setUseCustomMidVol] = useState<boolean>(false);
-  const [customMidVol, setCustomMidVol] = useState<number | ''>('');
+  const [midRe, setMidRe] = useState<number>(7.1);
+  const [midLe, setMidLe] = useState<number>(0.8);
+  const [midSealed, setMidSealed] = useState<boolean>(true);
+  const [useCustomMidVol, setUseCustomMidVol] = useState<boolean>(true);
+  const [customMidVol, setCustomMidVol] = useState<number | ''>(0);
   const [midCabinetDepth, setMidCabinetDepth] = useState<number | ''>(15);
   const [tweeterYPct, setTweeterYPct] = useState<number>(25);
   const [midrangeYPct, setMidrangeYPct] = useState<number>(50);
+
+  // Additional midrange parameters (initialized to GRS 5SBM1-8 defaults)
+  const [midDiaNominal, setMidDiaNominal] = useState<string>("5-1/4\"");
+  const [midBoltCircle, setMidBoltCircle] = useState<string>("5\"");
+  const [midPowerRms, setMidPowerRms] = useState<number>(100);
+  const [midPowerMax, setMidPowerMax] = useState<number>(200);
+  const [midFreqMin, setMidFreqMin] = useState<number>(500);
+  const [midFreqMax, setMidFreqMax] = useState<number>(10000);
+  const [midSens, setMidSens] = useState<number>(91);
+  const [midVcDiameter, setMidVcDiameter] = useState<string>("1\"");
 
   // Bandpass State
   const [bandpassOrder, setBandpassOrder] = useState<4 | 6>(4);
@@ -308,7 +321,7 @@ function App() {
     let vMid = 0;
     let vMidPartition = 0;
     let vWooferPartition = 0;
-    if (crossoverWays === 3) {
+    if (crossoverWays === 3 && !midSealed) {
       if (useCustomMidVol && Number(customMidVol) > 0) {
         vMid = Number(customMidVol);
       } else {
@@ -893,6 +906,28 @@ function App() {
             setMidQts={setMidQts}
             midTargetQtc={midTargetQtc}
             setMidTargetQtc={setMidTargetQtc}
+            zMidrange={zMidrange}
+            setZMidrange={setZMidrange}
+            midRe={midRe}
+            setMidRe={setMidRe}
+            midLe={midLe}
+            setMidLe={setMidLe}
+            midDiaNominal={midDiaNominal}
+            setMidDiaNominal={setMidDiaNominal}
+            midBoltCircle={midBoltCircle}
+            setMidBoltCircle={setMidBoltCircle}
+            midPowerRms={midPowerRms}
+            setMidPowerRms={setMidPowerRms}
+            midPowerMax={midPowerMax}
+            setMidPowerMax={setMidPowerMax}
+            midFreqMin={midFreqMin}
+            setMidFreqMin={setMidFreqMin}
+            midFreqMax={midFreqMax}
+            setMidFreqMax={setMidFreqMax}
+            midSens={midSens}
+            setMidSens={setMidSens}
+            midVcDiameter={midVcDiameter}
+            setMidVcDiameter={setMidVcDiameter}
           />
         </div>
 
@@ -1055,6 +1090,8 @@ function App() {
             setMidrangeYPct={setMidrangeYPct}
             midCabinetDepth={midCabinetDepth}
             setMidCabinetDepth={setMidCabinetDepth}
+            midSealed={midSealed}
+            setMidSealed={setMidSealed}
           />
         </div>
 
@@ -1150,6 +1187,7 @@ function App() {
                 onBracingCountChange={handleBracingCountChange}
                 bracingPositions={bracingPositions}
                 onBracingPositionsChange={setBracingPositions}
+                midSealed={midSealed}
               />
             </div>
 
@@ -1170,6 +1208,8 @@ function App() {
                 enableZobelProp={enableZobel}
                 reProp={zobelRe}
                 leProp={zobelLe}
+                midReProp={midRe}
+                midLeProp={midLe}
                 enableLPadProp={enableLPad}
                 attenuationProp={lpadAttenuation}
                 zLoadProp={lpadZLoad}

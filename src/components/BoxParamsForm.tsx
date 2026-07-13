@@ -173,6 +173,8 @@ interface BoxParamsFormProps {
   setMidrangeYPct: (val: number) => void;
   midCabinetDepth: number | '';
   setMidCabinetDepth: (val: number | '') => void;
+  midSealed?: boolean;
+  setMidSealed?: (val: boolean) => void;
 }
 
 export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
@@ -329,6 +331,8 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
   setMidrangeYPct,
   midCabinetDepth,
   setMidCabinetDepth,
+  midSealed = false,
+  setMidSealed = () => {},
 }) => {
   const t = (text: string) => translate(text, lang);
 
@@ -941,166 +945,205 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 <div className="form-subsection-title" style={{ marginTop: 0, marginBottom: '0.35rem' }}>
                   {t("Recinto de Medios (Cámara Separada)")}
                 </div>
-
-                {/* Collapsible reference panel */}
-                <details style={{
-                  background: 'rgba(15, 23, 42, 0.3)',
-                  border: '1px solid var(--card-border)',
-                  borderRadius: '6px',
-                  padding: '0.4rem 0.55rem',
-                  marginBottom: '0.75rem',
-                  fontSize: '0.68rem',
-                  color: 'var(--text-muted)'
-                }}>
-                  <summary style={{
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                    color: 'var(--accent)',
-                    outline: 'none',
-                    userSelect: 'none'
-                  }}>
-                    ℹ️ {t("Guía de Diseño de Cámaras de Medios (Ver más)")}
-                  </summary>
-                  <ul style={{ paddingLeft: '1rem', marginTop: '0.3rem', marginBottom: 0, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                    <li><strong>{t("Aislamiento Hermético:")}</strong> {t("Debe ser completamente hermética para que la presión de aire del woofer no interfiera con el cono de medios.")}</li>
-                    <li><strong>{t("Evitar Formas Cúbicas:")}</strong> {t("Usa paneles traseros inclinados o dimensiones no paralelas para dispersar y romper las ondas estacionarias internas.")}</li>
-                    <li><strong>{t("Relleno de Damping:")}</strong> {t("Se recomienda rellenar la cámara generosamente con absorbente (lana, fieltro o espuma acústica) para mitigar resonancias.")}</li>
-                    <li><strong>{t("Rigidez:")}</strong> {t("Hazla sólida e integrada con el arriostramiento (bracing) del cajón principal.")}</li>
-                  </ul>
-                </details>
-
-                <div className="input-group" style={{ marginBottom: '0.75rem' }}>
-                  <label>{t("Cálculo del Volumen de Medios")}</label>
-                  <div className="segmented-control" style={{ padding: '2px', borderRadius: '0px' }}>
-                    <button
-                      type="button"
-                      className={!useCustomMidVol ? 'active' : ''}
-                      onClick={() => setUseCustomMidVol(false)}
-                      style={{ padding: '0.25rem', fontSize: '0.7rem', borderRadius: '0px' }}
-                    >
-                      {t("Calcular (T/S)")}
-                    </button>
-                    <button
-                      type="button"
-                      className={useCustomMidVol ? 'active' : ''}
-                      onClick={() => setUseCustomMidVol(true)}
-                      style={{ padding: '0.25rem', fontSize: '0.7rem', borderRadius: '0px' }}
-                    >
-                      {t("Volumen Manual")}
-                    </button>
-                  </div>
+                {/* Opción Medio Sellado/Blindado */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.75rem', padding: '0.45rem', background: 'rgba(255,255,255,0.03)', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <input
+                    type="checkbox"
+                    id="midSealedCheckbox"
+                    checked={midSealed}
+                    onChange={(e) => setMidSealed(e.target.checked)}
+                    style={{ margin: 0, cursor: 'pointer', width: '14px', height: '14px' }}
+                  />
+                  <label htmlFor="midSealedCheckbox" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-main)', cursor: 'pointer', userSelect: 'none' }}>
+                    {t("Medio sellado atrás / blindado (No requiere cámara)")}
+                  </label>
                 </div>
 
-                {!useCustomMidVol ? (
-                  <div className="input-grid" style={{ marginBottom: '0.5rem' }}>
-                    <div className="input-group">
-                      <label>Fs ({t("Medios")}) (Hz)</label>
+                {!midSealed ? (
+                  <>
+                    {/* Collapsible reference panel */}
+                    <details style={{
+                      background: 'rgba(15, 23, 42, 0.3)',
+                      border: '1px solid var(--card-border)',
+                      borderRadius: '6px',
+                      padding: '0.4rem 0.55rem',
+                      marginBottom: '0.75rem',
+                      fontSize: '0.68rem',
+                      color: 'var(--text-muted)'
+                    }}>
+                      <summary style={{
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                        color: 'var(--accent)',
+                        outline: 'none',
+                        userSelect: 'none'
+                      }}>
+                        ℹ️ {t("Guía de Diseño de Cámaras de Medios (Ver más)")}
+                      </summary>
+                      <ul style={{ paddingLeft: '1rem', marginTop: '0.3rem', marginBottom: 0, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                        <li><strong>{t("Aislamiento Hermético:")}</strong> {t("Debe ser completamente hermética para que la presión de aire del woofer no interfiera con el cono de medios.")}</li>
+                        <li><strong>{t("Evitar Formas Cúbicas:")}</strong> {t("Usa paneles traseros inclinados o dimensiones no paralelas para dispersar y romper las ondas estacionarias internas.")}</li>
+                        <li><strong>{t("Relleno de Damping:")}</strong> {t("Se recomienda rellenar la cámara generosamente con absorbente (lana, fieltro o espuma acústica) para mitigar resonancias.")}</li>
+                        <li><strong>{t("Rigidez:")}</strong> {t("Hazla sólida e integrada con el arriostramiento (bracing) del cajón principal.")}</li>
+                      </ul>
+                    </details>
+
+                    <div className="input-group" style={{ marginBottom: '0.75rem' }}>
+                      <label>{t("Cálculo del Volumen de Medios")}</label>
+                      <div className="segmented-control" style={{ padding: '2px', borderRadius: '0px' }}>
+                        <button
+                          type="button"
+                          className={!useCustomMidVol ? 'active' : ''}
+                          onClick={() => setUseCustomMidVol(false)}
+                          style={{ padding: '0.25rem', fontSize: '0.7rem', borderRadius: '0px' }}
+                        >
+                          {t("Calcular (T/S)")}
+                        </button>
+                        <button
+                          type="button"
+                          className={useCustomMidVol ? 'active' : ''}
+                          onClick={() => setUseCustomMidVol(true)}
+                          style={{ padding: '0.25rem', fontSize: '0.7rem', borderRadius: '0px' }}
+                        >
+                          {t("Volumen Manual")}
+                        </button>
+                      </div>
+                    </div>
+
+                    {!useCustomMidVol ? (
+                      <div className="input-grid" style={{ marginBottom: '0.5rem' }}>
+                        <div className="input-group">
+                          <label>Fs ({t("Medios")}) (Hz)</label>
+                          <div className="input-wrapper">
+                            <input
+                              type="number"
+                              value={midFs}
+                              onChange={(e) => setMidFs(parseFloat(e.target.value) || 120)}
+                              style={{ height: '30px', padding: '0.2rem 0.55rem', fontSize: '0.78rem' }}
+                            />
+                          </div>
+                        </div>
+                        <div className="input-group">
+                          <label>Vas ({t("Medios")}) (L)</label>
+                          <div className="input-wrapper">
+                            <input
+                              type="number"
+                              value={convertTo(midVas, 'volume', unitSystem)}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value) || 0;
+                                setMidVas(convertFrom(val, 'volume', unitSystem));
+                              }}
+                              style={{ height: '30px', padding: '0.2rem 0.55rem', fontSize: '0.78rem' }}
+                            />
+                          </div>
+                        </div>
+                        <div className="input-group">
+                          <label>Qts ({t("Medios")})</label>
+                          <div className="input-wrapper">
+                            <input
+                              type="number"
+                              value={midQts}
+                              onChange={(e) => setMidQts(parseFloat(e.target.value) || 0.45)}
+                              step="0.01"
+                              style={{ height: '30px', padding: '0.2rem 0.55rem', fontSize: '0.78rem' }}
+                            />
+                          </div>
+                        </div>
+                        <div className="input-group">
+                          <label>{t("Qtc Objetivo (Medios)")}</label>
+                          <div className="input-wrapper">
+                            <input
+                              type="number"
+                              value={midTargetQtc}
+                              onChange={(e) => setMidTargetQtc(parseFloat(e.target.value) || 0.707)}
+                              step="0.01"
+                              style={{ height: '30px', padding: '0.2rem 0.55rem', fontSize: '0.78rem' }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="input-group" style={{ marginBottom: '0.5rem' }}>
+                        <label>{t("Volumen del Recinto de Medios")} (L)</label>
+                        <div className="input-wrapper">
+                          <input
+                            type="number"
+                            value={customMidVol}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setCustomMidVol(val === '' ? '' : parseFloat(val) || 0);
+                            }}
+                            placeholder="3.0"
+                            step="0.1"
+                            style={{ height: '30px', padding: '0.2rem 0.55rem', fontSize: '0.78rem' }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="input-group" style={{ marginBottom: '0.5rem' }}>
+                      <label>{t("Profundidad de la Cámara de Medios")} ({getUnitLabel('length', unitSystem)})</label>
                       <div className="input-wrapper">
                         <input
                           type="number"
-                          value={midFs}
-                          onChange={(e) => setMidFs(parseFloat(e.target.value) || 120)}
-                          style={{ height: '30px', padding: '0.2rem 0.55rem', fontSize: '0.78rem' }}
+                          value={displayVal(midCabinetDepth, 'length')}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) || 0;
+                            setMidCabinetDepth(convertFrom(val, 'length', unitSystem));
+                          }}
+                          step="0.1"
+                          style={{ height: '30px', padding: '0.2rem 2.2rem 0.2rem 0.55rem', fontSize: '0.78rem' }}
                         />
+                        <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                       </div>
                     </div>
-                    <div className="input-group">
-                      <label>Vas ({t("Medios")}) (L)</label>
-                      <div className="input-wrapper">
-                        <input
-                          type="number"
-                          value={midVas}
-                          onChange={(e) => setMidVas(parseFloat(e.target.value) || 5)}
-                          style={{ height: '30px', padding: '0.2rem 0.55rem', fontSize: '0.78rem' }}
-                        />
-                      </div>
+
+                    {/* Resultados del Recinto debajo de los inputs */}
+                    <div style={{ borderTop: '1px solid var(--card-border)', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
+                      <label style={{ color: 'var(--accent)', fontWeight: 650, fontSize: '0.72rem', display: 'block', marginBottom: '0.15rem' }}>
+                        {t("Resultados del Recinto:")}
+                      </label>
+                      {cabinetData?.valid ? (
+                        (() => {
+                          let vMid = 3.0;
+                          if (useCustomMidVol) {
+                            vMid = Number(customMidVol) > 0 ? Number(customMidVol) : 3.0;
+                          } else {
+                            if (midQts > 0 && midQts < midTargetQtc && midVas > 0) {
+                              vMid = midVas / (Math.pow(midTargetQtc / midQts, 2) - 1);
+                            }
+                          }
+                          const wI = cabinetData.wInt;
+                          const dI = cabinetData.dMid ?? 15;
+                          const hM = cabinetData.hMid ?? 20;
+                          
+                          const qtcReal = (midQts > 0 && midVas > 0 && vMid > 0) ? midQts * Math.sqrt(midVas / vMid + 1) : null;
+                          const fcReal = (midFs > 0 && midVas > 0 && vMid > 0) ? midFs * Math.sqrt(midVas / vMid + 1) : null;
+
+                          return (
+                            <div style={{ fontSize: '0.74rem', color: 'var(--text-main)', lineHeight: '1.25' }}>
+                              <div><strong>{t("Volumen:")}</strong> {vMid.toFixed(1)} L</div>
+                              <div style={{ marginTop: '0.15rem' }}><strong>{t("Dimensiones Internas:")}</strong> {convertTo(hM, 'length', unitSystem).toFixed(1)} x {convertTo(wI, 'length', unitSystem).toFixed(1)} x {convertTo(dI, 'length', unitSystem).toFixed(1)} {getUnitLabel('length', unitSystem)}</div>
+                              {qtcReal && qtcReal > 0 && (
+                                <div style={{ marginTop: '0.15rem' }}>
+                                  <strong>Qtc:</strong> {qtcReal.toFixed(3)} {fcReal && fcReal > 0 ? `| <strong>Fc:</strong> ${fcReal.toFixed(0)} Hz` : ''}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()
+                      ) : (
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                          {t("Ingresa dimensiones válidas en la cabina para ver las medidas del recinto.")}
+                        </div>
+                      )}
                     </div>
-                    <div className="input-group">
-                      <label>Qts ({t("Medios")})</label>
-                      <div className="input-wrapper">
-                        <input
-                          type="number"
-                          value={midQts}
-                          onChange={(e) => setMidQts(parseFloat(e.target.value) || 0.45)}
-                          step="0.01"
-                          style={{ height: '30px', padding: '0.2rem 0.55rem', fontSize: '0.78rem' }}
-                        />
-                      </div>
-                    </div>
-                    <div className="input-group">
-                      <label>{t("Qtc Objetivo (Medios)")}</label>
-                      <div className="input-wrapper">
-                        <input
-                          type="number"
-                          value={midTargetQtc}
-                          onChange={(e) => setMidTargetQtc(parseFloat(e.target.value) || 0.707)}
-                          step="0.01"
-                          style={{ height: '30px', padding: '0.2rem 0.55rem', fontSize: '0.78rem' }}
-                        />
-                      </div>
-                    </div>
-                  </div>
+                  </>
                 ) : (
-                  <div className="input-group" style={{ marginBottom: '0.5rem' }}>
-                    <label>{t("Volumen del Recinto de Medios")} (L)</label>
-                    <div className="input-wrapper">
-                      <input
-                        type="number"
-                        value={customMidVol}
-                        onChange={(e) => setCustomMidVol(parseFloat(e.target.value) || '')}
-                        placeholder="3.0"
-                        style={{ height: '30px', padding: '0.2rem 0.55rem', fontSize: '0.78rem' }}
-                      />
-                      <span className="unit-badge">L</span>
-                    </div>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: '1.3', padding: '0.25rem 0' }}>
+                    {t("El medio es de campana sellada o blindada. No requiere volumen de aire ni división interna dentro de la caja principal.")}
                   </div>
                 )}
-
-                <div className="input-group" style={{ marginBottom: '0.5rem' }}>
-                  <label>{t("Profundidad de la Cámara de Medios")} ({getUnitLabel('length', unitSystem)})</label>
-                  <div className="input-wrapper">
-                    <input
-                      type="number"
-                      value={displayVal(midCabinetDepth, 'length')}
-                      onChange={(e) => handleInputChange(e.target.value, setMidCabinetDepth, 'length')}
-                      style={{ height: '30px', padding: '0.2rem 2.2rem 0.2rem 0.55rem', fontSize: '0.78rem' }}
-                    />
-                    <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
-                  </div>
-                </div>
-
-                {/* Resultados del Recinto debajo de los inputs */}
-                <div style={{ borderTop: '1px solid var(--card-border)', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
-                  <label style={{ color: 'var(--accent)', fontWeight: 600, fontSize: '0.72rem', display: 'block', marginBottom: '0.15rem' }}>
-                    {t("Resultados del Recinto:")}
-                  </label>
-                  {cabinetData?.valid ? (
-                    (() => {
-                      let vMid = 3.0;
-                      if (useCustomMidVol) {
-                        vMid = Number(customMidVol) > 0 ? Number(customMidVol) : 3.0;
-                      } else {
-                        if (midQts > 0 && midQts < midTargetQtc && midVas > 0) {
-                          vMid = midVas / (Math.pow(midTargetQtc / midQts, 2) - 1);
-                        }
-                      }
-                      const wI = cabinetData.wInt;
-                      const dI = cabinetData.dMid ?? 15;
-                      const hM = cabinetData.hMid ?? 20;
-                      
-                      return (
-                        <div style={{ fontSize: '0.74rem', color: 'var(--text-main)', lineHeight: '1.25' }}>
-                          <div><strong>{t("Volumen:")}</strong> {vMid.toFixed(1)} L</div>
-                          <div style={{ marginTop: '0.15rem' }}><strong>{t("Dimensiones Internas:")}</strong> {convertTo(hM, 'length', unitSystem).toFixed(1)} x {convertTo(wI, 'length', unitSystem).toFixed(1)} x {convertTo(dI, 'length', unitSystem).toFixed(1)} {getUnitLabel('length', unitSystem)}</div>
-                        </div>
-                      );
-                    })()
-                  ) : (
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                      {t("Ingresa dimensiones válidas en la cabina para ver las medidas del recinto.")}
-                    </div>
-                  )}
-                </div>
               </div>
             )}
 

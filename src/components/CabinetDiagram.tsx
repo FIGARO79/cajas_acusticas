@@ -37,6 +37,7 @@ interface CabinetDiagramProps {
   bracingPositions?: number[];
   onBracingPositionsChange?: (v: number[]) => void;
   flaredEnds?: 0 | 1 | 2;
+  midSealed?: boolean;
 }
 
 export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
@@ -66,6 +67,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
   bracingPositions = [0.35, 0.7],
   onBracingPositionsChange,
   flaredEnds = 0,
+  midSealed = false,
 }) => {
   const t = (text: string) => translate(text, lang);
 
@@ -479,7 +481,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
   const internalPartitions = !isBandpass ? (
     <g>
       {/* Partition for Midrange Chamber */}
-      {crossoverWays === 3 && cabinetData && (() => {
+      {crossoverWays === 3 && !midSealed && cabinetData && (() => {
         const dVal = shape === 'rectangular' ? cabinetData.dInt : ((cabinetData.dTrapTopInt || 0) + (cabinetData.dTrapBotInt || 0)) / 2;
         const dM = cabinetData.dMid ?? 15;
         const hM = cabinetData.hMid ?? 20;
@@ -968,97 +970,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
   };
 
   const renderSectionalCrossovers = () => {
-    const list: React.JSX.Element[] = [];
-    if (isBandpass) return null;
-    
-    // Draw crossover boards
-    if (crossoverWays === 2) {
-      // Single board on the back wall near bottom
-      const xBoard = offsetXSide + plotWidthSide - tScale - 5 * scale;
-      const yBoard = offsetY + plotHeight - tScale - 10 * scale - 4 * scale;
-      const wBoard = 4 * scale;
-      const hBoard = 10 * scale;
-      list.push(
-        <g key="xover-board" opacity="0.9">
-          <rect x={xBoard} y={yBoard} width={wBoard} height={hBoard} fill="#14532d" stroke="#16a34a" strokeWidth="1" rx="1.5" />
-          <line x1={xBoard + wBoard*0.2} y1={yBoard + hBoard*0.2} x2={xBoard + wBoard*0.8} y2={yBoard + hBoard*0.4} stroke="#eab308" strokeWidth="0.8" opacity="0.5" />
-          <line x1={xBoard + wBoard*0.8} y1={yBoard + hBoard*0.4} x2={xBoard + wBoard*0.3} y2={yBoard + hBoard*0.8} stroke="#eab308" strokeWidth="0.8" opacity="0.5" />
-          <rect x={xBoard + wBoard*0.1} y={yBoard + hBoard*0.15} width={wBoard*0.8} height={hBoard*0.25} fill="#f97316" stroke="#c2410c" strokeWidth="0.75" rx="2" />
-          {Array.from({ length: 5 }).map((_, i) => (
-            <line
-              key={`coil-w-${i}`}
-              x1={xBoard + wBoard*0.2 + i * (wBoard*0.5/4)}
-              y1={yBoard + hBoard*0.15}
-              x2={xBoard + wBoard*0.2 + i * (wBoard*0.5/4)}
-              y2={yBoard + hBoard*0.4}
-              stroke="#ea580c"
-              strokeWidth="1.2"
-            />
-          ))}
-          <rect x={xBoard + wBoard*0.2} y={yBoard + hBoard*0.55} width={wBoard*0.6} height={hBoard*0.3} fill="#0ea5e9" stroke="#0284c7" strokeWidth="0.75" rx="3" />
-          <line x1={xBoard + wBoard*0.5} y1={yBoard + hBoard*0.5} x2={xBoard + wBoard*0.5} y2={yBoard + hBoard*0.55} stroke="#cbd5e1" strokeWidth="0.8" />
-          <line x1={xBoard + wBoard*0.5} y1={yBoard + hBoard*0.85} x2={xBoard + wBoard*0.5} y2={yBoard + hBoard*0.9} stroke="#cbd5e1" strokeWidth="0.8" />
-          <text x={xBoard - 4} y={yBoard + hBoard/2} fill="var(--text-muted)" fontSize="8.5" textAnchor="middle" transform={`rotate(-90 ${xBoard-4} ${yBoard+hBoard/2})`} opacity="0.8">
-            {t("Filtro Crossover")}
-          </text>
-        </g>
-      );
-    } else if (crossoverWays === 3) {
-      // Woofer LF board on bottom wall
-      const xBoardLF = offsetXSide + plotWidthSide - tScale - 12 * scale;
-      const yBoardLF = offsetY + plotHeight - tScale - 3 * scale;
-      const wBoardLF = 10 * scale;
-      const hBoardLF = 2.5 * scale;
-      list.push(
-        <g key="xover-board-lf" opacity="0.9">
-          <rect x={xBoardLF} y={yBoardLF} width={wBoardLF} height={hBoardLF} fill="#14532d" stroke="#16a34a" strokeWidth="1" rx="1.5" />
-          <rect x={xBoardLF + wBoardLF*0.15} y={yBoardLF + hBoardLF*0.1} width={wBoardLF*0.35} height={hBoardLF*0.8} fill="#f97316" stroke="#c2410c" strokeWidth="0.75" rx="2" />
-          {Array.from({ length: 6 }).map((_, i) => (
-            <line
-              key={`coil-lf-${i}`}
-              x1={xBoardLF + wBoardLF*0.18 + i * (wBoardLF*0.28/5)}
-              y1={yBoardLF + hBoardLF*0.1}
-              x2={xBoardLF + wBoardLF*0.18 + i * (wBoardLF*0.28/5)}
-              y2={yBoardLF + hBoardLF*0.9}
-              stroke="#ea580c"
-              strokeWidth="1.5"
-            />
-          ))}
-          <rect x={xBoardLF + wBoardLF*0.6} y={yBoardLF + hBoardLF*0.2} width={wBoardLF*0.3} height={hBoardLF*0.6} fill="#0ea5e9" stroke="#0284c7" strokeWidth="0.75" rx="3" />
-          <text x={xBoardLF + wBoardLF/2} y={yBoardLF - 4} fill="var(--text-muted)" fontSize="8" textAnchor="middle" opacity="0.8">
-            {t("LF X-Over")}
-          </text>
-        </g>
-      );
-
-      // Mid/High HF board on back wall
-      const xBoardHF = offsetXSide + plotWidthSide - tScale - 5 * scale;
-      const yBoardHF = offsetY + tScale + 12 * scale;
-      const wBoardHF = 4 * scale;
-      const hBoardHF = 8 * scale;
-      list.push(
-        <g key="xover-board-hf" opacity="0.9">
-          <rect x={xBoardHF} y={yBoardHF} width={wBoardHF} height={hBoardHF} fill="#14532d" stroke="#16a34a" strokeWidth="1" rx="1.5" />
-          <rect x={xBoardHF + wBoardHF*0.1} y={yBoardHF + hBoardHF*0.15} width={wBoardHF*0.8} height={hBoardHF*0.25} fill="#f97316" stroke="#c2410c" strokeWidth="0.75" rx="1" />
-          {Array.from({ length: 4 }).map((_, i) => (
-            <line
-              key={`coil-hf-${i}`}
-              x1={xBoardHF + wBoardHF*0.2 + i * (wBoardHF*0.5/3)}
-              y1={yBoardHF + hBoardHF*0.15}
-              x2={xBoardHF + wBoardHF*0.2 + i * (wBoardHF*0.5/3)}
-              y2={yBoardHF + hBoardHF*0.4}
-              stroke="#ea580c"
-              strokeWidth="1"
-            />
-          ))}
-          <rect x={xBoardHF + wBoardHF*0.2} y={yBoardHF + hBoardHF*0.55} width={wBoardHF*0.6} height={hBoardHF*0.3} fill="#0ea5e9" stroke="#0284c7" strokeWidth="0.75" rx="2" />
-          <text x={xBoardHF - 4} y={yBoardHF + hBoardHF/2} fill="var(--text-muted)" fontSize="8" textAnchor="middle" transform={`rotate(-90 ${xBoardHF-4} ${yBoardHF+hBoardHF/2})`} opacity="0.8">
-            {t("MF/HF X-Over")}
-          </text>
-        </g>
-      );
-    }
-    return list;
+    return null;
   };
 
   const renderBracingTemplate = () => {

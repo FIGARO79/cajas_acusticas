@@ -82,6 +82,7 @@ interface CabinetTabProps {
   onBracingCountChange?: (v: number) => void;
   bracingPositions?: number[];
   onBracingPositionsChange?: (v: number[]) => void;
+  midSealed?: boolean;
 }
 
 
@@ -154,6 +155,7 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
   bracingCount = 2,
   bracingPositions = [0.35, 0.7],
   onBracingPositionsChange,
+  midSealed = false,
 }) => {
   const t = React.useCallback((text: string) => translate(text, lang), [lang]);
   const [hoveredPieceIndex, setHoveredPieceIndex] = useState<number | null>(null);
@@ -222,7 +224,7 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
 
     // Midrange Chamber Volume Calculation (vMid)
     let vMid = 0;
-    if (crossoverWays === 3) {
+    if (crossoverWays === 3 && !midSealed) {
       if (useCustomMidVol && Number(customMidVol) > 0) {
         vMid = Number(customMidVol);
       } else {
@@ -383,7 +385,7 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
 
     if (valid && wInt > 0) {
       const dVal = (woodShape === 'rectangular' ? dInt : (dTrapTopInt + dTrapBotInt) / 2);
-      if (crossoverWays === 3) {
+      if (crossoverWays === 3 && !midSealed) {
         const dMid = Math.min(Number(midCabinetDepth) || 15, dVal - 1);
         const hM = (wInt > 0 && dMid > 0) ? (vMid * 1000) / (wInt * dMid) : 0;
         vMidPartition = (wInt * (dMid + hM) * thickness) / 1000;
@@ -729,6 +731,7 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
           bracingPositions={bracingPositions}
           onBracingPositionsChange={onBracingPositionsChange}
           flaredEnds={flaredEnds}
+          midSealed={midSealed}
         />
 
 

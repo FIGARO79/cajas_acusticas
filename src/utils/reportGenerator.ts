@@ -139,7 +139,7 @@ export function generateReportHTML(
   // 4. Crossover (Zobel, Lpad)
   let crossoverHTML = '';
   if (xoverData && xoverData.xoverResults) {
-    const { crossoverWays, crossoverType, fc, fcLow, fcHigh, enableZobel, enableLPad, xoverResults, zobelResults, lpadResults } = xoverData;
+    const { crossoverWays, crossoverType, fc, fcLow, fcHigh, enableZobel, enableLPad, xoverResults, zobelResults, midZobelResults, lpadResults } = xoverData;
     
     let xoverDetails: string;
     if (crossoverWays === '2way') {
@@ -236,13 +236,15 @@ export function generateReportHTML(
     }
 
     let extraNetworks = '';
-    if (enableZobel && zobelResults) {
+    if (enableZobel && (zobelResults || midZobelResults)) {
       extraNetworks += `
         <div class="xover-box highlight">
           <h4>${t("Red Zobel")}</h4>
           <ul>
-            <li>Cz: <strong>${formatNum(zobelResults.cz, 2)} µF</strong></li>
-            <li>Rz: <strong>${formatNum(zobelResults.rz, 2)} Ω</strong></li>
+            ${zobelResults ? `<li>Woofer Cz: <strong>${formatNum(zobelResults.cz, 2)} µF</strong></li>
+            <li>Woofer Rz: <strong>${formatNum(zobelResults.rz, 2)} Ω</strong></li>` : ''}
+            ${crossoverWays === '3way' && midZobelResults ? `<li>Medios Cz: <strong>${formatNum(midZobelResults.cz, 2)} µF</strong></li>
+            <li>Medios Rz: <strong>${formatNum(midZobelResults.rz, 2)} Ω</strong></li>` : ''}
           </ul>
         </div>
       `;

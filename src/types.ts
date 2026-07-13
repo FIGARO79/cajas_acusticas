@@ -156,11 +156,14 @@ export interface CrossoverExportData {
   enableZobel: boolean;
   re: number;
   le: number;
+  midRe?: number;
+  midLe?: number;
   enableLPad: boolean;
   attenuation: number;
   zLoad: number;
   xoverResults: CrossoverResult | null;
   zobelResults: { rz: number; cz: number } | null;
+  midZobelResults?: { rz: number; cz: number } | null;
   lpadResults: { r1: number; r2: number } | null;
 }
 
