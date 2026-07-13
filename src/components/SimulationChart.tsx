@@ -716,12 +716,11 @@ export const SimulationChart: React.FC<SimulationChartProps> = ({
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
           {/* Segmented range selector */}
-          <div className="segmented-control" style={{ padding: '2px', borderRadius: '8px', display: 'flex', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--card-border)' }}>
+          <div className="segmented-control">
             <button
               type="button"
               className={rangeMode === 'bass' ? 'active' : ''}
               onClick={() => setRangeMode('bass')}
-              style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem', borderRadius: '6px', cursor: 'pointer', border: 'none', background: rangeMode === 'bass' ? 'var(--primary)' : 'transparent', color: '#ffffff', fontWeight: 600 }}
             >
               {t("Graves")}
             </button>
@@ -729,21 +728,20 @@ export const SimulationChart: React.FC<SimulationChartProps> = ({
               type="button"
               className={rangeMode === 'full' ? 'active' : ''}
               onClick={() => setRangeMode('full')}
-              style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem', borderRadius: '6px', cursor: 'pointer', border: 'none', background: rangeMode === 'full' ? 'var(--primary)' : 'transparent', color: '#ffffff', fontWeight: 600 }}
             >
               {t("Filtros / 20kHz")}
             </button>
           </div>
 
           {/* Toggle Reference Lines */}
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.7rem', color: 'var(--text-main)', cursor: 'pointer', margin: 0, fontWeight: 500 }}>
+          <label className="checkbox-container" style={{ fontSize: '0.74rem' }}>
             <input
               type="checkbox"
               checked={showRefLines}
               onChange={(e) => setShowRefLines(e.target.checked)}
-              style={{ width: '13px', height: '13px', accentColor: 'var(--accent)', cursor: 'pointer' }}
             />
-            {t("Líneas Ref.")}
+            <div className="custom-checkbox"></div>
+            <span>{t("Líneas Ref.")}</span>
           </label>
         </div>
       </div>

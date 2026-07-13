@@ -78,6 +78,10 @@ interface CabinetTabProps {
   midCabinetDepth?: number | '';
   enableBracing?: boolean;
   onEnableBracingChange?: (v: boolean) => void;
+  bracingCount?: number;
+  onBracingCountChange?: (v: number) => void;
+  bracingPositions?: number[];
+  onBracingPositionsChange?: (v: number[]) => void;
 }
 
 
@@ -147,6 +151,9 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
   portLocation = 'front',
   enableBracing = false,
   onEnableBracingChange,
+  bracingCount = 2,
+  bracingPositions = [0.35, 0.7],
+  onBracingPositionsChange,
 }) => {
   const t = React.useCallback((text: string) => translate(text, lang), [lang]);
   const [hoveredPieceIndex, setHoveredPieceIndex] = useState<number | null>(null);
@@ -522,9 +529,15 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
     midCabinetDepth, displayVal, t
   ]);
 
+  const lastCabinetDataStrRef = React.useRef('');
+
   useEffect(() => {
-    if (onCabinetDataChange) {
-      onCabinetDataChange(cabinetData);
+    const cabinetDataStr = cabinetData ? JSON.stringify(cabinetData) : '';
+    if (cabinetDataStr !== lastCabinetDataStrRef.current) {
+      lastCabinetDataStrRef.current = cabinetDataStr;
+      if (onCabinetDataChange) {
+        onCabinetDataChange(cabinetData);
+      }
     }
   }, [cabinetData, onCabinetDataChange]);
 
@@ -669,7 +682,19 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
     }
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%', boxSizing: 'border-box' }}>
+      <div 
+        className="read-only-cabinet-tab" 
+        style={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '0.75rem', 
+          width: '100%', 
+          boxSizing: 'border-box',
+          maxHeight: 'calc(100vh - 220px)',
+          overflowY: 'auto',
+          paddingRight: '0.5rem'
+        }}
+      >
         {/* Diagrama dinámico Corte A-A (Alineado arriba bajo la gráfica) */}
         <CabinetDiagram
           lang={lang}
@@ -699,6 +724,11 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
           midVas={midVas}
           midQts={midQts}
           midTargetQtc={midTargetQtc}
+          enableBracing={enableBracing}
+          bracingCount={bracingCount}
+          bracingPositions={bracingPositions}
+          onBracingPositionsChange={onBracingPositionsChange}
+          flaredEnds={flaredEnds}
         />
 
 
@@ -825,7 +855,14 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
 
   return (
     <div className="tab-content active" id="tab-wood">
-      <div className="wood-layout">
+      <div 
+        className="wood-layout"
+        style={{
+          maxHeight: 'calc(100vh - 220px)',
+          overflowY: 'auto',
+          paddingRight: '0.5rem'
+        }}
+      >
         
         {/* Selector del modo de ebanistería */}
         <div className="wood-mode-selector-container">

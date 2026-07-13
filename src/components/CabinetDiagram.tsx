@@ -32,6 +32,11 @@ interface CabinetDiagramProps {
   midQts?: number;
   midTargetQtc?: number;
   portLocation?: 'front' | 'rear';
+  enableBracing?: boolean;
+  bracingCount?: number;
+  bracingPositions?: number[];
+  onBracingPositionsChange?: (v: number[]) => void;
+  flaredEnds?: 0 | 1 | 2;
 }
 
 export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
@@ -56,6 +61,11 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
   crossoverWays = 2,
   driverConfig = 'single',
   portLocation = 'front',
+  enableBracing = false,
+  bracingCount = 2,
+  bracingPositions = [0.35, 0.7],
+  onBracingPositionsChange,
+  flaredEnds = 0,
 }) => {
   const t = (text: string) => translate(text, lang);
 
@@ -113,8 +123,16 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
   const offsetXSide = paddingLeft + plotWidthFront + paddingMiddle;
   const offsetY = paddingTop;
 
+  // Dimensiones de plantilla de refuerzo
+  const plotWidthBrace = cabinetData.wInt * scale;
+  const plotHeightBrace = (shape === 'rectangular' ? cabinetData.dInt : ((cabinetData.dTrapTopInt || 0) + (cabinetData.dTrapBotInt || 0)) / 2) * scale;
+  const offsetXBrace = offsetXSide + plotWidthSide + paddingMiddle;
+  const showBracingTemplate = enableBracing && bracingCount > 0 && boxType !== 'bandpass';
+
   // Dimensiones dinámicas totales del lienzo (viewBox)
-  const svgWidth = offsetXSide + plotWidthSide + paddingRight;
+  const svgWidth = showBracingTemplate
+    ? offsetXBrace + plotWidthBrace + paddingRight
+    : offsetXSide + plotWidthSide + paddingRight;
   const svgHeight = paddingTop + plotHeight + paddingBottom;
 
   // Grosor de madera en la escala
@@ -122,6 +140,63 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
 
   // Inner height in scale
   const innerHeightScale = plotHeight - 2 * tScale;
+
+  const handleBracingMouseDown = (e: React.MouseEvent, index: number) => {
+    if (!onBracingPositionsChange) return;
+    e.preventDefault();
+    const svgElement = (e.currentTarget as any).ownerSVGElement;
+    if (!svgElement) return;
+
+    // The SVG height is dynamically defined by svgHeight. We can get it directly from bounding rect.
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const rect = svgElement.getBoundingClientRect();
+      const clientY = moveEvent.clientY;
+      const svgY = (clientY - rect.top) * (svgHeight / rect.height);
+      
+      let ratio = (svgY - offsetY - tScale) / innerHeightScale;
+      ratio = Math.max(0.05, Math.min(0.95, ratio));
+      
+      const newPositions = [...bracingPositions];
+      newPositions[index] = Number(ratio.toFixed(3));
+      onBracingPositionsChange(newPositions);
+    };
+
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleBracingTouchStart = (e: React.TouchEvent, index: number) => {
+    if (!onBracingPositionsChange) return;
+    const svgElement = (e.currentTarget as any).ownerSVGElement;
+    if (!svgElement) return;
+
+    const handleTouchMove = (moveEvent: TouchEvent) => {
+      if (moveEvent.touches.length === 0) return;
+      const rect = svgElement.getBoundingClientRect();
+      const clientY = moveEvent.touches[0].clientY;
+      const svgY = (clientY - rect.top) * (svgHeight / rect.height);
+      
+      let ratio = (svgY - offsetY - tScale) / innerHeightScale;
+      ratio = Math.max(0.05, Math.min(0.95, ratio));
+      
+      const newPositions = [...bracingPositions];
+      newPositions[index] = Number(ratio.toFixed(3));
+      onBracingPositionsChange(newPositions);
+    };
+
+    const handleTouchEnd = () => {
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleTouchEnd);
+    };
+
+    window.addEventListener('touchmove', handleTouchMove, { passive: true });
+    window.addEventListener('touchend', handleTouchEnd);
+  };
 
   // Bandpass helper coordinates
   const isBandpass = boxType === 'bandpass';
@@ -330,38 +405,69 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
     <g>
       {layout.map((d, idx) => {
         const hDriver = d.rOuter * 2;
-        const dDriver = d.type === 'tweeter' ? 12 : d.type === 'midrange' ? 20 : 35; // depth scale in pixels
+        const dDriver = d.type === 'tweeter' ? 12 : d.type === 'midrange' ? 20 : 32; // depth in scale
         const yTop = d.yCenter - d.rOuter;
+        const xFlange = offsetXSide + tScale;
+        const xMagnet = xFlange + dDriver * 0.55;
+
+        // Tweeter (perfil plano con imán trasero pequeño)
+        if (d.type === 'tweeter') {
+          return (
+            <g key={idx} opacity="0.95">
+              {/* Flange frontal del Tweeter */}
+              <rect x={xFlange - 1.5} y={yTop} width="3" height={hDriver} fill="#334155" stroke="#000000" strokeWidth="1" />
+              {/* Domo de agudos */}
+              <path d={`M ${xFlange},${d.yCenter - 6} Q ${xFlange + 4},${d.yCenter} ${xFlange},${d.yCenter + 6}`} fill="none" stroke="#000000" strokeWidth="1" />
+              {/* Conjunto magnético compacto */}
+              <rect x={xFlange + 1.5} y={d.yCenter - hDriver * 0.28} width="8" height={hDriver * 0.56} fill="#475569" stroke="#000000" strokeWidth="1" rx="0.5" />
+            </g>
+          );
+        }
+
+        // Midrange y Woofer (perfil detallado)
+        const rSurround = d.type === 'midrange' ? 2.5 : 4;
+        const hVoiceCoil = hDriver * 0.18;
+        const wMagnet = dDriver * 0.45;
+        const hMagnet = hDriver * 0.65;
+
         return (
-          <g key={idx}>
-            {/* Cone */}
-            <path
-              d={`M ${offsetXSide + tScale},${yTop} 
-                  Q ${offsetXSide + tScale + dDriver * 0.15},${yTop + hDriver * 0.15} ${offsetXSide + tScale + dDriver * 0.6},${yTop + hDriver * 0.35}
-                  L ${offsetXSide + tScale + dDriver * 0.6},${yTop + hDriver * 0.65}
-                  Q ${offsetXSide + tScale + dDriver * 0.15},${yTop + hDriver * 0.85} ${offsetXSide + tScale},${yTop + hDriver}
-                  L ${offsetXSide + tScale},${yTop + hDriver - 3}
-                  Q ${offsetXSide + tScale + dDriver * 0.20},${yTop + hDriver * 0.8} ${offsetXSide + tScale + dDriver * 0.55},${yTop + hDriver * 0.6}
-                  L ${offsetXSide + tScale + dDriver * 0.55},${yTop + hDriver * 0.4}
-                  Q ${offsetXSide + tScale + dDriver * 0.20},${yTop + hDriver * 0.2} ${offsetXSide + tScale},${yTop + 3} Z`}
-              fill={d.color}
-              opacity="0.85"
-              stroke="#000000"
-              strokeWidth="1.2"
-            />
-            {/* Magnet */}
-            <line x1={offsetXSide + tScale + dDriver * 0.55} y1={yTop + hDriver * 0.4} x2={offsetXSide + tScale + dDriver * 0.85} y2={yTop + hDriver * 0.45} stroke="#000000" strokeWidth="1.5" />
-            <line x1={offsetXSide + tScale + dDriver * 0.55} y1={yTop + hDriver * 0.6} x2={offsetXSide + tScale + dDriver * 0.85} y2={yTop + hDriver * 0.55} stroke="#000000" strokeWidth="1.5" />
-            <rect
-              x={offsetXSide + tScale + dDriver * 0.8}
-              y={yTop + hDriver * 0.42}
-              width={dDriver * 0.25}
-              height={hDriver * 0.16}
-              fill="#475569"
-              stroke="#000000"
-              strokeWidth="1.2"
-              rx="2"
-            />
+          <g key={idx} opacity="0.95">
+            {/* Basket Flange */}
+            <rect x={xFlange - 1.5} y={yTop} width="3" height={hDriver} fill="#334155" stroke="#000000" strokeWidth="1" />
+
+            {/* Suspension / Surround */}
+            <path d={`M ${xFlange},${yTop + 2} A ${rSurround} ${rSurround} 0 0 1 ${xFlange},${yTop + 2 + rSurround * 2}`} fill="none" stroke="#000000" strokeWidth="1" />
+            <path d={`M ${xFlange},${yTop + hDriver - 2} A ${rSurround} ${rSurround} 0 0 0 ${xFlange},${yTop + hDriver - 2 - rSurround * 2}`} fill="none" stroke="#000000" strokeWidth="1" />
+
+            {/* Cono */}
+            <line x1={xFlange} y1={yTop + 2 + rSurround * 2} x2={xMagnet} y2={d.yCenter - hVoiceCoil / 2} stroke="#000000" strokeWidth="1.25" />
+            <line x1={xFlange} y1={yTop + hDriver - 2 - rSurround * 2} x2={xMagnet} y2={d.yCenter + hVoiceCoil / 2} stroke="#000000" strokeWidth="1.25" />
+
+            {/* Dust cap */}
+            <path d={`M ${xFlange + dDriver * 0.22},${d.yCenter - hVoiceCoil * 0.8} Q ${xFlange + dDriver * 0.4},${d.yCenter} ${xFlange + dDriver * 0.22},${d.yCenter + hVoiceCoil * 0.8}`} fill="none" stroke="#000000" strokeWidth="1" />
+
+            {/* Brazos del Chasis */}
+            <line x1={xFlange + 1.5} y1={yTop + 6} x2={xMagnet} y2={d.yCenter - hVoiceCoil * 1.1} stroke="#334155" strokeWidth="1.2" />
+            <line x1={xFlange + 1.5} y1={yTop + hDriver - 6} x2={xMagnet} y2={d.yCenter + hVoiceCoil * 1.1} stroke="#334155" strokeWidth="1.2" />
+
+            {/* Centradores / Spider */}
+            <line x1={xMagnet - 2} y1={d.yCenter - hVoiceCoil / 2} x2={xMagnet + 4} y2={d.yCenter - hVoiceCoil / 2} stroke="#f97316" strokeWidth="1" strokeDasharray="1 1" />
+            <line x1={xMagnet - 2} y1={d.yCenter + hVoiceCoil / 2} x2={xMagnet + 4} y2={d.yCenter + hVoiceCoil / 2} stroke="#f97316" strokeWidth="1" strokeDasharray="1 1" />
+            <path d={`M ${xMagnet - 5},${d.yCenter - hVoiceCoil / 2} Q ${xMagnet - 2.5},${d.yCenter - hVoiceCoil * 0.9} ${xMagnet},${d.yCenter - hVoiceCoil * 1.25}`} fill="none" stroke="#ea580c" strokeWidth="0.8" />
+            <path d={`M ${xMagnet - 5},${d.yCenter + hVoiceCoil / 2} Q ${xMagnet - 2.5},${d.yCenter + hVoiceCoil * 0.9} ${xMagnet},${d.yCenter + hVoiceCoil * 1.25}`} fill="none" stroke="#ea580c" strokeWidth="0.8" />
+
+            {/* Magnetic Stack */}
+            {/* Top Plate (Metal) */}
+            <rect x={xMagnet} y={d.yCenter - hMagnet / 2} width={wMagnet * 0.22} height={hMagnet} fill="#94a3b8" stroke="#000000" strokeWidth="0.8" />
+            {/* Magnet Ring (Ferrita/Neodimio) */}
+            <rect x={xMagnet + wMagnet * 0.22} y={d.yCenter - hMagnet * 0.46} width={wMagnet * 0.63} height={hMagnet * 0.92} fill="#1e293b" stroke="#000000" strokeWidth="0.8" />
+            {/* Back Plate & Pole Piece */}
+            <path d={`M ${xMagnet + wMagnet * 0.85},${d.yCenter - hMagnet / 2} 
+                      L ${xMagnet + wMagnet},${d.yCenter - hMagnet / 2} 
+                      L ${xMagnet + wMagnet},${d.yCenter + hMagnet / 2} 
+                      L ${xMagnet + wMagnet * 0.85},${d.yCenter + hMagnet / 2} Z`} 
+                  fill="#94a3b8" stroke="#000000" strokeWidth="0.8" />
+            <rect x={xMagnet} y={d.yCenter - hVoiceCoil * 0.35} width={wMagnet} height={hVoiceCoil * 0.7} fill="#64748b" stroke="#000000" strokeWidth="0.7" />
           </g>
         );
       })}
@@ -574,13 +680,26 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
       ? offsetY + plotHeight - tScale - pHeightScale - 12
       : portY;
 
+    const rFlare = Math.min(10, pHeightScale * 0.35);
+    const outerFlared = flaredEnds >= 1;
+    const innerFlared = flaredEnds === 2;
+
     if (portLocation === 'front' || isBandpass) {
+      const xEnd = offsetXSide + tScale + pLenScale;
+      const topPath = outerFlared || innerFlared
+        ? `M ${offsetXSide - (outerFlared ? rFlare : 0)},${portYSide - (outerFlared ? rFlare : 0)} Q ${offsetXSide},${portYSide} ${offsetXSide + (outerFlared ? rFlare : 0)},${portYSide} L ${xEnd - (innerFlared ? rFlare : 0)},${portYSide} Q ${xEnd},${portYSide} ${xEnd + (innerFlared ? rFlare : 0)},${portYSide - (innerFlared ? rFlare : 0)}`
+        : `M ${offsetXSide},${portYSide} L ${xEnd},${portYSide}`;
+
+      const botPath = outerFlared || innerFlared
+        ? `M ${offsetXSide - (outerFlared ? rFlare : 0)},${portYSide + pHeightScale + (outerFlared ? rFlare : 0)} Q ${offsetXSide},${portYSide + pHeightScale} ${offsetXSide + (outerFlared ? rFlare : 0)},${portYSide + pHeightScale} L ${xEnd - (innerFlared ? rFlare : 0)},${portYSide + pHeightScale} Q ${xEnd},${portYSide + pHeightScale} ${xEnd + (innerFlared ? rFlare : 0)},${portYSide + pHeightScale + (innerFlared ? rFlare : 0)}`
+        : `M ${offsetXSide},${portYSide + pHeightScale} L ${xEnd},${portYSide + pHeightScale}`;
+
       portElement = (
         <g>
           <rect x={offsetXSide - 1} y={portYSide + 0.5} width={tScale + 2} height={pHeightScale - 1} fill="var(--card-bg)" />
-          <line x1={offsetXSide} y1={portYSide} x2={offsetXSide + tScale + pLenScale} y2={portYSide} stroke="#000000" strokeWidth="2" />
-          <line x1={offsetXSide} y1={portYSide + pHeightScale} x2={offsetXSide + tScale + pLenScale} y2={portYSide + pHeightScale} stroke="#000000" strokeWidth="2" />
-          <line x1={offsetXSide + tScale + pLenScale} y1={portYSide} x2={offsetXSide + tScale + pLenScale} y2={portYSide + pHeightScale} stroke="#000000" strokeWidth="1.5" strokeDasharray="3 3" />
+          <path d={topPath} fill="none" stroke="#000000" strokeWidth="2" />
+          <path d={botPath} fill="none" stroke="#000000" strokeWidth="2" />
+          <line x1={xEnd} y1={portYSide} x2={xEnd} y2={portYSide + pHeightScale} stroke="#000000" strokeWidth="1.5" strokeDasharray="3 3" />
           <text x={offsetXSide + tScale + pLenScale / 2} y={portYSide - 5} fill="#10b981" stroke="none" fontSize="9.5" fontWeight="normal" textAnchor="middle">
             {isBandpass
               ? `Lv1: ${convertTo(effectivePortLength, 'length', unitSystem).toFixed(1)}${uLabel}`
@@ -592,11 +711,20 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
       // Rear Port (drawn on the right side of sectional view)
       const xStart = offsetXSide + plotWidthSide;
       const xInnerEnd = offsetXSide + plotWidthSide - tScale - pLenScale;
+
+      const topPath = outerFlared || innerFlared
+        ? `M ${xStart + (outerFlared ? rFlare : 0)},${portYSide - (outerFlared ? rFlare : 0)} Q ${xStart},${portYSide} ${xStart - (outerFlared ? rFlare : 0)},${portYSide} L ${xInnerEnd + (innerFlared ? rFlare : 0)},${portYSide} Q ${xInnerEnd},${portYSide} ${xInnerEnd - (innerFlared ? rFlare : 0)},${portYSide - (innerFlared ? rFlare : 0)}`
+        : `M ${xStart},${portYSide} L ${xInnerEnd},${portYSide}`;
+
+      const botPath = outerFlared || innerFlared
+        ? `M ${xStart + (outerFlared ? rFlare : 0)},${portYSide + pHeightScale + (outerFlared ? rFlare : 0)} Q ${xStart},${portYSide + pHeightScale} ${xStart - (outerFlared ? rFlare : 0)},${portYSide + pHeightScale} L ${xInnerEnd + (innerFlared ? rFlare : 0)},${portYSide + pHeightScale} Q ${xInnerEnd},${portYSide + pHeightScale} ${xInnerEnd - (innerFlared ? rFlare : 0)},${portYSide + pHeightScale + (innerFlared ? rFlare : 0)}`
+        : `M ${xStart},${portYSide + pHeightScale} L ${xInnerEnd},${portYSide + pHeightScale}`;
+
       portElement = (
         <g>
           <rect x={xStart - tScale - 1} y={portYSide + 0.5} width={tScale + 2} height={pHeightScale - 1} fill="var(--card-bg)" />
-          <line x1={xStart} y1={portYSide} x2={xInnerEnd} y2={portYSide} stroke="#000000" strokeWidth="2" />
-          <line x1={xStart} y1={portYSide + pHeightScale} x2={xInnerEnd} y2={portYSide + pHeightScale} stroke="#000000" strokeWidth="2" />
+          <path d={topPath} fill="none" stroke="#000000" strokeWidth="2" />
+          <path d={botPath} fill="none" stroke="#000000" strokeWidth="2" />
           <line x1={xInnerEnd} y1={portYSide} x2={xInnerEnd} y2={portYSide + pHeightScale} stroke="#000000" strokeWidth="1.5" strokeDasharray="3 3" />
           <text x={xStart - tScale - pLenScale / 2} y={portYSide - 5} fill="#10b981" stroke="none" fontSize="9.5" fontWeight="normal" textAnchor="middle">
             {`Lv: ${portLength > 0 ? convertTo(portLength, 'length', unitSystem).toFixed(1) : 'N/A'}${uLabel}`}
@@ -613,12 +741,26 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
     const pLenScaleVr = 12 * scale; // 12cm visual
     const portYVr = offsetY + plotHeight - tScale - pHeightScaleVr - 12; // Mismo alto que el puerto izquierdo
     const xStartVr = offsetXSide + plotWidthSide;
+    const xInnerEndVr = xStartVr - tScale - pLenScaleVr;
+
+    const rFlare = Math.min(10, pHeightScaleVr * 0.35);
+    const outerFlared = flaredEnds >= 1;
+    const innerFlared = flaredEnds === 2;
+
+    const topPath = outerFlared || innerFlared
+      ? `M ${xStartVr + (outerFlared ? rFlare : 0)},${portYVr - (outerFlared ? rFlare : 0)} Q ${xStartVr},${portYVr} ${xStartVr - (outerFlared ? rFlare : 0)},${portYVr} L ${xInnerEndVr + (innerFlared ? rFlare : 0)},${portYVr} Q ${xInnerEndVr},${portYVr} ${xInnerEndVr - (innerFlared ? rFlare : 0)},${portYVr - (innerFlared ? rFlare : 0)}`
+      : `M ${xStartVr},${portYVr} L ${xInnerEndVr},${portYVr}`;
+
+    const botPath = outerFlared || innerFlared
+      ? `M ${xStartVr + (outerFlared ? rFlare : 0)},${portYVr + pHeightScaleVr + (outerFlared ? rFlare : 0)} Q ${xStartVr},${portYVr + pHeightScaleVr} ${xStartVr - (outerFlared ? rFlare : 0)},${portYVr + pHeightScaleVr} L ${xInnerEndVr + (innerFlared ? rFlare : 0)},${portYVr + pHeightScaleVr} Q ${xInnerEndVr},${portYVr + pHeightScaleVr} ${xInnerEndVr - (innerFlared ? rFlare : 0)},${portYVr + pHeightScaleVr + (innerFlared ? rFlare : 0)}`
+      : `M ${xStartVr},${portYVr + pHeightScaleVr} L ${xInnerEndVr},${portYVr + pHeightScaleVr}`;
+
     portElementVr = (
       <g>
         <rect x={xStartVr - tScale - 1} y={portYVr + 0.5} width={tScale + 2} height={pHeightScaleVr - 1} fill="var(--card-bg)" />
-        <line x1={xStartVr} y1={portYVr} x2={xStartVr - tScale - pLenScaleVr} y2={portYVr} stroke="#000000" strokeWidth="2" />
-        <line x1={xStartVr} y1={portYVr + pHeightScaleVr} x2={xStartVr - tScale - pLenScaleVr} y2={portYVr + pHeightScaleVr} stroke="#000000" strokeWidth="2" />
-        <line x1={xStartVr - tScale - pLenScaleVr} y1={portYVr} x2={xStartVr - tScale - pLenScaleVr} y2={portYVr + pHeightScaleVr} stroke="#000000" strokeWidth="1.5" strokeDasharray="3 3" />
+        <path d={topPath} fill="none" stroke="#000000" strokeWidth="2" />
+        <path d={botPath} fill="none" stroke="#000000" strokeWidth="2" />
+        <line x1={xInnerEndVr} y1={portYVr} x2={xInnerEndVr} y2={portYVr + pHeightScaleVr} stroke="#000000" strokeWidth="1.5" strokeDasharray="3 3" />
         <text x={xStartVr - tScale - pLenScaleVr / 2} y={portYVr - 5} fill="#ec4899" stroke="none" fontSize="9.5" fontWeight="normal" textAnchor="middle">
           Lv2
         </text>
@@ -685,6 +827,421 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
     }
   }
 
+  const spikeY = offsetY + plotHeight;
+
+  // Render de las puntas de desacoplo (spikes) en el fondo del bafle
+  const renderSpikes = () => {
+    const frontSpike1X = offsetXFront + tScale + (plotWidthFront - 2 * tScale) * 0.15;
+    const frontSpike2X = offsetXFront + plotWidthFront - tScale - (plotWidthFront - 2 * tScale) * 0.15;
+    const sideSpike1X = offsetXSide + tScale + (plotWidthSide - 2 * tScale) * 0.15;
+    const sideSpike2X = offsetXSide + plotWidthSide - tScale - (plotWidthSide - 2 * tScale) * 0.15;
+
+    const drawSpike = (x: number, key: string) => (
+      <g key={key} stroke="#64748b" strokeWidth="0.75" fill="none">
+        {/* Cuerpo cónico de la punta */}
+        <path d={`M ${x - 3},${spikeY} L ${x + 3},${spikeY} L ${x},${spikeY + 7} Z`} fill="#94a3b8" />
+        {/* Tuerca de ajuste */}
+        <line x1={x - 4.5} y1={spikeY - 0.75} x2={x + 4.5} y2={spikeY - 0.75} stroke="#334155" strokeWidth="1.5" />
+        <rect x={x - 2.5} y={spikeY - 3} width="5" height="2" fill="#64748b" stroke="none" />
+      </g>
+    );
+
+    return [
+      drawSpike(frontSpike1X, 'f-sp-1'),
+      drawSpike(frontSpike2X, 'f-sp-2'),
+      drawSpike(sideSpike1X, 's-sp-1'),
+      drawSpike(sideSpike2X, 's-sp-2')
+    ];
+  };
+
+  // Render de refuerzos internos (bracing) con orificios en la vista de corte lateral
+  const renderBracing = () => {
+    const braces: React.JSX.Element[] = [];
+    if (isBandpass || !enableBracing || bracingCount <= 0) return braces;
+    
+    const positions = bracingPositions.slice(0, bracingCount);
+
+    positions.forEach((pos, idx) => {
+      const y = offsetY + tScale + pos * innerHeightScale;
+      braces.push(
+        <g 
+          key={`br-${idx}`}
+          style={{ cursor: 'ns-resize' }}
+          onMouseDown={(e) => handleBracingMouseDown(e, idx)}
+          onTouchStart={(e) => handleBracingTouchStart(e, idx)}
+          onMouseOver={(e) => {
+            const rect = e.currentTarget.querySelector('rect');
+            if (rect) {
+              rect.setAttribute('fill', 'rgba(0, 120, 212, 0.32)');
+              rect.setAttribute('stroke', '#0078d4');
+            }
+          }}
+          onMouseOut={(e) => {
+            const rect = e.currentTarget.querySelector('rect');
+            if (rect) {
+              rect.setAttribute('fill', 'rgba(100, 116, 139, 0.15)');
+              rect.setAttribute('stroke', '#475569');
+            }
+          }}
+        >
+          {/* Panel de madera del refuerzo */}
+          <rect
+            x={offsetXSide + tScale}
+            y={y - tScale / 2}
+            width={plotWidthSide - 2 * tScale}
+            height={tScale}
+            fill="rgba(100, 116, 139, 0.15)"
+            stroke="#475569"
+            strokeWidth="1.2"
+            style={{ transition: 'all 0.15s ease' }}
+          />
+          {/* Orificios circulares de paso de aire (elipses de perspectiva) */}
+          <ellipse
+            cx={offsetXSide + tScale + (plotWidthSide - 2 * tScale) * 0.35}
+            cy={y}
+            rx={Math.min(8, (plotWidthSide - 2 * tScale) * 0.1)}
+            ry={tScale * 0.35}
+            fill="var(--card-bg)"
+            stroke="#475569"
+            strokeWidth="0.8"
+          />
+          <ellipse
+            cx={offsetXSide + tScale + (plotWidthSide - 2 * tScale) * 0.65}
+            cy={y}
+            rx={Math.min(8, (plotWidthSide - 2 * tScale) * 0.1)}
+            ry={tScale * 0.35}
+            fill="var(--card-bg)"
+            stroke="#475569"
+            strokeWidth="0.8"
+          />
+        </g>
+      );
+    });
+    return braces;
+  };
+
+  // Render de líneas de trazo para los refuerzos en la vista frontal
+  const renderFrontBraces = () => {
+    const lines: React.JSX.Element[] = [];
+    if (isBandpass || !enableBracing || bracingCount <= 0) return lines;
+    
+    const positions = bracingPositions.slice(0, bracingCount);
+
+    positions.forEach((pos, idx) => {
+      const y = offsetY + tScale + pos * innerHeightScale;
+      lines.push(
+        <line
+          key={`fb-${idx}`}
+          x1={offsetXFront + tScale}
+          y1={y}
+          x2={offsetXFront + plotWidthFront - tScale}
+          y2={y}
+          stroke="#0078d4"
+          strokeWidth="1.2"
+          strokeDasharray="4 3"
+          opacity="0.85"
+        />
+      );
+    });
+    return lines;
+  };
+
+
+
+  // Bornes de conexión traseros (binding posts)
+  const renderBindingPosts = () => {
+    if (isBandpass) return null;
+    const yPos = offsetY + plotHeight - tScale - 26;
+    const xPos = offsetXSide + plotWidthSide;
+    return (
+      <g key="binding-posts" opacity="0.9">
+        {/* Placa plástica */}
+        <rect x={xPos - tScale - 1} y={yPos - 9} width={tScale + 2} height="18" fill="#0f172a" stroke="#000000" strokeWidth="0.8" />
+        {/* Borne rojo */}
+        <rect x={xPos} y={yPos - 6} width="5" height="3" fill="#dc2626" stroke="#000000" strokeWidth="0.5" rx="0.3" />
+        <line x1={xPos - tScale} y1={yPos - 4.5} x2={xPos} y2={yPos - 4.5} stroke="#94a3b8" strokeWidth="1" />
+        {/* Borne negro */}
+        <rect x={xPos} y={yPos + 3} width="5" height="3" fill="#000000" stroke="#000000" strokeWidth="0.5" rx="0.3" />
+        <line x1={xPos - tScale} y1={yPos + 4.5} x2={xPos} y2={yPos + 4.5} stroke="#94a3b8" strokeWidth="1" />
+      </g>
+    );
+  };
+
+  const renderSectionalCrossovers = () => {
+    const list: React.JSX.Element[] = [];
+    if (isBandpass) return null;
+    
+    // Draw crossover boards
+    if (crossoverWays === 2) {
+      // Single board on the back wall near bottom
+      const xBoard = offsetXSide + plotWidthSide - tScale - 5 * scale;
+      const yBoard = offsetY + plotHeight - tScale - 10 * scale - 4 * scale;
+      const wBoard = 4 * scale;
+      const hBoard = 10 * scale;
+      list.push(
+        <g key="xover-board" opacity="0.9">
+          <rect x={xBoard} y={yBoard} width={wBoard} height={hBoard} fill="#14532d" stroke="#16a34a" strokeWidth="1" rx="1.5" />
+          <line x1={xBoard + wBoard*0.2} y1={yBoard + hBoard*0.2} x2={xBoard + wBoard*0.8} y2={yBoard + hBoard*0.4} stroke="#eab308" strokeWidth="0.8" opacity="0.5" />
+          <line x1={xBoard + wBoard*0.8} y1={yBoard + hBoard*0.4} x2={xBoard + wBoard*0.3} y2={yBoard + hBoard*0.8} stroke="#eab308" strokeWidth="0.8" opacity="0.5" />
+          <rect x={xBoard + wBoard*0.1} y={yBoard + hBoard*0.15} width={wBoard*0.8} height={hBoard*0.25} fill="#f97316" stroke="#c2410c" strokeWidth="0.75" rx="2" />
+          {Array.from({ length: 5 }).map((_, i) => (
+            <line
+              key={`coil-w-${i}`}
+              x1={xBoard + wBoard*0.2 + i * (wBoard*0.5/4)}
+              y1={yBoard + hBoard*0.15}
+              x2={xBoard + wBoard*0.2 + i * (wBoard*0.5/4)}
+              y2={yBoard + hBoard*0.4}
+              stroke="#ea580c"
+              strokeWidth="1.2"
+            />
+          ))}
+          <rect x={xBoard + wBoard*0.2} y={yBoard + hBoard*0.55} width={wBoard*0.6} height={hBoard*0.3} fill="#0ea5e9" stroke="#0284c7" strokeWidth="0.75" rx="3" />
+          <line x1={xBoard + wBoard*0.5} y1={yBoard + hBoard*0.5} x2={xBoard + wBoard*0.5} y2={yBoard + hBoard*0.55} stroke="#cbd5e1" strokeWidth="0.8" />
+          <line x1={xBoard + wBoard*0.5} y1={yBoard + hBoard*0.85} x2={xBoard + wBoard*0.5} y2={yBoard + hBoard*0.9} stroke="#cbd5e1" strokeWidth="0.8" />
+          <text x={xBoard - 4} y={yBoard + hBoard/2} fill="var(--text-muted)" fontSize="8.5" textAnchor="middle" transform={`rotate(-90 ${xBoard-4} ${yBoard+hBoard/2})`} opacity="0.8">
+            {t("Filtro Crossover")}
+          </text>
+        </g>
+      );
+    } else if (crossoverWays === 3) {
+      // Woofer LF board on bottom wall
+      const xBoardLF = offsetXSide + plotWidthSide - tScale - 12 * scale;
+      const yBoardLF = offsetY + plotHeight - tScale - 3 * scale;
+      const wBoardLF = 10 * scale;
+      const hBoardLF = 2.5 * scale;
+      list.push(
+        <g key="xover-board-lf" opacity="0.9">
+          <rect x={xBoardLF} y={yBoardLF} width={wBoardLF} height={hBoardLF} fill="#14532d" stroke="#16a34a" strokeWidth="1" rx="1.5" />
+          <rect x={xBoardLF + wBoardLF*0.15} y={yBoardLF + hBoardLF*0.1} width={wBoardLF*0.35} height={hBoardLF*0.8} fill="#f97316" stroke="#c2410c" strokeWidth="0.75" rx="2" />
+          {Array.from({ length: 6 }).map((_, i) => (
+            <line
+              key={`coil-lf-${i}`}
+              x1={xBoardLF + wBoardLF*0.18 + i * (wBoardLF*0.28/5)}
+              y1={yBoardLF + hBoardLF*0.1}
+              x2={xBoardLF + wBoardLF*0.18 + i * (wBoardLF*0.28/5)}
+              y2={yBoardLF + hBoardLF*0.9}
+              stroke="#ea580c"
+              strokeWidth="1.5"
+            />
+          ))}
+          <rect x={xBoardLF + wBoardLF*0.6} y={yBoardLF + hBoardLF*0.2} width={wBoardLF*0.3} height={hBoardLF*0.6} fill="#0ea5e9" stroke="#0284c7" strokeWidth="0.75" rx="3" />
+          <text x={xBoardLF + wBoardLF/2} y={yBoardLF - 4} fill="var(--text-muted)" fontSize="8" textAnchor="middle" opacity="0.8">
+            {t("LF X-Over")}
+          </text>
+        </g>
+      );
+
+      // Mid/High HF board on back wall
+      const xBoardHF = offsetXSide + plotWidthSide - tScale - 5 * scale;
+      const yBoardHF = offsetY + tScale + 12 * scale;
+      const wBoardHF = 4 * scale;
+      const hBoardHF = 8 * scale;
+      list.push(
+        <g key="xover-board-hf" opacity="0.9">
+          <rect x={xBoardHF} y={yBoardHF} width={wBoardHF} height={hBoardHF} fill="#14532d" stroke="#16a34a" strokeWidth="1" rx="1.5" />
+          <rect x={xBoardHF + wBoardHF*0.1} y={yBoardHF + hBoardHF*0.15} width={wBoardHF*0.8} height={hBoardHF*0.25} fill="#f97316" stroke="#c2410c" strokeWidth="0.75" rx="1" />
+          {Array.from({ length: 4 }).map((_, i) => (
+            <line
+              key={`coil-hf-${i}`}
+              x1={xBoardHF + wBoardHF*0.2 + i * (wBoardHF*0.5/3)}
+              y1={yBoardHF + hBoardHF*0.15}
+              x2={xBoardHF + wBoardHF*0.2 + i * (wBoardHF*0.5/3)}
+              y2={yBoardHF + hBoardHF*0.4}
+              stroke="#ea580c"
+              strokeWidth="1"
+            />
+          ))}
+          <rect x={xBoardHF + wBoardHF*0.2} y={yBoardHF + hBoardHF*0.55} width={wBoardHF*0.6} height={hBoardHF*0.3} fill="#0ea5e9" stroke="#0284c7" strokeWidth="0.75" rx="2" />
+          <text x={xBoardHF - 4} y={yBoardHF + hBoardHF/2} fill="var(--text-muted)" fontSize="8" textAnchor="middle" transform={`rotate(-90 ${xBoardHF-4} ${yBoardHF+hBoardHF/2})`} opacity="0.8">
+            {t("MF/HF X-Over")}
+          </text>
+        </g>
+      );
+    }
+    return list;
+  };
+
+  const renderBracingTemplate = () => {
+    if (!showBracingTemplate) return null;
+
+    const wInt = cabinetData.wInt;
+    const dVal = shape === 'rectangular' ? cabinetData.dInt : ((cabinetData.dTrapTopInt || 0) + (cabinetData.dTrapBotInt || 0)) / 2;
+    const offsetYBrace = offsetY + (plotHeight - plotHeightBrace) / 2;
+
+    const outerRect = (
+      <rect
+        x={offsetXBrace}
+        y={offsetYBrace}
+        width={plotWidthBrace}
+        height={plotHeightBrace}
+        fill="rgba(100, 116, 139, 0.1)"
+        stroke="#000000"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+    );
+
+    const innerBorder = (
+      <rect
+        x={offsetXBrace + tScale}
+        y={offsetYBrace + tScale}
+        width={plotWidthBrace - 2 * tScale}
+        height={plotHeightBrace - 2 * tScale}
+        fill="none"
+        stroke="#475569"
+        strokeWidth="1.2"
+        strokeDasharray="4 3"
+      />
+    );
+
+    const vertCross = (
+      <rect
+        x={offsetXBrace + plotWidthBrace / 2 - tScale / 2}
+        y={offsetYBrace + tScale}
+        width={tScale}
+        height={plotHeightBrace - 2 * tScale}
+        fill="url(#wood-hatch)"
+        stroke="#000000"
+        strokeWidth="1"
+      />
+    );
+
+    const horizCross = (
+      <rect
+        x={offsetXBrace + tScale}
+        y={offsetYBrace + plotHeightBrace / 2 - tScale / 2}
+        width={plotWidthBrace - 2 * tScale}
+        height={tScale}
+        fill="url(#wood-hatch)"
+        stroke="#000000"
+        strokeWidth="1"
+      />
+    );
+
+    const qW = (plotWidthBrace - 3 * tScale) / 2;
+    const qH = (plotHeightBrace - 3 * tScale) / 2;
+    const rHole = Math.min(qW, qH) * 0.75;
+    const rHoleMm = Math.round((rHole / scale) * 10);
+
+    const drawHole = (cx: number, cy: number, key: string) => {
+      if (rHole <= 4) return null;
+      return (
+        <g key={key}>
+          <circle cx={cx} cy={cy} r={rHole} fill="var(--card-bg)" stroke="#000000" strokeWidth="1.5" />
+          <line x1={cx - rHole - 3} y1={cy} x2={cx + rHole + 3} y2={cy} stroke="#10b981" strokeWidth="0.5" strokeDasharray="3 3" opacity="0.6" />
+          <line x1={cx} y1={cy - rHole - 3} x2={cx} y2={cy + rHole + 3} stroke="#10b981" strokeWidth="0.5" strokeDasharray="3 3" opacity="0.6" />
+        </g>
+      );
+    };
+
+    const cx1 = offsetXBrace + tScale + qW / 2;
+    const cx2 = offsetXBrace + 2 * tScale + qW + qW / 2;
+    const cy1 = offsetYBrace + tScale + qH / 2;
+    const cy2 = offsetYBrace + 2 * tScale + qH + qH / 2;
+
+    const holes = [
+      drawHole(cx1, cy1, 'hole-1'),
+      drawHole(cx2, cy1, 'hole-2'),
+      drawHole(cx1, cy2, 'hole-3'),
+      drawHole(cx2, cy2, 'hole-4'),
+    ];
+
+    const dimLineY = offsetYBrace + plotHeightBrace + 20;
+    const dimLineX = offsetXBrace - 25;
+
+    return (
+      <g key="bracing-template-view">
+        <rect
+          x={offsetXBrace}
+          y={offsetYBrace}
+          width={plotWidthBrace}
+          height={plotHeightBrace}
+          fill="rgba(100, 116, 139, 0.12)"
+        />
+        <rect
+          x={offsetXBrace}
+          y={offsetYBrace}
+          width={plotWidthBrace}
+          height={plotHeightBrace}
+          fill="url(#wood-hatch)"
+        />
+
+        <rect x={offsetXBrace + tScale} y={offsetYBrace + tScale} width={qW} height={qH} fill="var(--card-bg)" stroke="#000000" strokeWidth="1.2" />
+        <rect x={offsetXBrace + 2 * tScale + qW} y={offsetYBrace + tScale} width={qW} height={qH} fill="var(--card-bg)" stroke="#000000" strokeWidth="1.2" />
+        <rect x={offsetXBrace + tScale} y={offsetYBrace + 2 * tScale + qH} width={qW} height={qH} fill="var(--card-bg)" stroke="#000000" strokeWidth="1.2" />
+        <rect x={offsetXBrace + 2 * tScale + qW} y={offsetYBrace + 2 * tScale + qH} width={qW} height={qH} fill="var(--card-bg)" stroke="#000000" strokeWidth="1.2" />
+
+        {outerRect}
+        {innerBorder}
+        {vertCross}
+        {horizCross}
+        {holes}
+
+        {rHole > 4 && (
+          <g>
+            <text x={cx1} y={cy1 + 2.5} fill="var(--text-muted)" fontSize="8" fontWeight="bold" textAnchor="middle" opacity="0.8">
+              Ø{rHoleMm * 2}
+            </text>
+            <text x={cx2} y={cy1 + 2.5} fill="var(--text-muted)" fontSize="8" fontWeight="bold" textAnchor="middle" opacity="0.8">
+              Ø{rHoleMm * 2}
+            </text>
+            <text x={cx1} y={cy2 + 2.5} fill="var(--text-muted)" fontSize="8" fontWeight="bold" textAnchor="middle" opacity="0.8">
+              Ø{rHoleMm * 2}
+            </text>
+            <text x={cx2} y={cy2 + 2.5} fill="var(--text-muted)" fontSize="8" fontWeight="bold" textAnchor="middle" opacity="0.8">
+              Ø{rHoleMm * 2}
+            </text>
+          </g>
+        )}
+
+        <text
+          x={offsetXBrace + plotWidthBrace / 2}
+          y={offsetY + plotHeight + 48}
+          fill="var(--text-muted)"
+          fontSize="9.5"
+          fontWeight="bold"
+          letterSpacing="1px"
+          textAnchor="middle"
+          opacity="0.6"
+        >
+          {t("PLANTILLA REFUERZO")}
+        </text>
+
+        <g stroke="#64748b" strokeWidth="1.2">
+          <line x1={offsetXBrace} y1={dimLineY - 10} x2={offsetXBrace} y2={dimLineY + 5} />
+          <line x1={offsetXBrace + plotWidthBrace} y1={dimLineY - 10} x2={offsetXBrace + plotWidthBrace} y2={dimLineY + 5} />
+          <line x1={offsetXBrace} y1={dimLineY} x2={offsetXBrace + plotWidthBrace} y2={dimLineY} strokeWidth="1.3" markerStart="url(#tick)" markerEnd="url(#tick)" />
+        </g>
+        <text
+          x={offsetXBrace + plotWidthBrace / 2}
+          y={dimLineY + 14}
+          fill="#64748b"
+          fontSize="11.5"
+          fontWeight="normal"
+          textAnchor="middle"
+        >
+          {convertTo(wInt, 'length', unitSystem).toFixed(1)} {uLabel}
+        </text>
+
+        <g stroke="#64748b" strokeWidth="1.2">
+          <line x1={dimLineX - 10} y1={offsetYBrace} x2={dimLineX + 5} y2={offsetYBrace} />
+          <line x1={dimLineX - 10} y1={offsetYBrace + plotHeightBrace} x2={dimLineX + 5} y2={offsetYBrace + plotHeightBrace} />
+          <line x1={dimLineX} y1={offsetYBrace} x2={dimLineX} y2={offsetYBrace + plotHeightBrace} strokeWidth="1.3" markerStart="url(#tick)" markerEnd="url(#tick)" />
+        </g>
+        <text
+          x={dimLineX - 8}
+          y={offsetYBrace + plotHeightBrace / 2 + 4}
+          fill="#64748b"
+          fontSize="11.5"
+          fontWeight="normal"
+          textAnchor="end"
+        >
+          {convertTo(dVal, 'length', unitSystem).toFixed(1)}
+        </text>
+      </g>
+    );
+  };
+
   return (
     <div style={{
       background: 'var(--card-bg)',
@@ -702,36 +1259,52 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
       </span>
 
       <svg width="100%" viewBox={`0 0 ${svgWidth} ${svgHeight}`} fill="none" style={{ maxWidth: '100%' }}>
-        {/* Cuadrícula de fondo sutil */}
+        {/* Cuadrícula de fondo sutil y patrones CAD */}
         <defs>
           <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
             <path d="M 20 0 L 0 0 0 20" fill="none" stroke="var(--text-muted)" strokeWidth="1" opacity="0.08" />
           </pattern>
+          <pattern id="wood-hatch" width="10" height="10" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
+            <line x1="0" y1="0" x2="0" y2="10" stroke="rgba(100, 116, 139, 0.45)" strokeWidth="0.8" />
+          </pattern>
+          <marker id="tick" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <line x1="1" y1="9" x2="9" y2="1" stroke="#64748b" strokeWidth="1.5" />
+          </marker>
         </defs>
         <rect width="100%" height="100%" fill="url(#grid)" rx="8" />
 
         {/* --- DIBUJO VISTA FRONTAL --- */}
-        <path d={`${frontExtPath} ${frontIntPath}`} fill="rgba(245, 158, 11, 0.08)" fillRule="evenodd" />
-        <path d={frontExtPath} stroke="#000000" strokeWidth="3" strokeLinejoin="round" fill="none" />
+        <path d={`${frontExtPath} ${frontIntPath}`} fill="rgba(100, 116, 139, 0.12)" fillRule="evenodd" />
+        <path d={`${frontExtPath} ${frontIntPath}`} fill="url(#wood-hatch)" fillRule="evenodd" />
+        <path d={frontExtPath} stroke="#000000" strokeWidth="2.5" strokeLinejoin="round" fill="none" />
         <path d={frontIntPath} stroke="#000000" strokeWidth="1.5" strokeLinejoin="round" fill="none" />
+        
+        {/* Biseles y chaflanes decorativos (CAD style) */}
+        <path d={`M ${offsetXFront},${offsetY + 12} L ${offsetXFront + 12},${offsetY} M ${offsetXFront + plotWidthFront},${offsetY + 12} L ${offsetXFront + plotWidthFront - 12},${offsetY}`} stroke="#000000" strokeWidth="0.75" opacity="0.65" />
+        <text x={offsetXFront + 16} y={offsetY + 16} fill="var(--text-muted)" fontSize="7" opacity="0.6">20°</text>
+        <text x={offsetXFront + plotWidthFront - 16} y={offsetY + 16} fill="var(--text-muted)" fontSize="7" textAnchor="end" opacity="0.6">20°</text>
+
         {isBandpass ? frontSpeaker : (
           <g>
             {layout.map((d, idx) => (
               <g key={idx}>
-                {/* Flange / Suspensión externa */}
+                {/* Flange / Suspensión externa (Concéntrica) */}
                 <circle cx={wooferX} cy={d.yCenter} r={d.rOuter} fill="none" stroke={speakerStroke} strokeWidth="1.75" opacity={speakerOpacity} />
                 <circle cx={wooferX} cy={d.yCenter} r={d.rOuter - 2.5} fill="none" stroke="#64748b" strokeWidth="0.75" opacity={0.6} />
-
-                {/* Cono */}
-                <circle cx={wooferX} cy={d.yCenter} r={d.rOuter * 0.8} fill={d.color} opacity={0.12} stroke={d.color} strokeWidth="0.75" />
-                <circle cx={wooferX} cy={d.yCenter} r={d.rOuter * 0.8 - 2.5} fill="none" stroke="#64748b" strokeWidth="0.6" opacity={0.8} />
+                
+                {/* Cono & Borde de la suspensión */}
+                {d.type !== 'tweeter' && (
+                  <circle cx={wooferX} cy={d.yCenter} r={d.rOuter - 5.5} fill="none" stroke="#475569" strokeWidth="0.75" opacity="0.5" />
+                )}
+                <circle cx={wooferX} cy={d.yCenter} r={d.rOuter * 0.78} fill={d.color} opacity={0.10} stroke={d.color} strokeWidth="0.75" />
+                <circle cx={wooferX} cy={d.yCenter} r={d.rOuter * 0.78 - 2.5} fill="none" stroke="#64748b" strokeWidth="0.6" opacity={0.8} />
 
                 {/* Cubrepolvo */}
                 <circle cx={wooferX} cy={d.yCenter} r={d.rOuter * 0.25} fill="none" stroke={speakerStroke} strokeWidth="1.25" opacity={speakerOpacity} />
 
                 {/* Ejes técnicos */}
-                <line x1={wooferX - d.rOuter - 3} y1={d.yCenter} x2={wooferX + d.rOuter + 3} y2={d.yCenter} stroke="#10b981" strokeWidth="0.6" strokeDasharray="3 2" opacity="0.45" />
-                <line x1={wooferX} y1={d.yCenter - d.rOuter - 3} x2={wooferX} y2={d.yCenter + d.rOuter + 3} stroke="#10b981" strokeWidth="0.6" strokeDasharray="3 2" opacity="0.45" />
+                <line x1={wooferX - d.rOuter - 4} y1={d.yCenter} x2={wooferX + d.rOuter + 4} y2={d.yCenter} stroke="#10b981" strokeWidth="0.6" strokeDasharray="5 2 2 2" opacity="0.45" />
+                <line x1={wooferX} y1={d.yCenter - d.rOuter - 4} x2={wooferX} y2={d.yCenter + d.rOuter + 4} stroke="#10b981" strokeWidth="0.6" strokeDasharray="5 2 2 2" opacity="0.45" />
 
                 {/* Etiqueta */}
                 <text x={wooferX} y={d.yCenter + 2.5} fill="var(--text-muted)" fontSize="7" fontWeight="bold" textAnchor="middle" opacity="0.75">{d.label}</text>
@@ -740,11 +1313,21 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
           </g>
         )}
         {frontPorts}
+        {renderFrontBraces()}
 
         {/* --- DIBUJO SECCIÓN LATERAL --- */}
-        <path d={`${extPath} ${intPath}`} fill="rgba(245, 158, 11, 0.08)" fillRule="evenodd" />
-        <path d={extPath} stroke="#000000" strokeWidth="3" strokeLinejoin="round" fill="none" />
+        <path d={`${extPath} ${intPath}`} fill="rgba(100, 116, 139, 0.12)" fillRule="evenodd" />
+        <path d={`${extPath} ${intPath}`} fill="url(#wood-hatch)" fillRule="evenodd" />
+        <path d={extPath} stroke="#000000" strokeWidth="2.5" strokeLinejoin="round" fill="none" />
         <path d={intPath} stroke="#000000" strokeWidth="1.5" strokeLinejoin="round" fill="none" />
+        
+        {/* Doble espesor del bafle frontal (Sección lateral) */}
+        <line x1={offsetXSide + tScale / 2} y1={offsetY + tScale} x2={offsetXSide + tScale / 2} y2={offsetY + plotHeight - tScale} stroke="#000000" strokeWidth="0.75" strokeDasharray="3 3" opacity="0.5" />
+        
+        {renderBracing()}
+        {renderBindingPosts()}
+        {renderSpikes()}
+
         {bandpassDivider}
         {speakerConeStandard}
         {speakerMagnetStandard}
@@ -753,6 +1336,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
         {portElement}
         {portElementVr}
         {internalPartitions}
+        {renderSectionalCrossovers()}
 
         {/* Volumen interior etiqueta (Vb o Vf/Vr en círculos) */}
         {!isBandpass ? (
@@ -841,21 +1425,19 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
           {t("CORTE SECCIÓN A-A")}
         </text>
 
-        {/* --- ACOTACIONES (Líneas verdes) --- */}
+        {/* --- ACOTACIONES (Estilo CAD / Arquitectónico) --- */}
 
         {/* Cota Altura Externa (Central / Compartida) */}
-        <g stroke="#10b981" strokeWidth="1.3">
+        <g stroke="#64748b" strokeWidth="1.2">
           <line x1={midX - 10} y1={offsetY} x2={midX + 10} y2={offsetY} />
           <line x1={midX - 10} y1={offsetY + plotHeight} x2={midX + 10} y2={offsetY + plotHeight} />
-          <line x1={midX} y1={offsetY} x2={midX} y2={offsetY + plotHeight} strokeWidth="1.8" />
-          <polygon points={`${midX},${offsetY} ${midX - 4},${offsetY + 7.5} ${midX + 4},${offsetY + 7.5}`} fill="#10b981" />
-          <polygon points={`${midX},${offsetY + plotHeight} ${midX - 4},${offsetY + plotHeight - 7.5} ${midX + 4},${offsetY + plotHeight - 7.5}`} fill="#10b981" />
+          <line x1={midX} y1={offsetY} x2={midX} y2={offsetY + plotHeight} strokeWidth="1.3" markerStart="url(#tick)" markerEnd="url(#tick)" />
         </g>
         <text
           x={midX - 8}
           y={offsetY + plotHeight / 2 + 4}
-          fill="#10b981"
-          fontSize="13"
+          fill="#64748b"
+          fontSize="11.5"
           fontWeight="normal"
           textAnchor="end"
         >
@@ -863,18 +1445,16 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
         </text>
 
         {/* Cota Ancho Externo (Abajo Vista Frontal) */}
-        <g stroke="#10b981" strokeWidth="1.3">
+        <g stroke="#64748b" strokeWidth="1.2">
           <line x1={offsetXFront} y1={offsetY + plotHeight + 10} x2={offsetXFront} y2={offsetY + plotHeight + 25} />
           <line x1={offsetXFront + plotWidthFront} y1={offsetY + plotHeight + 10} x2={offsetXFront + plotWidthFront} y2={offsetY + plotHeight + 25} />
-          <line x1={offsetXFront} y1={offsetY + plotHeight + 20} x2={offsetXFront + plotWidthFront} y2={offsetY + plotHeight + 20} strokeWidth="1.8" />
-          <polygon points={`${offsetXFront},${offsetY + plotHeight + 20} ${offsetXFront + 7.5},${offsetY + plotHeight + 16} ${offsetXFront + 7.5},${offsetY + plotHeight + 24}`} fill="#10b981" />
-          <polygon points={`${offsetXFront + plotWidthFront},${offsetY + plotHeight + 20} ${offsetXFront + plotWidthFront - 7.5},${offsetY + plotHeight + 16} ${offsetXFront + plotWidthFront - 7.5},${offsetY + plotHeight + 24}`} fill="#10b981" />
+          <line x1={offsetXFront} y1={offsetY + plotHeight + 20} x2={offsetXFront + plotWidthFront} y2={offsetY + plotHeight + 20} strokeWidth="1.3" markerStart="url(#tick)" markerEnd="url(#tick)" />
         </g>
         <text
           x={offsetXFront + plotWidthFront / 2}
-          y={offsetY + plotHeight + 35}
-          fill="#10b981"
-          fontSize="13"
+          y={offsetY + plotHeight + 34}
+          fill="#64748b"
+          fontSize="11.5"
           fontWeight="normal"
           textAnchor="middle"
         >
@@ -883,18 +1463,16 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
 
         {/* Cota Profundidad Externa (Sección Lateral) */}
         {shape === 'rectangular' ? (
-          <g stroke="#10b981" strokeWidth="1.3">
+          <g stroke="#64748b" strokeWidth="1.2">
             <line x1={offsetXSide} y1={offsetY + plotHeight + 10} x2={offsetXSide} y2={offsetY + plotHeight + 25} />
             <line x1={offsetXSide + plotWidthSide} y1={offsetY + plotHeight + 10} x2={offsetXSide + plotWidthSide} y2={offsetY + plotHeight + 25} />
-            <line x1={offsetXSide} y1={offsetY + plotHeight + 20} x2={offsetXSide + plotWidthSide} y2={offsetY + plotHeight + 20} strokeWidth="1.8" />
-            <polygon points={`${offsetXSide},${offsetY + plotHeight + 20} ${offsetXSide + 7.5},${offsetY + plotHeight + 16} ${offsetXSide + 7.5},${offsetY + plotHeight + 24}`} fill="#10b981" />
-            <polygon points={`${offsetXSide + plotWidthSide},${offsetY + plotHeight + 20} ${offsetXSide + plotWidthSide - 7.5},${offsetY + plotHeight + 16} ${offsetXSide + plotWidthSide - 7.5},${offsetY + plotHeight + 24}`} fill="#10b981" />
+            <line x1={offsetXSide} y1={offsetY + plotHeight + 20} x2={offsetXSide + plotWidthSide} y2={offsetY + plotHeight + 20} strokeWidth="1.3" markerStart="url(#tick)" markerEnd="url(#tick)" />
             <text
               x={offsetXSide + plotWidthSide / 2}
-              y={offsetY + plotHeight + 35}
-              fill="#10b981"
+              y={offsetY + plotHeight + 34}
+              fill="#64748b"
               stroke="none"
-              fontSize="13"
+              fontSize="11.5"
               fontWeight="normal"
               textAnchor="middle"
             >
@@ -903,19 +1481,17 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
           </g>
         ) : (
           // Trapezoidal - Cotas de profundidad superior e inferior
-          <g stroke="#10b981" strokeWidth="1.3">
+          <g stroke="#64748b" strokeWidth="1.2">
             {/* Superior */}
             <line x1={offsetXSide} y1={offsetY - 25} x2={offsetXSide} y2={offsetY - 10} />
             <line x1={offsetXSide + (dTrapTopExt || 0) * scale} y1={offsetY - 25} x2={offsetXSide + (dTrapTopExt || 0) * scale} y2={offsetY - 10} />
-            <line x1={offsetXSide} y1={offsetY - 20} x2={offsetXSide + (dTrapTopExt || 0) * scale} y2={offsetY - 20} strokeWidth="1.8" />
-            <polygon points={`${offsetXSide},${offsetY - 20} ${offsetXSide + 7.5},${offsetY - 24} ${offsetXSide + 7.5},${offsetY - 16}`} fill="#10b981" />
-            <polygon points={`${offsetXSide + (dTrapTopExt || 0) * scale},${offsetY - 20} ${offsetXSide + (dTrapTopExt || 0) * scale - 7.5},${offsetY - 24} ${offsetXSide + (dTrapTopExt || 0) * scale - 7.5},${offsetY - 16}`} fill="#10b981" />
+            <line x1={offsetXSide} y1={offsetY - 20} x2={offsetXSide + (dTrapTopExt || 0) * scale} y2={offsetY - 20} strokeWidth="1.3" markerStart="url(#tick)" markerEnd="url(#tick)" />
             <text
               x={offsetXSide + ((dTrapTopExt || 0) * scale) / 2}
               y={offsetY - 28}
-              fill="#10b981"
+              fill="#64748b"
               stroke="none"
-              fontSize="11.5"
+              fontSize="11"
               fontWeight="normal"
               textAnchor="middle"
             >
@@ -925,15 +1501,13 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
             {/* Inferior */}
             <line x1={offsetXSide} y1={offsetY + plotHeight + 10} x2={offsetXSide} y2={offsetY + plotHeight + 25} />
             <line x1={offsetXSide + (dTrapBotExt || 0) * scale} y1={offsetY + plotHeight + 10} x2={offsetXSide + (dTrapBotExt || 0) * scale} y2={offsetY + plotHeight + 25} />
-            <line x1={offsetXSide} y1={offsetY + plotHeight + 20} x2={offsetXSide + (dTrapBotExt || 0) * scale} y2={offsetY + plotHeight + 20} strokeWidth="1.8" />
-            <polygon points={`${offsetXSide},${offsetY + plotHeight + 20} ${offsetXSide + 7.5},${offsetY + plotHeight + 16} ${offsetXSide + 7.5},${offsetY + plotHeight + 24}`} fill="#10b981" />
-            <polygon points={`${offsetXSide + (dTrapBotExt || 0) * scale},${offsetY + plotHeight + 20} ${offsetXSide + (dTrapBotExt || 0) * scale - 7.5},${offsetY + plotHeight + 16} ${offsetXSide + (dTrapBotExt || 0) * scale - 7.5},${offsetY + plotHeight + 24}`} fill="#10b981" />
+            <line x1={offsetXSide} y1={offsetY + plotHeight + 20} x2={offsetXSide + (dTrapBotExt || 0) * scale} y2={offsetY + plotHeight + 20} strokeWidth="1.3" markerStart="url(#tick)" markerEnd="url(#tick)" />
             <text
               x={offsetXSide + ((dTrapBotExt || 0) * scale) / 2}
-              y={offsetY + plotHeight + 35}
-              fill="#10b981"
+              y={offsetY + plotHeight + 34}
+              fill="#64748b"
               stroke="none"
-              fontSize="11.5"
+              fontSize="11"
               fontWeight="normal"
               textAnchor="middle"
             >
@@ -943,19 +1517,17 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
         )}
 
         {/* Cadena de Acotación de Alturas en Vista Frontal (Izquierda) */}
-        <g stroke="#10b981" strokeWidth="1.2" opacity="0.85">
+        <g stroke="#64748b" strokeWidth="1.2">
           {/* Cota Altura Centro Altavoz desde Arriba */}
           <line x1={offsetXFront - 21} y1={offsetY} x2={offsetXFront - 11} y2={offsetY} />
           <line x1={offsetXFront - 21} y1={wooferYCenter} x2={offsetXFront - 11} y2={wooferYCenter} />
-          <line x1={offsetXFront - 16} y1={offsetY} x2={offsetXFront - 16} y2={wooferYCenter} strokeWidth="1.5" />
-          <polygon points={`${offsetXFront - 16},${offsetY} ${offsetXFront - 19},${offsetY + 6} ${offsetXFront - 13},${offsetY + 6}`} fill="#10b981" />
-          <polygon points={`${offsetXFront - 16},${wooferYCenter} ${offsetXFront - 19},${wooferYCenter - 6} ${offsetXFront - 13},${wooferYCenter - 6}`} fill="#10b981" />
+          <line x1={offsetXFront - 16} y1={offsetY} x2={offsetXFront - 16} y2={wooferYCenter} strokeWidth="1.3" markerStart="url(#tick)" markerEnd="url(#tick)" />
           <text
             x={offsetXFront - 22}
             y={offsetY + distWooferTop / 2 + 4}
-            fill="#10b981"
+            fill="#64748b"
             stroke="none"
-            fontSize="11.5"
+            fontSize="11"
             fontWeight="normal"
             textAnchor="end"
           >
@@ -967,15 +1539,13 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
             <>
               <line x1={offsetXFront - 21} y1={portYCenter} x2={offsetXFront - 11} y2={portYCenter} />
               <line x1={offsetXFront - 21} y1={offsetY + plotHeight} x2={offsetXFront - 11} y2={offsetY + plotHeight} />
-              <line x1={offsetXFront - 16} y1={portYCenter} x2={offsetXFront - 16} y2={offsetY + plotHeight} strokeWidth="1.5" />
-              <polygon points={`${offsetXFront - 16},${portYCenter} ${offsetXFront - 19},${portYCenter + 6} ${offsetXFront - 13},${portYCenter + 6}`} fill="#10b981" />
-              <polygon points={`${offsetXFront - 16},${offsetY + plotHeight} ${offsetXFront - 19},${offsetY + plotHeight - 6} ${offsetXFront - 13},${offsetY + plotHeight - 6}`} fill="#10b981" />
+              <line x1={offsetXFront - 16} y1={portYCenter} x2={offsetXFront - 16} y2={offsetY + plotHeight} strokeWidth="1.3" markerStart="url(#tick)" markerEnd="url(#tick)" />
               <text
                 x={offsetXFront - 22}
                 y={portYCenter + distPortBot / 2 + 4}
-                fill="#10b981"
+                fill="#64748b"
                 stroke="none"
-                fontSize="11.5"
+                fontSize="11"
                 fontWeight="normal"
                 textAnchor="end"
               >
@@ -986,33 +1556,32 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
         </g>
 
         {/* Cota Altura Interna (Izquierda/Dentro de la sección) */}
-        <g stroke="#10b981" strokeWidth="1.2" strokeDasharray="3 3" opacity="0.75">
-          <line x1={offsetXSide + tScale} y1={offsetY + tScale} x2={offsetXSide + tScale + 15} y2={offsetY + tScale} />
-          <line x1={offsetXSide + tScale} y1={offsetY + plotHeight - tScale} x2={offsetXSide + tScale + 15} y2={offsetY + plotHeight - tScale} />
-          <line x1={offsetXSide + tScale + 10} y1={offsetY + tScale} x2={offsetXSide + tScale + 10} y2={offsetY + plotHeight - tScale} strokeDasharray="none" />
+        <g stroke="#64748b" strokeWidth="1.2" strokeDasharray="3 3" opacity="0.65">
+          <line x1={offsetXSide + tScale} y1={offsetY + tScale} x2={offsetXSide + tScale + 15} y2={offsetY + tScale} strokeDasharray="none" />
+          <line x1={offsetXSide + tScale} y1={offsetY + plotHeight - tScale} x2={offsetXSide + tScale + 15} y2={offsetY + plotHeight - tScale} strokeDasharray="none" />
+          <line x1={offsetXSide + tScale + 10} y1={offsetY + tScale} x2={offsetXSide + tScale + 10} y2={offsetY + plotHeight - tScale} strokeDasharray="none" markerStart="url(#tick)" markerEnd="url(#tick)" />
         </g>
         <text
-          x={offsetXSide + tScale + 16}
-          y={offsetY + tScale + 22}
-          fill="#10b981"
-          fontSize="11.5"
+          x={offsetXSide + tScale + 15}
+          y={offsetY + tScale + 20}
+          fill="#64748b"
+          fontSize="11"
           fontWeight="normal"
-          opacity="0.9"
         >
           {hIntDisp}
         </text>
 
         {/* Cota Espesor Madera (Arriba Izquierda de la sección) */}
-        <g stroke="#10b981" strokeWidth="1.2">
+        <g stroke="#64748b" strokeWidth="1.2">
           <line x1={offsetXSide} y1={offsetY - 15} x2={offsetXSide} y2={offsetY + 5} />
           <line x1={offsetXSide + tScale} y1={offsetY - 15} x2={offsetXSide + tScale} y2={offsetY + 5} />
-          <line x1={offsetXSide - 10} y1={offsetY - 10} x2={offsetXSide + tScale + 10} y2={offsetY - 10} strokeWidth="1.2" />
+          <line x1={offsetXSide} y1={offsetY - 10} x2={offsetXSide + tScale} y2={offsetY - 10} strokeWidth="1.3" markerStart="url(#tick)" markerEnd="url(#tick)" />
         </g>
         <text
           x={offsetXSide + tScale / 2}
           y={offsetY - 15}
-          fill="#10b981"
-          fontSize="10"
+          fill="#64748b"
+          fontSize="9.5"
           fontWeight="normal"
           textAnchor="middle"
         >
@@ -1160,6 +1729,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
           }
           return null;
         })()}
+        {renderBracingTemplate()}
       </svg>
       <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.5rem', textAlign: 'center' }}>
         * {t("Representación técnica (Vistas Frontal y de Sección Lateral). Todas las cotas están en")}{' '}{uLabel}.

@@ -152,6 +152,20 @@ function App() {
   const [woodThickness, setWoodThickness] = useState<number | ''>(15);
   const [woodExtra, setWoodExtra] = useState<number | ''>(3.5);
   const [enableBracing, setEnableBracing] = useState(false);
+  const [bracingCount, setBracingCount] = useState<number>(2);
+  const [bracingPositions, setBracingPositions] = useState<number[]>([0.35, 0.7]);
+
+  const handleBracingCountChange = (count: number) => {
+    setBracingCount(count);
+    if (count <= 0) {
+      setBracingPositions([]);
+    } else if (count === 1) {
+      setBracingPositions([0.5]);
+    } else {
+      const step = 0.6 / (count - 1);
+      setBracingPositions(Array.from({ length: count }, (_, i) => 0.2 + i * step));
+    }
+  };
 
 
   const [speakerYPct, setSpeakerYPct] = useState<number>(50);
@@ -858,7 +872,6 @@ function App() {
         {/* PARÁMETROS IZQUIERDA */}
         <div className="font-unified-form" style={{ display: 'contents' }}>
           <SpeakerParamsForm 
-
             lang={lang}
             unitSystem={unitSystem}
             params={params}
@@ -870,6 +883,16 @@ function App() {
             onPresetChange={handlePresetChange}
             customDrivers={customDrivers}
             onCustomDriversChange={handleCustomDriversChange}
+            crossoverWays={crossoverWays}
+            setCrossoverWays={setCrossoverWays}
+            midFs={midFs}
+            setMidFs={setMidFs}
+            midVas={midVas}
+            setMidVas={setMidVas}
+            midQts={midQts}
+            setMidQts={setMidQts}
+            midTargetQtc={midTargetQtc}
+            setMidTargetQtc={setMidTargetQtc}
           />
         </div>
 
@@ -953,6 +976,8 @@ function App() {
             setWoodExtra={setWoodExtra}
             enableBracing={enableBracing}
             onEnableBracingChange={setEnableBracing}
+            bracingCount={bracingCount}
+            onBracingCountChange={handleBracingCountChange}
             woodLockVal1={woodLockVal1}
             setWoodLockVal1={setWoodLockVal1}
             woodLockVal2={woodLockVal2}
@@ -1121,6 +1146,10 @@ function App() {
                 midCabinetDepth={midCabinetDepth}
                 enableBracing={enableBracing}
                 onEnableBracingChange={setEnableBracing}
+                bracingCount={bracingCount}
+                onBracingCountChange={handleBracingCountChange}
+                bracingPositions={bracingPositions}
+                onBracingPositionsChange={setBracingPositions}
               />
             </div>
 

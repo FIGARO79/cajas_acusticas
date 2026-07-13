@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { type Lang, translate } from '../utils/translations';
 import { type UnitSystem, convertTo, convertFrom, getUnitLabel } from '../utils/units';
 import type { CalculatedPorted, CalculatedSealed, CalculatedBandpass, SpeakerParams, PortSuggestions, WoodCabinetData } from '../types';
@@ -86,6 +86,8 @@ interface BoxParamsFormProps {
   setWoodExtra: (val: number | '') => void;
   enableBracing?: boolean;
   onEnableBracingChange?: (v: boolean) => void;
+  bracingCount?: number;
+  onBracingCountChange?: (v: number) => void;
 
   // Locks/Fijaciones
   woodLockVal1: number | '';
@@ -247,6 +249,8 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
   setWoodExtra,
   enableBracing = false,
   onEnableBracingChange,
+  bracingCount = 2,
+  onBracingCountChange,
 
   woodLockVal1,
   setWoodLockVal1,
@@ -327,6 +331,106 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
   setMidCabinetDepth,
 }) => {
   const t = (text: string) => translate(text, lang);
+
+  // Air-Core Inductor Winding Calculator State
+  const [whLTarget, setWhLTarget] = useState<number>(1.0); // mH
+  const [whCoilDia, setWhCoilDia] = useState<number>(25.0); // mm (mean diameter)
+  const [whCoilLen, setWhCoilLen] = useState<number>(20.0); // mm (winding length)
+  const [whWireDia, setWhWireDia] = useState<number>(1.0); // mm (wire diameter)
+  const [whCalcMode, setWhCalcMode] = useState<'turns' | 'inductance'>('turns');
+  const [whTurns, setWhTurns] = useState<number>(100);
+
+  const whCalculations = useMemo(() => {
+    const d = whCoilDia; // mm
+    const l = whCoilLen; // mm
+    const dw = whWireDia; // mm
+
+    if (d <= 0 || l <= 0) return null;
+
+    let turns = whTurns;
+    let inductance = whLTarget;
+
+    if (whCalcMode === 'turns') {
+      const luH = inductance * 1000;
+      const n2 = (luH * (9 * d + 10 * l)) / (d * d);
+      turns = n2 > 0 ? Math.sqrt(n2) : 0;
+    } else {
+      const luH = (d * d * turns * turns) / (9 * d + 10 * l);
+      inductance = luH / 1000;
+    }
+
+    const meanCircumference = Math.PI * d; // mm
+    const wireLengthM = (turns * meanCircumference) / 1000;
+    
+    const wireArea = dw > 0 ? Math.PI * Math.pow(dw / 2, 2) : 0;
+    const resistance = wireArea > 0 ? (0.0172 * wireLengthM) / wireArea : 0;
+    const copperWeightG = wireArea > 0 ? (wireArea * wireLengthM / 100) * 8.89 : 0;
+
+    const turnsPerLayer = dw > 0 ? l / dw : 0;
+    const layers = turnsPerLayer > 0 ? Math.ceil(turns / turnsPerLayer) : 0;
+    const windingHeight = layers * dw; // mm
+
+    return {
+      turns: Math.round(turns * 10) / 10,
+      inductance: Math.round(inductance * 1000) / 1000,
+      wireLengthM: Math.round(wireLengthM * 100) / 100,
+      resistance: Math.round(resistance * 100) / 100,
+      layers,
+      windingHeight: Math.round(windingHeight * 10) / 10,
+      copperWeightG: Math.round(copperWeightG * 10) / 10,
+    };
+  }, [whLTarget, whCoilDia, whCoilLen, whWireDia, whCalcMode, whTurns]);
+
+  const suggestedInductors = useMemo(() => {
+    const list: Array<{ label: string; value: number }> = [];
+    const Rt = zTweeter;
+    const Rm = zMidrange;
+    const Rw = zWoofer;
+    const f = fc;
+    const fL = fcLow;
+    const fH = fcHigh;
+
+    if (crossoverWays === 2 && f > 0) {
+      if (crossoverType === '1st_order') {
+        list.push({ label: `${t("Woofer L1")} (1er O)`, value: (Rw / (2 * Math.PI * f)) * 1000 });
+      } else if (crossoverType === '2nd_butter') {
+        list.push({ label: `${t("Tweeter L1")} (2do O Butter)`, value: ((Rt * Math.sqrt(2)) / (2 * Math.PI * f)) * 1000 });
+        list.push({ label: `${t("Woofer L1")} (2do O Butter)`, value: ((Rw * Math.sqrt(2)) / (2 * Math.PI * f)) * 1000 });
+      } else if (crossoverType === '2nd_lr') {
+        list.push({ label: `${t("Tweeter L1")} (2do O LR)`, value: (Rt / (Math.PI * f)) * 1000 });
+        list.push({ label: `${t("Woofer L1")} (2do O LR)`, value: (Rw / (Math.PI * f)) * 1000 });
+      } else if (crossoverType === '4th_lr') {
+        list.push({ label: `${t("Tweeter L1")} (4to O LR)`, value: (0.1592 * Rt * 1000) / f });
+        list.push({ label: `${t("Tweeter L2")} (4to O LR)`, value: (0.0796 * Rt * 1000) / f });
+        list.push({ label: `${t("Woofer L1")} (4to O LR)`, value: (0.1592 * Rw * 1000) / f });
+        list.push({ label: `${t("Woofer L2")} (4to O LR)`, value: (0.0796 * Rw * 1000) / f });
+      }
+    } else if (crossoverWays === 3 && fL > 0 && fH > 0) {
+      if (crossoverType === '1st_order') {
+        list.push({ label: `${t("Woofer L1")} (1er O)`, value: (Rw / (2 * Math.PI * fL)) * 1000 });
+      } else if (crossoverType === '2nd_butter') {
+        list.push({ label: `${t("Woofer L1")} (2do O Butter)`, value: ((Rw * Math.sqrt(2)) / (2 * Math.PI * fL)) * 1000 });
+      } else if (crossoverType === '2nd_lr') {
+        list.push({ label: `${t("Woofer L1")} (2do O LR)`, value: (Rw / (Math.PI * fL)) * 1000 });
+      } else if (crossoverType === '4th_lr') {
+        list.push({ label: `${t("Woofer L1")} (4to O LR)`, value: (0.1592 * Rw * 1000) / fL });
+        list.push({ label: `${t("Woofer L2")} (4to O LR)`, value: (0.0796 * Rw * 1000) / fL });
+      }
+
+      if (crossoverType === '1st_order') {
+        list.push({ label: `${t("Medio L1 (Paso Banda)")} (1er O)`, value: (Rm / (2 * Math.PI * fH)) * 1000 });
+      } else if (crossoverType === '2nd_butter') {
+        list.push({ label: `${t("Medio L1 (Paso Banda)")} (2do O Butter)`, value: ((Rm * Math.sqrt(2)) / (2 * Math.PI * fH)) * 1000 });
+      } else if (crossoverType === '2nd_lr') {
+        list.push({ label: `${t("Medio L1 (Paso Banda)")} (2do O LR)`, value: (Rm / (Math.PI * fH)) * 1000 });
+      } else if (crossoverType === '4th_lr') {
+        list.push({ label: `${t("Medio L1 (Paso Banda)")} (4to O LR)`, value: (0.1592 * Rm * 1000) / fH });
+        list.push({ label: `${t("Medio L2 (Paso Banda)")} (4to O LR)`, value: (0.0796 * Rm * 1000) / fH });
+      }
+    }
+
+    return list;
+  }, [crossoverWays, crossoverType, fc, fcLow, fcHigh, zTweeter, zMidrange, zWoofer, t]);
 
   const suggestions = useMemo<PortSuggestions | null>(() => {
     if (portedData.valid && portedData.Vb > 0 && portedData.Fb > 0) {
@@ -516,7 +620,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
           className={activeTab === 'crossover' ? 'active' : ''}
           style={{ padding: '0.3rem 0.2rem' }}
         >
-          {t("Divisor (Xover)")}
+          XOVER
         </button>
       </div>
 
@@ -790,14 +894,41 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 </div>
                 <div className="input-group">
                   <label>{t("Refuerzos Internos")}</label>
-                  <div className="input-wrapper" style={{ display: 'flex', alignItems: 'center', height: '30px', gap: '0.4rem' }}>
-                    <input
-                      type="checkbox"
-                      checked={enableBracing}
-                      onChange={(e) => onEnableBracingChange?.(e.target.checked)}
-                      style={{ width: '1.1rem', height: '1.1rem', cursor: 'pointer', margin: 0 }}
-                    />
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t("Mostrar Bracing")}</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    <div className="input-wrapper" style={{ display: 'flex', alignItems: 'center', height: '30px', gap: '0.4rem' }}>
+                      <input
+                        type="checkbox"
+                        checked={enableBracing}
+                        onChange={(e) => onEnableBracingChange?.(e.target.checked)}
+                        style={{ width: '1.1rem', height: '1.1rem', cursor: 'pointer', margin: 0 }}
+                      />
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t("Mostrar Bracing")}</span>
+                    </div>
+                    {enableBracing && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{t("Cantidad:")}</span>
+                        <select
+                          value={bracingCount}
+                          onChange={(e) => onBracingCountChange?.(Number(e.target.value))}
+                          style={{
+                            height: '25px',
+                            padding: '0 4px',
+                            fontSize: '0.75rem',
+                            background: 'var(--input-bg)',
+                            color: 'var(--text-main)',
+                            border: '1px solid var(--input-border)',
+                            borderRadius: '4px',
+                            width: '55px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <option value={1}>1</option>
+                          <option value={2}>2</option>
+                          <option value={3}>3</option>
+                          <option value={4}>4</option>
+                        </select>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1413,20 +1544,27 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
               {boxType === 'ported' && prTuning === 'port' && (
                 <>
                   <div className="input-group" style={{ marginBottom: '0.25rem' }}>
-                    <label>{t("Ubicación del Puerto")}</label>
-                    <select 
-                      value={portLocation} 
-                      onChange={(e) => setPortLocation(e.target.value as 'front' | 'rear')}
-                      className="input-select"
-                      style={{ width: '100%', height: '25px', padding: '0px 2rem 0px 0.55rem' }}
-                    >
-                      <option value="front">{t("Frente")}</option>
-                      <option value="rear">{t("Atrás")}</option>
-                    </select>
+                    <label style={{ fontSize: '0.65rem' }}>{t("Ubicación del Puerto")}</label>
+                    <div className="segmented-control segmented-control-mini" style={{ width: '100%' }}>
+                      <button
+                        type="button"
+                        className={portLocation === 'front' ? 'active' : ''}
+                        onClick={() => setPortLocation('front')}
+                      >
+                        {t("Frente")}
+                      </button>
+                      <button
+                        type="button"
+                        className={portLocation === 'rear' ? 'active' : ''}
+                        onClick={() => setPortLocation('rear')}
+                      >
+                        {t("Atrás")}
+                      </button>
+                    </div>
                   </div>
 
                   <div className="input-group" style={{ marginBottom: '0.25rem' }}>
-                    <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem' }}>
+                    <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem' }}>
                       <span>{t("Posición Vertical Puerto(s)")}</span>
                       <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{portYPct}%</span>
                     </label>
@@ -1437,6 +1575,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                         max="85"
                         value={portYPct}
                         onChange={(e) => setPortYPct(parseInt(e.target.value))}
+                        className="slider-mini"
                         style={{ flex: 1, accentColor: 'var(--accent)', cursor: 'pointer' }}
                       />
                     </div>
@@ -1640,6 +1779,158 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Calculadora de Inductores (Fórmula de Wheeler) */}
+            <div className="premium-form-card" style={{ borderTop: '1px solid var(--card-border)', paddingTop: '0.75rem' }}>
+              <div className="form-subsection-title" style={{ marginTop: 0 }}>
+                {t("Diseñador de Inductores (Núcleo de Aire)")}
+              </div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '0.6rem' }}>
+                {t("Calcula las vueltas y dimensiones para construir tus propias bobinas usando la fórmula de Wheeler.")}
+              </div>
+
+              {suggestedInductors.length > 0 && (
+                <div className="input-group" style={{ marginBottom: '0.6rem' }}>
+                  <label>{t("Cargar valor del crossover:")}</label>
+                  <select
+                    className="input-select"
+                    style={{ width: '100%', height: '34px', fontSize: '0.75rem' }}
+                    defaultValue=""
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      if (val > 0) {
+                        setWhLTarget(val);
+                        setWhCalcMode('turns');
+                      }
+                    }}
+                  >
+                    <option value="">-- {t("Seleccionar valor")} --</option>
+                    {suggestedInductors.map((ind, idx) => (
+                      <option key={idx} value={ind.value}>
+                        {ind.label}: {ind.value.toFixed(3)} mH
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="input-group" style={{ marginBottom: '0.6rem' }}>
+                <label>{t("Modo de Cálculo")}</label>
+                <div className="segmented-control" style={{ padding: '2px', borderRadius: '0px' }}>
+                  <button
+                    type="button"
+                    className={whCalcMode === 'turns' ? 'active' : ''}
+                    onClick={() => setWhCalcMode('turns')}
+                    style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', borderRadius: '0px' }}
+                  >
+                    {t("Calcular Espiras")}
+                  </button>
+                  <button
+                    type="button"
+                    className={whCalcMode === 'inductance' ? 'active' : ''}
+                    onClick={() => setWhCalcMode('inductance')}
+                    style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', borderRadius: '0px' }}
+                  >
+                    {t("Calcular Inductancia")}
+                  </button>
+                </div>
+              </div>
+
+              <div className="input-grid">
+                {whCalcMode === 'turns' ? (
+                  <div className="input-group">
+                    <label>{t("Inductancia Obj.")} (mH)</label>
+                    <div className="input-wrapper">
+                      <input
+                        type="number"
+                        value={whLTarget}
+                        onChange={(e) => setWhLTarget(Math.max(0.001, parseFloat(e.target.value) || 1.0))}
+                        step="0.05"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="input-group">
+                    <label>{t("Número de Espiras (N)")}</label>
+                    <div className="input-wrapper">
+                      <input
+                        type="number"
+                        value={whTurns}
+                        onChange={(e) => setWhTurns(Math.max(1, parseInt(e.target.value) || 100))}
+                        step="5"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="input-group">
+                  <label>{t("Diámetro Medio (d)")} (mm)</label>
+                  <div className="input-wrapper">
+                    <input
+                      type="number"
+                      value={whCoilDia}
+                      onChange={(e) => setWhCoilDia(Math.max(1.0, parseFloat(e.target.value) || 25.0))}
+                      step="1"
+                    />
+                  </div>
+                </div>
+
+                <div className="input-group">
+                  <label>{t("Longitud Bobina (l)")} (mm)</label>
+                  <div className="input-wrapper">
+                    <input
+                      type="number"
+                      value={whCoilLen}
+                      onChange={(e) => setWhCoilLen(Math.max(1.0, parseFloat(e.target.value) || 20.0))}
+                      step="1"
+                    />
+                  </div>
+                </div>
+
+                <div className="input-group">
+                  <label>{t("Diámetro Alambre")} (mm)</label>
+                  <div className="input-wrapper">
+                    <input
+                      type="number"
+                      value={whWireDia}
+                      onChange={(e) => setWhWireDia(Math.max(0.1, parseFloat(e.target.value) || 1.0))}
+                      step="0.1"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {whCalculations && (
+                <div style={{ marginTop: '0.75rem', background: 'rgba(255,255,255,0.02)', padding: '0.6rem', border: '1px solid var(--card-border)', borderRadius: '6px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', fontSize: '0.72rem' }}>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)' }}>{t("Inductancia:")}</span>{' '}
+                      <strong style={{ color: 'var(--ported-color)' }}>{whCalculations.inductance.toFixed(3)} mH</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)' }}>{t("Espiras (vueltas):")}</span>{' '}
+                      <strong style={{ color: 'var(--primary)' }}>{whCalculations.turns}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)' }}>{t("Long. Alambre:")}</span>{' '}
+                      <strong>{whCalculations.wireLengthM} m</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)' }}>{t("Resistencia (Re):")}</span>{' '}
+                      <strong>{whCalculations.resistance} Ω</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)' }}>{t("Capas de Winding:")}</span>{' '}
+                      <strong>{whCalculations.layers} ({whCalculations.windingHeight} mm)</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)' }}>{t("Peso Cobre:")}</span>{' '}
+                      <strong>{whCalculations.copperWeightG} g</strong>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

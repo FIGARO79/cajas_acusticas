@@ -16,6 +16,17 @@ interface SpeakerParamsFormProps {
   onPresetChange: (presetId: string, params: SpeakerParams | null) => void;
   customDrivers?: CustomDriver[];
   onCustomDriversChange?: (drivers: CustomDriver[]) => void;
+
+  crossoverWays: number;
+  setCrossoverWays: (ways: number) => void;
+  midFs: number;
+  setMidFs: (val: number) => void;
+  midVas: number;
+  setMidVas: (val: number) => void;
+  midQts: number;
+  setMidQts: (val: number) => void;
+  midTargetQtc: number;
+  setMidTargetQtc: (val: number) => void;
 }
 
 const UNIT_TYPES: Record<string, 'volume' | 'volume_small' | 'length' | 'length_small' | 'area'> = {
@@ -39,6 +50,17 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
   onPresetChange,
   customDrivers = [],
   onCustomDriversChange = () => {},
+
+  crossoverWays,
+  setCrossoverWays,
+  midFs,
+  setMidFs,
+  midVas,
+  setMidVas,
+  midQts,
+  setMidQts,
+  midTargetQtc,
+  setMidTargetQtc,
 }) => {
   const t = (text: string) => translate(text, lang);
   const [proMode, setProMode] = useState(false);
@@ -448,7 +470,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
   return (
     <aside className="panel">
       {/* Selector de Pestañas de Altavoz (Menú de Texto Plano) */}
-      <div className="driver-menu-links" style={{ display: 'flex', gap: '1.25rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--card-border)', paddingBottom: '0.5rem' }}>
+      <div className="driver-menu-links" style={{ display: 'flex', gap: '1.5rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--card-border)', paddingBottom: '0.5rem' }}>
         <button 
           type="button"
           onClick={() => setDriverTab('view')}
@@ -463,7 +485,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
             cursor: 'pointer',
             fontFamily: 'var(--font-sans)',
             outline: 'none',
-            letterSpacing: '0.02em',
+            letterSpacing: 'normal',
             transition: 'color 0.15s ease'
           }}
         >
@@ -483,7 +505,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
             cursor: 'pointer',
             fontFamily: 'var(--font-sans)',
             outline: 'none',
-            letterSpacing: '0.02em',
+            letterSpacing: 'normal',
             transition: 'color 0.15s ease'
           }}
         >
@@ -670,6 +692,85 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
             <option value="isobaric">{t("Isobárica / Push-Pull (0.5x Vb)")}</option>
           </select>
         </div>
+
+        <div className="input-group input-group-full" style={{ marginTop: '0.4rem', marginBottom: '0.4rem' }}>
+          <label>{t("Vías del Sistema")}</label>
+          <div className="segmented-control" style={{ padding: '2px', borderRadius: '0px' }}>
+            <button
+              type="button"
+              className={crossoverWays === 2 ? 'active' : ''}
+              onClick={() => setCrossoverWays(2)}
+              style={{ padding: '0.45rem 0.25rem', fontSize: '0.8rem', borderRadius: '0px', flex: 1 }}
+            >
+              {t("2 Vías")}
+            </button>
+            <button
+              type="button"
+              className={crossoverWays === 3 ? 'active' : ''}
+              onClick={() => setCrossoverWays(3)}
+              style={{ padding: '0.45rem 0.25rem', fontSize: '0.8rem', borderRadius: '0px', flex: 1 }}
+            >
+              {t("3 Vías")}
+            </button>
+          </div>
+        </div>
+
+        {crossoverWays === 3 && (
+          <div style={{ marginTop: '0.5rem', marginBottom: '0.75rem', padding: '0.75rem', background: 'rgba(234,179,8,0.03)', border: '1px solid rgba(234,179,8,0.1)', borderRadius: '8px' }}>
+            <div className="form-subsection-title" style={{ color: '#eab308', borderBottomColor: 'rgba(234,179,8,0.1)', marginTop: 0 }}>
+              {t("Parámetros de Medios (Midrange T/S)")}
+            </div>
+            <div className="input-grid">
+              <div className="input-group">
+                <label>Fs (Hz)</label>
+                <div className="input-wrapper">
+                  <input
+                    type="number"
+                    value={midFs}
+                    onChange={(e) => setMidFs(parseFloat(e.target.value) || 0)}
+                    step="1"
+                  />
+                </div>
+              </div>
+              <div className="input-group">
+                <label>Vas ({getUnitLabel('volume', unitSystem)})</label>
+                <div className="input-wrapper">
+                  <input
+                    type="number"
+                    value={convertTo(midVas, 'volume', unitSystem)}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value) || 0;
+                      setMidVas(convertFrom(val, 'volume', unitSystem));
+                    }}
+                    step="0.1"
+                  />
+                </div>
+              </div>
+              <div className="input-group">
+                <label>Qts</label>
+                <div className="input-wrapper">
+                  <input
+                    type="number"
+                    value={midQts}
+                    onChange={(e) => setMidQts(parseFloat(e.target.value) || 0)}
+                    step="0.01"
+                  />
+                </div>
+              </div>
+              <div className="input-group">
+                <label>Qtc Obj.</label>
+                <div className="input-wrapper">
+                  <input
+                    type="number"
+                    value={midTargetQtc}
+                    onChange={(e) => setMidTargetQtc(parseFloat(e.target.value) || 0.707)}
+                    step="0.01"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
  
         {driverConfig !== 'single' && (
           <div className="alert-box info" style={{ padding: '0.6rem 0.8rem', fontSize: '0.8rem', marginBottom: '1rem', borderLeftColor: 'var(--primary)' }}>

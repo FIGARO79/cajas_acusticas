@@ -150,8 +150,10 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({
             lp: { l1: l1_w / 1000, c1: c1_w / 1000, l2: l2_w / 1000, c2: c2_w / 1000 }
           };
         }
-      } catch (e) {
-        console.error("WASM crossover calculation error, falling back to JS:", e);
+      } catch (e: any) {
+        if (!(e && e.message && e.message.includes("WASM not initialized yet"))) {
+          console.error("WASM crossover calculation error, falling back to JS:", e);
+        }
       }
 
       // Fallback JS math (2-way)
@@ -300,8 +302,10 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({
       const wasm = getWasm();
       const res = wasm.calc_zobel(re, le);
       return { rz: res.rz, cz: res.cz };
-    } catch (e) {
-      console.error("WASM Zobel error, falling back:", e);
+    } catch (e: any) {
+      if (!(e && e.message && e.message.includes("WASM not initialized yet"))) {
+        console.error("WASM Zobel error, falling back:", e);
+      }
       const rz = 1.25 * re;
       const cz = (le * 1000) / (rz * rz);
       return { rz, cz };
@@ -317,8 +321,10 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({
       const wasm = getWasm();
       const res = wasm.calc_lpad(attenuation, zLoad);
       return { r1: res.r1, r2: res.r2 };
-    } catch (e) {
-      console.error("WASM LPad error, falling back:", e);
+    } catch (e: any) {
+      if (!(e && e.message && e.message.includes("WASM not initialized yet"))) {
+        console.error("WASM LPad error, falling back:", e);
+      }
       const k = Math.pow(10, -attenuation / 20);
       const r1 = zLoad * (1 - k);
       const r2 = zLoad * k / (1 - k);
@@ -910,7 +916,7 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({
 
   if (readOnly) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%', boxSizing: 'border-box' }}>
+      <div className="read-only-crossover-tab" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%', boxSizing: 'border-box' }}>
         {/* Esquema de conexión */}
         <div style={{ width: '100%', marginTop: '0.25rem' }}>
           {renderSchematic()}
