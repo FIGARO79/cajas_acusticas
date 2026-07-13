@@ -379,7 +379,7 @@ select.input-select {
   color: var(--text-main);
   padding: 0.3rem 2rem 0.3rem 0.55rem;
   border-radius: 0;
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-size: 0.8rem;
   outline: none;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -591,7 +591,7 @@ select.input-select:focus {
 
 .result-tile-value {
   font-size: 1.45rem;
-  font-family: var(--font-display);
+  font-family: var(--font-mono);
   font-weight: 700;
   color: var(--text-main);
   letter-spacing: -0.02em;
@@ -806,6 +806,7 @@ input[type="range"]::-moz-range-thumb:hover {
 .pro-calc-value {
   font-weight: 600;
   color: var(--text-main);
+  font-family: var(--font-mono);
 }
 
 /* Alert Box */
@@ -916,6 +917,7 @@ input[type="range"]::-moz-range-thumb:hover {
   padding: 0.65rem 0.85rem;
   border-top: 1px solid rgba(255, 255, 255, 0.04);
   color: var(--text-main);
+  font-family: var(--font-mono);
 }
 
 .wood-table tr:hover {
@@ -1652,7 +1654,6 @@ html[data-theme="light"] .desktop-menu-separator {
     min-height: 0;
     overflow: hidden;
     gap: 0;
-    height: 100%;
   }
 
   .font-unified-form:nth-child(1) aside.panel,
@@ -2602,8 +2603,8 @@ input[type="range"].slider-mini::-moz-range-thumb {
 
 .read-only-cabinet-tab,
 .read-only-crossover-tab {
-  max-height: 480px !important;
-  overflow-y: auto !important;
+  max-height: none !important;
+  overflow-y: visible !important;
   padding-right: 0.5rem !important;
   padding-bottom: 1rem !important;
 }
@@ -2630,8 +2631,67 @@ input[type="range"].slider-mini::-moz-range-thumb {
 @media (min-width: 1024px) {
   .read-only-cabinet-tab,
   .read-only-crossover-tab {
-    max-height: calc(100vh - 210px) !important;
+    max-height: none !important;
   }
+}
+
+/* Hacer que toda la tipografía de los diagramas (cabina y crossover) sea uniforme,
+   acorde al tipo de letra (Outfit) y tamaño general de la aplicación */
+.cabinet-diagram-card svg text,
+.read-only-crossover-tab svg text,
+#tab-crossover svg text {
+  font-family: var(--font-sans), sans-serif !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  opacity: 1 !important;
+}
+
+/* Excluir y preservar los símbolos de polaridad masivos + y - del crossover */
+.read-only-crossover-tab svg text[font-size="26"],
+.read-only-crossover-tab svg text[font-size="28"],
+#tab-crossover svg text[font-size="26"],
+#tab-crossover svg text[font-size="28"] {
+  font-size: 26px !important;
+  font-weight: 800 !important;
+}
+
+/* Tabla de componentes del crossover */
+.crossover-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+.crossover-table th {
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-muted);
+  text-align: left;
+  padding: 0.65rem 0.85rem;
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.crossover-table td {
+  padding: 0.65rem 0.85rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  color: var(--text-main);
+  font-family: var(--font-mono);
+}
+.crossover-table tr:hover {
+  background: rgba(255, 255, 255, 0.01);
+}
+html[data-theme="light"] .crossover-table {
+  border-color: rgba(0, 0, 0, 0.06);
+}
+html[data-theme="light"] .crossover-table th {
+  background: rgba(0, 0, 0, 0.02);
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+html[data-theme="light"] .crossover-table td {
+  border-top-color: rgba(0, 0, 0, 0.04);
 }
 
 

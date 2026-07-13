@@ -329,7 +329,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
             x={wooferX}
             y={wooferYCenter - 2}
             fill="var(--text-muted)"
-            fontSize="9"
+            fontSize="3.1"
             fontWeight="bold"
             textAnchor="middle"
             opacity="0.7"
@@ -340,7 +340,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
             x={wooferX}
             y={wooferYCenter + 8}
             fill="var(--text-muted)"
-            fontSize="7.5"
+            fontSize="2.6"
             textAnchor="middle"
             opacity="0.6"
           >
@@ -558,7 +558,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
                 x={offsetXSide + tScale + dMidScale / 2}
                 y={yM + 3}
                 fill="#eab308"
-                fontSize="8.5"
+                fontSize="3"
                 fontWeight="bold"
                 textAnchor="middle"
                 opacity="0.95"
@@ -592,7 +592,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
                 x={offsetXSide + plotWidthSide / 2}
                 y={yPart - 4}
                 fill="#38bdf8"
-                fontSize="8.5"
+                fontSize="3"
                 fontWeight="bold"
                 textAnchor="middle"
                 opacity="0.95"
@@ -702,7 +702,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
           <path d={topPath} fill="none" stroke="#000000" strokeWidth="2" />
           <path d={botPath} fill="none" stroke="#000000" strokeWidth="2" />
           <line x1={xEnd} y1={portYSide} x2={xEnd} y2={portYSide + pHeightScale} stroke="#000000" strokeWidth="1.5" strokeDasharray="3 3" />
-          <text x={offsetXSide + tScale + pLenScale / 2} y={portYSide - 5} fill="#10b981" stroke="none" fontSize="9.5" fontWeight="normal" textAnchor="middle">
+          <text x={offsetXSide + tScale + pLenScale / 2} y={portYSide - 5} fill="#10b981" stroke="none" fontSize="3.3" fontWeight="normal" textAnchor="middle">
             {isBandpass
               ? `Lv1: ${convertTo(effectivePortLength, 'length', unitSystem).toFixed(1)}${uLabel}`
               : `Lv: ${portLength > 0 ? convertTo(portLength, 'length', unitSystem).toFixed(1) : 'N/A'}${uLabel}`}
@@ -728,7 +728,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
           <path d={topPath} fill="none" stroke="#000000" strokeWidth="2" />
           <path d={botPath} fill="none" stroke="#000000" strokeWidth="2" />
           <line x1={xInnerEnd} y1={portYSide} x2={xInnerEnd} y2={portYSide + pHeightScale} stroke="#000000" strokeWidth="1.5" strokeDasharray="3 3" />
-          <text x={xStart - tScale - pLenScale / 2} y={portYSide - 5} fill="#10b981" stroke="none" fontSize="9.5" fontWeight="normal" textAnchor="middle">
+          <text x={xStart - tScale - pLenScale / 2} y={portYSide - 5} fill="#10b981" stroke="none" fontSize="3.3" fontWeight="normal" textAnchor="middle">
             {`Lv: ${portLength > 0 ? convertTo(portLength, 'length', unitSystem).toFixed(1) : 'N/A'}${uLabel}`}
           </text>
         </g>
@@ -763,7 +763,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
         <path d={topPath} fill="none" stroke="#000000" strokeWidth="2" />
         <path d={botPath} fill="none" stroke="#000000" strokeWidth="2" />
         <line x1={xInnerEndVr} y1={portYVr} x2={xInnerEndVr} y2={portYVr + pHeightScaleVr} stroke="#000000" strokeWidth="1.5" strokeDasharray="3 3" />
-        <text x={xStartVr - tScale - pLenScaleVr / 2} y={portYVr - 5} fill="#ec4899" stroke="none" fontSize="9.5" fontWeight="normal" textAnchor="middle">
+        <text x={xStartVr - tScale - pLenScaleVr / 2} y={portYVr - 5} fill="#ec4899" stroke="none" fontSize="3.3" fontWeight="normal" textAnchor="middle">
           Lv2
         </text>
       </g>
@@ -805,7 +805,8 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
             <line x1={cx - 5} y1={portYCenter} x2={cx + 5} y2={portYCenter} stroke="#10b981" strokeWidth="0.75" strokeDasharray={portLocation === 'rear' ? "2 2" : "5 2"} opacity={portLocation === 'rear' ? 0.25 : 0.5} />
             <line x1={cx} y1={portYCenter - 5} x2={cx} y2={portYCenter + 5} stroke="#10b981" strokeWidth="0.75" strokeDasharray={portLocation === 'rear' ? "2 2" : "5 2"} opacity={portLocation === 'rear' ? 0.25 : 0.5} />
             {portLocation === 'rear' && (
-              <text x={cx} y={portYCenter + 2.5} fill="var(--text-muted)" fontSize="7" fontWeight="bold" textAnchor="middle" opacity="0.6">{t("Atrás")}</text>
+              <text x={cx} y={portYCenter + 2.5} fill="var(--text-muted)"
+          fontSize="3" fontWeight="bold" textAnchor="middle" opacity="0.6">{t("Atrás")}</text>
             )}
           </g>
         );
@@ -821,7 +822,8 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
             <line x1={cx - 5} y1={portYCenter} x2={cx + 5} y2={portYCenter} stroke="#10b981" strokeWidth="0.75" strokeDasharray={portLocation === 'rear' ? "2 2" : "5 2"} opacity={portLocation === 'rear' ? 0.25 : 0.5} />
             <line x1={cx} y1={portYCenter - 5} x2={cx} y2={portYCenter + 5} stroke="#10b981" strokeWidth="0.75" strokeDasharray={portLocation === 'rear' ? "2 2" : "5 2"} opacity={portLocation === 'rear' ? 0.25 : 0.5} />
             {portLocation === 'rear' && (
-              <text x={cx} y={portYCenter + 2.5} fill="var(--text-muted)" fontSize="7" fontWeight="bold" textAnchor="middle" opacity="0.6">{t("Atrás")}</text>
+              <text x={cx} y={portYCenter + 2.5} fill="var(--text-muted)"
+          fontSize="3" fontWeight="bold" textAnchor="middle" opacity="0.6">{t("Atrás")}</text>
             )}
           </g>
         );
@@ -1091,16 +1093,16 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
 
         {rHole > 4 && (
           <g>
-            <text x={cx1} y={cy1 + 2.5} fill="var(--text-muted)" fontSize="8" fontWeight="bold" textAnchor="middle" opacity="0.8">
+            <text x={cx1} y={cy1 + 2.5} fill="var(--text-muted)" fontSize="2.8" fontWeight="bold" textAnchor="middle" opacity="0.8">
               Ø{rHoleMm * 2}
             </text>
-            <text x={cx2} y={cy1 + 2.5} fill="var(--text-muted)" fontSize="8" fontWeight="bold" textAnchor="middle" opacity="0.8">
+            <text x={cx2} y={cy1 + 2.5} fill="var(--text-muted)" fontSize="2.8" fontWeight="bold" textAnchor="middle" opacity="0.8">
               Ø{rHoleMm * 2}
             </text>
-            <text x={cx1} y={cy2 + 2.5} fill="var(--text-muted)" fontSize="8" fontWeight="bold" textAnchor="middle" opacity="0.8">
+            <text x={cx1} y={cy2 + 2.5} fill="var(--text-muted)" fontSize="2.8" fontWeight="bold" textAnchor="middle" opacity="0.8">
               Ø{rHoleMm * 2}
             </text>
-            <text x={cx2} y={cy2 + 2.5} fill="var(--text-muted)" fontSize="8" fontWeight="bold" textAnchor="middle" opacity="0.8">
+            <text x={cx2} y={cy2 + 2.5} fill="var(--text-muted)" fontSize="2.8" fontWeight="bold" textAnchor="middle" opacity="0.8">
               Ø{rHoleMm * 2}
             </text>
           </g>
@@ -1110,7 +1112,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
           x={offsetXBrace + plotWidthBrace / 2}
           y={offsetY + plotHeight + 48}
           fill="var(--text-muted)"
-          fontSize="9.5"
+          fontSize="3.3"
           fontWeight="bold"
           letterSpacing="1px"
           textAnchor="middle"
@@ -1128,7 +1130,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
           x={offsetXBrace + plotWidthBrace / 2}
           y={dimLineY + 14}
           fill="#64748b"
-          fontSize="11.5"
+          fontSize="3"
           fontWeight="normal"
           textAnchor="middle"
         >
@@ -1144,7 +1146,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
           x={dimLineX - 8}
           y={offsetYBrace + plotHeightBrace / 2 + 4}
           fill="#64748b"
-          fontSize="11.5"
+          fontSize="3"
           fontWeight="normal"
           textAnchor="end"
         >
@@ -1155,7 +1157,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
   };
 
   return (
-    <div style={{
+    <div className="cabinet-diagram-card" style={{
       background: 'var(--card-bg)',
       borderRadius: '12px',
       padding: '1.5rem',
@@ -1193,8 +1195,10 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
         
         {/* Biseles y chaflanes decorativos (CAD style) */}
         <path d={`M ${offsetXFront},${offsetY + 12} L ${offsetXFront + 12},${offsetY} M ${offsetXFront + plotWidthFront},${offsetY + 12} L ${offsetXFront + plotWidthFront - 12},${offsetY}`} stroke="#000000" strokeWidth="0.75" opacity="0.65" />
-        <text x={offsetXFront + 16} y={offsetY + 16} fill="var(--text-muted)" fontSize="7" opacity="0.6">20°</text>
-        <text x={offsetXFront + plotWidthFront - 16} y={offsetY + 16} fill="var(--text-muted)" fontSize="7" textAnchor="end" opacity="0.6">20°</text>
+        <text x={offsetXFront + 16} y={offsetY + 16} fill="var(--text-muted)"
+          fontSize="3" opacity="0.6">20°</text>
+        <text x={offsetXFront + plotWidthFront - 16} y={offsetY + 16} fill="var(--text-muted)"
+          fontSize="3" textAnchor="end" opacity="0.6">20°</text>
 
         {isBandpass ? frontSpeaker : (
           <g>
@@ -1219,7 +1223,8 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
                 <line x1={wooferX} y1={d.yCenter - d.rOuter - 4} x2={wooferX} y2={d.yCenter + d.rOuter + 4} stroke="#10b981" strokeWidth="0.6" strokeDasharray="5 2 2 2" opacity="0.45" />
 
                 {/* Etiqueta */}
-                <text x={wooferX} y={d.yCenter + 2.5} fill="var(--text-muted)" fontSize="7" fontWeight="bold" textAnchor="middle" opacity="0.75">{d.label}</text>
+                <text x={wooferX} y={d.yCenter + 2.5} fill="var(--text-muted)"
+          fontSize="3" fontWeight="bold" textAnchor="middle" opacity="0.75">{d.label}</text>
               </g>
             ))}
           </g>
@@ -1256,7 +1261,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
             x={offsetXSide + plotWidthSide / 2}
             y={offsetY + plotHeight / 2}
             fill="var(--text-muted)"
-            fontSize="13"
+            fontSize="3.1"
             fontWeight="normal"
             textAnchor="middle"
             opacity="0.35"
@@ -1279,7 +1284,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
                 x={offsetXSide + tScale + (xDividerClamped - offsetXSide - tScale) / 2}
                 y={offsetY + plotHeight / 2 + 3.5}
                 fill="var(--text-main)"
-                fontSize="10"
+                fontSize="3.5"
                 fontWeight="bold"
                 textAnchor="middle"
               >
@@ -1301,7 +1306,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
                 x={xDividerClamped + tScale + (offsetXSide + plotWidthSide - tScale - (xDividerClamped + tScale)) / 2}
                 y={offsetY + plotHeight / 2 + 3.5}
                 fill="var(--text-main)"
-                fontSize="10"
+                fontSize="3.5"
                 fontWeight="bold"
                 textAnchor="middle"
               >
@@ -1316,7 +1321,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
           x={offsetXFront + plotWidthFront / 2}
           y={offsetY + plotHeight + 48}
           fill="var(--text-muted)"
-          fontSize="9.5"
+          fontSize="3"
           fontWeight="bold"
           letterSpacing="1px"
           textAnchor="middle"
@@ -1328,7 +1333,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
           x={offsetXSide + plotWidthSide / 2}
           y={offsetY + plotHeight + 48}
           fill="var(--text-muted)"
-          fontSize="9.5"
+          fontSize="3"
           fontWeight="bold"
           letterSpacing="1px"
           textAnchor="middle"
@@ -1349,7 +1354,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
           x={midX - 8}
           y={offsetY + plotHeight / 2 + 4}
           fill="#64748b"
-          fontSize="11.5"
+          fontSize="3"
           fontWeight="normal"
           textAnchor="end"
         >
@@ -1366,7 +1371,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
           x={offsetXFront + plotWidthFront / 2}
           y={offsetY + plotHeight + 34}
           fill="#64748b"
-          fontSize="11.5"
+          fontSize="3"
           fontWeight="normal"
           textAnchor="middle"
         >
@@ -1384,7 +1389,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
               y={offsetY + plotHeight + 34}
               fill="#64748b"
               stroke="none"
-              fontSize="11.5"
+              fontSize="3"
               fontWeight="normal"
               textAnchor="middle"
             >
@@ -1403,7 +1408,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
               y={offsetY - 28}
               fill="#64748b"
               stroke="none"
-              fontSize="11"
+              fontSize="3"
               fontWeight="normal"
               textAnchor="middle"
             >
@@ -1419,7 +1424,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
               y={offsetY + plotHeight + 34}
               fill="#64748b"
               stroke="none"
-              fontSize="11"
+              fontSize="3"
               fontWeight="normal"
               textAnchor="middle"
             >
@@ -1439,7 +1444,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
             y={offsetY + distWooferTop / 2 + 4}
             fill="#64748b"
             stroke="none"
-            fontSize="11"
+            fontSize="3"
             fontWeight="normal"
             textAnchor="end"
           >
@@ -1457,7 +1462,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
                 y={portYCenter + distPortBot / 2 + 4}
                 fill="#64748b"
                 stroke="none"
-                fontSize="11"
+                fontSize="3"
                 fontWeight="normal"
                 textAnchor="end"
               >
@@ -1477,7 +1482,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
           x={offsetXSide + tScale + 15}
           y={offsetY + tScale + 20}
           fill="#64748b"
-          fontSize="11"
+          fontSize="3"
           fontWeight="normal"
         >
           {hIntDisp}
@@ -1493,7 +1498,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
           x={offsetXSide + tScale / 2}
           y={offsetY - 15}
           fill="#64748b"
-          fontSize="9.5"
+          fontSize="3.3"
           fontWeight="normal"
           textAnchor="middle"
         >
