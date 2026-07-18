@@ -417,7 +417,7 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
 
       return (
         <div style={{ background: 'var(--card-bg)', borderRadius: '12px', padding: '1rem 1.5rem 1.25rem 1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', boxSizing: 'border-box', backdropFilter: 'blur(16px)' }}>
-          <span className="control-title" style={{ alignSelf: 'flex-start', fontSize: '1rem', color: 'var(--text-main)', marginBottom: '0.75rem', fontWeight: 600 }}>
+          <span className="control-title" style={{ color: 'var(--text-main)', marginBottom: '1rem' }}>
             {t("Esquema de Conexión del Crossover (2 Vías)")}
           </span>
           <svg width="100%" viewBox="0 -25 850 475" fill="none" style={{ maxWidth: '100%', height: 'auto', color: 'var(--text-main)' }}>
@@ -649,7 +649,7 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
 
       return (
         <div style={{ background: 'var(--card-bg)', borderRadius: '12px', padding: '1rem 1.5rem 1.25rem 1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', boxSizing: 'border-box', backdropFilter: 'blur(16px)' }}>
-          <span className="control-title" style={{ alignSelf: 'flex-start', fontSize: '1rem', color: 'var(--text-main)', marginBottom: '0.75rem', fontWeight: 600 }}>
+          <span className="control-title" style={{ color: 'var(--text-main)', marginBottom: '1rem' }}>
             {t("Esquema de Conexión del Crossover (3 Vías)")}
           </span>
           <svg width="100%" viewBox="0 0 850 640" fill="none" style={{ maxWidth: '100%', height: 'auto', color: 'var(--text-main)' }}>

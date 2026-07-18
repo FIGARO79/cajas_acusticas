@@ -448,7 +448,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
       boxSizing: 'border-box',
       backdropFilter: 'blur(16px)'
     }}>
-      <span className="control-title" style={{ alignSelf: 'flex-start', fontSize: '1rem', color: 'var(--text-main)', marginBottom: '1.25rem', fontWeight: 600 }}>
+      <span className="control-title" style={{ color: 'var(--text-main)', marginBottom: '1rem' }}>
         {t("Plano de Fabricación de la Cabina")}
       </span>
 
