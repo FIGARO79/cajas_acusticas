@@ -1840,10 +1840,17 @@ svg line, svg path, svg circle {
   transition: stroke 0.3s ease, fill 0.3s ease, stroke-width 0.2s ease;
 }
 
-/* Vía de Agudos (High Pass - parte superior del circuito y componentes) */
-svg line[y1="60"][stroke="#ef4444"],
-svg line[y2="60"][stroke="#ef4444"],
+/* Entrada de Señal Común (Polo Positivo Inicial de la Amplificación) */
 svg line[x1="60"][y1="60"][stroke="#ef4444"],
+svg line[x1="60"][y1="270"][stroke="#ef4444"],
+svg line[x1="110"][y1="60"][stroke="#ef4444"],
+svg line[x1="110"][y1="480"][stroke="#ef4444"] {
+  stroke: #f43f5e !important; /* Rojo Coral Premium */
+}
+
+/* Vía de Agudos (High Pass - parte superior del circuito y componentes) */
+svg line[y1="60"][stroke="#ef4444"]:not([x1="60"]),
+svg line[y2="60"][stroke="#ef4444"]:not([x1="60"]),
 svg line[x1="120"][stroke="#ef4444"],
 svg line[x1="160"][stroke="#ef4444"],
 svg line[x1="200"][y1="60"][stroke="#ef4444"],
@@ -1863,9 +1870,10 @@ svg path[d*="Q 335"][stroke="currentColor"] {
 }
 
 /* Vía de Graves (Low Pass - parte inferior del circuito y componentes) */
-svg line[y1="270"][stroke="#ef4444"],
-svg line[y2="270"][stroke="#ef4444"],
-svg line[x1="60"][y1="270"][stroke="#ef4444"],
+svg line[y1="270"][stroke="#ef4444"]:not([x1="60"]),
+svg line[y2="270"][stroke="#ef4444"]:not([x1="60"]),
+svg line[y1="480"][stroke="#ef4444"]:not([x1="110"]),
+svg line[y2="480"][stroke="#ef4444"]:not([x1="110"]),
 svg line[x1="140"][stroke="#ef4444"],
 svg line[x1="236"][stroke="#ef4444"],
 svg line[x1="250"][stroke="#ef4444"],
@@ -1875,7 +1883,8 @@ svg line[x1="460"][stroke="#ef4444"],
 svg line[x1="540"][stroke="#ef4444"],
 svg line[x1="340"][stroke="#ef4444"],
 svg path[d*="270"][stroke="#ef4444"], /* Inductores en serie Graves */
-svg path[d*="330"][stroke="#ef4444"] {
+svg path[d*="330"][stroke="#ef4444"],
+svg path[d*="480"][stroke="#ef4444"] {
   stroke: #10b981 !important; /* Verde Graves */
 }
 
