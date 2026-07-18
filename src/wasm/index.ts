@@ -190,3 +190,15 @@ export async function calcBandpass6Curve(vf: number, vr: number, fl: number, fh:
 }
 
 
+
+/** Calculate number of turns needed for an inductor (Reverse Wheeler formula) */
+export async function calcVueltasInductor(l_mh: number, d_mm: number, l_cm: number) {
+  const wasm = await getWasm();
+  return wasm.calc_vueltas_inductor_wheeler(l_mh, d_mm, l_cm);
+}
+
+/** Calculate inductor value from physical dimensions (Wheeler formula) */
+export async function calcInductorWheeler(n: number, d_mm: number, l_cm: number) {
+  const wasm = await getWasm();
+  return wasm.calc_inductor_wheeler(n, d_mm, l_cm);
+}

@@ -128,3 +128,13 @@ mod tests {
     }
 }
 
+
+#[wasm_bindgen]
+pub fn calc_vueltas_inductor_wheeler(l_mh: f64, d_mm: f64, l_cm: f64) -> f64 {
+    if l_mh <= 0.0 || d_mm <= 0.0 || l_cm <= 0.0 {
+        return 0.0;
+    }
+    let l_uh = l_mh * 1000.0;
+    let n_squared = (l_uh * (9.0 * d_mm + 100.0 * l_cm)) / d_mm.powi(2);
+    n_squared.sqrt()
+}

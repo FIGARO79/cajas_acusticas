@@ -66,6 +66,27 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
   const [attenuationLocal, setAttenuation] = useState<number>(3); // dB
   const [zLoadLocal, setZLoad] = useState<number>(8);
 
+  // 5. Inductor Calculator Inputs (Wheeler)
+  const [indCalcTargetL, setIndCalcTargetL] = useState<number | ''>(1.0);
+  const [indCalcD, setIndCalcD] = useState<number | ''>(20.0);
+  const [indCalcLen, setIndCalcLen] = useState<number | ''>(2.0);
+  const [indCalcN, setIndCalcN] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (indCalcTargetL && indCalcD && indCalcLen) {
+      try {
+        const wasm = getWasm();
+        const n = wasm.calc_vueltas_inductor_wheeler(Number(indCalcTargetL), Number(indCalcD), Number(indCalcLen));
+        setIndCalcN(n > 0 ? n : null);
+      } catch (e) {
+        console.error("Error calculating inductor turns:", e);
+        setIndCalcN(null);
+      }
+    } else {
+      setIndCalcN(null);
+    }
+  }, [indCalcTargetL, indCalcD, indCalcLen]);
+
   // Resolver valores activos
   const crossoverWays = readOnly ? (crossoverWaysProp || '2way') : crossoverWaysLocal;
   const crossoverType = readOnly ? (crossoverTypeProp || '2nd_lr') : crossoverTypeLocal;
@@ -1454,6 +1475,65 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
             renderComponentsTable()
           ) : (
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{t("Completa los valores del crossover.")}</p>
+          )}
+        </div>
+
+        {/* CALCULADORA DE INDUCTORES */}
+        <div className="panel" style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', padding: '1.5rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', backdropFilter: 'blur(16px)', boxShadow: '0 4px 30px rgba(0, 0, 0, 0.2)', marginTop: '0.5rem' }}>
+          <span className="control-title" style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--warning)' }}>
+            {t("Calculadora de Inductores (Fórmula de Wheeler)")}
+          </span>
+          <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginBottom: '1rem', lineHeight: '1.3' }}>
+            {t("Calcula el número de vueltas (espiras) necesarias para construir una bobina con núcleo de aire dado su valor en mH y las dimensiones físicas de la formaleta.")}
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+            <div className="input-group">
+              <label>{t("Inductancia Objetivo (L)")}</label>
+              <div className="input-wrapper">
+                <input 
+                  type="number" 
+                  value={indCalcTargetL} 
+                  onChange={(e) => setIndCalcTargetL(e.target.value === '' ? '' : parseFloat(e.target.value))} 
+                  step="0.01"
+                  min="0.01"
+                />
+                <span className="unit-badge">mH</span>
+              </div>
+            </div>
+            <div className="input-group">
+              <label>{t("Diámetro Promedio (d)")}</label>
+              <div className="input-wrapper">
+                <input 
+                  type="number" 
+                  value={indCalcD} 
+                  onChange={(e) => setIndCalcD(e.target.value === '' ? '' : parseFloat(e.target.value))} 
+                  step="0.1"
+                  min="1"
+                />
+                <span className="unit-badge">mm</span>
+              </div>
+            </div>
+            <div className="input-group">
+              <label>{t("Longitud de Bobina (l)")}</label>
+              <div className="input-wrapper">
+                <input 
+                  type="number" 
+                  value={indCalcLen} 
+                  onChange={(e) => setIndCalcLen(e.target.value === '' ? '' : parseFloat(e.target.value))} 
+                  step="0.1"
+                  min="0.1"
+                />
+                <span className="unit-badge">cm</span>
+              </div>
+            </div>
+          </div>
+
+          {indCalcN !== null && (
+            <div style={{ marginTop: '1rem', background: 'rgba(245, 158, 11, 0.03)', border: '1px solid rgba(245, 158, 11, 0.15)', padding: '1rem', borderRadius: '8px', fontSize: '0.9rem', textAlign: 'center' }}>
+              <span style={{ color: 'var(--text-muted)' }}>{t("Vueltas requeridas (aprox):")}</span>{' '}
+              <strong style={{ color: 'var(--text-main)', fontSize: '1.2rem' }}>{Math.round(indCalcN)} {t("espiras")}</strong>
+            </div>
           )}
         </div>
 
