@@ -708,7 +708,7 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
   return (
     <div className="panel chart-card" style={{ display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-        <h3 className="panel-title" style={{ margin: 0, fontSize: '0.95rem' }}>{t("Simulación de Respuesta en Frecuencia (dB vs Hz)")}</h3>
+        <h3 className="panel-title" style={{ margin: 0 }}>{t("Simulación de Respuesta en Frecuencia (dB vs Hz)")}</h3>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
           {/* Segmented range selector */}
