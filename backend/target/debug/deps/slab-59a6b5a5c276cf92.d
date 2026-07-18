@@ -1,0 +1,8 @@
+/home/fabio/Programacion/cajas_acusticas/backend/target/debug/deps/slab-59a6b5a5c276cf92.d: /home/fabio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slab-0.4.12/src/lib.rs /home/fabio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slab-0.4.12/src/builder.rs
+
+/home/fabio/Programacion/cajas_acusticas/backend/target/debug/deps/libslab-59a6b5a5c276cf92.rlib: /home/fabio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slab-0.4.12/src/lib.rs /home/fabio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slab-0.4.12/src/builder.rs
+
+/home/fabio/Programacion/cajas_acusticas/backend/target/debug/deps/libslab-59a6b5a5c276cf92.rmeta: /home/fabio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slab-0.4.12/src/lib.rs /home/fabio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slab-0.4.12/src/builder.rs
+
+/home/fabio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slab-0.4.12/src/lib.rs:
+/home/fabio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slab-0.4.12/src/builder.rs:
