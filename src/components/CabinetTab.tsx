@@ -58,6 +58,7 @@ interface CabinetTabProps {
   portHeight: number | '';
   portArea: number | '';
   dampingFactor: number;
+  dampingType?: 'none' | 'light' | 'moderate' | 'heavy';
   flaredEnds?: 0 | 1 | 2;
   onCabinetDataChange?: (data: WoodCabinetData | null) => void;
   readOnly?: boolean;
@@ -112,6 +113,7 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
   portHeight,
   portArea,
   dampingFactor,
+  dampingType,
   flaredEnds = 0,
   onCabinetDataChange,
   readOnly = false,
@@ -561,6 +563,7 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
           bandpassRatio={bandpassData && bandpassData.valid ? bandpassData.Vr / (bandpassData.Vf + bandpassData.Vr) : 0.5}
           bandpassVf={bandpassData?.Vf}
           bandpassVr={bandpassData?.Vr}
+          dampingType={dampingType}
         />
 
         {/* Resultados de Ebanistería */}

@@ -22,6 +22,7 @@ interface CabinetDiagramProps {
   bandpassRatio?: number;
   bandpassVf?: number;
   bandpassVr?: number;
+  dampingType?: 'none' | 'light' | 'moderate' | 'heavy';
 }
 
 export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
@@ -41,6 +42,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
   portYPct = 85,
   bandpassOrder = 4,
   bandpassRatio = 0.5,
+  dampingType = 'none',
 }) => {
   const t = (text: string) => translate(text, lang);
 
@@ -94,6 +96,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
   const plotWidthSide = dMax * scale;
 
   // Distribución del espacio horizontal y vertical para ceñirse al contenido
+  const isBandpass = boxType === 'bandpass';
   const offsetXFront = paddingLeft;
   const offsetXSide = paddingLeft + plotWidthFront + paddingMiddle;
   const offsetY = paddingTop;
@@ -109,8 +112,8 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
   const innerHeightScale = plotHeight - 2 * tScale;
 
   // Bandpass helper coordinates
-  const isBandpass = boxType === 'bandpass';
   const bandpassRatioVal = bandpassRatio !== undefined ? bandpassRatio : 0.5;
+  
   const innerWidthSide = plotWidthSide - 2 * tScale;
   const xDivider = offsetXSide + tScale + innerWidthSide * (1 - bandpassRatioVal);
   const xDividerClamped = Math.min(offsetXSide + tScale + innerWidthSide * 0.75, Math.max(offsetXSide + tScale + innerWidthSide * 0.25, xDivider));
@@ -132,9 +135,9 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
   const wooferY = wooferYCenter - rOuter;
   const wooferX = offsetXFront + plotWidthFront / 2;
 
-  const speakerStroke = isBandpass ? "#64748b" : "#000000";
+  const speakerStroke = isBandpass ? "var(--text-muted)" : "var(--text-main)";
   const speakerDash = isBandpass ? "4 4" : "none";
-  const speakerOpacity = isBandpass ? 0.35 : 1.0;
+  const speakerOpacity = isBandpass ? 0.35 : 0.85;
 
   const frontSpeaker = (
     <g>
@@ -276,36 +279,98 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
   // Altavoz de perfil para cajas Bandpass (cono apunta a la izquierda, imán a la derecha)
   const wooferDepthBP = Math.min(plotWidthSide * 0.4, 40);
   const speakerConeBP = isBandpass ? (
-    <path
-      d={`M ${xDividerClamped},${wooferYSide} 
-          Q ${xDividerClamped - wooferDepthBP * 0.15},${wooferYSide + wooferH * 0.15} ${xDividerClamped - wooferDepthBP * 0.6},${wooferYSide + wooferH * 0.35}
-          L ${xDividerClamped - wooferDepthBP * 0.6},${wooferYSide + wooferH * 0.65}
-          Q ${xDividerClamped - wooferDepthBP * 0.15},${wooferYSide + wooferH * 0.85} ${xDividerClamped},${wooferYSide + wooferH}
-          L ${xDividerClamped},${wooferYSide + wooferH - 4}
-          Q ${xDividerClamped - wooferDepthBP * 0.2},${wooferYSide + wooferH * 0.8} ${xDividerClamped - wooferDepthBP * 0.55},${wooferYSide + wooferH * 0.6}
-          L ${xDividerClamped - wooferDepthBP * 0.55},${wooferYSide + wooferH * 0.4}
-          Q ${xDividerClamped - wooferDepthBP * 0.2},${wooferYSide + wooferH * 0.2} ${xDividerClamped},${wooferYSide + 4} Z`}
-      fill="#38bdf8"
-      opacity="0.85"
-    />
-  ) : null;
+    <g id="speaker-detail-bp">
+      {/* 1. Anillo de montaje (Gasket/Frame edge) */}
+      <rect x={xDividerClamped - 3} y={wooferYSide} width="6" height={wooferH} fill="var(--card-bg)" stroke="var(--text-main)" strokeWidth="1" />
+      <line x1={xDividerClamped} y1={wooferYSide} x2={xDividerClamped} y2={wooferYSide + wooferH} stroke="var(--text-main)" strokeWidth="1.5" />
 
-  const speakerMagnetBP = isBandpass ? (
-    <g>
-      <line x1={xDividerClamped} y1={wooferYCenterSide - 8} x2={xDividerClamped + wooferDepthBP * 0.35} y2={wooferYCenterSide - 12} stroke="#000000" strokeWidth="2" />
-      <line x1={xDividerClamped} y1={wooferYCenterSide + 8} x2={xDividerClamped + wooferDepthBP * 0.35} y2={wooferYCenterSide + 12} stroke="#000000" strokeWidth="2" />
-      <rect
-        x={xDividerClamped + wooferDepthBP * 0.3}
-        y={wooferYCenterSide - 15}
-        width={wooferDepthBP * 0.25}
-        height="30"
-        fill="#475569"
-        stroke="#000000"
-        strokeWidth="1.5"
-        rx="2"
-      />
+      {/* 2. Suspensión de goma (Surround - medio rollo apuntando a la izquierda) */}
+      <path d={`M ${xDividerClamped - 2},${wooferYSide + 6} A 7,8 0 0,0 ${xDividerClamped - 2},${wooferYSide + 22}`} fill="none" stroke="var(--text-main)" strokeWidth="2.5" />
+      <path d={`M ${xDividerClamped - 2},${wooferYSide + wooferH - 22} A 7,8 0 0,0 ${xDividerClamped - 2},${wooferYSide + wooferH - 6}`} fill="none" stroke="var(--text-main)" strokeWidth="2.5" />
+
+      {/* 3. Cono del altavoz (Curva suave, gris claro) */}
+      <path d={`M ${xDividerClamped - 2},${wooferYSide + 22} 
+                Q ${xDividerClamped + wooferDepthBP * 0.15},${wooferYCenterSide - 25} 
+                  ${xDividerClamped + wooferDepthBP * 0.35},${wooferYCenterSide - 16}`} 
+            fill="none" stroke="var(--text-main)" strokeWidth="2.5" opacity="0.6" />
+      <path d={`M ${xDividerClamped - 2},${wooferYSide + wooferH - 22} 
+                Q ${xDividerClamped + wooferDepthBP * 0.15},${wooferYCenterSide + 25} 
+                  ${xDividerClamped + wooferDepthBP * 0.35},${wooferYCenterSide + 16}`} 
+            fill="none" stroke="var(--text-main)" strokeWidth="2.5" opacity="0.6" />
+
+      {/* 4. Cubrepolvo central (Gris oscuro) */}
+      <path d={`M ${xDividerClamped + wooferDepthBP * 0.18},${wooferYCenterSide - 19} 
+                Q ${xDividerClamped + wooferDepthBP * 0.04},${wooferYCenterSide} 
+                  ${xDividerClamped + wooferDepthBP * 0.18},${wooferYCenterSide + 19}`} 
+            fill="none" stroke="var(--text-main)" strokeWidth="2" opacity="0.8" />
+
+      {/* 5. Araña de suspensión (Spider - zig zag fino) */}
+      <path d={`M ${xDividerClamped + wooferDepthBP * 0.35},${wooferYCenterSide - 16} 
+                L ${xDividerClamped + wooferDepthBP * 0.33},${wooferYCenterSide - 20}
+                L ${xDividerClamped + wooferDepthBP * 0.31},${wooferYCenterSide - 16}
+                L ${xDividerClamped + wooferDepthBP * 0.29},${wooferYCenterSide - 24}
+                L ${xDividerClamped + wooferDepthBP * 0.27},${wooferYCenterSide - 16}
+                L ${xDividerClamped + wooferDepthBP * 0.25},${wooferYSide + 26}`} 
+            fill="none" stroke="var(--text-main)" strokeWidth="1.2" opacity="0.5" />
+      <path d={`M ${xDividerClamped + wooferDepthBP * 0.35},${wooferYCenterSide + 16} 
+                L ${xDividerClamped + wooferDepthBP * 0.33},${wooferYCenterSide + 20}
+                L ${xDividerClamped + wooferDepthBP * 0.31},${wooferYCenterSide + 16}
+                L ${xDividerClamped + wooferDepthBP * 0.29},${wooferYCenterSide + 24}
+                L ${xDividerClamped + wooferDepthBP * 0.27},${wooferYCenterSide + 16}
+                L ${xDividerClamped + wooferDepthBP * 0.25},${wooferYSide + wooferH - 26}`} 
+            fill="none" stroke="var(--text-main)" strokeWidth="1.2" opacity="0.5" />
+
+      {/* 6. Formador de bobina móvil y Bobina (Gris técnico) */}
+      <rect x={xDividerClamped + wooferDepthBP * 0.33} y={wooferYCenterSide - 16} width={wooferDepthBP * 0.25} height="32" fill="var(--card-bg)" stroke="var(--text-muted)" strokeWidth="1" />
+      {/* Devanados (líneas horizontales sutiles) */}
+      <line x1={xDividerClamped + wooferDepthBP * 0.42} y1={wooferYCenterSide - 14} x2={xDividerClamped + wooferDepthBP * 0.54} y2={wooferYCenterSide - 14} stroke="var(--text-muted)" strokeWidth="1" />
+      <line x1={xDividerClamped + wooferDepthBP * 0.42} y1={wooferYCenterSide - 10} x2={xDividerClamped + wooferDepthBP * 0.54} y2={wooferYCenterSide - 10} stroke="var(--text-muted)" strokeWidth="1" />
+      <line x1={xDividerClamped + wooferDepthBP * 0.42} y1={wooferYCenterSide + 10} x2={xDividerClamped + wooferDepthBP * 0.54} y2={wooferYCenterSide + 10} stroke="var(--text-muted)" strokeWidth="1" />
+      <line x1={xDividerClamped + wooferDepthBP * 0.42} y1={wooferYCenterSide + 14} x2={xDividerClamped + wooferDepthBP * 0.54} y2={wooferYCenterSide + 14} stroke="var(--text-muted)" strokeWidth="1" />
+
+      {/* 7. Brazos de la canasta (Metal técnico) */}
+      <path d={`M ${xDividerClamped},${wooferYSide + 22} 
+                L ${xDividerClamped + wooferDepthBP * 0.35},${wooferYCenterSide - 28} 
+                L ${xDividerClamped + wooferDepthBP * 0.42},${wooferYCenterSide - 28}
+                L ${xDividerClamped + wooferDepthBP * 0.42},${wooferYCenterSide - 31}
+                L ${xDividerClamped + wooferDepthBP * 0.33},${wooferYCenterSide - 31}
+                Z`} fill="var(--card-bg)" stroke="var(--text-main)" strokeWidth="1.2" opacity="0.7" />
+      <path d={`M ${xDividerClamped},${wooferYSide + wooferH - 22} 
+                L ${xDividerClamped + wooferDepthBP * 0.35},${wooferYCenterSide + 28} 
+                L ${xDividerClamped + wooferDepthBP * 0.42},${wooferYCenterSide + 28}
+                L ${xDividerClamped + wooferDepthBP * 0.42},${wooferYCenterSide + 31}
+                L ${xDividerClamped + wooferDepthBP * 0.33},${wooferYCenterSide + 31}
+                Z`} fill="var(--card-bg)" stroke="var(--text-main)" strokeWidth="1.2" opacity="0.7" />
+
+      {/* 8. Motor de Imán (CAD outline style) */}
+      {/* Placa polar delantera (Top Plate) */}
+      <rect x={xDividerClamped + wooferDepthBP * 0.40} y={wooferYCenterSide - 34} width={wooferDepthBP * 0.16} height="12" fill="var(--card-bg)" stroke="var(--text-main)" strokeWidth="1.2" />
+      <rect x={xDividerClamped + wooferDepthBP * 0.40} y={wooferYCenterSide + 22} width={wooferDepthBP * 0.16} height="12" fill="var(--card-bg)" stroke="var(--text-main)" strokeWidth="1.2" />
+
+      {/* Imán de ferrita (Gris con hatch o sólido claro) */}
+      <rect x={xDividerClamped + wooferDepthBP * 0.44} y={wooferYCenterSide - 45} width={wooferDepthBP * 0.32} height="15" fill="var(--text-muted)" opacity="0.3" stroke="var(--text-main)" strokeWidth="1.2" />
+      <rect x={xDividerClamped + wooferDepthBP * 0.44} y={wooferYCenterSide + 30} width={wooferDepthBP * 0.32} height="15" fill="var(--text-muted)" opacity="0.3" stroke="var(--text-main)" strokeWidth="1.2" />
+
+      {/* Placa polar trasera con núcleo y ventilación (T-Yoke) */}
+      <path d={`M ${xDividerClamped + wooferDepthBP * 0.42},${wooferYCenterSide - 9} 
+                L ${xDividerClamped + wooferDepthBP * 0.78},${wooferYCenterSide - 9} 
+                L ${xDividerClamped + wooferDepthBP * 0.78},${wooferYCenterSide - 48}
+                L ${xDividerClamped + wooferDepthBP * 0.88},${wooferYCenterSide - 48}
+                L ${xDividerClamped + wooferDepthBP * 0.88},${wooferYCenterSide + 48}
+                L ${xDividerClamped + wooferDepthBP * 0.78},${wooferYCenterSide + 48}
+                L ${xDividerClamped + wooferDepthBP * 0.78},${wooferYCenterSide + 9}
+                L ${xDividerClamped + wooferDepthBP * 0.42},${wooferYCenterSide + 9}
+                L ${xDividerClamped + wooferDepthBP * 0.42},${wooferYCenterSide + 6}
+                L ${xDividerClamped + wooferDepthBP * 0.74},${wooferYCenterSide + 6}
+                L ${xDividerClamped + wooferDepthBP * 0.74},${wooferYCenterSide - 6}
+                L ${xDividerClamped + wooferDepthBP * 0.42},${wooferYCenterSide - 6}
+                Z`} fill="var(--card-bg)" stroke="var(--text-main)" strokeWidth="1.2" />
+      {/* Línea sutil de ventilación trasera */}
+      <line x1={xDividerClamped + wooferDepthBP * 0.74} y1={wooferYCenterSide} x2={xDividerClamped + wooferDepthBP * 0.88} y2={wooferYCenterSide} stroke="var(--text-muted)" strokeWidth="1" strokeDasharray="3 2" />
     </g>
   ) : null;
+
+  const speakerMagnetBP = null;
 
   // Tabiques divisorios verticales superior e inferior
   const dividerUpperHeight = wooferYSide - (offsetY + tScale);
@@ -314,27 +379,47 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
     <g>
       {/* Tabique Superior */}
       {dividerUpperHeight > 0 && (
-        <rect 
-          x={xDividerClamped} 
-          y={offsetY + tScale} 
-          width={tScale} 
-          height={dividerUpperHeight} 
-          fill="rgba(245, 158, 11, 0.12)" 
-          stroke="#000000" 
-          strokeWidth="1.5" 
-        />
+        <g>
+          <rect 
+            x={xDividerClamped} 
+            y={offsetY + tScale} 
+            width={tScale} 
+            height={dividerUpperHeight} 
+            fill="url(#wood-hatch)" 
+          />
+          <rect 
+            x={xDividerClamped} 
+            y={offsetY + tScale} 
+            width={tScale} 
+            height={dividerUpperHeight} 
+            fill="none"
+            stroke="var(--text-main)" 
+            strokeWidth="1.5"
+            opacity="0.85" 
+          />
+        </g>
       )}
       {/* Tabique Inferior */}
       {dividerLowerHeight > 0 && (
-        <rect 
-          x={xDividerClamped} 
-          y={wooferYSide + wooferH} 
-          width={tScale} 
-          height={dividerLowerHeight} 
-          fill="rgba(245, 158, 11, 0.12)" 
-          stroke="#000000" 
-          strokeWidth="1.5" 
-        />
+        <g>
+          <rect 
+            x={xDividerClamped} 
+            y={wooferYSide + wooferH} 
+            width={tScale} 
+            height={dividerLowerHeight} 
+            fill="url(#wood-hatch)" 
+          />
+          <rect 
+            x={xDividerClamped} 
+            y={wooferYSide + wooferH} 
+            width={tScale} 
+            height={dividerLowerHeight} 
+            fill="none"
+            stroke="var(--text-main)" 
+            strokeWidth="1.5"
+            opacity="0.85"
+          />
+        </g>
       )}
     </g>
   ) : null;
@@ -468,22 +553,35 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
             <stop offset="70%" stopColor="#0284c7" stopOpacity="0.2" />
             <stop offset="100%" stopColor="var(--card-bg)" stopOpacity="0.1" />
           </radialGradient>
+          <pattern id="wood-hatch" width="8" height="8" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+            <line x1="0" y1="0" x2="0" y2="8" stroke="var(--text-main)" strokeWidth="0.75" opacity="0.3" />
+          </pattern>
           <linearGradient id="cota-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.8" />
             <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.3" />
           </linearGradient>
+          <pattern id="damping-pattern" width="16" height="16" patternUnits="userSpaceOnUse" patternTransform="rotate(15)">
+            <path d="M 0,8 Q 4,0 8,8 T 16,8" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" opacity="0.4" />
+            <path d="M 0,16 Q 4,8 8,16 T 16,16" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" opacity="0.4" />
+          </pattern>
         </defs>
         <rect width="100%" height="100%" fill="url(#grid)" rx="12" style={{ stroke: 'var(--border-color)', strokeWidth: 1 }} />
 
         {/* --- DIBUJO VISTA FRONTAL --- */}
-        <path d={`${frontExtPath} ${frontIntPath}`} fill="url(#wood-gradient)" fillRule="evenodd" />
+        <path d={`${frontExtPath} ${frontIntPath}`} fill={isBandpass ? "url(#wood-hatch)" : "url(#wood-gradient)"} fillRule="evenodd" />
+        {dampingType !== 'none' && !isBandpass && (
+          <path d={frontIntPath} fill="url(#damping-pattern)" opacity={dampingType === 'heavy' ? 0.7 : dampingType === 'moderate' ? 0.35 : 0.15} />
+        )}
         <path d={frontExtPath} stroke="var(--text-main)" strokeWidth="2.5" strokeLinejoin="round" fill="none" opacity="0.85" />
         <path d={frontIntPath} stroke="var(--text-muted)" strokeWidth="1.2" strokeLinejoin="round" fill="none" opacity="0.5" />
         {frontSpeaker}
         {frontPorts}
 
         {/* --- DIBUJO SECCIÓN LATERAL --- */}
-        <path d={`${extPath} ${intPath}`} fill="url(#wood-gradient)" fillRule="evenodd" />
+        <path d={`${extPath} ${intPath}`} fill={isBandpass ? "url(#wood-hatch)" : "url(#wood-gradient)"} fillRule="evenodd" />
+        {dampingType !== 'none' && (
+          <path d={intPath} fill="url(#damping-pattern)" opacity={dampingType === 'heavy' ? 0.7 : dampingType === 'moderate' ? 0.35 : 0.15} />
+        )}
         <path d={extPath} stroke="var(--text-main)" strokeWidth="2.5" strokeLinejoin="round" fill="none" opacity="0.85" />
         <path d={intPath} stroke="var(--text-muted)" strokeWidth="1.2" strokeLinejoin="round" fill="none" opacity="0.5" />
         {bandpassDivider}
@@ -576,9 +674,9 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
           fontWeight="bold"
           letterSpacing="1px"
           textAnchor="middle"
-          opacity="0.6"
+          opacity="0.75"
         >
-          {t("CORTE SECCIÓN A-A")}
+          {isBandpass ? t("CORTE A-A") : t("CORTE SECCIÓN A-A")}
         </text>
 
         {/* --- ACOTACIONES (Líneas verdes) --- */}
@@ -609,38 +707,123 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
           <line x1={offsetXFront} y1={offsetY + plotHeight + 20} x2={offsetXFront + plotWidthFront} y2={offsetY + plotHeight + 20} strokeWidth="1.8" />
           <polygon points={`${offsetXFront},${offsetY + plotHeight + 20} ${offsetXFront + 7.5},${offsetY + plotHeight + 16} ${offsetXFront + 7.5},${offsetY + plotHeight + 24}`} fill="#10b981" />
           <polygon points={`${offsetXFront + plotWidthFront},${offsetY + plotHeight + 20} ${offsetXFront + plotWidthFront - 7.5},${offsetY + plotHeight + 16} ${offsetXFront + plotWidthFront - 7.5},${offsetY + plotHeight + 24}`} fill="#10b981" />
+          <text
+            x={offsetXFront + plotWidthFront / 2}
+            y={offsetY + plotHeight + 35}
+            fill="#10b981"
+            fontSize="13"
+            fontWeight="normal"
+            textAnchor="middle"
+          >
+            {wExtDisp} {uLabel}
+          </text>
         </g>
-        <text
-          x={offsetXFront + plotWidthFront / 2}
-          y={offsetY + plotHeight + 35}
-          fill="#10b981"
-          fontSize="13"
-          fontWeight="normal"
-          textAnchor="middle"
-        >
-          {wExtDisp} {uLabel}
-        </text>
 
-        {/* Cota Profundidad Externa (Sección Lateral) */}
+        {/* Cota Bandpass Verticals (Puerto izquierda y Altura woofer derecha) */}
+        {isBandpass && (
+          <>
+            {/* Puerto vertical (izquierda) - ej. 9.0 */}
+            <g stroke="#10b981" strokeWidth="1.3">
+              <line x1={offsetXSide - 15} y1={offsetY + plotHeight - tScale} x2={offsetXSide - 15} y2={offsetY + plotHeight - tScale - pHeightScale} strokeWidth="1.8" />
+              <line x1={offsetXSide - 25} y1={offsetY + plotHeight - tScale} x2={offsetXSide - 5} y2={offsetY + plotHeight - tScale} />
+              <line x1={offsetXSide - 25} y1={offsetY + plotHeight - tScale - pHeightScale} x2={offsetXSide - 5} y2={offsetY + plotHeight - tScale - pHeightScale} />
+              <polygon points={`${offsetXSide - 15},${offsetY + plotHeight - tScale} ${offsetXSide - 19},${offsetY + plotHeight - tScale - 7.5} ${offsetXSide - 11},${offsetY + plotHeight - tScale - 7.5}`} fill="#10b981" />
+              <polygon points={`${offsetXSide - 15},${offsetY + plotHeight - tScale - pHeightScale} ${offsetXSide - 19},${offsetY + plotHeight - tScale - pHeightScale + 7.5} ${offsetXSide - 11},${offsetY + plotHeight - tScale - pHeightScale + 7.5}`} fill="#10b981" />
+              <text
+                x={offsetXSide - 22}
+                y={offsetY + plotHeight - tScale - pHeightScale / 2 + 4}
+                fill="#10b981"
+                stroke="none"
+                fontSize="12"
+                fontWeight="bold"
+                textAnchor="end"
+              >
+                {convertTo(pHeightScale / scale, 'length', unitSystem).toFixed(1)}
+              </text>
+            </g>
+
+            {/* Altura woofer/bafle (derecha) - ej. 17.0 */}
+            <g stroke="#10b981" strokeWidth="1.3">
+              <line x1={offsetXSide + plotWidthSide + 15} y1={offsetY + plotHeight - tScale} x2={offsetXSide + plotWidthSide + 15} y2={wooferYSide + wooferH} strokeWidth="1.8" />
+              <line x1={offsetXSide + plotWidthSide + 5} y1={offsetY + plotHeight - tScale} x2={offsetXSide + plotWidthSide + 25} y2={offsetY + plotHeight - tScale} />
+              <line x1={offsetXSide + plotWidthSide + 5} y1={wooferYSide + wooferH} x2={offsetXSide + plotWidthSide + 25} y2={wooferYSide + wooferH} />
+              <polygon points={`${offsetXSide + plotWidthSide + 15},${offsetY + plotHeight - tScale} ${offsetXSide + plotWidthSide + 11},${offsetY + plotHeight - tScale - 7.5} ${offsetXSide + plotWidthSide + 19},${offsetY + plotHeight - tScale - 7.5}`} fill="#10b981" />
+              <polygon points={`${offsetXSide + plotWidthSide + 15},${wooferYSide + wooferH} ${offsetXSide + plotWidthSide + 11},${wooferYSide + wooferH + 7.5} ${offsetXSide + plotWidthSide + 19},${wooferYSide + wooferH + 7.5}`} fill="#10b981" />
+              <text
+                x={offsetXSide + plotWidthSide + 22}
+                y={wooferYSide + wooferH + ((offsetY + plotHeight - tScale) - (wooferYSide + wooferH)) / 2 + 4}
+                fill="#10b981"
+                stroke="none"
+                fontSize="12"
+                fontWeight="bold"
+                textAnchor="start"
+              >
+                {convertTo(((offsetY + plotHeight - tScale) - (wooferYSide + wooferH)) / scale, 'length', unitSystem).toFixed(1)}
+              </text>
+            </g>
+          </>
+        )}
+
+        {/* Cota Profundidad (Sección Lateral) */}
         {shape === 'rectangular' ? (
-          <g stroke="#10b981" strokeWidth="1.3">
-            <line x1={offsetXSide} y1={offsetY + plotHeight + 10} x2={offsetXSide} y2={offsetY + plotHeight + 25} />
-            <line x1={offsetXSide + plotWidthSide} y1={offsetY + plotHeight + 10} x2={offsetXSide + plotWidthSide} y2={offsetY + plotHeight + 25} />
-            <line x1={offsetXSide} y1={offsetY + plotHeight + 20} x2={offsetXSide + plotWidthSide} y2={offsetY + plotHeight + 20} strokeWidth="1.8" />
-            <polygon points={`${offsetXSide},${offsetY + plotHeight + 20} ${offsetXSide + 7.5},${offsetY + plotHeight + 16} ${offsetXSide + 7.5},${offsetY + plotHeight + 24}`} fill="#10b981" />
-            <polygon points={`${offsetXSide + plotWidthSide},${offsetY + plotHeight + 20} ${offsetXSide + plotWidthSide - 7.5},${offsetY + plotHeight + 16} ${offsetXSide + plotWidthSide - 7.5},${offsetY + plotHeight + 24}`} fill="#10b981" />
-            <text
-              x={offsetXSide + plotWidthSide / 2}
-              y={offsetY + plotHeight + 35}
-              fill="#10b981"
-              stroke="none"
-              fontSize="13"
-              fontWeight="normal"
-              textAnchor="middle"
-            >
-              {dExtDisp} {uLabel}
-            </text>
-          </g>
+          isBandpass ? (
+            <g stroke="#10b981" strokeWidth="1.3">
+              {/* Cota Interna 36.0 */}
+              <line x1={offsetXSide + tScale} y1={offsetY + plotHeight + 10} x2={offsetXSide + tScale} y2={offsetY + plotHeight + 25} />
+              <line x1={offsetXSide + plotWidthSide - tScale} y1={offsetY + plotHeight + 10} x2={offsetXSide + plotWidthSide - tScale} y2={offsetY + plotHeight + 25} />
+              <line x1={offsetXSide + tScale} y1={offsetY + plotHeight + 18} x2={offsetXSide + plotWidthSide - tScale} y2={offsetY + plotHeight + 18} strokeWidth="1.8" />
+              <polygon points={`${offsetXSide + tScale},${offsetY + plotHeight + 18} ${offsetXSide + tScale + 7.5},${offsetY + plotHeight + 14} ${offsetXSide + tScale + 7.5},${offsetY + plotHeight + 22}`} fill="#10b981" />
+              <polygon points={`${offsetXSide + plotWidthSide - tScale},${offsetY + plotHeight + 18} ${offsetXSide + plotWidthSide - tScale - 7.5},${offsetY + plotHeight + 14} ${offsetXSide + plotWidthSide - tScale - 7.5},${offsetY + plotHeight + 22}`} fill="#10b981" />
+              <text
+                x={offsetXSide + plotWidthSide / 2}
+                y={offsetY + plotHeight + 12}
+                fill="#10b981"
+                stroke="none"
+                fontSize="12"
+                fontWeight="bold"
+                textAnchor="middle"
+              >
+                {hIntDisp}
+              </text>
+
+              {/* Cota Externa 40.0 */}
+              <line x1={offsetXSide} y1={offsetY + plotHeight + 25} x2={offsetXSide} y2={offsetY + plotHeight + 43} />
+              <line x1={offsetXSide + plotWidthSide} y1={offsetY + plotHeight + 25} x2={offsetXSide + plotWidthSide} y2={offsetY + plotHeight + 43} />
+              <line x1={offsetXSide} y1={offsetY + plotHeight + 35} x2={offsetXSide + plotWidthSide} y2={offsetY + plotHeight + 35} strokeWidth="1.8" />
+              <polygon points={`${offsetXSide},${offsetY + plotHeight + 35} ${offsetXSide + 7.5},${offsetY + plotHeight + 31} ${offsetXSide + 7.5},${offsetY + plotHeight + 39}`} fill="#10b981" />
+              <polygon points={`${offsetXSide + plotWidthSide},${offsetY + plotHeight + 35} ${offsetXSide + plotWidthSide - 7.5},${offsetY + plotHeight + 31} ${offsetXSide + plotWidthSide - 7.5},${offsetY + plotHeight + 39}`} fill="#10b981" />
+              <text
+                x={offsetXSide + plotWidthSide / 2}
+                y={offsetY + plotHeight + 48}
+                fill="#10b981"
+                stroke="none"
+                fontSize="12"
+                fontWeight="bold"
+                textAnchor="middle"
+              >
+                {dExtDisp}
+              </text>
+            </g>
+          ) : (
+            <g stroke="#10b981" strokeWidth="1.3">
+              <line x1={offsetXSide} y1={offsetY + plotHeight + 10} x2={offsetXSide} y2={offsetY + plotHeight + 25} />
+              <line x1={offsetXSide + plotWidthSide} y1={offsetY + plotHeight + 10} x2={offsetXSide + plotWidthSide} y2={offsetY + plotHeight + 25} />
+              <line x1={offsetXSide} y1={offsetY + plotHeight + 20} x2={offsetXSide + plotWidthSide} y2={offsetY + plotHeight + 20} strokeWidth="1.8" />
+              <polygon points={`${offsetXSide},${offsetY + plotHeight + 20} ${offsetXSide + 7.5},${offsetY + plotHeight + 16} ${offsetXSide + 7.5},${offsetY + plotHeight + 24}`} fill="#10b981" />
+              <polygon points={`${offsetXSide + plotWidthSide},${offsetY + plotHeight + 20} ${offsetXSide + plotWidthSide - 7.5},${offsetY + plotHeight + 16} strokeWidth="1.8" ${offsetXSide + plotWidthSide - 7.5},${offsetY + plotHeight + 24}`} fill="#10b981" />
+              <text
+                x={offsetXSide + plotWidthSide / 2}
+                y={offsetY + plotHeight + 35}
+                fill="#10b981"
+                stroke="none"
+                fontSize="13"
+                fontWeight="normal"
+                textAnchor="middle"
+              >
+                {dExtDisp} {uLabel}
+              </text>
+            </g>
+          )
         ) : (
           // Trapezoidal - Cotas de profundidad superior e inferior
           <g stroke="#10b981" strokeWidth="1.3">

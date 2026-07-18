@@ -936,6 +936,7 @@ function App({ wasmError }: AppProps) {
                 portHeight={portHeight}
                 portArea={portArea}
                 dampingFactor={dampingFactor}
+                dampingType={dampingType}
                 flaredEnds={flaredEnds}
                 onCabinetDataChange={handleCabinetDataChange}
                 readOnly={true}
