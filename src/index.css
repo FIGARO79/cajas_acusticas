@@ -1830,3 +1830,77 @@ html[data-theme="light"] .premium-panel-btn.active-primary {
   border-color: transparent;
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
 }
+
+/* ==========================================================================
+   DISEÑOS Y DIAGRAMAS PREMIUM (CABINET Y CROSSOVER)
+   ========================================================================== */
+
+/* Efectos visuales de circuitos del Crossover */
+svg line, svg path, svg circle {
+  transition: stroke 0.3s ease, fill 0.3s ease, stroke-width 0.2s ease;
+}
+
+/* Vía de Agudos (High Pass - parte superior del circuito y componentes) */
+svg line[y1="60"][stroke="#ef4444"],
+svg line[y2="60"][stroke="#ef4444"],
+svg line[x1="60"][y1="60"][stroke="#ef4444"],
+svg line[x1="120"][stroke="#ef4444"],
+svg line[x1="160"][stroke="#ef4444"],
+svg line[x1="200"][y1="60"][stroke="#ef4444"],
+svg line[x1="310"][stroke="#ef4444"],
+svg line[x1="350"][stroke="#ef4444"],
+svg line[x1="390"][stroke="#ef4444"],
+svg line[x1="510"][stroke="#ef4444"],
+svg line[x1="560"][stroke="#ef4444"],
+svg line[x1="245"][stroke="#ef4444"],
+svg line[x1="260"][stroke="#ef4444"],
+svg line[x1="190"][stroke="#ef4444"],
+svg line[x1="205"][stroke="#ef4444"],
+svg line[x1="310"][stroke="#ef4444"],
+svg path[d*="Q 175"][stroke="currentColor"], /* Inductores High Pass */
+svg path[d*="Q 335"][stroke="currentColor"] {
+  stroke: #38bdf8 !important; /* Celeste Agudos */
+}
+
+/* Vía de Graves (Low Pass - parte inferior del circuito y componentes) */
+svg line[y1="270"][stroke="#ef4444"],
+svg line[y2="270"][stroke="#ef4444"],
+svg line[x1="60"][y1="270"][stroke="#ef4444"],
+svg line[x1="140"][stroke="#ef4444"],
+svg line[x1="236"][stroke="#ef4444"],
+svg line[x1="250"][stroke="#ef4444"],
+svg line[x1="330"][stroke="#ef4444"],
+svg line[x1="426"][stroke="#ef4444"],
+svg line[x1="460"][stroke="#ef4444"],
+svg line[x1="540"][stroke="#ef4444"],
+svg line[x1="340"][stroke="#ef4444"],
+svg path[d*="270"][stroke="#ef4444"], /* Inductores en serie Graves */
+svg path[d*="330"][stroke="#ef4444"] {
+  stroke: #10b981 !important; /* Verde Graves */
+}
+
+/* Vía de Medios (Band Pass - de 3 Vías) */
+svg line[y1="260"][stroke="#ef4444"],
+svg line[y2="260"][stroke="#ef4444"],
+svg line[x1="110"][y1="260"][stroke="#ef4444"],
+svg line[x1="260"][stroke="#ef4444"],
+svg path[d*="260"][stroke="currentColor"] {
+  stroke: #f59e0b !important; /* Ámbar Medios */
+}
+
+/* Nodos y conexiones de unión */
+svg circle[fill="#ef4444"] {
+  fill: var(--accent) !important;
+}
+
+/* Mejoras en el texto de los diagramas */
+svg text {
+  font-family: var(--font-title);
+  letter-spacing: -0.01em;
+}
+
+/* Animaciones sutiles al interactuar con el circuito */
+svg line:hover, svg path:hover {
+  stroke-width: 5.5px !important;
+}
+

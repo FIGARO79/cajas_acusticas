@@ -458,20 +458,34 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
           <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
             <path d="M 20 0 L 0 0 0 20" fill="none" stroke="var(--text-muted)" strokeWidth="1" opacity="0.08" />
           </pattern>
+          {/* Gradientes Premium */}
+          <linearGradient id="wood-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.04" />
+            <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.14" />
+          </linearGradient>
+          <radialGradient id="speaker-cone-gradient" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.4" />
+            <stop offset="70%" stopColor="#0284c7" stopOpacity="0.2" />
+            <stop offset="100%" stopColor="var(--card-bg)" stopOpacity="0.1" />
+          </radialGradient>
+          <linearGradient id="cota-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.8" />
+            <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.3" />
+          </linearGradient>
         </defs>
-        <rect width="100%" height="100%" fill="url(#grid)" rx="8" />
+        <rect width="100%" height="100%" fill="url(#grid)" rx="12" style={{ stroke: 'var(--border-color)', strokeWidth: 1 }} />
 
         {/* --- DIBUJO VISTA FRONTAL --- */}
-        <path d={`${frontExtPath} ${frontIntPath}`} fill="rgba(245, 158, 11, 0.08)" fillRule="evenodd" />
-        <path d={frontExtPath} stroke="#000000" strokeWidth="3" strokeLinejoin="round" fill="none" />
-        <path d={frontIntPath} stroke="#000000" strokeWidth="1.5" strokeLinejoin="round" fill="none" />
+        <path d={`${frontExtPath} ${frontIntPath}`} fill="url(#wood-gradient)" fillRule="evenodd" />
+        <path d={frontExtPath} stroke="var(--text-main)" strokeWidth="2.5" strokeLinejoin="round" fill="none" opacity="0.85" />
+        <path d={frontIntPath} stroke="var(--text-muted)" strokeWidth="1.2" strokeLinejoin="round" fill="none" opacity="0.5" />
         {frontSpeaker}
         {frontPorts}
 
         {/* --- DIBUJO SECCIÓN LATERAL --- */}
-        <path d={`${extPath} ${intPath}`} fill="rgba(245, 158, 11, 0.08)" fillRule="evenodd" />
-        <path d={extPath} stroke="#000000" strokeWidth="3" strokeLinejoin="round" fill="none" />
-        <path d={intPath} stroke="#000000" strokeWidth="1.5" strokeLinejoin="round" fill="none" />
+        <path d={`${extPath} ${intPath}`} fill="url(#wood-gradient)" fillRule="evenodd" />
+        <path d={extPath} stroke="var(--text-main)" strokeWidth="2.5" strokeLinejoin="round" fill="none" opacity="0.85" />
+        <path d={intPath} stroke="var(--text-muted)" strokeWidth="1.2" strokeLinejoin="round" fill="none" opacity="0.5" />
         {bandpassDivider}
         {speakerConeStandard}
         {speakerMagnetStandard}

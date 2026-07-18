@@ -96,9 +96,9 @@ export async function calcSuggestedPorted(qts: number, fs: number, vas: number) 
 }
 
 /** Radiador pasivo calculation */
-export async function calcRadiadorPasivo(vb: number, dv: number, vas: number, fs: number, cd: number, mp: number) {
+export async function calcRadiadorPasivo(vb: number, vas: number, fs: number, cd: number, mp: number) {
   const wasm = await getWasm();
-  const res = wasm.calc_radiador_pasivo(vb, dv, vas, fs, cd, mp);
+  const res = wasm.calc_radiador_pasivo(vb, vas, fs, cd, mp);
   return { fb: res.fb, capAcustica: res.cap_acustica, masaAñadida: res.masa_añadida };
 }
 

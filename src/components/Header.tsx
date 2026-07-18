@@ -59,28 +59,36 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Menu bar */}
-      <div className="desktop-menu-bar" ref={menuBarRef}>
+      <div className="desktop-menu-bar" ref={menuBarRef} role="menubar">
 
         {/* ARCHIVO */}
-        <div className="desktop-menu-item">
+        <div className="desktop-menu-item" role="none">
           <button
             className={`desktop-menu-trigger ${openMenu === 'archivo' ? 'active' : ''}`}
             onClick={() => handleMenuClick('archivo')}
             onMouseEnter={() => openMenu && setOpenMenu('archivo')}
             type="button"
+            role="menuitem"
+            aria-haspopup="true"
+            aria-expanded={openMenu === 'archivo'}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') closeMenu();
+            }}
           >
             {t("Archivo")}
           </button>
           {openMenu === 'archivo' && (
-            <div className="desktop-menu-dropdown">
+            <div className="desktop-menu-dropdown" role="menu" aria-label={t("Archivo")}>
               <button
                 className="desktop-menu-option"
                 onClick={() => { onExportReport?.(); closeMenu(); }}
                 type="button"
+                role="menuitem"
+                onKeyDown={(e) => { if (e.key === 'Escape') closeMenu(); }}
               >
                 {t("Exportar Reporte")}
               </button>
-              <div className="desktop-menu-separator" />
+              <div className="desktop-menu-separator" role="separator" />
               <button
                 className="desktop-menu-option"
                 onClick={() => {
@@ -88,6 +96,8 @@ export const Header: React.FC<HeaderProps> = ({
                   closeMenu();
                 }}
                 type="button"
+                role="menuitem"
+                onKeyDown={(e) => { if (e.key === 'Escape') closeMenu(); }}
               >
                 {t("Acerca de AcousticLAB")}
               </button>
@@ -96,28 +106,38 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* VENTANA */}
-        <div className="desktop-menu-item">
+        <div className="desktop-menu-item" role="none">
           <button
             className={`desktop-menu-trigger ${openMenu === 'ventana' ? 'active' : ''}`}
             onClick={() => handleMenuClick('ventana')}
             onMouseEnter={() => openMenu && setOpenMenu('ventana')}
             type="button"
+            role="menuitem"
+            aria-haspopup="true"
+            aria-expanded={openMenu === 'ventana'}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') closeMenu();
+            }}
           >
             {t("Ventana")}
           </button>
           {openMenu === 'ventana' && (
-            <div className="desktop-menu-dropdown">
-              <div className="desktop-menu-label">{t("Tema")}</div>
+            <div className="desktop-menu-dropdown" role="menu" aria-label={t("Ventana")}>
+              <div className="desktop-menu-label" role="presentation">{t("Tema")}</div>
               <button
                 className={`desktop-menu-option ${theme === 'dark' ? 'checked' : ''}`}
                 onClick={() => { if (theme !== 'dark') toggleTheme(); closeMenu(); }}
                 type="button"
+                role="menuitemcheckbox"
+                aria-checked={theme === 'dark'}
+                onKeyDown={(e) => { if (e.key === 'Escape') closeMenu(); }}
               >
-                {theme === 'dark' && <span className="menu-check">✓</span>}
+                {theme === 'dark' && <span className="menu-check" aria-hidden="true">✓</span>}
                 {t("Modo Oscuro")}
               </button>
               <button
                 className={`desktop-menu-option ${theme === 'light' ? 'checked' : ''}`}
+
                 onClick={() => { if (theme !== 'light') toggleTheme(); closeMenu(); }}
                 type="button"
               >

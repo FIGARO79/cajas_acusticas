@@ -23,7 +23,7 @@ interface CrossoverTabProps {
   zLoadProp?: number;
 }
 
-export const CrossoverTab: React.FC<CrossoverTabProps> = ({
+const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
   lang,
   onRegisterExporter,
   readOnly = false,
@@ -737,8 +737,8 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({
                 <line x1="200" y1="270" x2="235" y2="270" stroke="#ef4444" strokeWidth="4" />
                 <text x="140" y="320" fill="#eab308" fontSize="13" fontWeight="bold">
                   {crossoverType === '4th_lr'
-                    ? `C1/C2_HP = ${bp.c1_hp.toFixed(1)} / ${bp.c2_hp.toFixed(1)} µF`
-                    : `C1 = ${(bp.c_hp || bp.c1_hp).toFixed(2)} µF`}
+                    ? `C1/C2_HP = ${(bp.c1_hp || 0).toFixed(1)} / ${(bp.c2_hp || 0).toFixed(1)} µF`
+                    : `C1 = ${(bp.c_hp || bp.c1_hp || 0).toFixed(2)} µF`}
                 </text>
               </>
             ) : (
@@ -751,8 +751,8 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({
                 <path d="M 235,270 Q 247,245 259,270 Q 271,245 283,270 Q 295,245 307,270 Q 319,245 331,270" fill="none" stroke="#ef4444" strokeWidth="4" />
                 <text x="235" y="230" fill="#eab308" fontSize="13" fontWeight="bold">
                   {crossoverType === '4th_lr'
-                    ? `L1/L2_LP = ${bp.l1_lp.toFixed(2)} / ${bp.l2_lp.toFixed(2)} mH`
-                    : `L1 = ${(bp.l_lp || bp.l1_lp).toFixed(3)} mH`}
+                    ? `L1/L2_LP = ${(bp.l1_lp || 0).toFixed(2)} / ${(bp.l2_lp || 0).toFixed(2)} mH`
+                    : `L1 = ${(bp.l_lp || bp.l1_lp || 0).toFixed(3)} mH`}
                 </text>
               </>
             ) : (
@@ -770,8 +770,8 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({
                 <circle cx="380" cy="390" r="7" fill="currentColor" />
                 <text x="370" y="365" textAnchor="end" fill="#eab308" fontSize="13" fontWeight="bold">
                   {crossoverType === '4th_lr'
-                    ? `L1/L2_HP = ${bp.l1_hp.toFixed(2)} / ${bp.l2_hp.toFixed(2)} mH`
-                    : `L2 = ${bp.l_hp.toFixed(3)} mH`}
+                    ? `L1/L2_HP = ${(bp.l1_hp || 0).toFixed(2)} / ${(bp.l2_hp || 0).toFixed(2)} mH`
+                    : `L2 = ${(bp.l_hp || 0).toFixed(3)} mH`}
                 </text>
               </>
             )}
@@ -786,8 +786,8 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({
                 <circle cx="460" cy="390" r="7" fill="currentColor" />
                 <text x="480" y="320" fill="#eab308" fontSize="13" fontWeight="bold">
                   {crossoverType === '4th_lr'
-                    ? `C1/C2_LP = ${bp.c1_lp.toFixed(1)} / ${bp.c2_lp.toFixed(1)} µF`
-                    : `C2 = ${bp.c_lp.toFixed(2)} µF`}
+                    ? `C1/C2_LP = ${(bp.c1_lp || 0).toFixed(1)} / ${(bp.c2_lp || 0).toFixed(1)} µF`
+                    : `C2 = ${(bp.c_lp || 0).toFixed(2)} µF`}
                 </text>
               </>
             )}
@@ -1593,3 +1593,6 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({
     </div>
   );
 };
+
+export const CrossoverTab = React.memo(CrossoverTabComponent);
+

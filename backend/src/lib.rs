@@ -15,12 +15,18 @@ pub use crate::isobaric::*;
 pub use crate::auto_params::*;
 pub use crate::curves::*;
 
-#[cfg(feature = "wee_alloc")]
-#[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-/// Suma dos enteros de 32 bits y devuelve el resultado. (Dejamos esta función de prueba)
-#[wasm_bindgen]
-pub fn suma(a: i32, b: i32) -> i32 {
+    #[test]
+    fn test_suma() {
+        assert_eq!(suma(2, 2), 4);
+    }
+}
+
+#[cfg(test)]
+fn suma(a: i32, b: i32) -> i32 {
     a + b
 }
+

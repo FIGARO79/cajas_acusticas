@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { type Lang, translate } from '../utils/translations';
 import type { CalculatedPorted, SpeakerParams, PortSuggestions } from '../types';
-import { suggestPortConfig } from '../utils/acousticMath';
+import { suggestPortConfig, calcPortLength } from '../utils/acousticMath';
 import { calcSuggestedPorted } from '../wasm/index';
+
 
 import { type UnitSystem, convertTo, convertFrom, getUnitLabel } from '../utils/units';
 
@@ -31,6 +32,19 @@ interface PortedBoxTabProps {
   setPortArea: (area: number | '') => void;
   isLinkedToCabinet: boolean;
   onExportReport?: () => void;
+  // Passive Radiator Shared State
+  prTuning: 'port' | 'radiator';
+  setPrTuning: (tuning: 'port' | 'radiator') => void;
+  prDia: number;
+  setPrDia: (dia: number) => void;
+  prVas: number;
+  setPrVas: (vas: number) => void;
+  prFs: number;
+  setPrFs: (fs: number) => void;
+  prMms: number;
+  setPrMms: (mms: number) => void;
+  prFbNatural: number;
+  prMasaAnadidaG: number;
 }
 
 export const PortedBoxTab: React.FC<PortedBoxTabProps> = ({
@@ -57,7 +71,19 @@ export const PortedBoxTab: React.FC<PortedBoxTabProps> = ({
   portArea,
   setPortArea,
   isLinkedToCabinet,
-  onExportReport
+  onExportReport,
+  prTuning,
+  setPrTuning,
+  prDia,
+  setPrDia,
+  prVas,
+  setPrVas,
+  prFs,
+  setPrFs,
+  prMms,
+  setPrMms,
+  prFbNatural,
+  prMasaAnadidaG,
 }) => {
   const t = React.useCallback((text: string) => translate(text, lang), [lang]);
 
@@ -65,45 +91,6 @@ export const PortedBoxTab: React.FC<PortedBoxTabProps> = ({
   if (portArea !== undefined || typeof setPortArea === 'function') {
     // No-op
   }
-
-  // --- ESTADOS DE RADIADOR PASIVO ---
-  const [prTuning, setPrTuning] = useState<'port' | 'radiator'>('port');
-  const [prDia, setPrDia] = useState<number>(params.diaNominal && !isNaN(parseFloat(params.diaNominal)) ? parseFloat(params.diaNominal) * 2.54 : 20); // cm
-  const [prVas, setPrVas] = useState<number>(params.vas || 45); // L
-  const [prFs, setPrFs] = useState<number>(25); // Hz
-  const [prMms, setPrMms] = useState<number>(35); // g
-  const { prFbNatural, prMasaAnadidaG } = useMemo(() => {
-    if (portedData.valid && portedData.Vb > 0) {
-      const rho = 1.205;
-      const c = 343.0;
-      const sd_m2 = Math.PI * Math.pow((prDia / 100) / 2, 2);
-      const vb_m3 = portedData.Vb / 1000;
-      const vas_m3 = prVas / 1000;
-
-      // Compliancias acústicas
-      const cab = vb_m3 / (rho * c * c * sd_m2 * sd_m2);
-      const cap = vas_m3 / (rho * c * c * sd_m2 * sd_m2);
-
-      // Masa acústica propia (kg/m4)
-      const mp_propia = (prMms / 1000) / Math.pow(sd_m2, 2);
-
-      // Sintonía natural (Hz)
-      const fbNat = (1.0 / (2.0 * Math.PI)) * Math.sqrt(1.0 / (mp_propia * (cap + cab)));
-
-      // Masa acústica total requerida para sintonizar a la frecuencia objetivo de la caja (portedData.Fb)
-      const targetFb = portedData.Fb;
-      const mp_total_req = 1.0 / (4.0 * Math.PI * Math.PI * targetFb * targetFb * (cap + cab));
-      const mp_ad_req = mp_total_req - mp_propia;
-
-      // Masa mecánica añadida en gramos
-      const masaMecG = mp_ad_req * sd_m2 * sd_m2 * 1000;
-      return {
-        prFbNatural: fbNat,
-        prMasaAnadidaG: Math.max(0, masaMecG)
-      };
-    }
-    return { prFbNatural: 0, prMasaAnadidaG: 0 };
-  }, [prDia, prVas, prMms, portedData]);
 
   // Suggested commercial port sizes
   const suggestions = useMemo<PortSuggestions | null>(() => {
@@ -122,8 +109,7 @@ export const PortedBoxTab: React.FC<PortedBoxTabProps> = ({
         : 2 * Math.sqrt(((portWidth || 0) * (portHeight || 0)) / Math.PI); // Diámetro equivalente
 
       if (pDia > 0) {
-        const rPort = pDia / 2;
-        const Lv = ((23562.5 * Math.pow(pDia, 2) * pCount) / (portedData.Fb * portedData.Fb * portedData.Vb)) - (1.46 * rPort);
+        const Lv = calcPortLength(portedData.Vb, portedData.Fb, pDia, 0, pCount);
         
         const displayLv = convertTo(Lv, 'length', unitSystem);
         const unitLabel = getUnitLabel('length', unitSystem);

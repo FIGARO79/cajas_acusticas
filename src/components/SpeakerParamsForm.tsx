@@ -376,7 +376,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (activeIndex >= 0 && activeIndex < filteredDrivers.length) {
-        handleSelectDriver(filteredDrivers[activeIndex]);
+        handleSelectDriver(filteredDrivers[activeIndex] as any);
       }
     } else if (e.key === 'Escape') {
       setShowDropdown(false);
@@ -548,7 +548,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
                   {filteredDrivers.map((item, index) => (
                     <li
                       key={item.driver.ID}
-                      onClick={() => handleSelectDriver(item)}
+                      onClick={() => handleSelectDriver(item as any)}
                       className={`search-item ${index === activeIndex ? 'active' : ''}`}
                       ref={index === activeIndex ? activeRef : null}
                     >

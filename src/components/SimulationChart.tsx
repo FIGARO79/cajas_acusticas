@@ -194,7 +194,7 @@ interface SimulationChartProps {
   fcHigh?: number;
 }
 
-export const SimulationChart: React.FC<SimulationChartProps> = ({
+const SimulationChartComponent: React.FC<SimulationChartProps> = ({
   lang,
   theme,
   sealedData,
@@ -691,10 +691,11 @@ export const SimulationChart: React.FC<SimulationChartProps> = ({
         titleFont: { family: 'Plus Jakarta Sans' },
         bodyFont: { family: 'Inter' },
         borderColor: chartTooltipBorder,
-        borderWidth: 1,
         callbacks: {
           label: function (context: TooltipItem<'line'>) {
-            return `${context.dataset.label}: ${context.parsed.y.toFixed(1)} dB ${t('a')} ${context.parsed.x >= 1000 ? (context.parsed.x/1000).toFixed(1)+'k' : context.parsed.x} Hz`;
+            const yVal = context.parsed.y !== null && context.parsed.y !== undefined ? context.parsed.y.toFixed(1) : '0.0';
+            const xVal = context.parsed.x !== null && context.parsed.x !== undefined ? context.parsed.x : 0;
+            return `${context.dataset.label}: ${yVal} dB ${t('a')} ${xVal >= 1000 ? (xVal/1000).toFixed(1)+'k' : xVal} Hz`;
           },
         },
       },
@@ -745,7 +746,7 @@ export const SimulationChart: React.FC<SimulationChartProps> = ({
 
       <div className="chart-container" style={{ flex: 1, minHeight: '260px' }}>
         {data.datasets.length > 0 ? (
-          <Line data={data} options={options} plugins={[lineAnnotationPlugin]} />
+          <Line data={data as any} options={options as any} plugins={[lineAnnotationPlugin]} />
         ) : (
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'var(--text-muted)' }}>
             {t("Completa los parámetros mínimos del altavoz (Fs, Vas, Qts).")}
@@ -755,3 +756,6 @@ export const SimulationChart: React.FC<SimulationChartProps> = ({
     </div>
   );
 };
+
+export const SimulationChart = React.memo(SimulationChartComponent);
+

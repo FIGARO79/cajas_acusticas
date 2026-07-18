@@ -2,6 +2,18 @@ import type { SpeakerParams, CalculatedSealed, CalculatedPorted, PortSuggestions
 
 export const QL_LOSSES = 7.0;
 
+export function getKCorrection(flaredEnds: number): number {
+  return flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
+}
+
+export function calcPortLength(vb: number, fb: number, dv: number, flaredEnds: number, numPorts = 1): number {
+  if (vb <= 0 || fb <= 0 || dv <= 0) return 0;
+  const k = getKCorrection(flaredEnds);
+  const len = ((23562.5 * Math.pow(dv, 2) * numPorts) / (fb * fb * vb)) - (k * dv);
+  return Math.max(0, len);
+}
+
+
 // Logarithmic frequency sweep 10 Hz - 500 Hz
 export const chartFrequencies: number[] = (() => {
   const freqs: number[] = [];
@@ -151,10 +163,8 @@ export function suggestPortConfig(Vb: number, Fb: number, params: SpeakerParams,
   const standardSizes = [5.0, 7.5, 10.0, 15.0];
   const options = [];
 
-  const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
-
   // Theoretical exact min option
-  const lvMin = ((23562.5 * Math.pow(dMin, 2)) / (Fb * Fb * Vb)) - (kCorrection * dMin);
+  const lvMin = calcPortLength(Vb, Fb, dMin, flaredEnds, 1);
   if (lvMin >= minLength) {
     options.push({
       numPorts: 1,
@@ -168,7 +178,7 @@ export function suggestPortConfig(Vb: number, Fb: number, params: SpeakerParams,
   standardSizes.forEach(size => {
     const numPorts = Math.ceil(Math.pow(dMin / size, 2));
     if (numPorts > 0 && numPorts <= 4) {
-      const lv = ((23562.5 * Math.pow(size, 2) * numPorts) / (Fb * Fb * Vb)) - (kCorrection * size);
+      const lv = calcPortLength(Vb, Fb, size, flaredEnds, numPorts);
       if (lv >= minLength) {
         options.push({
           numPorts: numPorts,

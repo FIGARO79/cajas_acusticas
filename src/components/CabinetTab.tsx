@@ -3,6 +3,8 @@ import { type Lang, translate } from '../utils/translations';
 import type { CalculatedSealed, CalculatedPorted, CalculatedBandpass, SpeakerParams, WoodCabinetData, WoodCutPiece } from '../types';
 import { type UnitSystem, convertTo, convertFrom, getUnitLabel } from '../utils/units';
 import { CabinetDiagram } from './CabinetDiagram';
+import { calcPortLength } from '../utils/acousticMath';
+
 
 interface CabinetTabProps {
   lang: Lang;
@@ -63,7 +65,7 @@ interface CabinetTabProps {
   portYPct?: number;
 }
 
-export const CabinetTab: React.FC<CabinetTabProps> = ({
+const CabinetTabComponent: React.FC<CabinetTabProps> = ({
   lang,
   unitSystem,
   params,
@@ -164,8 +166,7 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
             : (2 * Math.sqrt(((Number(portWidth) || 0) * (Number(portHeight) || 0)) / Math.PI));
 
         if (pDia > 0) {
-          const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
-          const Lv = ((23562.5 * Math.pow(pDia, 2) * pCount) / (portedData.Fb * portedData.Fb * portedData.Vb)) - (kCorrection * pDia);
+          const Lv = calcPortLength(portedData.Vb, portedData.Fb, pDia, flaredEnds, pCount);
           if (Lv > 0) {
             if (isRect) {
               const w = Number(portWidth) || 0;
@@ -429,9 +430,8 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
       }
 
       if (pDia > 0) {
-        const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
         const Lv = cabinetData.vNeto > 0 
-          ? ((23562.5 * Math.pow(pDia, 2) * pCount) / (portedData.Fb * portedData.Fb * cabinetData.vNeto)) - (kCorrection * pDia)
+          ? calcPortLength(cabinetData.vNeto, portedData.Fb, pDia, flaredEnds, pCount)
           : 0;
         
         const displayLv = convertTo(Lv, 'length', unitSystem);
@@ -531,12 +531,11 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
           ? (2 * Math.sqrt((Number(portArea) || 0) / Math.PI))
           : (2 * Math.sqrt(((Number(portWidth) || 0) * (Number(portHeight) || 0)) / Math.PI));
       if (pDia > 0 && pCount > 0) {
-        const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
         const targetVol = cabinetData.vNeto > 0 ? cabinetData.vNeto : portedData.Vb;
         const Lv = targetVol > 0
-          ? ((23562.5 * Math.pow(pDia, 2) * pCount) / (portedData.Fb * portedData.Fb * targetVol)) - (kCorrection * pDia)
+          ? calcPortLength(targetVol, portedData.Fb, pDia, flaredEnds, pCount)
           : 0;
-        numericPortLength = Lv > 0 ? Lv : 0;
+        numericPortLength = Lv;
       }
     }
 
@@ -1045,3 +1044,6 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
     </div>
   );
 };
+
+export const CabinetTab = React.memo(CabinetTabComponent);
+

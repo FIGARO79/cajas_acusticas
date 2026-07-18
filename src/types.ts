@@ -162,7 +162,7 @@ export interface CrossoverExportData {
 }
 
 export interface DatabaseWoofer {
-  ID?: number;
+  ID?: string | number;
   Model?: string;
   "Company ID": number;
   Vas?: number;
@@ -180,6 +180,9 @@ export interface DatabaseWoofer {
   Qts?: number;
   Re?: number;
   Pe?: number;
+  BL?: number;
+  Z?: number;
+  SPL1?: number;
   _isCustom?: boolean;
   _customBrand?: string;
 }

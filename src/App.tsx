@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useDeferredValue } from 'react';
+import { useState, useEffect, useRef, useCallback, useDeferredValue, useMemo } from 'react';
 import { Header } from './components/Header';
 import { SpeakerParamsForm } from './components/SpeakerParamsForm';
 import { BoxParamsForm } from './components/BoxParamsForm';
@@ -8,11 +8,15 @@ import { CrossoverTab } from './components/CrossoverTab';
 import { type Lang, translate } from './utils/translations';
 import { type UnitSystem, convertTo, getUnitLabel } from './utils/units';
 import type { SpeakerParams, CalculatedSealed, CalculatedPorted, CalculatedBandpass, CustomDriver, WoodCabinetData, CrossoverExportData } from './types';
-import { estimateF3 } from './utils/acousticMath';
-import { getWasm, initWasm } from './wasm/index.ts';
+import { estimateF3, calcPortLength, getKCorrection } from './utils/acousticMath';
+import { getWasm, calcRadiadorPasivo } from './wasm/index.ts';
 import { generateReportHTML } from './utils/reportGenerator';
 
-function App() {
+interface AppProps {
+  wasmError?: string | null;
+}
+
+function App({ wasmError }: AppProps) {
   // Theme & Language
   const [lang, setLang] = useState<Lang>(() => (localStorage.getItem('lang') as Lang) || 'es');
   const [unitSystem, setUnitSystem] = useState<UnitSystem>(() => (localStorage.getItem('unitSystem') as UnitSystem) || 'metric');
@@ -105,6 +109,9 @@ function App() {
   const [prVas, setPrVas] = useState<number>(45);
   const [prFs, setPrFs] = useState<number>(25);
   const [prMms, setPrMms] = useState<number>(35);
+  const [prFbNatural, setPrFbNatural] = useState<number>(0);
+  const [prMasaAnadidaG, setPrMasaAnadidaG] = useState<number>(0);
+
 
   // Woodworking parameters
   const [woodMode, setWoodMode] = useState<'calc' | 'input'>('calc');
@@ -146,15 +153,13 @@ function App() {
 
   // Shared state for technical report exporting
   const cabinetRef = useRef<WoodCabinetData | null>(null);
-  const handleCabinetDataChange = useCallback((data: WoodCabinetData) => {
+  const handleCabinetDataChange = useCallback((data: WoodCabinetData | null) => {
     cabinetRef.current = data;
   }, []);
   const crossoverRef = useRef<(() => CrossoverExportData) | null>(null);
   const handleRegisterCrossover = useCallback((exp: () => CrossoverExportData) => {
     crossoverRef.current = exp;
   }, []);
-
-
 
   // Sync theme to document element
   useEffect(() => {
@@ -172,11 +177,6 @@ function App() {
   useEffect(() => {
     localStorage.setItem('unitSystem', unitSystem);
   }, [unitSystem]);
-
-  // Initialize WASM module on component mount
-  useEffect(() => {
-    initWasm().catch(err => console.error('WASM init error:', err));
-  }, []);
 
   const toggleTheme = () => {
     setTheme(prev => prev === 'dark' ? 'light' : 'dark');
@@ -270,7 +270,7 @@ function App() {
 
     if (bruto <= 0) return 0;
 
-    let targetFb = customFb;
+    let targetFb = customFbState ?? 38;
     if (!customPorted) {
       try {
         const wasm = getWasm();
@@ -304,7 +304,6 @@ function App() {
             portVol = (pCount * Math.PI * Math.pow(pDia / 2, 2) * Lv) / 1000;
           }
         } else {
-          const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
           let currentNetVol = bruto - extra; // Initial guess of physical net volume
           
           // Solve the circular reference (netVol -> targetVb -> portLength -> portVol -> netVol) iteratively
@@ -314,7 +313,7 @@ function App() {
               portVol = 0;
               break;
             }
-            const Lv = ((23562.5 * Math.pow(pDia, 2) * pCount) / (targetFb * targetFb * targetVb)) - (kCorrection * pDia);
+            const Lv = calcPortLength(targetVb, targetFb, pDia, flaredEnds, pCount);
             if (Lv > 0) {
               if (isRect) {
                 const w = Number(portWidth) || 0;
@@ -332,13 +331,13 @@ function App() {
       }
     }
 
-    return Math.max(0, bruto - (extra + portVol));
+    return Math.max(0, bruto - extra);
   };
 
   const manualNetVol = getManualWoodNetVolume();
 
   // --- CALCULAR CAJA SELLADA ---
-  const calculateSealed = (): CalculatedSealed => {
+  const sealedData = useMemo<CalculatedSealed>(() => {
     if (validationError || !adjParams.fs || !adjParams.vas || !adjParams.qts) {
       return { valid: false, Vb: 0, Fc: 0, Qtc: targetQtc, F3: 0 };
     }
@@ -350,7 +349,6 @@ function App() {
       const alpha = adjParams.vas / sealedVb;
       const sealedQtc = adjParams.qts * Math.sqrt(alpha + 1);
       
-      // We calculate Fc and F3 correctly using Wasm by passing the resulting vb
       const result = wasm.calc_caja_sellada(adjParams.fs, adjParams.vas, adjParams.qts, sealedVb, targetQtc);
       return {
         valid: true,
@@ -364,7 +362,6 @@ function App() {
         return { valid: false, Vb: 0, Fc: 0, Qtc: targetQtc, F3: 0 };
       }
       
-      // To get optimal vb from Qtc, we can pass a dummy vb_target and read vb_optimo
       const tempResult = wasm.calc_caja_sellada(adjParams.fs, adjParams.vas, adjParams.qts, 10.0, targetQtc);
       const optimalVb = tempResult.vb_optimo;
       
@@ -378,12 +375,10 @@ function App() {
         F3: result.f3
       };
     }
-  };
-
-  const sealedData = calculateSealed();
+  }, [validationError, adjParams.fs, adjParams.vas, adjParams.qts, woodMode, manualNetVol, dampingFactor, targetQtc]);
 
   // --- CALCULAR CAJA VENTILADA ---
-  const calculatePorted = (): CalculatedPorted => {
+  const portedData = useMemo<CalculatedPorted>(() => {
     if (validationError || !adjParams.fs || !adjParams.vas || !adjParams.qts) {
       return { valid: false, Vb: 0, Fb: 0, F3: 0, Fs: adjParams.fs || 0, Qts: adjParams.qts || 0, Vas: adjParams.vas || 0, alignment: '' };
     }
@@ -397,13 +392,14 @@ function App() {
 
     if (woodMode === 'input' && manualNetVol > 0) {
       VbPorted = manualNetVol * dampingFactor;
-      FbPorted = customFb;
+      // Usar estado crudo directamente en el cálculo para evitar circulares
+      FbPorted = customFbState ?? 38; 
       F3Ported = estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas);
       alignmentActive = 'Manual';
     } else {
       if (customPorted) {
-        VbPorted = customVb;
-        FbPorted = customFb;
+        VbPorted = customVbState ?? 45;
+        FbPorted = customFbState ?? 38;
         F3Ported = estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas);
         alignmentActive = 'Manual';
       } else {
@@ -423,7 +419,7 @@ function App() {
           : (2 * Math.sqrt(((Number(portWidth) || 0) * (Number(portHeight) || 0)) / Math.PI));
       const pCount = Number(portCount) || 1;
       if (pDia > 0 && VbPorted > 0) {
-        const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
+        const kCorrection = getKCorrection(flaredEnds);
         const Lv_cm = Number(customPortLength);
         const fbCalc = Math.sqrt((23562.5 * Math.pow(pDia, 2) * pCount) / (VbPorted * (Lv_cm + kCorrection * pDia)));
         if (fbCalc > 0 && !isNaN(fbCalc) && isFinite(fbCalc)) {
@@ -444,9 +440,7 @@ function App() {
       Vas: adjParams.vas,
       alignment: alignmentActive
     };
-  };
-
-  const portedData = calculatePorted();
+  }, [validationError, adjParams.fs, adjParams.vas, adjParams.qts, woodMode, manualNetVol, dampingFactor, customPorted, customVbState, customFbState, useCustomPortLength, customPortLength, portShape, portDiameter, portArea, portWidth, portHeight, portCount, flaredEnds, lang]);
 
   const customVb = customPorted ? (customVbState ?? Math.round((portedData.Vb || 45) * 10) / 10) : Math.round((portedData.Vb || 45) * 10) / 10;
   const customFb = customPorted ? (customFbState ?? Math.round((portedData.Fb || 38) * 10) / 10) : Math.round((portedData.Fb || 38) * 10) / 10;
@@ -469,7 +463,7 @@ function App() {
   };
 
   // --- CALCULAR CAJA PASO BANDA (BANDPASS) ---
-  const calculateBandpass = (): CalculatedBandpass => {
+  const bandpassData = useMemo<CalculatedBandpass>(() => {
     if (validationError || !adjParams.fs || !adjParams.vas || !adjParams.qts) {
       return { valid: false, order: bandpassOrder, Vf: 0, Vr: 0, Fb: 0, F0: 0, delta_f: 0, Fl: 0, Fh: 0 };
     }
@@ -504,9 +498,7 @@ function App() {
       console.error("Bandpass calculation error:", e);
       return { valid: false, order: bandpassOrder, Vf: 0, Vr: 0, Fb: 0, F0: 0, delta_f: 0, Fl: 0, Fh: 0 };
     }
-  };
-
-  const bandpassData = calculateBandpass();
+  }, [validationError, adjParams.fs, adjParams.vas, adjParams.qts, bandpassOrder, bandpassS, bandpassA]);
 
   const deferredSealedData = useDeferredValue(sealedData);
   const deferredPortedData = useDeferredValue(portedData);
@@ -528,8 +520,7 @@ function App() {
           : (2 * Math.sqrt(((Number(portWidth) || 0) * (Number(portHeight) || 0)) / Math.PI));
 
       if (pDia > 0) {
-        const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
-        const Lv = ((23562.5 * Math.pow(pDia, 2) * pCount) / (portedData.Fb * portedData.Fb * portedData.Vb)) - (kCorrection * pDia);
+        const Lv = calcPortLength(portedData.Vb, portedData.Fb, pDia, flaredEnds, pCount);
         
         const displayLv = convertTo(Lv, 'length', unitSystem);
         const unitLabel = getUnitLabel('length', unitSystem);
@@ -548,35 +539,32 @@ function App() {
 
   const portLength = getPortLengthCalculation();
 
-  // --- CÁLCULO SÍNCRONO DE RADIADOR PASIVO ---
-  const getRadiadorPasivoCalculations = () => {
-    if (portedData.valid && portedData.Vb > 0) {
-      const rho = 1.205;
-      const c = 343.0;
-      const sd_m2 = Math.PI * Math.pow((prDia / 100) / 2, 2);
-      const vb_m3 = portedData.Vb / 1000;
-      const vas_m3 = prVas / 1000;
-
-      const cab = vb_m3 / (rho * c * c * sd_m2 * sd_m2);
-      const cap = vas_m3 / (rho * c * c * sd_m2 * sd_m2);
-      const mp_propia = (prMms / 1000) / Math.pow(sd_m2, 2);
-
-      const fbNat = (1.0 / (2.0 * Math.PI)) * Math.sqrt(1.0 / (mp_propia * (cap + cab)));
-
-      const targetFb = portedData.Fb;
-      const mp_total_req = 1.0 / (4.0 * Math.PI * Math.PI * targetFb * targetFb * (cap + cab));
-      const mp_ad_req = mp_total_req - mp_propia;
-      const masaMecG = mp_ad_req * sd_m2 * sd_m2 * 1000;
-
-      return {
-        prFbNatural: fbNat || 0,
-        prMasaAnadidaG: Math.max(0, masaMecG) || 0
-      };
+  // --- CÁLCULO ASÍNCRONO DE RADIADOR PASIVO CON MOTOR RUST/WASM ---
+  useEffect(() => {
+    let active = true;
+    if (portedData.valid && portedData.Vb > 0 && prDia > 0 && prVas > 0 && prMms > 0) {
+      // cd es el diámetro del cono del radiador pasivo
+      const cd = prDia; 
+      
+      calcRadiadorPasivo(portedData.Vb, prVas, prFs, cd, prMms)
+        .then((res) => {
+          if (active) {
+            setPrFbNatural(res.fb || 0);
+            setPrMasaAnadidaG(Math.max(0, res.masaAñadida || 0));
+          }
+        })
+        .catch((err) => {
+          console.error("Error al calcular radiador pasivo por WASM:", err);
+        });
+    } else {
+      setPrFbNatural(0);
+      setPrMasaAnadidaG(0);
     }
-    return { prFbNatural: 0, prMasaAnadidaG: 0 };
-  };
+    return () => {
+      active = false;
+    };
+  }, [portedData.valid, portedData.Vb, portedData.Fb, prDia, prVas, prFs, prMms]);
 
-  const { prFbNatural, prMasaAnadidaG } = getRadiadorPasivoCalculations();
 
 
   const handleCustomPortedChange = useCallback((val: boolean) => {
@@ -608,8 +596,8 @@ function App() {
             : (2 * Math.sqrt(((portWidth || 0) * (portHeight || 0)) / Math.PI));
         
         if (pDia > 0) {
-          const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
-          const Lv = ((23562.5 * Math.pow(pDia, 2) * pCount) / (portedData.Fb * portedData.Fb * (cabinetRef.current?.vNeto || portedData.Vb))) - (kCorrection * pDia);
+          const targetVb = cabinetRef.current?.vNeto || portedData.Vb;
+          const Lv = calcPortLength(targetVb, portedData.Fb, pDia, flaredEnds, pCount);
           if (Lv <= 0) {
             pLen = t("Excesivamente corto");
           } else {
@@ -637,7 +625,7 @@ function App() {
         portedData,
         dampingType,
         cabinetRef.current,
-        crossoverRef.current ? {
+        xoverData ? {
           crossoverWays: xoverData.crossoverWays,
           crossoverType: xoverData.crossoverType,
           fc: xoverData.fc,
@@ -680,6 +668,41 @@ function App() {
       alert(t("Ocurrió un error al generar el reporte: ") + errMsg);
     }
   };
+
+  if (wasmError) {
+    return (
+      <div className="container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '2rem', textAlign: 'center' }}>
+        <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '3rem', maxWidth: '600px', width: '100%', boxShadow: '0 8px 32px rgba(0,0,0,0.2)', backdropFilter: 'blur(8px)' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', marginBottom: '1.5rem' }}>
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+          </div>
+          <h1 style={{ fontFamily: 'var(--font-title)', fontSize: '1.75rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '1rem' }}>
+            {t("Error al inicializar el Motor Acústico")}
+          </h1>
+          <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', lineHeight: 1.6 }}>
+            {t("No se pudo cargar el motor matemático de alto rendimiento (WebAssembly). Esto puede ocurrir por restricciones del navegador o porque faltan archivos del compilador.")}
+          </p>
+          <div style={{ background: 'rgba(0,0,0,0.15)', borderLeft: '3px solid var(--danger)', padding: '1rem', borderRadius: '6px', textAlign: 'left', marginBottom: '2rem', wordBreak: 'break-all' }}>
+            <code style={{ fontSize: '0.9rem', color: 'var(--text-main)', fontFamily: 'monospace' }}>
+              {wasmError}
+            </code>
+          </div>
+          <button 
+            onClick={() => window.location.reload()} 
+            style={{ padding: '0.75rem 2rem', background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', transition: 'transform 0.2s', fontFamily: 'inherit' }}
+            onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+            onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+          >
+            {t("Reintentar cargar aplicación")}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container">
