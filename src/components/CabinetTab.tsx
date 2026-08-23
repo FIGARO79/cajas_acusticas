@@ -3,6 +3,8 @@ import { type Lang, translate } from '../utils/translations';
 import type { CalculatedSealed, CalculatedPorted, CalculatedBandpass, SpeakerParams, WoodCabinetData, WoodCutPiece } from '../types';
 import { type UnitSystem, convertTo, convertFrom, getUnitLabel } from '../utils/units';
 import { CabinetDiagram } from './CabinetDiagram';
+import { calcPortLength } from '../utils/acousticMath';
+
 
 interface CabinetTabProps {
   lang: Lang;
@@ -54,39 +56,17 @@ interface CabinetTabProps {
   portShape: 'round' | 'rectangular' | 'custom';
   portWidth: number | '';
   portHeight: number | '';
-  portArea?: number | '';
-  setPortArea?: (a: number | '') => void;
+  portArea: number | '';
   dampingFactor: number;
+  dampingType?: 'none' | 'light' | 'moderate' | 'heavy';
   flaredEnds?: 0 | 1 | 2;
   onCabinetDataChange?: (data: WoodCabinetData | null) => void;
   readOnly?: boolean;
   speakerYPct?: number;
   portYPct?: number;
-  portLocation?: 'front' | 'rear';
-
-  // New 3-way and dual-woofer props
-  crossoverWays?: number;
-  driverConfig?: string;
-  midFs?: number;
-  midVas?: number;
-  midQts?: number;
-  midTargetQtc?: number;
-  useCustomMidVol?: boolean;
-  customMidVol?: number | '';
-  tweeterYPct?: number;
-  midrangeYPct?: number;
-  midCabinetDepth?: number | '';
-  enableBracing?: boolean;
-  onEnableBracingChange?: (v: boolean) => void;
-  bracingCount?: number;
-  onBracingCountChange?: (v: number) => void;
-  bracingPositions?: number[];
-  onBracingPositionsChange?: (v: number[]) => void;
-  midSealed?: boolean;
 }
 
-
-export const CabinetTab: React.FC<CabinetTabProps> = ({
+const CabinetTabComponent: React.FC<CabinetTabProps> = ({
   lang,
   unitSystem,
   params,
@@ -133,34 +113,15 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
   portHeight,
   portArea,
   dampingFactor,
+  dampingType,
   flaredEnds = 0,
   onCabinetDataChange,
   readOnly = false,
   speakerYPct = 50,
   portYPct = 85,
-  crossoverWays = 2,
-  driverConfig = 'single',
-  midFs = 120,
-  midVas = 5,
-  midQts = 0.45,
-  midTargetQtc = 0.707,
-  useCustomMidVol = false,
-  customMidVol = '',
-  tweeterYPct = 25,
-  midrangeYPct = 50,
-  midCabinetDepth = 15,
-  portLocation = 'front',
-  enableBracing = false,
-  onEnableBracingChange,
-  bracingCount = 2,
-  bracingPositions = [0.35, 0.7],
-  onBracingPositionsChange,
-  midSealed = false,
 }) => {
   const t = React.useCallback((text: string) => translate(text, lang), [lang]);
   const [hoveredPieceIndex, setHoveredPieceIndex] = useState<number | null>(null);
-
-
 
 
 
@@ -207,8 +168,7 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
             : (2 * Math.sqrt(((Number(portWidth) || 0) * (Number(portHeight) || 0)) / Math.PI));
 
         if (pDia > 0) {
-          const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
-          const Lv = ((23562.5 * Math.pow(pDia, 2) * pCount) / (portedData.Fb * portedData.Fb * portedData.Vb)) - (kCorrection * pDia);
+          const Lv = calcPortLength(portedData.Vb, portedData.Fb, pDia, flaredEnds, pCount);
           if (Lv > 0) {
             if (isRect) {
               const w = Number(portWidth) || 0;
@@ -218,22 +178,6 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
               portVol = (pCount * Math.PI * Math.pow(pDia / 2, 2) * Lv) / 1000;
             }
           }
-        }
-      }
-    }
-
-    // Midrange Chamber Volume Calculation (vMid)
-    let vMid = 0;
-    if (crossoverWays === 3 && !midSealed) {
-      if (useCustomMidVol && Number(customMidVol) > 0) {
-        vMid = Number(customMidVol);
-      } else {
-        vMid = 3.0; // default 3 Liters
-        const mVas = midVas ?? 5;
-        const mQts = midQts ?? 0.45;
-        const mTargetQtc = midTargetQtc ?? 0.707;
-        if (mQts > 0 && mQts < mTargetQtc && mVas > 0) {
-          vMid = mVas / (Math.pow(mTargetQtc / mQts, 2) - 1);
         }
       }
     }
@@ -251,19 +195,7 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
       netVol = reqNetVol / dampingFactor;
 
       if (netVol > 0) {
-        // Estimate divider board volumes before we know physical dimensions
-        let vMidPartition = 0;
-        let vWooferPartition = 0;
-        const tempTotal = netVol + extraVal + portVol + vMid;
-        const estArea = Math.pow(tempTotal * 1000, 2/3); // cm^2
-        if (crossoverWays === 3) {
-          vMidPartition = (estArea * thickness) / 1000;
-        }
-        if (driverConfig === 'dual_isolated') {
-          vWooferPartition = (estArea * thickness) / 1000;
-        }
-
-        totalVol = netVol + extraVal + portVol + vMid + vMidPartition + vWooferPartition;
+        totalVol = netVol + extraVal + portVol;
         const volCm3 = totalVol * 1000;
 
         if (woodShape === 'rectangular') {
@@ -380,27 +312,6 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
       }
     }
 
-    let vMidPartition = 0;
-    let vWooferPartition = 0;
-
-    if (valid && wInt > 0) {
-      const dVal = (woodShape === 'rectangular' ? dInt : (dTrapTopInt + dTrapBotInt) / 2);
-      if (crossoverWays === 3 && !midSealed) {
-        const dMid = Math.min(Number(midCabinetDepth) || 15, dVal - 1);
-        const hM = (wInt > 0 && dMid > 0) ? (vMid * 1000) / (wInt * dMid) : 0;
-        vMidPartition = (wInt * (dMid + hM) * thickness) / 1000;
-      }
-      if (driverConfig === 'dual_isolated') {
-        vWooferPartition = (wInt * dVal * thickness) / 1000;
-      }
-
-      // Re-adjust manual mode net volume to account for partitions
-      if (woodMode === 'input') {
-        const vBruto = (wInt * dVal * hInt) / 1000;
-        netVol = Math.max(0, vBruto - (extraVal + portVol + vMid + vMidPartition + vWooferPartition)) * dampingFactor;
-      }
-    }
-
     if (valid) {
       const pieces: WoodCutPiece[] = [];
       const uLabel = getUnitLabel('length', unitSystem);
@@ -426,20 +337,6 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
             name: t("Divisor Interno (Bafle de Montaje)"),
             qty: 1,
             dimensions: `${displayVal(hInt, 'length')} x ${displayVal(wInt, 'length')} ${uLabel}`
-          });
-        }
-        if (crossoverWays === 3) {
-          pieces.push({
-            name: t("Divisor Interno (Cámara de Medios)"),
-            qty: 1,
-            dimensions: `${displayVal(wInt, 'length')} x ${displayVal(dInt, 'length')} ${uLabel}`
-          });
-        }
-        if (driverConfig === 'dual_isolated') {
-          pieces.push({
-            name: t("Divisor Interno (Cámaras de Woofers)"),
-            qty: 1,
-            dimensions: `${displayVal(wInt, 'length')} x ${displayVal(dInt, 'length')} ${uLabel}`
           });
         }
       } else {
@@ -476,43 +373,13 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
             dimensions: `${displayVal(hInt, 'length')} x ${displayVal(wInt, 'length')} ${uLabel}`
           });
         }
-        const dAvgInt = (dTrapTopInt + dTrapBotInt) / 2;
-        if (crossoverWays === 3) {
-          const dMid = Math.min(Number(midCabinetDepth) || 15, dAvgInt - 1);
-          const hM = (wInt > 0 && dMid > 0) ? (vMid * 1000) / (wInt * dMid) : 0;
-
-          pieces.push({
-            name: t("Divisor Horizontal (Cámara de Medios)"),
-            qty: 1,
-            dimensions: `${displayVal(wInt, 'length')} x ${displayVal(dMid, 'length')} ${uLabel}`
-          });
-          pieces.push({
-            name: t("Divisor Vertical (Cámara de Medios)"),
-            qty: 1,
-            dimensions: `${displayVal(wInt, 'length')} x ${displayVal(hM, 'length')} ${uLabel}`
-          });
-        }
-        if (driverConfig === 'dual_isolated') {
-          pieces.push({
-            name: t("Divisor Interno (Cámaras de Woofers)"),
-            qty: 1,
-            dimensions: `${displayVal(wInt, 'length')} x ${displayVal(dAvgInt, 'length')} ${uLabel}`
-          });
-        }
       }
-
-      const dVal = (woodShape === 'rectangular' ? dInt : (dTrapTopInt + dTrapBotInt) / 2);
-      const dMid = Math.min(Number(midCabinetDepth) || 15, dVal - 1);
-      const hMid = (wInt > 0 && dMid > 0) ? (vMid * 1000) / (wInt * dMid) : 0;
 
       return {
         valid: true,
         vNeto: netVol,
         vTotal: totalVol,
-        vExtra: (woodExtra || 0) + portVol + vMid + vMidPartition + vWooferPartition,
-        vMid,
-        dMid,
-        hMid,
+        vExtra: (woodExtra || 0) + portVol,
         hInt, wInt, dInt,
         dTrapTopInt, dTrapBotInt,
         hExt, wExt, dExt,
@@ -527,19 +394,12 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
     unitSystem, sealedData, portedData, bandpassData, dampingFactor, flaredEnds, woodMode, woodShape, woodConstraint, woodSource, woodRatio,
     woodLockVal1, woodLockVal2, woodLockVal3, woodExtHeight, woodExtWidth, woodExtDepth,
     woodTrapExtHeight, woodTrapExtWidth, woodTrapExtDepthTop, woodTrapExtDepthBot, woodThickness, woodExtra,
-    portCount, portDiameter, portShape, portWidth, portHeight, portArea, crossoverWays, driverConfig, midVas, midQts, midTargetQtc, useCustomMidVol, customMidVol,
-    midCabinetDepth, displayVal, t
+    portCount, portDiameter, portShape, portWidth, portHeight, portArea, t, displayVal
   ]);
 
-  const lastCabinetDataStrRef = React.useRef('');
-
   useEffect(() => {
-    const cabinetDataStr = cabinetData ? JSON.stringify(cabinetData) : '';
-    if (cabinetDataStr !== lastCabinetDataStrRef.current) {
-      lastCabinetDataStrRef.current = cabinetDataStr;
-      if (onCabinetDataChange) {
-        onCabinetDataChange(cabinetData);
-      }
+    if (onCabinetDataChange) {
+      onCabinetDataChange(cabinetData);
     }
   }, [cabinetData, onCabinetDataChange]);
 
@@ -572,9 +432,8 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
       }
 
       if (pDia > 0) {
-        const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
         const Lv = cabinetData.vNeto > 0 
-          ? ((23562.5 * Math.pow(pDia, 2) * pCount) / (portedData.Fb * portedData.Fb * cabinetData.vNeto)) - (kCorrection * pDia)
+          ? calcPortLength(cabinetData.vNeto, portedData.Fb, pDia, flaredEnds, pCount)
           : 0;
         
         const displayLv = convertTo(Lv, 'length', unitSystem);
@@ -674,29 +533,16 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
           ? (2 * Math.sqrt((Number(portArea) || 0) / Math.PI))
           : (2 * Math.sqrt(((Number(portWidth) || 0) * (Number(portHeight) || 0)) / Math.PI));
       if (pDia > 0 && pCount > 0) {
-        const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
         const targetVol = cabinetData.vNeto > 0 ? cabinetData.vNeto : portedData.Vb;
         const Lv = targetVol > 0
-          ? ((23562.5 * Math.pow(pDia, 2) * pCount) / (portedData.Fb * portedData.Fb * targetVol)) - (kCorrection * pDia)
+          ? calcPortLength(targetVol, portedData.Fb, pDia, flaredEnds, pCount)
           : 0;
-        numericPortLength = Lv > 0 ? Lv : 0;
+        numericPortLength = Lv;
       }
     }
 
     return (
-      <div 
-        className="read-only-cabinet-tab" 
-        style={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          gap: '0.75rem', 
-          width: '100%', 
-          boxSizing: 'border-box',
-          maxHeight: 'calc(100vh - 220px)',
-          overflowY: 'auto',
-          paddingRight: '0.5rem'
-        }}
-      >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%', boxSizing: 'border-box' }}>
         {/* Diagrama dinámico Corte A-A (Alineado arriba bajo la gráfica) */}
         <CabinetDiagram
           lang={lang}
@@ -713,42 +559,17 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
           hoveredPieceIndex={hoveredPieceIndex}
           speakerYPct={speakerYPct}
           portYPct={portYPct}
-          tweeterYPct={tweeterYPct}
-          midrangeYPct={midrangeYPct}
-          portLocation={portLocation}
           bandpassOrder={bandpassData?.order}
           bandpassRatio={bandpassData && bandpassData.valid ? bandpassData.Vr / (bandpassData.Vf + bandpassData.Vr) : 0.5}
           bandpassVf={bandpassData?.Vf}
           bandpassVr={bandpassData?.Vr}
-          crossoverWays={crossoverWays}
-          driverConfig={driverConfig}
-          midFs={midFs}
-          midVas={midVas}
-          midQts={midQts}
-          midTargetQtc={midTargetQtc}
-          enableBracing={enableBracing}
-          bracingCount={bracingCount}
-          bracingPositions={bracingPositions}
-          onBracingPositionsChange={onBracingPositionsChange}
-          flaredEnds={flaredEnds}
-          midSealed={midSealed}
+          dampingType={dampingType}
         />
 
-
         {/* Resultados de Ebanistería */}
-        <div 
-          className="results-summary" 
-          style={{ 
-            display: 'grid', 
-            gridTemplateColumns: crossoverWays === 3 ? 'repeat(auto-fit, minmax(70px, 1fr))' : '1fr 1fr 1fr', 
-            gap: '0.5rem', 
-            marginBottom: '0rem' 
-          }}
-        >
+        <div className="results-summary" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', marginBottom: '0rem' }}>
           <div className="result-tile" style={{ padding: '0.25rem' }}>
-            <span className="result-tile-label" style={{ fontSize: '0.65rem' }}>
-              {crossoverWays === 3 ? t("Vol. Woofer Neto") : t("Volumen Neto Resultante")}
-            </span>
+            <span className="result-tile-label" style={{ fontSize: '0.65rem' }}>{t("Volumen Neto Resultante")}</span>
             <span className="result-tile-value" style={{ fontSize: '0.65rem' }}>
               {cabinetData?.valid 
                 ? `${convertTo(cabinetData.vNeto, 'volume', unitSystem).toFixed(2)} ${getUnitLabel('volume', unitSystem)}` 
@@ -775,20 +596,6 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
               ) : 'N/A'}
             </span>
           </div>
-          {crossoverWays === 3 && cabinetData?.valid && (
-            <div className="result-tile" style={{ padding: '0.25rem' }}>
-              <span className="result-tile-label" style={{ fontSize: '0.65rem' }}>{t("Cámara de Medios")}</span>
-              <span className="result-tile-value" style={{ fontSize: '0.65rem', fontWeight: 600, marginTop: '0.15rem' }}>
-                {(() => {
-                  const vM = cabinetData.vMid ?? 3.0;
-                  const wI = cabinetData.wInt;
-                  const dI = woodShape === 'rectangular' ? cabinetData.dInt : ((cabinetData.dTrapTopInt || 0) + (cabinetData.dTrapBotInt || 0)) / 2;
-                  const hM = (wI > 0 && dI > 0) ? (vM * 1000) / (wI * dI) : 0;
-                  return `${convertTo(hM, 'length', unitSystem).toFixed(1)}x${convertTo(wI, 'length', unitSystem).toFixed(1)}x${convertTo(dI, 'length', unitSystem).toFixed(1)}`;
-                })()}
-              </span>
-            </div>
-          )}
         </div>
 
         {/* Puerto de sintonía */}
@@ -858,14 +665,7 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
 
   return (
     <div className="tab-content active" id="tab-wood">
-      <div 
-        className="wood-layout"
-        style={{
-          maxHeight: 'calc(100vh - 220px)',
-          overflowY: 'auto',
-          paddingRight: '0.5rem'
-        }}
-      >
+      <div className="wood-layout">
         
         {/* Selector del modo de ebanistería */}
         <div className="wood-mode-selector-container">
@@ -995,7 +795,7 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
               <button
                 onClick={handleApplySuggestedCabinet}
                 className="preset-select"
-                style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', background: 'var(--primary)', border: '1px solid var(--primary)', color: '#ffffff', borderRadius: '0px', cursor: 'pointer', fontWeight: 600 }}
+                style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', background: 'var(--primary)', border: '1px solid var(--primary)', color: '#ffffff', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
                 type="button"
                 disabled={!(woodSource === 'sealed' ? sealedData.valid : woodSource === 'ported' ? portedData.valid : bandpassData.valid)}
               >
@@ -1122,21 +922,7 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
               <span className="unit-badge">{getUnitLabel('volume', unitSystem)}</span>
             </div>
           </div>
-          <div className="input-group">
-            <label>{t("Refuerzos Internos")}</label>
-            <div className="input-wrapper" style={{ display: 'flex', alignItems: 'center', height: '38px', gap: '0.4rem' }}>
-              <input 
-                type="checkbox" 
-                checked={enableBracing} 
-                onChange={(e) => onEnableBracingChange?.(e.target.checked)} 
-                style={{ width: '1.25rem', height: '1.25rem', cursor: 'pointer', margin: 0 }}
-              />
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{t("Mostrar Bracing")}</span>
-
-            </div>
-          </div>
         </div>
-
 
         {/* Resultados de Ebanistería */}
         <div className="results-summary">
@@ -1175,21 +961,6 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
             </span>
             <span className="result-tile-sub">{t("Alto x Ancho x Profundidad")}</span>
           </div>
-          {crossoverWays === 3 && cabinetData?.valid && (
-            <div className="result-tile">
-              <span className="result-tile-label">{t("Cámara de Medios")}</span>
-              <span className="result-tile-value" style={{ fontSize: '0.95rem', fontWeight: 500, marginTop: '0.4rem' }}>
-                {(() => {
-                  const vM = cabinetData.vMid ?? 3.0;
-                  const wI = cabinetData.wInt;
-                  const dI = woodShape === 'rectangular' ? cabinetData.dInt : ((cabinetData.dTrapTopInt || 0) + (cabinetData.dTrapBotInt || 0)) / 2;
-                  const hM = (wI > 0 && dI > 0) ? (vM * 1000) / (wI * dI) : 0;
-                  return `${convertTo(hM, 'length', unitSystem).toFixed(1)} x ${convertTo(wI, 'length', unitSystem).toFixed(1)} x ${convertTo(dI, 'length', unitSystem).toFixed(1)} ${getUnitLabel('length', unitSystem)}`;
-                })()}
-              </span>
-              <span className="result-tile-sub">{t("Alto x Ancho x Profundidad")} ({cabinetData.vMid?.toFixed(1) ?? '3.0'} L)</span>
-            </div>
-          )}
         </div>
 
         {/* Puerto de sintonía en ebanistería */}
@@ -1276,3 +1047,6 @@ export const CabinetTab: React.FC<CabinetTabProps> = ({
     </div>
   );
 };
+
+export const CabinetTab = React.memo(CabinetTabComponent);
+

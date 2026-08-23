@@ -1,0 +1,14 @@
+/home/fabio/Programacion/cajas_acusticas/backend/target/wasm32-unknown-unknown/release/deps/serde-5af374557c6e6674.d: /home/fabio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/fabio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/fabio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/fabio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/fabio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/fabio/Programacion/cajas_acusticas/backend/target/wasm32-unknown-unknown/release/build/serde-66df6576f62e5089/out/private.rs
+
+/home/fabio/Programacion/cajas_acusticas/backend/target/wasm32-unknown-unknown/release/deps/libserde-5af374557c6e6674.rlib: /home/fabio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/fabio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/fabio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/fabio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/fabio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/fabio/Programacion/cajas_acusticas/backend/target/wasm32-unknown-unknown/release/build/serde-66df6576f62e5089/out/private.rs
+
+/home/fabio/Programacion/cajas_acusticas/backend/target/wasm32-unknown-unknown/release/deps/libserde-5af374557c6e6674.rmeta: /home/fabio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/fabio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/fabio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/fabio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/fabio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/fabio/Programacion/cajas_acusticas/backend/target/wasm32-unknown-unknown/release/build/serde-66df6576f62e5089/out/private.rs
+
+/home/fabio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs:
+/home/fabio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs:
+/home/fabio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs:
+/home/fabio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs:
+/home/fabio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs:
+/home/fabio/Programacion/cajas_acusticas/backend/target/wasm32-unknown-unknown/release/build/serde-66df6576f62e5089/out/private.rs:
+
+# env-dep:OUT_DIR=/home/fabio/Programacion/cajas_acusticas/backend/target/wasm32-unknown-unknown/release/build/serde-66df6576f62e5089/out

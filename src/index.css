@@ -1,44 +1,36 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
 
 :root {
-  --bg-main: #060913;
-  --bg-secondary: #0d1222;
-  --bg-tertiary: #131b31;
-  --card-bg: rgba(13, 20, 35, 0.45);
-  --card-border: rgba(255, 255, 255, 0.06);
-  --card-border-hover: rgba(255, 255, 255, 0.12);
+  --bg-gradient: radial-gradient(circle at top, #0f172a 0%, #050b18 100%);
+  --card-bg: rgba(15, 23, 42, 0.95);
+  --card-border: rgba(255, 255, 255, 0.09);
+  --card-border-hover: rgba(59, 130, 246, 0.35);
 
-  --text-main: #f1f5f9;
-  --text-muted: #64748b;
-  --text-secondary: #94a3b8;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
 
-  --primary: #38bdf8;
-  --primary-gradient: linear-gradient(135deg, #0284c7, #38bdf8);
-  --primary-glow: rgba(56, 189, 248, 0.15);
-  --accent: #f59e0b;
+  --primary: #3b82f6;
+  --primary-gradient: linear-gradient(135deg, #2563eb, #3b82f6);
+  --primary-glow: rgba(59, 130, 246, 0.06);
 
   --sealed-color: #0ea5e9;
-  --sealed-glow: rgba(14, 165, 233, 0.1);
+  --sealed-glow: rgba(14, 165, 233, 0.06);
   --ported-color: #10b981;
-  --ported-glow: rgba(16, 185, 129, 0.1);
+  --ported-glow: rgba(16, 185, 129, 0.06);
 
   --danger: #ef4444;
-  --danger-bg: rgba(239, 68, 68, 0.1);
+  --danger-bg: rgba(239, 68, 68, 0.08);
   --warning: #f59e0b;
-  --warning-bg: rgba(245, 158, 11, 0.1);
+  --warning-bg: rgba(245, 158, 11, 0.08);
   --success: #10b981;
-  --success-bg: rgba(16, 185, 129, 0.1);
+  --success-bg: rgba(16, 185, 129, 0.08);
 
-  --input-bg: rgba(10, 15, 30, 0.5);
-  --input-border: rgba(255, 255, 255, 0.08);
-  --input-focus: #38bdf8;
+  --input-bg: rgba(10, 15, 30, 0.85);
+  --input-border: rgba(255, 255, 255, 0.12);
+  --input-focus: #3b82f6;
 
   --font-display: 'Plus Jakarta Sans', sans-serif;
-  --font-sans: 'Outfit', sans-serif;
-  --font-mono: 'Menlo', 'Monaco', monospace;
-
-  --scrollbar-thumb: rgba(255, 255, 255, 0.1);
-  --scrollbar-thumb-hover: rgba(56, 189, 248, 0.3);
+  --font-sans: 'Inter', sans-serif;
 }
 
 /* RESET & BASE STYLES */
@@ -54,38 +46,32 @@ strong {
 
 body {
   font-family: var(--font-sans);
-  background-color: var(--bg-main);
-  background-image: 
-    radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.04) 0px, transparent 50%),
-    radial-gradient(at 100% 0%, rgba(245, 158, 11, 0.04) 0px, transparent 50%),
-    radial-gradient(at 50% 100%, rgba(99, 102, 241, 0.03) 0px, transparent 50%);
-  background-attachment: fixed;
+  background: #050b18;
+  background-image: var(--bg-gradient);
   color: var(--text-main);
   min-height: 100vh;
-  padding: 0;
+  padding: 0.75rem;
   line-height: 1.6;
   overflow-x: hidden;
-  position: relative;
 }
 
 /* Scrollbar styling */
 ::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg-main);
+  background: #050b18;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--scrollbar-thumb);
-  border: 3px solid var(--bg-main);
-  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--scrollbar-thumb-hover);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .container {
@@ -93,7 +79,7 @@ body {
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 0.75rem;
 }
 
 /* Header Style */
@@ -122,7 +108,7 @@ header::after {
 .logo-area {
   display: flex;
   align-items: center;
-  gap: 0;
+  gap: 0.5rem;
   margin-bottom: 0.4rem;
 }
 
@@ -155,12 +141,12 @@ header p {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 0;
+  gap: 0.75rem;
   margin-top: 0.5rem;
   background: rgba(10, 15, 30, 0.6);
   border: none;
   padding: 0.3rem 0.6rem;
-  border-radius: 0;
+  border-radius: 6px;
   width: fit-content;
   margin-left: auto;
   margin-right: auto;
@@ -185,7 +171,7 @@ select.preset-select {
   border: 1px solid rgba(255, 255, 255, 0.06);
   color: var(--text-main);
   padding: 0.4rem 1.75rem 0.4rem 0.65rem;
-  border-radius: 0;
+  border-radius: 6px;
   font-family: var(--font-sans);
   font-size: 0.825rem;
   cursor: pointer;
@@ -205,88 +191,49 @@ select.preset-select:focus {
   background-color: #0b0f1a;
 }
 
+/* Dashboard Grid Layout */
 .dashboard-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 0;
+  gap: 0.75rem;
 }
 
 @media (min-width: 1024px) {
   .dashboard-grid {
-    grid-template-columns: 425px 425px 1fr;
-    gap: 0;
+    grid-template-columns: 410px 1fr;
   }
 }
-
 
 /* Card Panels */
 .panel {
   background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 16px;
-  padding: 1.25rem;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  overflow: hidden;
-}
-
-.panel:hover {
-  border-color: var(--card-border-hover);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  border: none;
+  border-radius: 8px;
+  padding: 1rem;
+  backdrop-filter: blur(16px);
+  box-shadow: none;
+  transition: background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .panel-title {
   font-family: var(--font-display);
-  font-size: 0.95rem;
+  font-size: 1.15rem;
   font-weight: 600;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.85rem;
   display: flex;
   align-items: center;
-  gap: 0;
-  border-bottom: 1px solid var(--card-border);
-  padding-bottom: 0.45rem;
+  gap: 0.5rem;
+  border-bottom: none;
+  padding-bottom: 0.4rem;
   color: var(--text-main);
-  letter-spacing: 0em;
-  text-transform: none;
-}
-
-.form-section {
-  gap: 0;
-}
-
-.form-subsection-title {
-  color: var(--accent);
-  letter-spacing: 0.05em;
-  font-size: 0.85rem;
-  text-transform: uppercase;
-}
-
-button, input, select, textarea {
-  font-family: var(--font-sans);
-  font-size: 0.9rem;
-}
-
-button {
-  cursor: pointer;
-}
-
-input, select, textarea {
-  background: var(--input-bg);
-  color: var(--text-main);
-  border: 1px solid var(--input-border);
-  border-radius: 0;
-  padding: 0.4rem 0.6rem;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  letter-spacing: -0.01em;
 }
 
 /* Forms & Inputs styling */
 .form-section {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 0.55rem;
 }
 
 .form-subsection-title {
@@ -317,7 +264,6 @@ input, select, textarea {
 
 .input-group-full {
   grid-column: span 2;
-  margin-bottom: 0.75rem;
 }
 
 label {
@@ -328,29 +274,6 @@ label {
   justify-content: space-between;
   transition: color 0.2s;
   line-height: 1.1;
-}
-
-/* Alineación horizontal selectiva bajo demanda */
-.input-group-horizontal {
-  display: flex !important;
-  flex-direction: row !important;
-  align-items: center !important;
-  justify-content: space-between !important;
-  gap: 0.5rem !important;
-  min-height: 32px;
-}
-
-.input-group-horizontal label {
-  flex: 1 !important;
-  margin-bottom: 0 !important;
-  white-space: nowrap;
-}
-
-.input-group-horizontal .input-wrapper,
-.input-group-horizontal select,
-.input-group-horizontal input {
-  flex: 0 0 120px !important;
-  width: 120px !important;
 }
 
 .input-group:focus-within label {
@@ -378,8 +301,8 @@ select.input-select {
   border: 1px solid var(--input-border);
   color: var(--text-main);
   padding: 0.3rem 2rem 0.3rem 0.55rem;
-  border-radius: 0;
-  font-family: var(--font-mono);
+  border-radius: 4px;
+  font-family: var(--font-sans);
   font-size: 0.8rem;
   outline: none;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -419,11 +342,11 @@ select.input-select:focus {
 /* Error/Warnings Area */
 .notification-area {
   font-size: 0.8rem;
-  border-radius: 0;
+  border-radius: 6px;
   padding: 0.75rem 0.9rem;
   display: none;
   align-items: flex-start;
-  gap: 0;
+  gap: 0.5rem;
   margin-top: 0.85rem;
   line-height: 1.4;
 }
@@ -476,7 +399,7 @@ select.input-select:focus {
   align-items: center;
   justify-content: space-between;
   padding: 0.4rem 0.75rem;
-  border-radius: 0;
+  border-radius: 4px;
   font-weight: 500;
   font-size: 0.8rem;
   box-shadow: none;
@@ -505,7 +428,7 @@ select.input-select:focus {
 .tabs-header {
   display: flex;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  gap: 0;
+  gap: 0.35rem;
   margin-bottom: 0.85rem;
   overflow-x: auto;
 }
@@ -530,7 +453,7 @@ select.input-select:focus {
 .tab-btn:hover {
   color: var(--text-main);
   background: rgba(255, 255, 255, 0.03);
-  border-radius: 0;
+  border-radius: 6px 6px 0 0;
 }
 
 .tab-btn.active {
@@ -561,14 +484,14 @@ select.input-select:focus {
 .results-summary {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 0;
+  gap: 0.65rem;
   margin-bottom: 1rem;
 }
 
 .result-tile {
   background: rgba(10, 15, 30, 0.45);
   border: none;
-  border-radius: 0;
+  border-radius: 6px;
   padding: 0.65rem 0.85rem;
   display: flex;
   flex-direction: column;
@@ -591,7 +514,7 @@ select.input-select:focus {
 
 .result-tile-value {
   font-size: 1.45rem;
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
   font-weight: 700;
   color: var(--text-main);
   letter-spacing: -0.02em;
@@ -608,12 +531,12 @@ select.input-select:focus {
 .control-group {
   background: rgba(10, 15, 30, 0.4);
   border: none;
-  border-radius: 0;
+  border-radius: 6px;
   padding: 0.85rem;
   margin-bottom: 0.85rem;
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 0.85rem;
 }
 
 .control-title {
@@ -653,75 +576,36 @@ select.input-select:focus {
 input[type="range"] {
   appearance: none;
   width: 100%;
-  height: 14px;
-  border-radius: 7px;
-  background: linear-gradient(to bottom, #111419, #1c2027);
+  height: 5px;
+  border-radius: 3px;
+  background: #1e293b;
   outline: none;
   cursor: pointer;
-  box-shadow: 
-    inset 0 3px 6px rgba(0, 0, 0, 0.7),
-    0 1px 0 rgba(255, 255, 255, 0.05),
-    0 -1px 0 rgba(0, 0, 0, 0.6);
-  border: 1px solid #090a0c;
-  padding: 0 4px;
-  box-sizing: border-box;
+  transition: background 0.3s;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 32px;
+  width: 14px;
   height: 14px;
-  border-radius: 4px;
-  border: 1px solid #777c85;
-  background: 
-    repeating-linear-gradient(to right, transparent, transparent 3px, rgba(0, 0, 0, 0.22) 3px, rgba(0, 0, 0, 0.22) 4px, transparent 4px, transparent 6px) no-repeat center/14px 8px,
-    linear-gradient(to bottom, #ffffff 0%, #eaeaea 40%, #b8bcc2 50%, #d5d8dc 60%, #fcfcfc 100%);
-  box-shadow: 
-    0 3px 5px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.2);
-  transition: filter 0.15s;
+  border-radius: 50%;
+  background: #3b82f6;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  transition: transform 0.1s, background-color 0.1s;
 }
 
 input[type="range"]::-webkit-slider-thumb:hover {
-  filter: brightness(1.08);
+  transform: scale(1.2);
+  background: #60a5fa;
 }
-
-input[type="range"]::-moz-range-track {
-  background: linear-gradient(to bottom, #111419, #1c2027);
-  border: 1px solid #090a0c;
-  border-radius: 7px;
-  box-shadow: 
-    inset 0 3px 6px rgba(0, 0, 0, 0.7),
-    0 1px 0 rgba(255, 255, 255, 0.05),
-    0 -1px 0 rgba(0, 0, 0, 0.6);
-}
-
-input[type="range"]::-moz-range-thumb {
-  width: 32px;
-  height: 14px;
-  border-radius: 4px;
-  border: 1px solid #777c85;
-  background: 
-    linear-gradient(to bottom, #ffffff 0%, #eaeaea 40%, #b8bcc2 50%, #d5d8dc 60%, #fcfcfc 100%);
-  box-shadow: 
-    0 3px 5px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.2);
-  cursor: pointer;
-}
-
-input[type="range"]::-moz-range-thumb:hover {
-  filter: brightness(1.08);
-}
-
 
 /* Checkbox custom styled */
 .checkbox-container {
   display: flex;
   align-items: center;
-  gap: 0;
+  gap: 0.5rem;
   font-size: 0.8rem;
   cursor: pointer;
   user-select: none;
@@ -729,18 +613,14 @@ input[type="range"]::-moz-range-thumb:hover {
 }
 
 .checkbox-container input {
-  display: none !important;
-}
-
-.checkbox-container input[type="checkbox"]:not(.native-checkbox) {
-  display: none !important;
+  display: none;
 }
 
 .custom-checkbox {
   width: 16px;
   height: 16px;
   border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 0;
+  border-radius: 4px;
   background: var(--input-bg);
   display: flex;
   align-items: center;
@@ -772,12 +652,12 @@ input[type="range"]::-moz-range-thumb:hover {
 .pro-calc-panel {
   background: rgba(59, 130, 246, 0.03);
   border: none;
-  border-radius: 0;
+  border-radius: 6px;
   padding: 0.85rem;
   margin-top: 0.85rem;
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 0.55rem;
 }
 
 .pro-calc-title {
@@ -806,16 +686,15 @@ input[type="range"]::-moz-range-thumb:hover {
 .pro-calc-value {
   font-weight: 600;
   color: var(--text-main);
-  font-family: var(--font-mono);
 }
 
 /* Alert Box */
 .alert-box {
   display: flex;
   align-items: flex-start;
-  gap: 0;
+  gap: 0.65rem;
   padding: 0.65rem 0.85rem;
-  border-radius: 0;
+  border-radius: 6px;
   font-size: 0.8rem;
   line-height: 1.45;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
@@ -849,27 +728,27 @@ input[type="range"]::-moz-range-thumb:hover {
 .wood-layout {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 1.25rem;
 }
 
 .wood-grid-controls {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 0;
+  gap: 0.85rem;
   background: rgba(10, 15, 30, 0.4);
   border: none;
   padding: 0.65rem;
-  border-radius: 0;
+  border-radius: 6px;
 }
 
 /* Wood mode selector */
 .wood-mode-selector-container {
   display: flex;
-  gap: 0;
+  gap: 0.35rem;
   margin-bottom: 0.35rem;
   background: rgba(10, 15, 30, 0.65);
   padding: 0.3rem;
-  border-radius: 0;
+  border-radius: 6px;
   border: none;
 }
 
@@ -882,7 +761,7 @@ input[type="range"]::-moz-range-thumb:hover {
   font-family: var(--font-display);
   font-weight: 600;
   font-size: 0.825rem;
-  border-radius: 0;
+  border-radius: 4px;
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -898,7 +777,7 @@ input[type="range"]::-moz-range-thumb:hover {
   border-collapse: collapse;
   font-size: 0.825rem;
   background: rgba(10, 15, 30, 0.4);
-  border-radius: 0;
+  border-radius: 6px;
   overflow: hidden;
   border: none;
 }
@@ -917,7 +796,6 @@ input[type="range"]::-moz-range-thumb:hover {
   padding: 0.65rem 0.85rem;
   border-top: 1px solid rgba(255, 255, 255, 0.04);
   color: var(--text-main);
-  font-family: var(--font-mono);
 }
 
 .wood-table tr:hover {
@@ -937,7 +815,7 @@ input[type="range"]::-moz-range-thumb:hover {
   background: rgba(10, 15, 30, 0.45);
   border: none;
   padding: 0.85rem;
-  border-radius: 0;
+  border-radius: 6px;
   margin-top: 1rem;
   line-height: 1.55;
 }
@@ -970,11 +848,11 @@ input[type="range"]::-moz-range-thumb:hover {
   right: 1.5rem;
   display: flex;
   align-items: center;
-  gap: 0;
+  gap: 0.65rem;
   background: rgba(10, 15, 30, 0.7);
   border: none;
   padding: 0.25rem 0.5rem;
-  border-radius: 0;
+  border-radius: 6px;
   backdrop-filter: blur(12px);
   box-shadow: none;
   z-index: 1000;
@@ -998,7 +876,7 @@ input[type="range"]::-moz-range-thumb:hover {
   align-items: center;
   justify-content: center;
   padding: 0.35rem;
-  border-radius: 0;
+  border-radius: 4px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -1030,7 +908,7 @@ input[type="range"]::-moz-range-thumb:hover {
   font-size: 0.7rem;
   font-weight: 700;
   padding: 0.25rem 0.5rem;
-  border-radius: 0;
+  border-radius: 4px;
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   font-family: var(--font-sans);
@@ -1293,7 +1171,7 @@ html[data-theme="light"] .tab-btn:hover {
   font-weight: 500;
   display: flex;
   align-items: center;
-  gap: 0;
+  gap: 0.5rem;
 }
 
 html[data-theme="light"] .search-dropdown {
@@ -1317,29 +1195,28 @@ html[data-theme="light"] .search-item.active {
 /* Segmented Control tabs inside driver panel */
 .driver-tabs {
   display: flex;
-  background: transparent;
-  border: 1px solid var(--card-border);
-  border-radius: 0;
-  padding: 0;
-  gap: 0;
-  margin-bottom: 1rem;
+  background: rgba(10, 15, 30, 0.55);
+  border: 1px solid var(--card-border, rgba(255, 255, 255, 0.08));
+  border-radius: 8px;
+  padding: 4px;
+  gap: 4px;
+  margin-bottom: 1.25rem;
   position: relative;
-  box-shadow: none;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .driver-tab {
   flex: 1;
-  padding: 0.55rem 1rem;
+  padding: 9px 16px;
   text-align: center;
-  font-size: 0.8rem;
-  font-weight: 500;
+  font-size: 0.85rem;
+  font-weight: 600;
   cursor: pointer;
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--text-muted, #94a3b8);
   border: none;
-  border-right: 1px solid var(--card-border);
-  border-radius: 0;
-  transition: all 0.15s ease;
+  border-radius: 6px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   outline: none;
   display: flex;
   align-items: center;
@@ -1350,119 +1227,71 @@ html[data-theme="light"] .search-item.active {
   user-select: none;
 }
 
-.driver-tab:last-child {
-  border-right: none;
-}
-
+/* Micro-interacción al presionar click (haptic feedback visual) */
 .driver-tab:active {
-  transform: none;
+  transform: scale(0.97);
 }
 
 .driver-tab:hover {
-  color: var(--text-main);
-  background: var(--bg-tertiary);
+  color: var(--text-main, #f8fafc);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .driver-tab.active {
-  background: var(--primary);
+  background: var(--primary-gradient, linear-gradient(135deg, #2563eb, #3b82f6));
   color: #ffffff;
-  box-shadow: none;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3), 0 1px 3px rgba(0, 0, 0, 0.2);
 }
-
 
 /* Tema Claro */
-/* --- Light Theme --- */
-html[data-theme="light"] :root {
-  --bg-main: #ffffff;
-  --bg-secondary: #f5f5f5;
-  --bg-tertiary: #eeeeee;
-  --card-bg: #ffffff;
-  --card-border: #d0d0d0;
-  --card-border-hover: #b0b0b0;
-
-  --text-main: #333333;
-  --text-muted: #666666;
-  --text-secondary: #777777;
-
-  --scrollbar-thumb: rgba(174, 200, 219, 0.34);
-  --scrollbar-thumb-hover: rgba(66, 121, 163, 0.502);
+html[data-theme="light"] .driver-tabs {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
-html[data-theme="light"] body {
-  background: #f5f5f5;
+html[data-theme="light"] .driver-tab {
+  color: #64748b;
 }
 
-html[data-theme="light"] .top-navbar {
-  background: #f5f5f5;
-  border-bottom-color: #d0d0d0;
+html[data-theme="light"] .driver-tab:hover {
+  color: #0f172a;
+  background: rgba(0, 0, 0, 0.03);
 }
 
-html[data-theme="light"] .panel {
-  border-color: #d0d0d0;
-}
-
-html[data-theme="light"] input,
-html[data-theme="light"] select,
-html[data-theme="light"] textarea {
-  background: #f9f9f9;
-  border-color: #d0d0d0;
-  color: #333333;
-}
-
-html[data-theme="light"] input:focus,
-html[data-theme="light"] select:focus,
-html[data-theme="light"] textarea:focus {
-  border-color: var(--input-focus);
-}
-/* --- ESTILO APLICACIÓN DE ESCRITORIO NATIVA --- */
+html[data-theme="light"] .driver-tab.active {
+  background: #ffffff;
+  color: var(--primary, #3b82f6);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.02);
+}/* --- ESTILO APLICACIÓN DE ESCRITORIO UNIFICADO (DESKTOP APP STYLE) --- */
 .top-navbar {
   display: flex;
   align-items: center;
-  padding: 0.6rem 1rem;
-  background: var(--bg-secondary);
-  border: none;
-  border-bottom: 1px solid var(--card-border);
-  border-radius: 0;
-  backdrop-filter: none;
+  padding: 0;
+  background: rgba(10, 15, 30, 0.6);
+  border-bottom: none;
+  backdrop-filter: blur(12px);
   margin-bottom: 0;
+  border-radius: 0;
   width: 100%;
-  gap: 1rem;
+  gap: 0;
   position: relative;
   z-index: 10000;
-  box-shadow: none;
 }
 
 .logo-area-nav {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0;
-}
-
-.logo-mark {
-  width: 1.6rem;
-  height: 1.6rem;
-  display: grid;
-  place-items: center;
-  border-radius: 0;
-  background: var(--primary);
-  color: white;
-  box-shadow: none;
-  font-size: 0.85rem;
-  font-weight: 700;
-  border: 1px solid var(--input-border);
-}
-
-.logo-badge {
-  display: none;
+  gap: 0.5rem;
+  padding: 0.2rem 0.6rem;
 }
 
 .logo-area-nav h1 {
   font-size: 0.85rem;
-  font-weight: 600;
+  font-weight: 700;
   margin-bottom: 0;
   line-height: 1;
-  color: var(--text-main);
 }
 
 /* --- Desktop Menu Bar --- */
@@ -1480,13 +1309,13 @@ html[data-theme="light"] textarea:focus {
 .desktop-menu-trigger {
   background: none;
   border: none;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-family: var(--font-sans);
   font-size: 0.75rem;
   font-weight: 500;
   padding: 0.3rem 0.6rem;
   cursor: pointer;
-  transition: color 0.15s ease;
+  transition: all 0.15s ease;
   border-radius: 0;
   outline: none;
   user-select: none;
@@ -1494,7 +1323,7 @@ html[data-theme="light"] textarea:focus {
 
 .desktop-menu-trigger:hover,
 .desktop-menu-trigger.active {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.08);
   color: var(--text-main);
 }
 
@@ -1503,13 +1332,13 @@ html[data-theme="light"] textarea:focus {
   top: 100%;
   left: 0;
   min-width: 220px;
-  background: var(--card-bg);
-  backdrop-filter: none;
-  border: 1px solid var(--card-border);
+  background: var(--input-bg);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--input-border);
   border-radius: 0;
-  padding: 0;
+  padding: 4px 0;
   z-index: 9999;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+  box-shadow: none;
   animation: menuFadeIn 0.12s ease-out;
 }
 
@@ -1527,7 +1356,7 @@ html[data-theme="light"] textarea:focus {
 .desktop-menu-option {
   display: flex;
   align-items: center;
-  gap: 0;
+  gap: 0.5rem;
   width: 100%;
   background: none;
   border: none;
@@ -1544,7 +1373,8 @@ html[data-theme="light"] textarea:focus {
 }
 
 .desktop-menu-option:hover {
-  background: var(--input-bg);
+  background: var(--primary);
+  color: #ffffff;
 }
 
 .desktop-menu-option .menu-check {
@@ -1555,17 +1385,25 @@ html[data-theme="light"] textarea:focus {
   color: var(--primary);
 }
 
+.desktop-menu-option:hover .menu-check {
+  color: #ffffff;
+}
+
 .desktop-menu-option .menu-shortcut {
   margin-left: auto;
   font-size: 0.65rem;
-  opacity: 0.6;
+  opacity: 0.5;
   font-weight: 400;
+}
+
+.desktop-menu-option:hover .menu-shortcut {
+  opacity: 0.8;
 }
 
 .desktop-menu-label {
   font-size: 0.65rem;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   padding: 0.35rem 0.75rem 0.15rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -1574,10 +1412,9 @@ html[data-theme="light"] textarea:focus {
 
 .desktop-menu-separator {
   height: 1px;
-  background: var(--card-border);
+  background: rgba(255, 255, 255, 0.08);
   margin: 4px 0;
 }
-
 
 /* Remove old navbar-controls and nav-subtitle since they're no longer used */
 .navbar-controls,
@@ -1618,7 +1455,7 @@ html[data-theme="light"] .desktop-menu-separator {
 .navbar-controls {
   display: flex;
   align-items: center;
-  gap: 0;
+  gap: 0.5rem;
 }
 
 @media (min-width: 1024px) {
@@ -1629,7 +1466,8 @@ html[data-theme="light"] .desktop-menu-separator {
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    background: var(--bg-main);
+    background: #090d16;
+    background-image: none;
   }
 
   .container {
@@ -1645,8 +1483,8 @@ html[data-theme="light"] .desktop-menu-separator {
   .top-navbar {
     border-radius: 0;
     margin-bottom: 0;
-    background: var(--bg-secondary);
-    border-bottom: 1px solid var(--card-border);
+    background: #0d1321;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   }
 
   .dashboard-grid {
@@ -1654,48 +1492,47 @@ html[data-theme="light"] .desktop-menu-separator {
     min-height: 0;
     overflow: hidden;
     gap: 0;
+    grid-template-columns: 395px 395px 1fr;
+    height: 100%;
   }
 
-  .font-unified-form:nth-child(1) aside.panel,
-  .font-unified-form:nth-child(2) aside.panel {
-    height: 100%;
-    overflow-y: auto;
-    padding: 0.75rem 0.75rem;
-    background: var(--bg-secondary);
-    border-right: 1px solid var(--card-border);
+  .panel {
     border-radius: 0;
   }
 
-  .font-unified-form:nth-child(2) aside.panel {
-    background: var(--bg-main);
+  .dashboard-grid > aside.panel {
+    height: 100%;
+    overflow-y: auto;
+    padding: 1.25rem 1rem;
+    background: #0d1321;
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
   }
 
   .dashboard-main {
     height: 100%;
     overflow-y: auto;
-    padding: 0;
-    background: var(--bg-main);
+    padding: 0px;
+    background: #090d16;
   }
 
   .dashboard-main .panel {
-    padding: 0 !important;
-    border-radius: 0;
-    border: none;
+    padding: 0px !important;
+    border-radius: 0px;
   }
-
+  
   /* Ajustar scrollbar sutil de los paneles */
-  .font-unified-form aside.panel::-webkit-scrollbar,
+  .dashboard-grid > aside.panel::-webkit-scrollbar,
   .dashboard-main::-webkit-scrollbar {
     width: 5px;
   }
-  .font-unified-form aside.panel::-webkit-scrollbar-thumb,
+  .dashboard-grid > aside.panel::-webkit-scrollbar-thumb,
   .dashboard-main::-webkit-scrollbar-thumb {
-    background: var(--scrollbar-thumb);
-    border-radius: 0;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
   }
-  .font-unified-form aside.panel::-webkit-scrollbar-thumb:hover,
+  .dashboard-grid > aside.panel::-webkit-scrollbar-thumb:hover,
   .dashboard-main::-webkit-scrollbar-thumb:hover {
-    background: var(--scrollbar-thumb-hover);
+    background: rgba(255, 255, 255, 0.15);
   }
 }
 
@@ -1714,20 +1551,26 @@ html[data-theme="light"] ::-webkit-scrollbar-track {
   background: transparent;
 }
 
+html[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+html[data-theme="light"] .dashboard-grid > aside.panel::-webkit-scrollbar-thumb,
+html[data-theme="light"] .dashboard-main::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+html[data-theme="light"] .dashboard-grid > aside.panel::-webkit-scrollbar-thumb:hover,
+html[data-theme="light"] .dashboard-main::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
 
 /* Modo Claro Desktop - Sin gaps grises y fondos uniformes */
 @media (min-width: 1024px) {
-  .container {
-    padding: 0.85rem;
-  }
-
-  .dashboard-grid {
-    gap: 1rem;
-  }
-
-  .panel {
-    border-radius: 0;
-  }
   html[data-theme="light"] body {
     background: #f8fafc;
     background-image: none;
@@ -1738,7 +1581,7 @@ html[data-theme="light"] ::-webkit-scrollbar-track {
     border-bottom: 1px solid #e2e8f0;
   }
 
-  html[data-theme="light"] .font-unified-form aside.panel {
+  html[data-theme="light"] .dashboard-grid > aside.panel {
     background: #ffffff;
     border-right: 1px solid #e2e8f0;
   }
@@ -1757,7 +1600,7 @@ html[data-theme="light"] ::-webkit-scrollbar-track {
   display: flex;
   background: rgba(15, 23, 42, 0.45);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 0;
+  border-radius: 12px;
   padding: 3px;
   gap: 3px;
   position: relative;
@@ -1767,31 +1610,26 @@ html[data-theme="light"] ::-webkit-scrollbar-track {
 .segmented-control button {
   flex: 1;
   padding: 0.55rem 0.35rem;
-  border-radius: 0;
+  border-radius: 9px;
   font-size: 0.76rem;
   font-weight: 600;
   cursor: pointer;
   border: none;
-  border-right: 1px solid var(--card-border);
   background: transparent;
-  color: var(--text-secondary);
-  transition: all 0.15s ease;
-  text-shadow: none;
-}
-
-.segmented-control button:last-child {
-  border-right: none;
+  color: var(--text-muted);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .segmented-control button:hover {
   color: var(--text-main);
-  background: var(--bg-tertiary);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .segmented-control button.active {
-  background: var(--primary);
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
   color: #ffffff;
-  box-shadow: none;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
 /* Light theme support */
@@ -1816,32 +1654,21 @@ html[data-theme="light"] .segmented-control button.active {
   box-shadow: 0 3px 8px rgba(59, 130, 246, 0.2);
 }
 
-/* Premium Segmented Control Switcher */
-.segmented-control {
-  display: flex;
-  background: transparent;
-  border: 1px solid var(--card-border);
-  border-radius: 0;
-  padding: 0;
-  gap: 0;
-  position: relative;
-  box-shadow: none;
-}
-
+/* Sub-tabs header capsule style */
 .sub-tabs-header {
   display: flex;
-  background: rgba(15, 23, 42, 0.45);
+  background: rgba(15, 23, 42, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 0;
+  border-radius: 10px;
   padding: 2px;
   gap: 2px;
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
 }
 
 .sub-tabs-header button {
   flex: 1;
   padding: 0.45rem 0.25rem;
-  border-radius: 0;
+  border-radius: 8px;
   font-size: 0.74rem;
   font-weight: 600;
   cursor: pointer;
@@ -1855,9 +1682,21 @@ html[data-theme="light"] .segmented-control button.active {
   color: var(--text-main);
 }
 
+.sub-tabs-header button.active {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
+}
+
 html[data-theme="light"] .sub-tabs-header {
   background: rgba(241, 245, 249, 0.6);
   border-color: rgba(0, 0, 0, 0.04);
+}
+
+html[data-theme="light"] .sub-tabs-header button.active {
+  background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+  color: #ffffff !important;
+  box-shadow: 0 3px 8px rgba(59, 130, 246, 0.2) !important;
 }
 
 /* Premium EBP Badge Cards */
@@ -1865,9 +1704,9 @@ html[data-theme="light"] .sub-tabs-header {
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 0;
+  gap: 0.75rem;
   padding: 0.5rem 0.85rem;
-  border-radius: 0;
+  border-radius: 10px;
   margin-bottom: 1.25rem;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   background: rgba(13, 19, 33, 0.45);
@@ -1922,7 +1761,7 @@ html[data-theme="light"] .ebp-badge-card.ebp-normal {
 .premium-form-card {
   background: transparent;
   border: none;
-  border-radius: 0;
+  border-radius: 0px;
   padding: 0px;
   margin-bottom: 0.75rem;
   transition: none;
@@ -1953,7 +1792,7 @@ html[data-theme="light"] .premium-form-card:hover {
   padding: 0.55rem 1rem;
   font-size: 0.78rem;
   font-weight: 600;
-  border-radius: 0;
+  border-radius: 8px;
   cursor: pointer;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.03);
@@ -1992,707 +1831,85 @@ html[data-theme="light"] .premium-panel-btn.active-primary {
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
 }
 
-/* Unificación global de tamaño de texto al mismo nivel que SpeakerParamsForm */
-.font-unified-form input[type="number"],
-.font-unified-form input[type="text"],
-.font-unified-form select,
-.font-unified-form .input-wrapper input,
-.font-unified-form .input-group input,
-.font-unified-form select.input-select {
-  font-size: 0.8rem !important;
-}
-
-.font-unified-form label,
-.font-unified-form .input-group label {
-  font-size: 11px !important;
-}
-
-.font-unified-form .unit-badge {
-  font-size: 0.72rem !important;
-}
-
-.font-unified-form .form-subsection-title {
-  font-size: 12px !important;
-}
-
-/* Quitar mayúsculas forzadas en toda la interfaz */
-.control-title,
-.form-subsection-title,
-.result-tile-label,
-.pro-calc-title,
-.preset-label,
-.driver-menu-links button,
-.panel-title {
-  text-transform: none !important;
-}
-
-/* Forzar que todos los botones y controles segmentados tengan bordes rectos y el estilo metálico 3D (excepto interruptores y perillas redondas) */
-button,
-.segmented-control,
-.segmented-control button,
-.premium-panel-btn,
-.calc-btn,
-.preset-btn,
-.driver-btn,
-.tab-btn,
-.wood-mode-btn,
-.btn {
-  border-radius: 0 !important;
-}
-
 /* ==========================================================================
-   ESTILO DE CONTROLES SEGMENTADOS COMO DESLIZADORES INDUSTRIALES (FADERS)
+   DISEÑOS Y DIAGRAMAS PREMIUM (CABINET Y CROSSOVER)
    ========================================================================== */
 
-/* Contenedor de control segmentado (Pista/Canal del Fader) */
-.segmented-control {
-  position: relative !important;
-  display: flex !important;
-  background: linear-gradient(to bottom, #090b0e, #14171f) !important;
-  border: 1px solid #2a313e !important;
-  border-radius: 4px !important;
-  padding: 1px !important;
-  gap: 4px !important;
-  box-shadow: 
-    inset 0 2px 4px rgba(0, 0, 0, 0.85), 
-    0 1px 0 rgba(255, 255, 255, 0.05) !important;
-  align-items: center !important;
-  overflow: visible !important;
-  height: 20px !important;
+/* Efectos visuales de circuitos del Crossover */
+svg line, svg path, svg circle {
+  transition: stroke 0.3s ease, fill 0.3s ease, stroke-width 0.2s ease;
 }
 
-/* La ranura metálica central del fader (QUITADA) */
-.segmented-control::before {
-  display: none !important;
+/* Entrada de Señal Común (Polo Positivo Inicial de la Amplificación) */
+svg line[x1="60"][y1="60"][stroke="#ef4444"],
+svg line[x1="60"][y1="270"][stroke="#ef4444"],
+svg line[x1="110"][y1="60"][stroke="#ef4444"],
+svg line[x1="110"][y1="480"][stroke="#ef4444"] {
+  stroke: #f43f5e !important; /* Rojo Coral Premium */
 }
 
-/* Opciones/Botones inactivos (Serigrafiados en el panel) */
-.segmented-control button:not(.active) {
-  position: relative !important;
-  z-index: 1 !important;
-  flex: 1 !important;
-  height: 100% !important;
-  background: transparent !important;
-  border: none !important;
-  color: #64748b !important;
-  font-family: var(--font-sans), sans-serif !important;
-  font-size: 0.7rem !important;
-  font-weight: 700 !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.05em !important;
-  box-shadow: none !important;
-  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.6) !important;
-  transition: color 0.15s ease !important;
-  cursor: pointer !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  padding: 0 !important;
+/* Vía de Agudos (High Pass - parte superior del circuito y componentes) */
+svg line[y1="60"][stroke="#ef4444"]:not([x1="60"]),
+svg line[y2="60"][stroke="#ef4444"]:not([x1="60"]),
+svg line[x1="120"][stroke="#ef4444"],
+svg line[x1="160"][stroke="#ef4444"],
+svg line[x1="200"][y1="60"][stroke="#ef4444"],
+svg line[x1="310"][stroke="#ef4444"],
+svg line[x1="350"][stroke="#ef4444"],
+svg line[x1="390"][stroke="#ef4444"],
+svg line[x1="510"][stroke="#ef4444"],
+svg line[x1="560"][stroke="#ef4444"],
+svg line[x1="245"][stroke="#ef4444"],
+svg line[x1="260"][stroke="#ef4444"],
+svg line[x1="190"][stroke="#ef4444"],
+svg line[x1="205"][stroke="#ef4444"],
+svg line[x1="310"][stroke="#ef4444"],
+svg path[d*="Q 175"][stroke="currentColor"], /* Inductores High Pass */
+svg path[d*="Q 335"][stroke="currentColor"] {
+  stroke: #38bdf8 !important; /* Celeste Agudos */
 }
 
-.segmented-control button:not(.active):hover {
-  color: #cbd5e1 !important;
-  text-shadow: 0 0 3px rgba(255, 255, 255, 0.25) !important;
-  background: transparent !important;
+/* Vía de Graves (Low Pass - parte inferior del circuito y componentes) */
+svg line[y1="270"][stroke="#ef4444"]:not([x1="60"]),
+svg line[y2="270"][stroke="#ef4444"]:not([x1="60"]),
+svg line[y1="480"][stroke="#ef4444"]:not([x1="110"]),
+svg line[y2="480"][stroke="#ef4444"]:not([x1="110"]),
+svg line[x1="140"][stroke="#ef4444"],
+svg line[x1="236"][stroke="#ef4444"],
+svg line[x1="250"][stroke="#ef4444"],
+svg line[x1="330"][stroke="#ef4444"],
+svg line[x1="426"][stroke="#ef4444"],
+svg line[x1="460"][stroke="#ef4444"],
+svg line[x1="540"][stroke="#ef4444"],
+svg line[x1="340"][stroke="#ef4444"],
+svg path[d*="270"][stroke="#ef4444"], /* Inductores en serie Graves */
+svg path[d*="330"][stroke="#ef4444"],
+svg path[d*="480"][stroke="#ef4444"] {
+  stroke: #10b981 !important; /* Verde Graves */
 }
 
-/* Perilla Deslizante Activa (Fader Cap) - Similar al thumb del range slider de volumen */
-.segmented-control button.active {
-  position: relative !important;
-  z-index: 2 !important;
-  flex: 1 !important;
-  height: 20px !important;
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-  background: 
-    repeating-linear-gradient(to right, transparent, transparent 3px, rgba(0, 0, 0, 0.28) 3px, rgba(0, 0, 0, 0.28) 4px, transparent 4px, transparent 6px) no-repeat center/14px 8px,
-    linear-gradient(to bottom, #ffffff 0%, #eaeaea 40%, #b8bcc2 50%, #d5d8dc 60%, #fcfcfc 100%) !important;
-  color: #0f172a !important; /* Texto oscuro sobre la perilla de metal */
-  font-family: var(--font-sans), sans-serif !important;
-  font-size: 0.7rem !important;
-  font-weight: 800 !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.05em !important;
-  border: 1px solid #5a5f69 !important;
-  border-radius: 3px !important;
-  box-shadow: 
-    0 3px 5px rgba(0, 0, 0, 0.5), 
-    0 1px 2px rgba(0, 0, 0, 0.3), 
-    inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.25) !important;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  padding: 0 !important;
-  cursor: pointer !important;
+/* Vía de Medios (Band Pass - de 3 Vías) */
+svg line[y1="260"][stroke="#ef4444"],
+svg line[y2="260"][stroke="#ef4444"],
+svg line[x1="110"][y1="260"][stroke="#ef4444"],
+svg line[x1="260"][stroke="#ef4444"],
+svg path[d*="260"][stroke="currentColor"] {
+  stroke: #f59e0b !important; /* Ámbar Medios */
 }
 
-/* Línea indicadora central (QUITADA) */
-.segmented-control button.active::after {
-  display: none !important;
+/* Nodos y conexiones de unión */
+svg circle[fill="#ef4444"] {
+  fill: var(--accent) !important;
 }
 
-.segmented-control button.active:hover {
-  filter: brightness(1.05) !important;
+/* Mejoras en el texto de los diagramas */
+svg text {
+  font-family: var(--font-title);
+  letter-spacing: -0.01em;
 }
 
-
-/* ==========================================================================
-   ESTILO DE PESTAÑAS DE CONTROL SECUNDARIAS (SUB TABS FADERS)
-   ========================================================================== */
-
-.sub-tabs-header {
-  position: relative !important;
-  display: flex !important;
-  background: linear-gradient(to bottom, #090b0e, #14171f) !important;
-  border: 1px solid #2a313e !important;
-  border-radius: 4px !important;
-  padding: 1px !important;
-  gap: 4px !important;
-  box-shadow: 
-    inset 0 2px 4px rgba(0, 0, 0, 0.85), 
-    0 1px 0 rgba(255, 255, 255, 0.05) !important;
-  align-items: center !important;
-  overflow: visible !important;
-  height: 20px !important;
+/* Animaciones sutiles al interactuar con el circuito */
+svg line:hover, svg path:hover {
+  stroke-width: 5.5px !important;
 }
-
-/* Ranura del sub-tab (QUITADA) */
-.sub-tabs-header::before {
-  display: none !important;
-}
-
-.sub-tabs-header button:not(.active) {
-  position: relative !important;
-  z-index: 1 !important;
-  flex: 1 !important;
-  height: 100% !important;
-  background: transparent !important;
-  border: none !important;
-  color: #64748b !important;
-  font-family: var(--font-sans), sans-serif !important;
-  font-size: 0.7rem !important;
-  font-weight: 700 !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.05em !important;
-  box-shadow: none !important;
-  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.6) !important;
-  transition: color 0.15s ease !important;
-  cursor: pointer !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  padding: 0 !important;
-}
-
-.sub-tabs-header button:not(.active):hover {
-  color: #cbd5e1 !important;
-  text-shadow: 0 0 3px rgba(255, 255, 255, 0.25) !important;
-}
-
-.sub-tabs-header button.active {
-  position: relative !important;
-  z-index: 2 !important;
-  flex: 1 !important;
-  height: 20px !important;
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-  background: 
-    repeating-linear-gradient(to right, transparent, transparent 3px, rgba(0, 0, 0, 0.28) 3px, rgba(0, 0, 0, 0.28) 4px, transparent 4px, transparent 6px) no-repeat center/14px 8px,
-    linear-gradient(to bottom, #ffffff 0%, #eaeaea 40%, #b8bcc2 50%, #d5d8dc 60%, #fcfcfc 100%) !important;
-  color: #0f172a !important;
-  font-family: var(--font-sans), sans-serif !important;
-  font-size: 0.7rem !important;
-  font-weight: 800 !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.05em !important;
-  border: 1px solid #5a5f69 !important;
-  border-radius: 3px !important;
-  box-shadow: 
-    0 3px 5px rgba(0, 0, 0, 0.5), 
-    0 1px 2px rgba(0, 0, 0, 0.3), 
-    inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.25) !important;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  padding: 0 !important;
-  cursor: pointer !important;
-}
-
-/* Línea indicadora (QUITADA) */
-.sub-tabs-header button.active::after {
-  display: none !important;
-}
-
-.sub-tabs-header button.active:hover {
-  filter: brightness(1.05) !important;
-}
-
-
-/* ==========================================================================
-   ESTILO DE INTERRUPTORES DESLIZANTES (CHECKBOXES COMO DIALES)
-   ========================================================================== */
-
-/* Aplicable a inputs de tipo checkbox y a .custom-checkbox */
-input[type="checkbox"]:not(.native-checkbox),
-.custom-checkbox {
-  appearance: none !important;
-  -webkit-appearance: none !important;
-  width: 38px !important;
-  height: 18px !important;
-  border: 1px solid #2a313e !important;
-  border-radius: 9px !important; /* Forma de píldora para la pista */
-  background: #0d0f14 !important;
-  position: relative !important;
-  outline: none !important;
-  cursor: pointer !important;
-  transition: all 0.25s ease !important;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.7) !important;
-  display: inline-block !important;
-  vertical-align: middle !important;
-  margin: 0 !important;
-}
-
-/* Perilla circular deslizante */
-input[type="checkbox"]:not(.native-checkbox)::before,
-.custom-checkbox::before {
-  content: '' !important;
-  position: absolute !important;
-  top: 1px !important;
-  left: 1px !important;
-  width: 14px !important;
-  height: 14px !important;
-  border-radius: 50% !important;
-  background: linear-gradient(180deg, #94a3b8 0%, #475569 100%) !important;
-  border: 1px solid #1e293b !important;
-  box-shadow: 
-    0 2px 4px rgba(0,0,0,0.5),
-    inset 0 1px 0 rgba(255,255,255,0.2) !important;
-  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s ease !important;
-  display: block !important;
-}
-
-/* Desactivar checkmarks */
-.custom-checkbox::after {
-  display: none !important;
-}
-
-/* Estado de encendido (Desliza a la derecha y enciende LED) */
-input[type="checkbox"]:checked,
-.checkbox-container input:checked + .custom-checkbox {
-  background: #092c1a !important; /* Fondo verde oscuro */
-  border-color: #1b5335 !important;
-}
-
-input[type="checkbox"]:checked::before,
-.checkbox-container input:checked + .custom-checkbox::before {
-  transform: translateX(20px) !important;
-  background: linear-gradient(180deg, #10b981 0%, #047857 100%) !important;
-  border-color: #065f46 !important;
-  box-shadow: 
-    0 2px 4px rgba(0,0,0,0.5),
-    0 0 8px rgba(16, 185, 129, 0.6),
-    inset 0 1px 0 rgba(255,255,255,0.35) !important;
-}
-
-
-/* ==========================================================================
-   ESTILO DE BOTONES PREMIUM CON INDICADOR LED (PANEL SELECTIONS)
-   ========================================================================== */
-
-.premium-panel-btn {
-  position: relative !important;
-  height: 20px !important;
-  padding: 0 0.85rem 0 2.2rem !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: flex-start !important;
-  font-size: 0.7rem !important;
-  text-align: left !important;
-  background: linear-gradient(to bottom, #232733, #151821) !important;
-  border: 1px solid #13151c !important;
-  border-top: 1px solid #3d4558 !important;
-  border-bottom: 2px solid #08090d !important;
-  color: #a0aec0 !important;
-  box-shadow: 
-    0 1px 3px rgba(0,0,0,0.35),
-    inset 0 1px 0 rgba(255,255,255,0.05) !important;
-  transition: all 0.15s ease !important;
-  border-radius: 3px !important;
-}
-
-.premium-panel-btn:hover {
-  background: linear-gradient(to bottom, #2d3241, #1b1e29) !important;
-  color: #ffffff !important;
-}
-
-/* LED de estado del botón (apagado) */
-.premium-panel-btn::before {
-  content: '' !important;
-  position: absolute !important;
-  left: 12px !important;
-  top: 50% !important;
-  transform: translateY(-50%) !important;
-  width: 8px !important;
-  height: 8px !important;
-  border-radius: 50% !important;
-  background: #3e1b1b !important; /* LED rojo apagado */
-  border: 1px solid #1b0a0a !important;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.8) !important;
-  transition: all 0.15s ease !important;
-  display: block !important;
-}
-
-/* Botón presionado (activo) y LED encendido */
-.premium-panel-btn.active-primary,
-.premium-panel-btn.active {
-  background: linear-gradient(to bottom, #161821, #0c0e14) !important;
-  border: 1px solid #0a0b10 !important;
-  border-top: 1px solid #0a0b10 !important;
-  border-bottom: 1px solid #1c202b !important;
-  color: #ffffff !important;
-  box-shadow: 
-    inset 0 2px 4px rgba(0, 0, 0, 0.75),
-    0 1px 0 rgba(255, 255, 255, 0.05) !important;
-  transform: translateY(1px) !important;
-}
-
-.premium-panel-btn.active-primary::before,
-.premium-panel-btn.active::before {
-  background: #ff5722 !important; /* LED naranja brillante */
-  border-color: #ffa485 !important;
-  box-shadow: 
-    0 0 8px #ff5722,
-    0 0 15px rgba(255, 87, 34, 0.5),
-    inset 0 1px 1px #ffffff !important;
-}
-
-
-/* ==========================================================================
-   SOPORTE DE TEMA CLARO PARA LOS CONTROLES INDUSTRIALES
-   ========================================================================== */
-
-html[data-theme="light"] .segmented-control,
-html[data-theme="light"] .sub-tabs-header {
-  background: linear-gradient(to bottom, #cbd5e1, #e2e8f0) !important;
-  border-color: #94a3b8 !important;
-  box-shadow: 
-    inset 0 2px 4px rgba(0, 0, 0, 0.18), 
-    0 1px 0 rgba(255, 255, 255, 0.85) !important;
-}
-
-/* Ranuras en tema claro (QUITADAS) */
-html[data-theme="light"] .segmented-control::before,
-html[data-theme="light"] .sub-tabs-header::before {
-  display: none !important;
-}
-
-html[data-theme="light"] .segmented-control button:not(.active),
-html[data-theme="light"] .sub-tabs-header button:not(.active) {
-  color: #475569 !important;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.75) !important;
-}
-
-html[data-theme="light"] .segmented-control button:not(.active):hover,
-html[data-theme="light"] .sub-tabs-header button:not(.active):hover {
-  color: #0f172a !important;
-}
-
-html[data-theme="light"] .segmented-control button.active,
-html[data-theme="light"] .sub-tabs-header button.active {
-  background: 
-    repeating-linear-gradient(to right, transparent, transparent 3px, rgba(0, 0, 0, 0.15) 3px, rgba(0, 0, 0, 0.15) 4px, transparent 4px, transparent 6px) no-repeat center/14px 8px,
-    linear-gradient(to bottom, #ffffff 0%, #f1f5f9 40%, #cbd5e1 50%, #e2e8f0 60%, #ffffff 100%) !important;
-  border-color: #94a3b8 !important;
-  color: #0f172a !important;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) !important;
-  box-shadow: 
-    0 2px 4px rgba(0, 0, 0, 0.12), 
-    0 1px 1px rgba(0, 0, 0, 0.08), 
-    inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.1) !important;
-}
-
-/* Checkboxes tema claro */
-html[data-theme="light"] input[type="checkbox"]:not(.native-checkbox),
-html[data-theme="light"] .custom-checkbox {
-  background: #e2e8f0 !important;
-  border-color: #cbd5e1 !important;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.15) !important;
-}
-
-html[data-theme="light"] input[type="checkbox"]:not(.native-checkbox)::before,
-html[data-theme="light"] .custom-checkbox::before {
-  background: linear-gradient(180deg, #ffffff 0%, #e2e8f0 100%) !important;
-  border-color: #cbd5e1 !important;
-  box-shadow: 
-    0 2px 4px rgba(0,0,0,0.1),
-    inset 0 1px 0 rgba(255,255,255,0.9) !important;
-}
-
-html[data-theme="light"] input[type="checkbox"]:checked,
-html[data-theme="light"] .checkbox-container input:checked + .custom-checkbox {
-  background: #d1fae5 !important;
-  border-color: #a7f3d0 !important;
-}
-
-html[data-theme="light"] input[type="checkbox"]:checked::before,
-html[data-theme="light"] .checkbox-container input:checked + .custom-checkbox::before {
-  background: linear-gradient(180deg, #34d399 0%, #10b981 100%) !important;
-  border-color: #059669 !important;
-}
-
-/* Botones Premium tema claro */
-html[data-theme="light"] .premium-panel-btn {
-  background: linear-gradient(to bottom, #f8fafc, #e2e8f0) !important;
-  border-color: #cbd5e1 !important;
-  border-top-color: #ffffff !important;
-  border-bottom-color: #94a3b8 !important;
-  color: #475569 !important;
-  box-shadow: 
-    0 2px 3px rgba(0,0,0,0.05),
-    inset 0 1px 0 rgba(255,255,255,0.8) !important;
-}
-
-html[data-theme="light"] .premium-panel-btn:hover {
-  background: linear-gradient(to bottom, #ffffff, #f1f5f9) !important;
-  color: #0f172a !important;
-}
-
-html[data-theme="light"] .premium-panel-btn::before {
-  background: #e2e8f0 !important;
-  border-color: #cbd5e1 !important;
-  box-shadow: inset 0 1px 1px rgba(0,0,0,0.1) !important;
-}
-
-html[data-theme="light"] .premium-panel-btn.active-primary,
-html[data-theme="light"] .premium-panel-btn.active {
-  background: linear-gradient(to bottom, #f1f5f9, #e2e8f0) !important;
-  border-color: #cbd5e1 !important;
-  color: #0f172a !important;
-  box-shadow: 
-    inset 0 2px 4px rgba(0, 0, 0, 0.08),
-    0 1px 0 rgba(255,255,255,0.6) !important;
-  transform: translateY(1px) !important;
-}
-
-html[data-theme="light"] .premium-panel-btn.active-primary::before,
-html[data-theme="light"] .premium-panel-btn.active::before {
-  background: #3b82f6 !important;
-  border-color: #93c5fd !important;
-  box-shadow: 
-    0 0 6px #3b82f6,
-    inset 0 1px 1px #ffffff !important;
-}
-
-/* ==========================================================================
-   DISEÑOS MINI PARA COMPONENTES DE AJUSTES FINOS (14PX)
-   ========================================================================== */
-
-/* Control Segmentado Mini (Altura: 14px) */
-.segmented-control-mini {
-  height: 14px !important;
-  padding: 0px !important;
-  gap: 2px !important;
-  border-radius: 2px !important;
-}
-
-.segmented-control-mini button {
-  font-size: 0.62rem !important;
-  font-weight: 700 !important;
-  letter-spacing: 0.02em !important;
-  padding: 0 4px !important;
-  height: 100% !important;
-}
-
-.segmented-control-mini button.active {
-  height: 14px !important;
-  border-radius: 2px !important;
-  box-shadow: 
-    0 1px 2px rgba(0, 0, 0, 0.4), 
-    inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
-}
-
-/* Slider Mini (Altura: 14px) */
-input[type="range"].slider-mini {
-  height: 14px !important;
-  border-radius: 7px !important;
-  padding: 0 2px !important;
-}
-
-input[type="range"].slider-mini::-webkit-slider-thumb {
-  width: 24px !important;
-  height: 10px !important;
-  border-radius: 2px !important;
-}
-
-input[type="range"].slider-mini::-moz-range-thumb {
-  width: 24px !important;
-  height: 10px !important;
-  border-radius: 2px !important;
-}
-
-/* ==========================================================================
-   BARRAS DE SCROLL EN PANTALLAS PEQUEÑAS PARA ALTAVOZ, CAJA Y EBANISTERÍA
-   ========================================================================== */
-
-@media (max-width: 1023px) {
-  /* Contenedores de Parámetros de Altavoz y Caja (que están dentro de wrappers con display: contents) */
-  .font-unified-form aside.panel {
-    max-height: 400px !important;
-    overflow-y: auto !important;
-    border-bottom: 2px solid var(--card-border) !important;
-    padding-right: 0.5rem !important; /* Espacio para no chocar con la barra */
-  }
-
-  /* Contenedor de Ebanistería (CabinetTab) */
-  .wood-layout {
-    max-height: 450px !important;
-    overflow-y: auto !important;
-    padding-right: 0.5rem !important;
-    border-bottom: 1px solid var(--card-border) !important;
-  }
-
-  /* Personalización de barra de desplazamiento en móvil */
-  .font-unified-form aside.panel::-webkit-scrollbar,
-  .wood-layout::-webkit-scrollbar {
-    width: 6px !important;
-    display: block !important;
-  }
-
-  .font-unified-form aside.panel::-webkit-scrollbar-thumb,
-  .wood-layout::-webkit-scrollbar-thumb {
-    background: var(--scrollbar-thumb) !important;
-    border-radius: 3px !important;
-  }
-}
-
-/* ==========================================================================
-   REDUCCIÓN UNIFORME DE ALTURA DE INPUTS (ALTAVOZ Y CAJA / EBANISTERÍA)
-   ========================================================================== */
-
-.font-unified-form input[type="number"],
-.font-unified-form input[type="text"],
-.font-unified-form select,
-.font-unified-form select.input-select,
-.wood-layout input[type="number"],
-.wood-layout input[type="text"],
-.wood-layout select,
-.wood-layout select.input-select,
-.wood-grid-controls select,
-.wood-grid-controls input,
-.wood-layout .input-wrapper {
-  height: 25px !important;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
-  line-height: 25px !important;
-}
-
-/* Ajustes adicionales para inputs con íconos o buscadores */
-.font-unified-form .search-container input,
-.font-unified-form select {
-  height: 25px !important;
-}
-
-/* ==========================================================================
-   SCROLLBARS DE LOS PANELES DE DIAGRAMA Y CROSSOVER EN DETALLE (100% ZOOM / DESKTOP / MÓVIL)
-   ========================================================================== */
-
-.read-only-cabinet-tab,
-.read-only-crossover-tab {
-  max-height: none !important;
-  overflow-y: visible !important;
-  padding-right: 0.5rem !important;
-  padding-bottom: 1rem !important;
-}
-
-/* Scrollbar sutil para Chrome/Safari/Webkit */
-.read-only-cabinet-tab::-webkit-scrollbar,
-.read-only-crossover-tab::-webkit-scrollbar {
-  width: 5px !important;
-  display: block !important;
-}
-
-.read-only-cabinet-tab::-webkit-scrollbar-thumb,
-.read-only-crossover-tab::-webkit-scrollbar-thumb {
-  background: var(--scrollbar-thumb) !important;
-  border-radius: 3px !important;
-}
-
-.read-only-cabinet-tab::-webkit-scrollbar-thumb:hover,
-.read-only-crossover-tab::-webkit-scrollbar-thumb:hover {
-  background: var(--scrollbar-thumb-hover) !important;
-}
-
-/* En pantallas de escritorio (desktop) ajustamos la altura al alto del viewport */
-@media (min-width: 1024px) {
-  .read-only-cabinet-tab,
-  .read-only-crossover-tab {
-    max-height: none !important;
-  }
-}
-
-/* Hacer que toda la tipografía de los diagramas (cabina y crossover) sea uniforme,
-   acorde al tipo de letra (Outfit) y tamaño general de la aplicación */
-.cabinet-diagram-card svg text,
-.read-only-crossover-tab svg text,
-#tab-crossover svg text {
-  font-family: var(--font-sans), sans-serif !important;
-  font-size: 12px !important;
-  font-weight: 500 !important;
-  opacity: 1 !important;
-}
-
-/* Excluir y preservar los símbolos de polaridad masivos + y - del crossover */
-.read-only-crossover-tab svg text[font-size="26"],
-.read-only-crossover-tab svg text[font-size="28"],
-#tab-crossover svg text[font-size="26"],
-#tab-crossover svg text[font-size="28"] {
-  font-size: 26px !important;
-  font-weight: 800 !important;
-}
-
-/* Tabla de componentes del crossover */
-.crossover-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 0.5rem;
-  font-size: 0.8rem;
-  border: 1px solid rgba(255, 255, 255, 0.04);
-}
-.crossover-table th {
-  background: rgba(255, 255, 255, 0.02);
-  color: var(--text-muted);
-  text-align: left;
-  padding: 0.65rem 0.85rem;
-  font-weight: 600;
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-.crossover-table td {
-  padding: 0.65rem 0.85rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.04);
-  color: var(--text-main);
-  font-family: var(--font-mono);
-}
-.crossover-table tr:hover {
-  background: rgba(255, 255, 255, 0.01);
-}
-html[data-theme="light"] .crossover-table {
-  border-color: rgba(0, 0, 0, 0.06);
-}
-html[data-theme="light"] .crossover-table th {
-  background: rgba(0, 0, 0, 0.02);
-  border-bottom-color: rgba(0, 0, 0, 0.08);
-}
-html[data-theme="light"] .crossover-table td {
-  border-top-color: rgba(0, 0, 0, 0.04);
-}
-
-
 

@@ -80,9 +80,6 @@ export interface WoodCabinetData {
   dTrapBotExt?: number;
   thickness: number;
   pieces: WoodCutPiece[];
-  vMid?: number;
-  dMid?: number;
-  hMid?: number;
 }
 
 export interface CustomDriver {
@@ -93,7 +90,7 @@ export interface CustomDriver {
   isCustom: boolean;
 }
 
-interface PortSuggestionOption {
+export interface PortSuggestionOption {
   numPorts: number;
   diameter: number;
   length: number;
@@ -109,14 +106,14 @@ export type PortSuggestions = {
   options: PortSuggestionOption[];
 };
 
-interface FilterComponents2Way {
+export interface FilterComponents2Way {
   c1: number | null;
   l1: number | null;
   c2?: number;
   l2?: number;
 }
 
-interface FilterComponents3WayBP {
+export interface FilterComponents3WayBP {
   c_hp?: number | null;
   l_hp?: number | null;
   l_lp?: number | null;
@@ -156,19 +153,16 @@ export interface CrossoverExportData {
   enableZobel: boolean;
   re: number;
   le: number;
-  midRe?: number;
-  midLe?: number;
   enableLPad: boolean;
   attenuation: number;
   zLoad: number;
   xoverResults: CrossoverResult | null;
   zobelResults: { rz: number; cz: number } | null;
-  midZobelResults?: { rz: number; cz: number } | null;
   lpadResults: { r1: number; r2: number } | null;
 }
 
 export interface DatabaseWoofer {
-  ID?: number | string;
+  ID?: string | number;
   Model?: string;
   "Company ID": number;
   Vas?: number;

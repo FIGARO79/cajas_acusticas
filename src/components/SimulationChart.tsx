@@ -10,8 +10,6 @@ import {
   Tooltip,
   Legend,
   Filler,
-  type ChartData,
-  type ChartDataset,
   type TooltipItem,
 } from 'chart.js';
 import type { CalculatedSealed, CalculatedPorted, CalculatedBandpass, SpeakerParams } from '../types';
@@ -196,7 +194,7 @@ interface SimulationChartProps {
   fcHigh?: number;
 }
 
-export const SimulationChart: React.FC<SimulationChartProps> = ({
+const SimulationChartComponent: React.FC<SimulationChartProps> = ({
   lang,
   theme,
   sealedData,
@@ -272,10 +270,10 @@ export const SimulationChart: React.FC<SimulationChartProps> = ({
   }, [sealedData, portedData, bandpassData, params]);
 
   // Generate curves for full range if in 'full' mode
-  const fullRangeDatasets = React.useMemo<ChartDataset<'line', { x: number; y: number }[]>[]>(() => {
+  const fullRangeDatasets = React.useMemo(() => {
     if (rangeMode !== 'full') return [];
 
-    const datasets: ChartDataset<'line', { x: number; y: number }[]>[] = [];
+    const datasets: Record<string, unknown>[] = [];
     const fs = params.fs || 38;
     const qts = params.qts || 0.36;
     const vas = params.vas || 45;
@@ -593,7 +591,7 @@ export const SimulationChart: React.FC<SimulationChartProps> = ({
   const portedBorderColor = '#10b981';
   const bandpassBorderColor = '#f59e0b';
 
-  const data: ChartData<'line', { x: number; y: number }[], string> = {
+  const data = {
     datasets: rangeMode === 'bass' ? [
       ...(sealedData && sealedData.valid ? [{
         label: `${t("Caja Sellada")} (Vb ${sealedData.Vb.toFixed(1)}L, Qtc ${sealedData.Qtc.toFixed(2)})`,
@@ -693,13 +691,11 @@ export const SimulationChart: React.FC<SimulationChartProps> = ({
         titleFont: { family: 'Plus Jakarta Sans' },
         bodyFont: { family: 'Inter' },
         borderColor: chartTooltipBorder,
-        borderWidth: 1,
         callbacks: {
           label: function (context: TooltipItem<'line'>) {
-            const x = context.parsed.x;
-            const y = context.parsed.y;
-            if (x == null || y == null) return '';
-            return `${context.dataset.label}: ${y.toFixed(1)} dB ${t('a')} ${x >= 1000 ? (x/1000).toFixed(1)+'k' : x} Hz`;
+            const yVal = context.parsed.y !== null && context.parsed.y !== undefined ? context.parsed.y.toFixed(1) : '0.0';
+            const xVal = context.parsed.x !== null && context.parsed.x !== undefined ? context.parsed.x : 0;
+            return `${context.dataset.label}: ${yVal} dB ${t('a')} ${xVal >= 1000 ? (xVal/1000).toFixed(1)+'k' : xVal} Hz`;
           },
         },
       },
@@ -712,15 +708,16 @@ export const SimulationChart: React.FC<SimulationChartProps> = ({
   return (
     <div className="panel chart-card" style={{ display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-        <h3 className="panel-title" style={{ margin: 0, fontSize: '0.95rem' }}>{t("Simulación de Respuesta en Frecuencia (dB vs Hz)")}</h3>
+        <h3 className="panel-title" style={{ margin: 0 }}>{t("Simulación de Respuesta en Frecuencia (dB vs Hz)")}</h3>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
           {/* Segmented range selector */}
-          <div className="segmented-control">
+          <div className="segmented-control" style={{ padding: '2px', borderRadius: '8px', display: 'flex', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--card-border)' }}>
             <button
               type="button"
               className={rangeMode === 'bass' ? 'active' : ''}
               onClick={() => setRangeMode('bass')}
+              style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem', borderRadius: '6px', cursor: 'pointer', border: 'none', background: rangeMode === 'bass' ? 'var(--primary)' : 'transparent', color: '#ffffff', fontWeight: 600 }}
             >
               {t("Graves")}
             </button>
@@ -728,27 +725,28 @@ export const SimulationChart: React.FC<SimulationChartProps> = ({
               type="button"
               className={rangeMode === 'full' ? 'active' : ''}
               onClick={() => setRangeMode('full')}
+              style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem', borderRadius: '6px', cursor: 'pointer', border: 'none', background: rangeMode === 'full' ? 'var(--primary)' : 'transparent', color: '#ffffff', fontWeight: 600 }}
             >
               {t("Filtros / 20kHz")}
             </button>
           </div>
 
           {/* Toggle Reference Lines */}
-          <label className="checkbox-container" style={{ fontSize: '0.74rem' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.7rem', color: 'var(--text-main)', cursor: 'pointer', margin: 0, fontWeight: 500 }}>
             <input
               type="checkbox"
               checked={showRefLines}
               onChange={(e) => setShowRefLines(e.target.checked)}
+              style={{ width: '13px', height: '13px', accentColor: 'var(--accent)', cursor: 'pointer' }}
             />
-            <div className="custom-checkbox"></div>
-            <span>{t("Líneas Ref.")}</span>
+            {t("Líneas Ref.")}
           </label>
         </div>
       </div>
 
       <div className="chart-container" style={{ flex: 1, minHeight: '260px' }}>
         {data.datasets.length > 0 ? (
-          <Line data={data} options={options} plugins={[lineAnnotationPlugin]} />
+          <Line data={data as any} options={options as any} plugins={[lineAnnotationPlugin]} />
         ) : (
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'var(--text-muted)' }}>
             {t("Completa los parámetros mínimos del altavoz (Fs, Vas, Qts).")}
@@ -758,3 +756,6 @@ export const SimulationChart: React.FC<SimulationChartProps> = ({
     </div>
   );
 };
+
+export const SimulationChart = React.memo(SimulationChartComponent);
+

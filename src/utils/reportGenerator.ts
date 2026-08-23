@@ -139,7 +139,7 @@ export function generateReportHTML(
   // 4. Crossover (Zobel, Lpad)
   let crossoverHTML = '';
   if (xoverData && xoverData.xoverResults) {
-    const { crossoverWays, crossoverType, fc, fcLow, fcHigh, enableZobel, enableLPad, xoverResults, zobelResults, midZobelResults, lpadResults } = xoverData;
+    const { crossoverWays, crossoverType, fc, fcLow, fcHigh, enableZobel, enableLPad, xoverResults, zobelResults, lpadResults } = xoverData;
     
     let xoverDetails: string;
     if (crossoverWays === '2way') {
@@ -166,9 +166,10 @@ export function generateReportHTML(
         </div>
       `;
     } else {
-      const hp = xoverResults.hp || {};
-      const bp = 'bp' in xoverResults ? xoverResults.bp || {} : {};
-      const lp = xoverResults.lp || {};
+      const xAny = xoverResults as any;
+      const hp = xAny.hp || {};
+      const bp = xAny.bp || {};
+      const lp = xAny.lp || {};
       
       let hpList: string;
       let bpList: string;
@@ -236,15 +237,13 @@ export function generateReportHTML(
     }
 
     let extraNetworks = '';
-    if (enableZobel && (zobelResults || midZobelResults)) {
+    if (enableZobel && zobelResults) {
       extraNetworks += `
         <div class="xover-box highlight">
           <h4>${t("Red Zobel")}</h4>
           <ul>
-            ${zobelResults ? `<li>Woofer Cz: <strong>${formatNum(zobelResults.cz, 2)} µF</strong></li>
-            <li>Woofer Rz: <strong>${formatNum(zobelResults.rz, 2)} Ω</strong></li>` : ''}
-            ${crossoverWays === '3way' && midZobelResults ? `<li>Medios Cz: <strong>${formatNum(midZobelResults.cz, 2)} µF</strong></li>
-            <li>Medios Rz: <strong>${formatNum(midZobelResults.rz, 2)} Ω</strong></li>` : ''}
+            <li>Cz: <strong>${formatNum(zobelResults.cz, 2)} µF</strong></li>
+            <li>Rz: <strong>${formatNum(zobelResults.rz, 2)} Ω</strong></li>
           </ul>
         </div>
       `;
@@ -266,8 +265,8 @@ export function generateReportHTML(
       <div class="grid">
         <div class="card">
           <h3>${t("Configuración y Componentes")}</h3>
-          <p><strong>${t("Vías")}:</strong> ${crossoverWays === '2way' ? '2 Vías' : '3 Vías'}</p>
-          <p><strong>${t("Tipo de filtro")}:</strong> ${crossoverType === '1st_order' ? '1er Orden' : crossoverType === '2nd_butter' ? '2do Orden Butterworth' : crossoverType === '2nd_lr' ? '2do Orden Linkwitz-Riley' : '4to Orden Linkwitz-Riley'}</p>
+          <p><strong>${t("Vías")}:</strong> ${crossoverWays === '2way' ? t("2 Vías") : t("3 Vías")}</p>
+          <p><strong>${t("Tipo de filtro")}:</strong> ${crossoverType === '1st_order' ? t("1er Orden") : crossoverType === '2nd_butter' ? t("2do Orden Butterworth") : crossoverType === '2nd_lr' ? t("2do Orden Linkwitz-Riley") : t("4to Orden Linkwitz-Riley")}</p>
           <p><strong>${t("Frecuencia(s) de Cruce")}:</strong> ${crossoverWays === '2way' ? `${fc} Hz` : `${fcLow} Hz / ${fcHigh} Hz`}</p>
           <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:15px;">
             ${xoverDetails}
@@ -281,7 +280,7 @@ export function generateReportHTML(
   // 5. Ebanistería y Relleno
   let woodDetailsHTML = '';
   if (cabinetData && cabinetData.valid) {
-    const isRect = true;
+    const isRect = !cabinetData.dTrapTopExt;
     woodDetailsHTML = `
       <div class="section-title">${t("Dimensiones y Corte de Madera")}</div>
       <div class="grid">

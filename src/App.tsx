@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useDeferredValue } from 'react';
+import { useState, useEffect, useRef, useCallback, useDeferredValue, useMemo } from 'react';
 import { Header } from './components/Header';
 import { SpeakerParamsForm } from './components/SpeakerParamsForm';
 import { BoxParamsForm } from './components/BoxParamsForm';
@@ -8,11 +8,15 @@ import { CrossoverTab } from './components/CrossoverTab';
 import { type Lang, translate } from './utils/translations';
 import { type UnitSystem, convertTo, getUnitLabel } from './utils/units';
 import type { SpeakerParams, CalculatedSealed, CalculatedPorted, CalculatedBandpass, CustomDriver, WoodCabinetData, CrossoverExportData } from './types';
-import { estimateF3 } from './utils/acousticMath';
-import { getWasm, initWasm, isWasmReady } from './wasm/index.ts';
+import { estimateF3, calcPortLength, getKCorrection } from './utils/acousticMath';
+import { getWasm, calcRadiadorPasivo } from './wasm/index.ts';
 import { generateReportHTML } from './utils/reportGenerator';
 
-function App() {
+interface AppProps {
+  wasmError?: string | null;
+}
+
+function App({ wasmError }: AppProps) {
   // Theme & Language
   const [lang, setLang] = useState<Lang>(() => (localStorage.getItem('lang') as Lang) || 'es');
   const [unitSystem, setUnitSystem] = useState<UnitSystem>(() => (localStorage.getItem('unitSystem') as UnitSystem) || 'metric');
@@ -36,30 +40,6 @@ function App() {
   const [enableLPad, setEnableLPad] = useState<boolean>(false);
   const [lpadAttenuation, setLpadAttenuation] = useState<number>(3);
   const [lpadZLoad, setLpadZLoad] = useState<number>(8);
-
-  // Midrange Parameters for 3-way chamber calculations
-  const [midFs, setMidFs] = useState<number>(475);
-  const [midVas, setMidVas] = useState<number>(0);
-  const [midQts, setMidQts] = useState<number>(0.01);
-  const [midTargetQtc, setMidTargetQtc] = useState<number>(0.707);
-  const [midRe, setMidRe] = useState<number>(7.1);
-  const [midLe, setMidLe] = useState<number>(0.8);
-  const [midSealed, setMidSealed] = useState<boolean>(true);
-  const [useCustomMidVol, setUseCustomMidVol] = useState<boolean>(true);
-  const [customMidVol, setCustomMidVol] = useState<number | ''>(0);
-  const [midCabinetDepth, setMidCabinetDepth] = useState<number | ''>(15);
-  const [tweeterYPct, setTweeterYPct] = useState<number>(25);
-  const [midrangeYPct, setMidrangeYPct] = useState<number>(50);
-
-  // Additional midrange parameters (initialized to GRS 5SBM1-8 defaults)
-  const [midDiaNominal, setMidDiaNominal] = useState<string>("5-1/4\"");
-  const [midBoltCircle, setMidBoltCircle] = useState<string>("5\"");
-  const [midPowerRms, setMidPowerRms] = useState<number>(100);
-  const [midPowerMax, setMidPowerMax] = useState<number>(200);
-  const [midFreqMin, setMidFreqMin] = useState<number>(500);
-  const [midFreqMax, setMidFreqMax] = useState<number>(10000);
-  const [midSens, setMidSens] = useState<number>(91);
-  const [midVcDiameter, setMidVcDiameter] = useState<string>("1\"");
 
   // Bandpass State
   const [bandpassOrder, setBandpassOrder] = useState<4 | 6>(4);
@@ -129,6 +109,9 @@ function App() {
   const [prVas, setPrVas] = useState<number>(45);
   const [prFs, setPrFs] = useState<number>(25);
   const [prMms, setPrMms] = useState<number>(35);
+  const [prFbNatural, setPrFbNatural] = useState<number>(0);
+  const [prMasaAnadidaG, setPrMasaAnadidaG] = useState<number>(0);
+
 
   // Woodworking parameters
   const [woodMode, setWoodMode] = useState<'calc' | 'input'>('calc');
@@ -164,40 +147,19 @@ function App() {
 
   const [woodThickness, setWoodThickness] = useState<number | ''>(15);
   const [woodExtra, setWoodExtra] = useState<number | ''>(3.5);
-  const [enableBracing, setEnableBracing] = useState(false);
-  const [bracingCount, setBracingCount] = useState<number>(2);
-  const [bracingPositions, setBracingPositions] = useState<number[]>([0.35, 0.7]);
-
-  const handleBracingCountChange = (count: number) => {
-    setBracingCount(count);
-    if (count <= 0) {
-      setBracingPositions([]);
-    } else if (count === 1) {
-      setBracingPositions([0.5]);
-    } else {
-      const step = 0.6 / (count - 1);
-      setBracingPositions(Array.from({ length: count }, (_, i) => 0.2 + i * step));
-    }
-  };
-
 
   const [speakerYPct, setSpeakerYPct] = useState<number>(50);
   const [portYPct, setPortYPct] = useState<number>(85);
-  const [portLocation, setPortLocation] = useState<'front' | 'rear'>('front');
 
   // Shared state for technical report exporting
-  const [cabinetData, setCabinetData] = useState<WoodCabinetData | null>(null);
   const cabinetRef = useRef<WoodCabinetData | null>(null);
   const handleCabinetDataChange = useCallback((data: WoodCabinetData | null) => {
     cabinetRef.current = data;
-    setCabinetData(data);
   }, []);
   const crossoverRef = useRef<(() => CrossoverExportData) | null>(null);
   const handleRegisterCrossover = useCallback((exp: () => CrossoverExportData) => {
     crossoverRef.current = exp;
   }, []);
-
-
 
   // Sync theme to document element
   useEffect(() => {
@@ -216,19 +178,15 @@ function App() {
     localStorage.setItem('unitSystem', unitSystem);
   }, [unitSystem]);
 
-  // Initialize WASM module on component mount
-  useEffect(() => {
-    initWasm()
-      .catch(err => console.error('WASM init error:', err));
-  }, []);
-
   const toggleTheme = () => {
     setTheme(prev => prev === 'dark' ? 'light' : 'dark');
   };
 
   const handlePresetChange = (presetId: string, newParams: SpeakerParams | null) => {
     setPreset(presetId);
-    setCustomPorted(false); // Reset to optimal tuning when preset changes
+    setCustomVbState(null);
+    setCustomFbState(null);
+    setCustomPorted(false);
     if (newParams) {
       // Compute Qts automatically if Qms and Qes are provided but Qts is missing
       const updatedParams: SpeakerParams = { ...newParams };
@@ -266,8 +224,6 @@ function App() {
       adj.vas = params.vas * 2;
     } else if (driverConfig === 'isobaric') {
       adj.vas = params.vas * 0.5;
-    } else if (driverConfig === 'dual_isolated') {
-      adj.vas = params.vas * 2;
     }
     return adj;
   };
@@ -287,16 +243,13 @@ function App() {
     const thickness = (woodThickness || 0) / 10;
     const extra = woodExtra || 0;
     let bruto = 0;
-    let hInt: number, wInt: number, dInt = 0;
-    let d1Int = 0, d2Int = 0;
-
     if (woodShape === 'rectangular') {
       const hExt = woodExtHeight || 0;
       const wExt = woodExtWidth || 0;
       const dExt = woodExtDepth || 0;
-      hInt = hExt - (2 * thickness);
-      wInt = wExt - (2 * thickness);
-      dInt = dExt - (2 * thickness);
+      const hInt = hExt - (2 * thickness);
+      const wInt = wExt - (2 * thickness);
+      const dInt = dExt - (2 * thickness);
       if (hInt > 0 && wInt > 0 && dInt > 0) {
         bruto = (hInt * wInt * dInt) / 1000;
       }
@@ -305,10 +258,10 @@ function App() {
       const wExt = woodTrapExtWidth || 0;
       const d1Ext = woodTrapExtDepthTop || 0;
       const d2Ext = woodTrapExtDepthBot || 0;
-      hInt = hExt - (2 * thickness);
-      wInt = wExt - (2 * thickness);
-      d1Int = Math.max(0, d1Ext - (2 * thickness));
-      d2Int = Math.max(0, d2Ext - (2 * thickness));
+      const hInt = hExt - (2 * thickness);
+      const wInt = wExt - (2 * thickness);
+      const d1Int = Math.max(0, d1Ext - (2 * thickness));
+      const d2Int = Math.max(0, d2Ext - (2 * thickness));
       if (hInt > 0 && wInt > 0 && d1Int > 0 && d2Int > 0) {
         const dAvgInt = (d1Int + d2Int) / 2;
         bruto = (hInt * wInt * dAvgInt) / 1000;
@@ -317,51 +270,18 @@ function App() {
 
     if (bruto <= 0) return 0;
 
-    // Midrange Chamber Volume Calculation (vMid)
-    let vMid = 0;
-    let vMidPartition = 0;
-    let vWooferPartition = 0;
-    if (crossoverWays === 3 && !midSealed) {
-      if (useCustomMidVol && Number(customMidVol) > 0) {
-        vMid = Number(customMidVol);
-      } else {
-        vMid = 3.0; // default 3 Liters
-        const mVas = midVas ?? 5;
-        const mQts = midQts ?? 0.45;
-        const mTargetQtc = midTargetQtc ?? 0.707;
-        if (mQts > 0 && mQts < mTargetQtc && mVas > 0) {
-          vMid = mVas / (Math.pow(mTargetQtc / mQts, 2) - 1);
+    let targetFb = customFbState ?? 38;
+    if (!customPorted) {
+      try {
+        const wasm = getWasm();
+        if (wasm && adjParams.fs && adjParams.vas && adjParams.qts) {
+          const result = wasm.calc_alineacion_ventilada(adjParams.fs, adjParams.vas, adjParams.qts, "QB3");
+          targetFb = result.fb;
         }
-      }
-      
-      if (hInt > 0 && wInt > 0) {
-        const dVal = (woodShape === 'rectangular' ? dInt : (d1Int + d2Int) / 2);
-        const dMid = Math.min(midCabinetDepth || 15, dVal - 1);
-        const hM = (wInt > 0 && dMid > 0) ? (vMid * 1000) / (wInt * dMid) : 0;
-        vMidPartition = (wInt * (dMid + hM) * thickness) / 1000;
+      } catch (e) {
+        console.warn("Could not calculate optimal Vb/Fb from Wasm:", e);
       }
     }
-
-    if (driverConfig === 'dual_isolated' && hInt > 0 && wInt > 0) {
-      const dVal = (woodShape === 'rectangular' ? dInt : (d1Int + d2Int) / 2);
-      vWooferPartition = (wInt * dVal * thickness) / 1000;
-    }
-
-    let suggestedFb = 38;
-    if (adjParams.fs && adjParams.vas && adjParams.qts) {
-      if (isWasmReady()) {
-        try {
-          const wasm = getWasm();
-          suggestedFb = wasm.calc_alineacion_ventilada(adjParams.fs, adjParams.vas, adjParams.qts, "QB3").fb;
-        } catch (e) {
-          console.warn("Could not calculate optimal Vb/Fb from Wasm:", e);
-          suggestedFb = 0.94 * Math.pow(adjParams.qts, -0.9) * adjParams.fs;
-        }
-      } else {
-        suggestedFb = 0.94 * Math.pow(adjParams.qts, -0.9) * adjParams.fs;
-      }
-    }
-    const targetFb = customPorted ? (customFbState ?? suggestedFb) : suggestedFb;
 
     const pCount = Number(portCount) || 0;
     let portVol = 0;
@@ -384,8 +304,7 @@ function App() {
             portVol = (pCount * Math.PI * Math.pow(pDia / 2, 2) * Lv) / 1000;
           }
         } else {
-          const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
-          let currentNetVol = bruto - (extra + vMid + vMidPartition + vWooferPartition); // Initial guess of physical net volume
+          let currentNetVol = bruto - extra; // Initial guess of physical net volume
           
           // Solve the circular reference (netVol -> targetVb -> portLength -> portVol -> netVol) iteratively
           for (let iter = 0; iter < 4; iter++) {
@@ -394,7 +313,7 @@ function App() {
               portVol = 0;
               break;
             }
-            const Lv = ((23562.5 * Math.pow(pDia, 2) * pCount) / (targetFb * targetFb * targetVb)) - (kCorrection * pDia);
+            const Lv = calcPortLength(targetVb, targetFb, pDia, flaredEnds, pCount);
             if (Lv > 0) {
               if (isRect) {
                 const w = Number(portWidth) || 0;
@@ -406,110 +325,60 @@ function App() {
             } else {
               portVol = 0;
             }
-            currentNetVol = Math.max(0, bruto - (extra + portVol + vMid + vMidPartition + vWooferPartition));
+            currentNetVol = Math.max(0, bruto - (extra + portVol));
           }
         }
       }
     }
 
-    return Math.max(0, bruto - (extra + portVol + vMid + vMidPartition + vWooferPartition));
+    return Math.max(0, bruto - extra);
   };
 
   const manualNetVol = getManualWoodNetVolume();
 
   // --- CALCULAR CAJA SELLADA ---
-  const calculateSealed = (): CalculatedSealed => {
+  const sealedData = useMemo<CalculatedSealed>(() => {
     if (validationError || !adjParams.fs || !adjParams.vas || !adjParams.qts) {
       return { valid: false, Vb: 0, Fc: 0, Qtc: targetQtc, F3: 0 };
     }
 
-    if (isWasmReady()) {
-      try {
-        const wasm = getWasm();
-
-        if (woodMode === 'input' && manualNetVol > 0) {
-          const sealedVb = manualNetVol * dampingFactor;
-          const alpha = adjParams.vas / sealedVb;
-          const sealedQtc = adjParams.qts * Math.sqrt(alpha + 1);
-          // We calculate Fc and F3 correctly using Wasm by passing the resulting vb
-          const result = wasm.calc_caja_sellada(adjParams.fs, adjParams.vas, adjParams.qts, sealedVb, targetQtc);
-          return {
-            valid: true,
-            Vb: sealedVb,
-            Fc: result.fc,
-            Qtc: sealedQtc,
-            F3: result.f3
-          };
-        } else {
-          if (adjParams.qts >= targetQtc) {
-            return { valid: false, Vb: 0, Fc: 0, Qtc: targetQtc, F3: 0 };
-          }
-          
-          // To get optimal vb from Qtc, we can pass a dummy vb_target and read vb_optimo
-          const tempResult = wasm.calc_caja_sellada(adjParams.fs, adjParams.vas, adjParams.qts, 10.0, targetQtc);
-          const optimalVb = tempResult.vb_optimo;
-          
-          const result = wasm.calc_caja_sellada(adjParams.fs, adjParams.vas, adjParams.qts, optimalVb, targetQtc);
-
-          return {
-            valid: true,
-            Vb: optimalVb,
-            Fc: result.fc,
-            Qtc: result.qtc,
-            F3: result.f3
-          };
-        }
-      } catch (e) {
-        console.warn("Sealed calculation error in WASM, falling back to JS:", e);
-      }
-    }
-
-    // JS Fallback
-    const fs = adjParams.fs;
-    const vas = adjParams.vas;
-    const qts = adjParams.qts;
+    const wasm = getWasm();
 
     if (woodMode === 'input' && manualNetVol > 0) {
       const sealedVb = manualNetVol * dampingFactor;
-      if (sealedVb <= 0) return { valid: false, Vb: 0, Fc: 0, Qtc: targetQtc, F3: 0 };
-      const alpha = vas / sealedVb;
-      const sealedQtc = qts * Math.sqrt(alpha + 1);
-      const fc = fs * Math.sqrt(alpha + 1);
-      const f3_term = 1.0 / Math.pow(sealedQtc, 2) - 2.0;
-      const f3 = fc * Math.sqrt((f3_term + Math.sqrt(Math.pow(f3_term, 2) + 4.0)) / 2.0);
-
+      const alpha = adjParams.vas / sealedVb;
+      const sealedQtc = adjParams.qts * Math.sqrt(alpha + 1);
+      
+      const result = wasm.calc_caja_sellada(adjParams.fs, adjParams.vas, adjParams.qts, sealedVb, targetQtc);
       return {
         valid: true,
         Vb: sealedVb,
-        Fc: fc,
+        Fc: result.fc,
         Qtc: sealedQtc,
-        F3: f3
+        F3: result.f3
       };
     } else {
-      if (qts >= targetQtc) {
+      if (adjParams.qts >= targetQtc) {
         return { valid: false, Vb: 0, Fc: 0, Qtc: targetQtc, F3: 0 };
       }
-      const optimalVb = vas / (Math.pow(targetQtc / qts, 2) - 1.0);
-      if (optimalVb <= 0) return { valid: false, Vb: 0, Fc: 0, Qtc: targetQtc, F3: 0 };
-      const alpha = vas / optimalVb;
-      const fc = fs * Math.sqrt(alpha + 1);
-      const f3_term = 1.0 / Math.pow(targetQtc, 2) - 2.0;
-      const f3 = fc * Math.sqrt((f3_term + Math.sqrt(Math.pow(f3_term, 2) + 4.0)) / 2.0);
+      
+      const tempResult = wasm.calc_caja_sellada(adjParams.fs, adjParams.vas, adjParams.qts, 10.0, targetQtc);
+      const optimalVb = tempResult.vb_optimo;
+      
+      const result = wasm.calc_caja_sellada(adjParams.fs, adjParams.vas, adjParams.qts, optimalVb, targetQtc);
 
       return {
         valid: true,
         Vb: optimalVb,
-        Fc: fc,
-        Qtc: targetQtc,
-        F3: f3
+        Fc: result.fc,
+        Qtc: result.qtc,
+        F3: result.f3
       };
     }
-  };
-
-  const sealedData = calculateSealed();
+  }, [validationError, adjParams.fs, adjParams.vas, adjParams.qts, woodMode, manualNetVol, dampingFactor, targetQtc]);
 
   // --- CALCULAR CAJA VENTILADA ---
-  const calculatePorted = (): CalculatedPorted => {
+  const portedData = useMemo<CalculatedPorted>(() => {
     if (validationError || !adjParams.fs || !adjParams.vas || !adjParams.qts) {
       return { valid: false, Vb: 0, Fb: 0, F3: 0, Fs: adjParams.fs || 0, Qts: adjParams.qts || 0, Vas: adjParams.vas || 0, alignment: '' };
     }
@@ -517,47 +386,28 @@ function App() {
     let VbPorted: number;
     let FbPorted: number;
     let F3Ported: number;
-    let alignmentActive = 'Óptima (QB3)';
+    let alignmentActive: string;
 
-    let suggestedVb: number;
-    let suggestedFb: number;
-    let suggestedF3: number;
-
-    if (isWasmReady()) {
-      try {
-        const wasm = getWasm();
-        const result = wasm.calc_alineacion_ventilada(adjParams.fs, adjParams.vas, adjParams.qts, "QB3");
-        suggestedVb = result.vb;
-        suggestedFb = result.fb;
-        suggestedF3 = result.f3;
-        alignmentActive = 'Óptima (QB3 Wasm)';
-      } catch (e) {
-        console.warn("Could not calculate optimal alignment from WASM, using JS fallback:", e);
-        suggestedVb = 6.27 * Math.pow(adjParams.qts, 1.44) * adjParams.vas;
-        suggestedFb = 0.94 * Math.pow(adjParams.qts, -0.9) * adjParams.fs;
-        suggestedF3 = 1.2 * Math.pow(adjParams.qts, -0.9) * adjParams.fs;
-      }
-    } else {
-      suggestedVb = 6.27 * Math.pow(adjParams.qts, 1.44) * adjParams.vas;
-      suggestedFb = 0.94 * Math.pow(adjParams.qts, -0.9) * adjParams.fs;
-      suggestedF3 = 1.2 * Math.pow(adjParams.qts, -0.9) * adjParams.fs;
-    }
+    const wasm = getWasm();
 
     if (woodMode === 'input' && manualNetVol > 0) {
       VbPorted = manualNetVol * dampingFactor;
-      FbPorted = customPorted ? (customFbState ?? suggestedFb) : suggestedFb;
+      // Usar estado crudo directamente en el cálculo para evitar circulares
+      FbPorted = customFbState ?? 38; 
       F3Ported = estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas);
       alignmentActive = 'Manual';
     } else {
       if (customPorted) {
-        VbPorted = customVbState ?? suggestedVb;
-        FbPorted = customFbState ?? suggestedFb;
+        VbPorted = customVbState ?? 45;
+        FbPorted = customFbState ?? 38;
         F3Ported = estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas);
         alignmentActive = 'Manual';
       } else {
-        VbPorted = suggestedVb;
-        FbPorted = suggestedFb;
-        F3Ported = suggestedF3;
+        const result = wasm.calc_alineacion_ventilada(adjParams.fs, adjParams.vas, adjParams.qts, "QB3");
+        VbPorted = result.vb;
+        FbPorted = result.fb;
+        F3Ported = result.f3;
+        alignmentActive = 'Óptima (QB3 Wasm)';
       }
     }
 
@@ -569,7 +419,7 @@ function App() {
           : (2 * Math.sqrt(((Number(portWidth) || 0) * (Number(portHeight) || 0)) / Math.PI));
       const pCount = Number(portCount) || 1;
       if (pDia > 0 && VbPorted > 0) {
-        const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
+        const kCorrection = getKCorrection(flaredEnds);
         const Lv_cm = Number(customPortLength);
         const fbCalc = Math.sqrt((23562.5 * Math.pow(pDia, 2) * pCount) / (VbPorted * (Lv_cm + kCorrection * pDia)));
         if (fbCalc > 0 && !isNaN(fbCalc) && isFinite(fbCalc)) {
@@ -590,9 +440,7 @@ function App() {
       Vas: adjParams.vas,
       alignment: alignmentActive
     };
-  };
-
-  const portedData = calculatePorted();
+  }, [validationError, adjParams.fs, adjParams.vas, adjParams.qts, woodMode, manualNetVol, dampingFactor, customPorted, customVbState, customFbState, useCustomPortLength, customPortLength, portShape, portDiameter, portArea, portWidth, portHeight, portCount, flaredEnds, lang]);
 
   const customVb = customPorted ? (customVbState ?? Math.round((portedData.Vb || 45) * 10) / 10) : Math.round((portedData.Vb || 45) * 10) / 10;
   const customFb = customPorted ? (customFbState ?? Math.round((portedData.Fb || 38) * 10) / 10) : Math.round((portedData.Fb || 38) * 10) / 10;
@@ -615,84 +463,42 @@ function App() {
   };
 
   // --- CALCULAR CAJA PASO BANDA (BANDPASS) ---
-  const calculateBandpass = (): CalculatedBandpass => {
+  const bandpassData = useMemo<CalculatedBandpass>(() => {
     if (validationError || !adjParams.fs || !adjParams.vas || !adjParams.qts) {
       return { valid: false, order: bandpassOrder, Vf: 0, Vr: 0, Fb: 0, F0: 0, delta_f: 0, Fl: 0, Fh: 0 };
     }
 
-    if (isWasmReady()) {
-      try {
-        const wasm = getWasm();
-        if (bandpassOrder === 4) {
-          const res = wasm.calc_bandpass_4(adjParams.fs, adjParams.vas, adjParams.qts, bandpassS);
-          return {
-            valid: true,
-            order: 4,
-            Vf: res.vf,
-            Vr: res.vr,
-            Fb: res.fb,
-            F0: res.f0,
-            delta_f: res.delta_f
-          };
-        } else {
-          const res = wasm.calc_bandpass_6(adjParams.fs, adjParams.vas, adjParams.qts, bandpassA);
-          return {
-            valid: true,
-            order: 6,
-            Vf: res.vf,
-            Vr: res.vr,
-            Fb: 0,
-            Fl: res.fl,
-            Fh: res.fh
-          };
-        }
-      } catch (e) {
-        console.error("Bandpass calculation error in WASM, falling back to JS:", e);
+    const wasm = getWasm();
+
+    try {
+      if (bandpassOrder === 4) {
+        const res = wasm.calc_bandpass_4(adjParams.fs, adjParams.vas, adjParams.qts, bandpassS);
+        return {
+          valid: true,
+          order: 4,
+          Vf: res.vf,
+          Vr: res.vr,
+          Fb: res.fb,
+          F0: res.f0,
+          delta_f: res.delta_f
+        };
+      } else {
+        const res = wasm.calc_bandpass_6(adjParams.fs, adjParams.vas, adjParams.qts, bandpassA);
+        return {
+          valid: true,
+          order: 6,
+          Vf: res.vf,
+          Vr: res.vr,
+          Fb: 0,
+          Fl: res.fl,
+          Fh: res.fh
+        };
       }
+    } catch (e) {
+      console.error("Bandpass calculation error:", e);
+      return { valid: false, order: bandpassOrder, Vf: 0, Vr: 0, Fb: 0, F0: 0, delta_f: 0, Fl: 0, Fh: 0 };
     }
-
-    // JS Fallback
-    const fs = adjParams.fs;
-    const vas = adjParams.vas;
-    const qts = adjParams.qts;
-
-    if (bandpassOrder === 4) {
-      const s = bandpassS;
-      const term = s / qts;
-      const vf = vas / (Math.pow(term, 2) - 1.0);
-      const vr = 2.0 * Math.pow(s, 2) * Math.pow(qts, 2) * vas;
-      const fb = fs * term;
-      const f0 = fs * term;
-      const delta_f = (fs / qts) * s;
-
-      return {
-        valid: true,
-        order: 4,
-        Vf: Math.max(0, vf),
-        Vr: Math.max(0, vr),
-        Fb: fb,
-        F0: f0,
-        delta_f: delta_f
-      };
-    } else {
-      const a = bandpassA;
-      const fh = fs * Math.sqrt((1.0 + a) / 2.0);
-      const fl = fs * Math.sqrt(1.0 / (2.0 * (1.0 + a)));
-      const vol = vas * qts * Math.sqrt(2.0 * a);
-
-      return {
-        valid: true,
-        order: 6,
-        Vf: Math.max(0, vol),
-        Vr: Math.max(0, vol),
-        Fb: 0,
-        Fl: fl,
-        Fh: fh
-      };
-    }
-  };
-
-  const bandpassData = calculateBandpass();
+  }, [validationError, adjParams.fs, adjParams.vas, adjParams.qts, bandpassOrder, bandpassS, bandpassA]);
 
   const deferredSealedData = useDeferredValue(sealedData);
   const deferredPortedData = useDeferredValue(portedData);
@@ -706,12 +512,7 @@ function App() {
       return `${displayLv.toFixed(1)} ${unitLabel} (${t("Personalizada")})`;
     }
     const pCount = Number(portCount) || 0;
-    
-    // Choose active Vb and Fb depending on boxType
-    const activeVb = boxType === 'bandpass' ? bandpassData.Vf : portedData.Vb;
-    const activeFb = boxType === 'bandpass' ? (bandpassData.Fb > 0 ? bandpassData.Fb : customFb) : portedData.Fb;
-
-    if (pCount > 0 && activeVb > 0 && activeFb > 0) {
+    if (pCount > 0 && portedData.Vb > 0) {
       const pDia = portShape === 'round'
         ? (Number(portDiameter) || 0)
         : portShape === 'custom'
@@ -719,8 +520,7 @@ function App() {
           : (2 * Math.sqrt(((Number(portWidth) || 0) * (Number(portHeight) || 0)) / Math.PI));
 
       if (pDia > 0) {
-        const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
-        const Lv = ((23562.5 * Math.pow(pDia, 2) * pCount) / (activeFb * activeFb * activeVb)) - (kCorrection * pDia);
+        const Lv = calcPortLength(portedData.Vb, portedData.Fb, pDia, flaredEnds, pCount);
         
         const displayLv = convertTo(Lv, 'length', unitSystem);
         const unitLabel = getUnitLabel('length', unitSystem);
@@ -739,35 +539,32 @@ function App() {
 
   const portLength = getPortLengthCalculation();
 
-  // --- CÁLCULO SÍNCRONO DE RADIADOR PASIVO ---
-  const getRadiadorPasivoCalculations = () => {
-    if (portedData.valid && portedData.Vb > 0) {
-      const rho = 1.205;
-      const c = 343.0;
-      const sd_m2 = Math.PI * Math.pow((prDia / 100) / 2, 2);
-      const vb_m3 = portedData.Vb / 1000;
-      const vas_m3 = prVas / 1000;
-
-      const cab = vb_m3 / (rho * c * c * sd_m2 * sd_m2);
-      const cap = vas_m3 / (rho * c * c * sd_m2 * sd_m2);
-      const mp_propia = (prMms / 1000) / Math.pow(sd_m2, 2);
-
-      const fbNat = (1.0 / (2.0 * Math.PI)) * Math.sqrt(1.0 / (mp_propia * (cap + cab)));
-
-      const targetFb = portedData.Fb;
-      const mp_total_req = 1.0 / (4.0 * Math.PI * Math.PI * targetFb * targetFb * (cap + cab));
-      const mp_ad_req = mp_total_req - mp_propia;
-      const masaMecG = mp_ad_req * sd_m2 * sd_m2 * 1000;
-
-      return {
-        prFbNatural: fbNat || 0,
-        prMasaAnadidaG: Math.max(0, masaMecG) || 0
-      };
+  // --- CÁLCULO ASÍNCRONO DE RADIADOR PASIVO CON MOTOR RUST/WASM ---
+  useEffect(() => {
+    let active = true;
+    if (portedData.valid && portedData.Vb > 0 && prDia > 0 && prVas > 0 && prMms > 0) {
+      // cd es el diámetro del cono del radiador pasivo
+      const cd = prDia; 
+      
+      calcRadiadorPasivo(portedData.Vb, prVas, prFs, cd, prMms)
+        .then((res) => {
+          if (active) {
+            setPrFbNatural(res.fb || 0);
+            setPrMasaAnadidaG(Math.max(0, res.masaAñadida || 0));
+          }
+        })
+        .catch((err) => {
+          console.error("Error al calcular radiador pasivo por WASM:", err);
+        });
+    } else {
+      setPrFbNatural(0);
+      setPrMasaAnadidaG(0);
     }
-    return { prFbNatural: 0, prMasaAnadidaG: 0 };
-  };
+    return () => {
+      active = false;
+    };
+  }, [portedData.valid, portedData.Vb, portedData.Fb, prDia, prVas, prFs, prMms]);
 
-  const { prFbNatural, prMasaAnadidaG } = getRadiadorPasivoCalculations();
 
 
   const handleCustomPortedChange = useCallback((val: boolean) => {
@@ -782,7 +579,10 @@ function App() {
     console.log("handleExportReport: triggered");
     try {
       // Recopilar datos del crossover si está registrado
-      const xoverData = crossoverRef.current ? crossoverRef.current() : null;
+      let xoverData: CrossoverExportData | null = null;
+      if (crossoverRef.current) {
+        xoverData = crossoverRef.current();
+      }
 
       // Longitud del puerto, diámetro equivalente, velocidad del aire
       let pLen = 'N/A';
@@ -796,8 +596,8 @@ function App() {
             : (2 * Math.sqrt(((portWidth || 0) * (portHeight || 0)) / Math.PI));
         
         if (pDia > 0) {
-          const kCorrection = flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
-          const Lv = ((23562.5 * Math.pow(pDia, 2) * pCount) / (portedData.Fb * portedData.Fb * (cabinetRef.current?.vNeto || portedData.Vb))) - (kCorrection * pDia);
+          const targetVb = cabinetRef.current?.vNeto || portedData.Vb;
+          const Lv = calcPortLength(targetVb, portedData.Fb, pDia, flaredEnds, pCount);
           if (Lv <= 0) {
             pLen = t("Excesivamente corto");
           } else {
@@ -869,6 +669,41 @@ function App() {
     }
   };
 
+  if (wasmError) {
+    return (
+      <div className="container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '2rem', textAlign: 'center' }}>
+        <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '3rem', maxWidth: '600px', width: '100%', boxShadow: '0 8px 32px rgba(0,0,0,0.2)', backdropFilter: 'blur(8px)' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', marginBottom: '1.5rem' }}>
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+          </div>
+          <h1 style={{ fontFamily: 'var(--font-title)', fontSize: '1.75rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '1rem' }}>
+            {t("Error al inicializar el Motor Acústico")}
+          </h1>
+          <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', lineHeight: 1.6 }}>
+            {t("No se pudo cargar el motor matemático de alto rendimiento (WebAssembly). Esto puede ocurrir por restricciones del navegador o porque faltan archivos del compilador.")}
+          </p>
+          <div style={{ background: 'rgba(0,0,0,0.15)', borderLeft: '3px solid var(--danger)', padding: '1rem', borderRadius: '6px', textAlign: 'left', marginBottom: '2rem', wordBreak: 'break-all' }}>
+            <code style={{ fontSize: '0.9rem', color: 'var(--text-main)', fontFamily: 'monospace' }}>
+              {wasmError}
+            </code>
+          </div>
+          <button 
+            onClick={() => window.location.reload()} 
+            style={{ padding: '0.75rem 2rem', background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', transition: 'transform 0.2s', fontFamily: 'inherit' }}
+            onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+            onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+          >
+            {t("Reintentar cargar aplicación")}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container">
       <Header 
@@ -883,219 +718,156 @@ function App() {
 
       <div className="dashboard-grid">
         {/* PARÁMETROS IZQUIERDA */}
-        <div className="font-unified-form" style={{ display: 'contents' }}>
-          <SpeakerParamsForm 
-            lang={lang}
-            unitSystem={unitSystem}
-            params={params}
-            onParamsChange={setParams}
-            driverConfig={driverConfig}
-            onDriverConfigChange={setDriverConfig}
-            validationError={validationError}
-            preset={preset}
-            onPresetChange={handlePresetChange}
-            customDrivers={customDrivers}
-            onCustomDriversChange={handleCustomDriversChange}
-            crossoverWays={crossoverWays}
-            setCrossoverWays={setCrossoverWays}
-            midFs={midFs}
-            setMidFs={setMidFs}
-            midVas={midVas}
-            setMidVas={setMidVas}
-            midQts={midQts}
-            setMidQts={setMidQts}
-            midTargetQtc={midTargetQtc}
-            setMidTargetQtc={setMidTargetQtc}
-            zMidrange={zMidrange}
-            setZMidrange={setZMidrange}
-            midRe={midRe}
-            setMidRe={setMidRe}
-            midLe={midLe}
-            setMidLe={setMidLe}
-            midDiaNominal={midDiaNominal}
-            setMidDiaNominal={setMidDiaNominal}
-            midBoltCircle={midBoltCircle}
-            setMidBoltCircle={setMidBoltCircle}
-            midPowerRms={midPowerRms}
-            setMidPowerRms={setMidPowerRms}
-            midPowerMax={midPowerMax}
-            setMidPowerMax={setMidPowerMax}
-            midFreqMin={midFreqMin}
-            setMidFreqMin={setMidFreqMin}
-            midFreqMax={midFreqMax}
-            setMidFreqMax={setMidFreqMax}
-            midSens={midSens}
-            setMidSens={setMidSens}
-            midVcDiameter={midVcDiameter}
-            setMidVcDiameter={setMidVcDiameter}
-          />
-        </div>
+        <SpeakerParamsForm 
+          lang={lang}
+          unitSystem={unitSystem}
+          params={params}
+          onParamsChange={setParams}
+          driverConfig={driverConfig}
+          onDriverConfigChange={setDriverConfig}
+          validationError={validationError}
+          preset={preset}
+          onPresetChange={handlePresetChange}
+          customDrivers={customDrivers}
+          onCustomDriversChange={handleCustomDriversChange}
+        />
 
         {/* PARÁMETROS CENTRO: CAJA DE DISEÑO */}
-        <div className="font-unified-form" style={{ display: 'contents' }}>
-          <BoxParamsForm
-            lang={lang}
-            unitSystem={unitSystem}
-            boxType={boxType}
-            setBoxType={setBoxType}
-            customVb={customVb}
-            setCustomVb={setCustomVb}
-            customFb={customFb}
-            setCustomFb={setCustomFb}
-            customPorted={customPorted}
-            setCustomPorted={handleCustomPortedChange}
-            params={adjParams}
-            portedData={portedData}
-            sealedData={sealedData}
-            bandpassData={bandpassData}
-            cabinetData={cabinetData}
-            isLinkedToCabinet={woodMode === 'input' && manualNetVol > 0}
-            targetQtc={targetQtc}
-            setTargetQtc={setTargetQtc}
-            bandpassOrder={bandpassOrder}
-            setBandpassOrder={setBandpassOrder}
-            bandpassS={bandpassS}
-            setBandpassS={setBandpassS}
-            bandpassA={bandpassA}
-            setBandpassA={setBandpassA}
-            
-            portCount={portCount}
-            setPortCount={setPortCount}
-            portDiameter={portDiameter}
-            setPortDiameter={setPortDiameter}
-            portShape={portShape === 'custom' ? 'round' : portShape}
-            setPortShape={setPortShape}
-            portWidth={portWidth}
-            setPortWidth={setPortWidth}
-            portHeight={portHeight}
-            setPortHeight={setPortHeight}
-            portArea={portArea}
-            setPortArea={setPortArea}
-            portLength={portLength}
-            flaredEnds={flaredEnds}
-            setFlaredEnds={setFlaredEnds}
-            useCustomPortLength={useCustomPortLength}
-            setUseCustomPortLength={setUseCustomPortLength}
-            customPortLength={customPortLength}
-            setCustomPortLength={setCustomPortLength}
+        <BoxParamsForm
+          lang={lang}
+          unitSystem={unitSystem}
+          boxType={boxType}
+          setBoxType={setBoxType}
+          customVb={customVb}
+          setCustomVb={setCustomVb}
+          customFb={customFb}
+          setCustomFb={setCustomFb}
+          customPorted={customPorted}
+          setCustomPorted={handleCustomPortedChange}
+          params={adjParams}
+          portedData={portedData}
+          sealedData={sealedData}
+          bandpassData={bandpassData}
+          isLinkedToCabinet={woodMode === 'input' && manualNetVol > 0}
+          targetQtc={targetQtc}
+          setTargetQtc={setTargetQtc}
+          bandpassOrder={bandpassOrder}
+          setBandpassOrder={setBandpassOrder}
+          bandpassS={bandpassS}
+          setBandpassS={setBandpassS}
+          bandpassA={bandpassA}
+          setBandpassA={setBandpassA}
+          
+          portCount={portCount}
+          setPortCount={setPortCount}
+          portDiameter={portDiameter}
+          setPortDiameter={setPortDiameter}
+          portShape={portShape === 'custom' ? 'round' : portShape}
+          setPortShape={setPortShape}
+          portWidth={portWidth}
+          setPortWidth={setPortWidth}
+          portHeight={portHeight}
+          setPortHeight={setPortHeight}
+          portArea={portArea}
+          setPortArea={setPortArea}
+          portLength={portLength}
+          flaredEnds={flaredEnds}
+          setFlaredEnds={setFlaredEnds}
+          useCustomPortLength={useCustomPortLength}
+          setUseCustomPortLength={setUseCustomPortLength}
+          customPortLength={customPortLength}
+          setCustomPortLength={setCustomPortLength}
 
-            prTuning={prTuning}
-            setPrTuning={setPrTuning}
-            prDia={prDia}
-            setPrDia={setPrDia}
-            prVas={prVas}
-            setPrVas={setPrVas}
-            prFs={prFs}
-            setPrFs={setPrFs}
-            prMms={prMms}
-            setPrMms={setPrMms}
-            prFbNatural={prFbNatural}
-            prMasaAnadidaG={prMasaAnadidaG}
+          prTuning={prTuning}
+          setPrTuning={setPrTuning}
+          prDia={prDia}
+          setPrDia={setPrDia}
+          prVas={prVas}
+          setPrVas={setPrVas}
+          prFs={prFs}
+          setPrFs={setPrFs}
+          prMms={prMms}
+          setPrMms={setPrMms}
+          prFbNatural={prFbNatural}
+          prMasaAnadidaG={prMasaAnadidaG}
 
-            // SUBPESTAÑAS CENTRALES
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
+          // SUBPESTAÑAS CENTRALES
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
 
-            // Ebanistería props
-            woodMode={woodMode}
-            setWoodMode={setWoodMode}
-            woodShape={woodShape}
-            setWoodShape={setWoodShape}
-            woodConstraint={woodConstraint}
-            setWoodConstraint={setWoodConstraint}
-            woodRatio={woodRatio}
-            setWoodRatio={setWoodRatio}
-            woodThickness={woodThickness}
-            setWoodThickness={setWoodThickness}
-            woodExtra={woodExtra}
-            setWoodExtra={setWoodExtra}
-            enableBracing={enableBracing}
-            onEnableBracingChange={setEnableBracing}
-            bracingCount={bracingCount}
-            onBracingCountChange={handleBracingCountChange}
-            woodLockVal1={woodLockVal1}
-            setWoodLockVal1={setWoodLockVal1}
-            woodLockVal2={woodLockVal2}
-            setWoodLockVal2={setWoodLockVal2}
-            woodLockVal3={woodLockVal3}
-            setWoodLockVal3={setWoodLockVal3}
-            woodExtHeight={woodExtHeight}
-            setWoodExtHeight={setWoodExtHeight}
-            woodExtWidth={woodExtWidth}
-            setWoodExtWidth={setWoodExtWidth}
-            woodExtDepth={woodExtDepth}
-            setWoodExtDepth={setWoodExtDepth}
-            woodTrapExtHeight={woodTrapExtHeight}
-            setWoodTrapExtHeight={setWoodTrapExtHeight}
-            woodTrapExtWidth={woodTrapExtWidth}
-            setWoodTrapExtWidth={setWoodTrapExtWidth}
-            woodTrapExtDepthTop={woodTrapExtDepthTop}
-            setWoodTrapExtDepthTop={setWoodTrapExtDepthTop}
-            woodTrapExtDepthBot={woodTrapExtDepthBot}
-            setWoodTrapExtDepthBot={setWoodTrapExtDepthBot}
+          // Ebanistería props
+          woodMode={woodMode}
+          setWoodMode={setWoodMode}
+          woodShape={woodShape}
+          setWoodShape={setWoodShape}
+          woodConstraint={woodConstraint}
+          setWoodConstraint={setWoodConstraint}
+          woodRatio={woodRatio}
+          setWoodRatio={setWoodRatio}
+          woodThickness={woodThickness}
+          setWoodThickness={setWoodThickness}
+          woodExtra={woodExtra}
+          setWoodExtra={setWoodExtra}
+          woodLockVal1={woodLockVal1}
+          setWoodLockVal1={setWoodLockVal1}
+          woodLockVal2={woodLockVal2}
+          setWoodLockVal2={setWoodLockVal2}
+          woodLockVal3={woodLockVal3}
+          setWoodLockVal3={setWoodLockVal3}
+          woodExtHeight={woodExtHeight}
+          setWoodExtHeight={setWoodExtHeight}
+          woodExtWidth={woodExtWidth}
+          setWoodExtWidth={setWoodExtWidth}
+          woodExtDepth={woodExtDepth}
+          setWoodExtDepth={setWoodExtDepth}
+          woodTrapExtHeight={woodTrapExtHeight}
+          setWoodTrapExtHeight={setWoodTrapExtHeight}
+          woodTrapExtWidth={woodTrapExtWidth}
+          setWoodTrapExtWidth={setWoodTrapExtWidth}
+          woodTrapExtDepthTop={woodTrapExtDepthTop}
+          setWoodTrapExtDepthTop={setWoodTrapExtDepthTop}
+          woodTrapExtDepthBot={woodTrapExtDepthBot}
+          setWoodTrapExtDepthBot={setWoodTrapExtDepthBot}
 
-            // Damping props
-            dampingType={dampingType}
-            setDampingType={setDampingType}
-            // Crossover props
-            crossoverWays={crossoverWays}
-            setCrossoverWays={setCrossoverWays}
-            crossoverType={crossoverType}
-            setCrossoverType={setCrossoverType}
-            fc={fc}
-            setFc={setFc}
-            fcLow={fcLow}
-            setFcLow={setFcLow}
-            fcHigh={fcHigh}
-            setFcHigh={setFcHigh}
-            zTweeter={zTweeter}
-            setZTweeter={setZTweeter}
-            zMidrange={zMidrange}
-            setZMidrange={setZMidrange}
-            zWoofer={zWoofer}
-            setZWoofer={setZWoofer}
-            enableZobel={enableZobel}
-            setEnableZobel={setEnableZobel}
-            zobelRe={zobelRe}
-            setZobelRe={setZobelRe}
-            zobelLe={zobelLe}
-            setZobelLe={setZobelLe}
-            enableLPad={enableLPad}
-            setEnableLPad={setEnableLPad}
-            lpadAttenuation={lpadAttenuation}
-            setLpadAttenuation={setLpadAttenuation}
-            lpadZLoad={lpadZLoad}
-            setLpadZLoad={setLpadZLoad}
-            speakerYPct={speakerYPct}
-            setSpeakerYPct={setSpeakerYPct}
-            portYPct={portYPct}
-            setPortYPct={setPortYPct}
-            portLocation={portLocation}
-            setPortLocation={setPortLocation}
-            midFs={midFs}
-            setMidFs={setMidFs}
-            midVas={midVas}
-            setMidVas={setMidVas}
-            midQts={midQts}
-            setMidQts={setMidQts}
-            midTargetQtc={midTargetQtc}
-            setMidTargetQtc={setMidTargetQtc}
-            useCustomMidVol={useCustomMidVol}
-            setUseCustomMidVol={setUseCustomMidVol}
-            customMidVol={customMidVol}
-            setCustomMidVol={setCustomMidVol}
-            tweeterYPct={tweeterYPct}
-            setTweeterYPct={setTweeterYPct}
-            midrangeYPct={midrangeYPct}
-            setMidrangeYPct={setMidrangeYPct}
-            midCabinetDepth={midCabinetDepth}
-            setMidCabinetDepth={setMidCabinetDepth}
-            midSealed={midSealed}
-            setMidSealed={setMidSealed}
-          />
-        </div>
+          // Damping props
+          dampingType={dampingType}
+          setDampingType={setDampingType}
 
- 
+          // Crossover props
+          crossoverWays={crossoverWays}
+          setCrossoverWays={setCrossoverWays}
+          crossoverType={crossoverType}
+          setCrossoverType={setCrossoverType}
+          fc={fc}
+          setFc={setFc}
+          fcLow={fcLow}
+          setFcLow={setFcLow}
+          fcHigh={fcHigh}
+          setFcHigh={setFcHigh}
+          zTweeter={zTweeter}
+          setZTweeter={setZTweeter}
+          zMidrange={zMidrange}
+          setZMidrange={setZMidrange}
+          zWoofer={zWoofer}
+          setZWoofer={setZWoofer}
+          enableZobel={enableZobel}
+          setEnableZobel={setEnableZobel}
+          zobelRe={zobelRe}
+          setZobelRe={setZobelRe}
+          zobelLe={zobelLe}
+          setZobelLe={setZobelLe}
+          enableLPad={enableLPad}
+          setEnableLPad={setEnableLPad}
+          lpadAttenuation={lpadAttenuation}
+          setLpadAttenuation={setLpadAttenuation}
+          lpadZLoad={lpadZLoad}
+          setLpadZLoad={setLpadZLoad}
+          speakerYPct={speakerYPct}
+          setSpeakerYPct={setSpeakerYPct}
+          portYPct={portYPct}
+          setPortYPct={setPortYPct}
+        />
+
         {/* CONTENIDOS DERECHA */}
         <main className="dashboard-main">
           {/* Gráfico */}
@@ -1112,7 +884,7 @@ function App() {
             fcLow={fcLow}
             fcHigh={fcHigh}
           />
- 
+
           {/* Grilla de Resultados y Diagramas en Paralelo */}
           <div className="results-diagrams-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '0px', marginTop: '0px' }}>
             {/* Panel Izquierdo: Cajón y Plano Técnico */}
@@ -1164,30 +936,12 @@ function App() {
                 portHeight={portHeight}
                 portArea={portArea}
                 dampingFactor={dampingFactor}
+                dampingType={dampingType}
                 flaredEnds={flaredEnds}
                 onCabinetDataChange={handleCabinetDataChange}
                 readOnly={true}
                 speakerYPct={speakerYPct}
                 portYPct={portYPct}
-                portLocation={portLocation}
-                crossoverWays={crossoverWays}
-                driverConfig={driverConfig}
-                midFs={midFs}
-                midVas={midVas}
-                midQts={midQts}
-                midTargetQtc={midTargetQtc}
-                useCustomMidVol={useCustomMidVol}
-                customMidVol={customMidVol}
-                tweeterYPct={tweeterYPct}
-                midrangeYPct={midrangeYPct}
-                midCabinetDepth={midCabinetDepth}
-                enableBracing={enableBracing}
-                onEnableBracingChange={setEnableBracing}
-                bracingCount={bracingCount}
-                onBracingCountChange={handleBracingCountChange}
-                bracingPositions={bracingPositions}
-                onBracingPositionsChange={setBracingPositions}
-                midSealed={midSealed}
               />
             </div>
 
@@ -1208,8 +962,6 @@ function App() {
                 enableZobelProp={enableZobel}
                 reProp={zobelRe}
                 leProp={zobelLe}
-                midReProp={midRe}
-                midLeProp={midLe}
                 enableLPadProp={enableLPad}
                 attenuationProp={lpadAttenuation}
                 zLoadProp={lpadZLoad}

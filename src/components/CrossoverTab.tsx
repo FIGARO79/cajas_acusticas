@@ -23,7 +23,7 @@ interface CrossoverTabProps {
   zLoadProp?: number;
 }
 
-export const CrossoverTab: React.FC<CrossoverTabProps> = ({
+const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
   lang,
   onRegisterExporter,
   readOnly = false,
@@ -65,6 +65,27 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({
   const [enableLPadLocal, setEnableLPad] = useState<boolean>(false);
   const [attenuationLocal, setAttenuation] = useState<number>(3); // dB
   const [zLoadLocal, setZLoad] = useState<number>(8);
+
+  // 5. Inductor Calculator Inputs (Wheeler)
+  const [indCalcTargetL, setIndCalcTargetL] = useState<number | ''>(1.0);
+  const [indCalcD, setIndCalcD] = useState<number | ''>(20.0);
+  const [indCalcLen, setIndCalcLen] = useState<number | ''>(2.0);
+  const [indCalcN, setIndCalcN] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (indCalcTargetL && indCalcD && indCalcLen) {
+      try {
+        const wasm = getWasm();
+        const n = wasm.calc_vueltas_inductor_wheeler(Number(indCalcTargetL), Number(indCalcD), Number(indCalcLen));
+        setIndCalcN(n > 0 ? n : null);
+      } catch (e) {
+        console.error("Error calculating inductor turns:", e);
+        setIndCalcN(null);
+      }
+    } else {
+      setIndCalcN(null);
+    }
+  }, [indCalcTargetL, indCalcD, indCalcLen]);
 
   // Resolver valores activos
   const crossoverWays = readOnly ? (crossoverWaysProp || '2way') : crossoverWaysLocal;
@@ -150,10 +171,8 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({
             lp: { l1: l1_w / 1000, c1: c1_w / 1000, l2: l2_w / 1000, c2: c2_w / 1000 }
           };
         }
-      } catch (e: any) {
-        if (!(e && e.message && e.message.includes("WASM not initialized yet"))) {
-          console.error("WASM crossover calculation error, falling back to JS:", e);
-        }
+      } catch (e) {
+        console.error("WASM crossover calculation error, falling back to JS:", e);
       }
 
       // Fallback JS math (2-way)
@@ -302,10 +321,8 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({
       const wasm = getWasm();
       const res = wasm.calc_zobel(re, le);
       return { rz: res.rz, cz: res.cz };
-    } catch (e: any) {
-      if (!(e && e.message && e.message.includes("WASM not initialized yet"))) {
-        console.error("WASM Zobel error, falling back:", e);
-      }
+    } catch (e) {
+      console.error("WASM Zobel error, falling back:", e);
       const rz = 1.25 * re;
       const cz = (le * 1000) / (rz * rz);
       return { rz, cz };
@@ -321,10 +338,8 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({
       const wasm = getWasm();
       const res = wasm.calc_lpad(attenuation, zLoad);
       return { r1: res.r1, r2: res.r2 };
-    } catch (e: any) {
-      if (!(e && e.message && e.message.includes("WASM not initialized yet"))) {
-        console.error("WASM LPad error, falling back:", e);
-      }
+    } catch (e) {
+      console.error("WASM LPad error, falling back:", e);
       const k = Math.pow(10, -attenuation / 20);
       const r1 = zLoad * (1 - k);
       const r2 = zLoad * k / (1 - k);
@@ -333,259 +348,6 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({
   };
 
   const lpadResults = calculateLPad();
-
-  const getComponentRows = () => {
-    if (!xoverResults) return [];
-    const bpFilter = xoverResults.bp;
-    const rows: { name: string; section: string; type: string; value: string; colorClass?: string }[] = [];
-
-    // 1. Paso Alto (Tweeter)
-    if (xoverResults.hp.c1 !== null && xoverResults.hp.c1 !== undefined) {
-      rows.push({
-        name: 'C1',
-        section: t("Paso Alto (Tweeter)"),
-        type: t("Condensador (Serie)"),
-        value: `${xoverResults.hp.c1.toFixed(2)} µF`,
-        colorClass: 'var(--primary)'
-      });
-    }
-    if (xoverResults.hp.c2) {
-      rows.push({
-        name: 'C2',
-        section: t("Paso Alto (Tweeter)"),
-        type: t("Condensador (Serie)"),
-        value: `${xoverResults.hp.c2.toFixed(2)} µF`,
-        colorClass: 'var(--primary)'
-      });
-    }
-    if (xoverResults.hp.l1 !== null && xoverResults.hp.l1 !== undefined) {
-      rows.push({
-        name: 'L1',
-        section: t("Paso Alto (Tweeter)"),
-        type: t("Inductor (Paralelo)"),
-        value: `${xoverResults.hp.l1.toFixed(3)} mH`,
-        colorClass: 'var(--primary)'
-      });
-    }
-    if (xoverResults.hp.l2) {
-      rows.push({
-        name: 'L2',
-        section: t("Paso Alto (Tweeter)"),
-        type: t("Inductor (Paralelo)"),
-        value: `${xoverResults.hp.l2.toFixed(3)} mH`,
-        colorClass: 'var(--primary)'
-      });
-    }
-
-    // 2. L-Pad (Atenuador Tweeter)
-    if (enableLPad && lpadResults) {
-      rows.push({
-        name: 'R_ser',
-        section: t("Atenuación (L-Pad)"),
-        type: t("Resistencia (Serie)"),
-        value: `${lpadResults.r1.toFixed(2)} Ω`,
-        colorClass: '#38bdf8'
-      });
-      rows.push({
-        name: 'R_par',
-        section: t("Atenuación (L-Pad)"),
-        type: t("Resistencia (Paralelo)"),
-        value: `${lpadResults.r2.toFixed(2)} Ω`,
-        colorClass: '#38bdf8'
-      });
-    }
-
-    // 3. Banda de Paso (Medios)
-    if (crossoverWays === '3way' && bpFilter) {
-      if (crossoverType === '4th_lr') {
-        if (bpFilter.c1_hp !== undefined && bpFilter.c1_hp !== null) {
-          rows.push({
-            name: 'C1_HP',
-            section: t("Banda de Paso (Medios)"),
-            type: t("Condensador (Serie)"),
-            value: `${bpFilter.c1_hp.toFixed(2)} µF`,
-            colorClass: '#eab308'
-          });
-        }
-        if (bpFilter.c2_hp !== undefined && bpFilter.c2_hp !== null) {
-          rows.push({
-            name: 'C2_HP',
-            section: t("Banda de Paso (Medios)"),
-            type: t("Condensador (Serie)"),
-            value: `${bpFilter.c2_hp.toFixed(2)} µF`,
-            colorClass: '#eab308'
-          });
-        }
-        if (bpFilter.l1_hp !== undefined && bpFilter.l1_hp !== null) {
-          rows.push({
-            name: 'L1_HP',
-            section: t("Banda de Paso (Medios)"),
-            type: t("Inductor (Paralelo)"),
-            value: `${bpFilter.l1_hp.toFixed(3)} mH`,
-            colorClass: '#eab308'
-          });
-        }
-        if (bpFilter.l2_hp !== undefined && bpFilter.l2_hp !== null) {
-          rows.push({
-            name: 'L2_HP',
-            section: t("Banda de Paso (Medios)"),
-            type: t("Inductor (Paralelo)"),
-            value: `${bpFilter.l2_hp.toFixed(3)} mH`,
-            colorClass: '#eab308'
-          });
-        }
-        if (bpFilter.l1_lp !== undefined && bpFilter.l1_lp !== null) {
-          rows.push({
-            name: 'L1_LP',
-            section: t("Banda de Paso (Medios)"),
-            type: t("Inductor (Serie)"),
-            value: `${bpFilter.l1_lp.toFixed(3)} mH`,
-            colorClass: '#eab308'
-          });
-        }
-        if (bpFilter.l2_lp !== undefined && bpFilter.l2_lp !== null) {
-          rows.push({
-            name: 'L2_LP',
-            section: t("Banda de Paso (Medios)"),
-            type: t("Inductor (Serie)"),
-            value: `${bpFilter.l2_lp.toFixed(3)} mH`,
-            colorClass: '#eab308'
-          });
-        }
-        if (bpFilter.c1_lp !== undefined && bpFilter.c1_lp !== null) {
-          rows.push({
-            name: 'C1_LP',
-            section: t("Banda de Paso (Medios)"),
-            type: t("Condensador (Paralelo)"),
-            value: `${bpFilter.c1_lp.toFixed(2)} µF`,
-            colorClass: '#eab308'
-          });
-        }
-        if (bpFilter.c2_lp !== undefined && bpFilter.c2_lp !== null) {
-          rows.push({
-            name: 'C2_LP',
-            section: t("Banda de Paso (Medios)"),
-            type: t("Condensador (Paralelo)"),
-            value: `${bpFilter.c2_lp.toFixed(2)} µF`,
-            colorClass: '#eab308'
-          });
-        }
-      } else {
-        if (bpFilter.c_hp !== undefined || bpFilter.c1_hp !== undefined) {
-          rows.push({
-            name: 'C_HP',
-            section: t("Banda de Paso (Medios)"),
-            type: t("Condensador (Serie)"),
-            value: `${((bpFilter.c_hp || bpFilter.c1_hp) as number).toFixed(2)} µF`,
-            colorClass: '#eab308'
-          });
-        }
-        if (bpFilter.l_lp !== undefined || bpFilter.l1_lp !== undefined) {
-          rows.push({
-            name: 'L_LP',
-            section: t("Banda de Paso (Medios)"),
-            type: t("Inductor (Serie)"),
-            value: `${((bpFilter.l_lp || bpFilter.l1_lp) as number).toFixed(3)} mH`,
-            colorClass: '#eab308'
-          });
-        }
-        if (bpFilter.l_hp !== undefined && bpFilter.l_hp !== null) {
-          rows.push({
-            name: 'L_HP',
-            section: t("Banda de Paso (Medios)"),
-            type: t("Inductor (Paralelo)"),
-            value: `${bpFilter.l_hp.toFixed(3)} mH`,
-            colorClass: '#eab308'
-          });
-        }
-        if (bpFilter.c_lp !== undefined && bpFilter.c_lp !== null) {
-          rows.push({
-            name: 'C_LP',
-            section: t("Banda de Paso (Medios)"),
-            type: t("Condensador (Paralelo)"),
-            value: `${bpFilter.c_lp.toFixed(2)} µF`,
-            colorClass: '#eab308'
-          });
-        }
-      }
-    }
-
-    // 4. Paso Bajo (Woofer)
-    if (xoverResults.lp.l1 !== null && xoverResults.lp.l1 !== undefined) {
-      rows.push({
-        name: 'L1',
-        section: t("Paso Bajo (Woofer)"),
-        type: t("Inductor (Serie)"),
-        value: `${xoverResults.lp.l1.toFixed(3)} mH`,
-        colorClass: 'var(--success)'
-      });
-    }
-    if (xoverResults.lp.l2) {
-      rows.push({
-        name: 'L2',
-        section: t("Paso Bajo (Woofer)"),
-        type: t("Inductor (Serie)"),
-        value: `${xoverResults.lp.l2.toFixed(3)} mH`,
-        colorClass: 'var(--success)'
-      });
-    }
-    if (xoverResults.lp.c1 !== null && xoverResults.lp.c1 !== undefined) {
-      rows.push({
-        name: 'C1',
-        section: t("Paso Bajo (Woofer)"),
-        type: t("Condensador (Paralelo)"),
-        value: `${xoverResults.lp.c1.toFixed(2)} µF`,
-        colorClass: 'var(--success)'
-      });
-    }
-    if (xoverResults.lp.c2) {
-      rows.push({
-        name: 'C2',
-        section: t("Paso Bajo (Woofer)"),
-        type: t("Condensador (Paralelo)"),
-        value: `${xoverResults.lp.c2.toFixed(2)} µF`,
-        colorClass: 'var(--success)'
-      });
-    }
-
-    // 5. Red Zobel (Woofer)
-    if (enableZobel && zobelResults) {
-      rows.push({
-        name: 'Rz',
-        section: crossoverWays === '3way' ? t("Red Zobel (Woofer)") : t("Red Zobel"),
-        type: t("Resistencia (Serie)"),
-        value: `${zobelResults.rz.toFixed(1)} Ω`,
-        colorClass: 'var(--warning)'
-      });
-      rows.push({
-        name: 'Cz',
-        section: crossoverWays === '3way' ? t("Red Zobel (Woofer)") : t("Red Zobel"),
-        type: t("Condensador (Serie)"),
-        value: `${zobelResults.cz.toFixed(2)} µF`,
-        colorClass: 'var(--warning)'
-      });
-    }
-
-    // 6. Red Zobel (Medios)
-    if (crossoverWays === '3way' && enableZobel && midZobelResults) {
-      rows.push({
-        name: 'Rz_mid',
-        section: t("Red Zobel (Medios)"),
-        type: t("Resistencia (Serie)"),
-        value: `${midZobelResults.rz.toFixed(1)} Ω`,
-        colorClass: 'var(--warning)'
-      });
-      rows.push({
-        name: 'Cz_mid',
-        section: t("Red Zobel (Medios)"),
-        type: t("Condensador (Serie)"),
-        value: `${midZobelResults.cz.toFixed(2)} µF`,
-        colorClass: 'var(--warning)'
-      });
-    }
-
-    return rows;
-  };
 
   useEffect(() => {
     if (onRegisterExporter) {
@@ -676,7 +438,7 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({
 
       return (
         <div style={{ background: 'var(--card-bg)', borderRadius: '12px', padding: '1rem 1.5rem 1.25rem 1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', boxSizing: 'border-box', backdropFilter: 'blur(16px)' }}>
-          <span className="control-title" style={{ alignSelf: 'flex-start', fontSize: '1rem', color: 'var(--text-main)', marginBottom: '0.75rem', fontWeight: 600 }}>
+          <span className="control-title" style={{ color: 'var(--text-main)', marginBottom: '1rem' }}>
             {t("Esquema de Conexión del Crossover (2 Vías)")}
           </span>
           <svg width="100%" viewBox="0 -25 850 475" fill="none" style={{ maxWidth: '100%', height: 'auto', color: 'var(--text-main)' }}>
@@ -908,7 +670,7 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({
 
       return (
         <div style={{ background: 'var(--card-bg)', borderRadius: '12px', padding: '1rem 1.5rem 1.25rem 1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', boxSizing: 'border-box', backdropFilter: 'blur(16px)' }}>
-          <span className="control-title" style={{ alignSelf: 'flex-start', fontSize: '1rem', color: 'var(--text-main)', marginBottom: '0.75rem', fontWeight: 600 }}>
+          <span className="control-title" style={{ color: 'var(--text-main)', marginBottom: '1rem' }}>
             {t("Esquema de Conexión del Crossover (3 Vías)")}
           </span>
           <svg width="100%" viewBox="0 0 850 640" fill="none" style={{ maxWidth: '100%', height: 'auto', color: 'var(--text-main)' }}>
@@ -996,8 +758,8 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({
                 <line x1="200" y1="270" x2="235" y2="270" stroke="#ef4444" strokeWidth="4" />
                 <text x="140" y="320" fill="#eab308" fontSize="13" fontWeight="bold">
                   {crossoverType === '4th_lr'
-                    ? `C1/C2_HP = ${(bp.c1_hp ?? 0).toFixed(1)} / ${(bp.c2_hp ?? 0).toFixed(1)} µF`
-                    : `C1 = ${(bp.c_hp ?? bp.c1_hp ?? 0).toFixed(2)} µF`}
+                    ? `C1/C2_HP = ${(bp.c1_hp || 0).toFixed(1)} / ${(bp.c2_hp || 0).toFixed(1)} µF`
+                    : `C1 = ${(bp.c_hp || bp.c1_hp || 0).toFixed(2)} µF`}
                 </text>
               </>
             ) : (
@@ -1010,8 +772,8 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({
                 <path d="M 235,270 Q 247,245 259,270 Q 271,245 283,270 Q 295,245 307,270 Q 319,245 331,270" fill="none" stroke="#ef4444" strokeWidth="4" />
                 <text x="235" y="230" fill="#eab308" fontSize="13" fontWeight="bold">
                   {crossoverType === '4th_lr'
-                    ? `L1/L2_LP = ${(bp.l1_lp ?? 0).toFixed(2)} / ${(bp.l2_lp ?? 0).toFixed(2)} mH`
-                    : `L1 = ${(bp.l_lp ?? bp.l1_lp ?? 0).toFixed(3)} mH`}
+                    ? `L1/L2_LP = ${(bp.l1_lp || 0).toFixed(2)} / ${(bp.l2_lp || 0).toFixed(2)} mH`
+                    : `L1 = ${(bp.l_lp || bp.l1_lp || 0).toFixed(3)} mH`}
                 </text>
               </>
             ) : (
@@ -1029,8 +791,8 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({
                 <circle cx="380" cy="390" r="7" fill="currentColor" />
                 <text x="370" y="365" textAnchor="end" fill="#eab308" fontSize="13" fontWeight="bold">
                   {crossoverType === '4th_lr'
-                    ? `L1/L2_HP = ${(bp.l1_hp ?? 0).toFixed(2)} / ${(bp.l2_hp ?? 0).toFixed(2)} mH`
-                    : `L2 = ${(bp.l_hp ?? 0).toFixed(3)} mH`}
+                    ? `L1/L2_HP = ${(bp.l1_hp || 0).toFixed(2)} / ${(bp.l2_hp || 0).toFixed(2)} mH`
+                    : `L2 = ${(bp.l_hp || 0).toFixed(3)} mH`}
                 </text>
               </>
             )}
@@ -1045,8 +807,8 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({
                 <circle cx="460" cy="390" r="7" fill="currentColor" />
                 <text x="480" y="320" fill="#eab308" fontSize="13" fontWeight="bold">
                   {crossoverType === '4th_lr'
-                    ? `C1/C2_LP = ${(bp.c1_lp ?? 0).toFixed(1)} / ${(bp.c2_lp ?? 0).toFixed(1)} µF`
-                    : `C2 = ${(bp.c_lp ?? 0).toFixed(2)} µF`}
+                    ? `C1/C2_LP = ${(bp.c1_lp || 0).toFixed(1)} / ${(bp.c2_lp || 0).toFixed(1)} µF`
+                    : `C2 = ${(bp.c_lp || 0).toFixed(2)} µF`}
                 </text>
               </>
             )}
@@ -1167,9 +929,245 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({
     }
   };
 
+
+  const renderComponentsTable = () => {
+    if (!xoverResults) return null;
+    return (
+      <div style={{ overflowX: 'auto' }}>
+              <table className="wood-table" style={{ width: '100%', fontSize: '0.85rem' }}>
+                <thead>
+                  <tr>
+                    <th>{t("Vía / Sección")}</th>
+                    <th>{t("Componente")}</th>
+                    <th>{t("Tipo de Conexión")}</th>
+                    <th>{t("Valor")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* TWEETER */}
+                  {hpFilter?.c1 !== null && hpFilter?.c1 !== undefined && (
+                    <tr>
+                      <td style={{ color: 'var(--primary)', fontWeight: 600 }}>{t("Paso Alto (Tweeter)")}</td>
+                      <td><strong>C1</strong></td>
+                      <td>{t("Serie")}</td>
+                      <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{hpFilter.c1.toFixed(2)} µF</td>
+                    </tr>
+                  )}
+                  {hpFilter?.c2 && (
+                    <tr>
+                      <td style={{ color: 'var(--primary)', fontWeight: 600 }}>{t("Paso Alto (Tweeter)")}</td>
+                      <td><strong>C2</strong></td>
+                      <td>{t("Serie")}</td>
+                      <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{hpFilter.c2.toFixed(2)} µF</td>
+                    </tr>
+                  )}
+                  {hpFilter?.l1 !== null && hpFilter?.l1 !== undefined && (
+                    <tr>
+                      <td style={{ color: 'var(--primary)', fontWeight: 600 }}>{t("Paso Alto (Tweeter)")}</td>
+                      <td><strong>L1</strong></td>
+                      <td>{t("Paralelo")}</td>
+                      <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{hpFilter.l1.toFixed(3)} mH</td>
+                    </tr>
+                  )}
+                  {hpFilter?.l2 && (
+                    <tr>
+                      <td style={{ color: 'var(--primary)', fontWeight: 600 }}>{t("Paso Alto (Tweeter)")}</td>
+                      <td><strong>L2</strong></td>
+                      <td>{t("Paralelo")}</td>
+                      <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{hpFilter.l2.toFixed(3)} mH</td>
+                    </tr>
+                  )}
+
+                  {/* MIDRANGE */}
+                  {crossoverWays === '3way' && bpFilter && (
+                    crossoverType === '4th_lr' ? (
+                      <>
+                        {bpFilter.c1_hp !== undefined && (
+                          <tr>
+                            <td style={{ color: '#eab308', fontWeight: 600 }}>{t("Banda de Paso (Mid)")}</td>
+                            <td><strong>C1_HP</strong></td>
+                            <td>{t("Serie")} ({t("Sección Paso Alto")})</td>
+                            <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{bpFilter.c1_hp.toFixed(2)} µF</td>
+                          </tr>
+                        )}
+                        {bpFilter.c2_hp !== undefined && (
+                          <tr>
+                            <td style={{ color: '#eab308', fontWeight: 600 }}>{t("Banda de Paso (Mid)")}</td>
+                            <td><strong>C2_HP</strong></td>
+                            <td>{t("Serie")} ({t("Sección Paso Alto")})</td>
+                            <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{bpFilter.c2_hp.toFixed(2)} µF</td>
+                          </tr>
+                        )}
+                        {bpFilter.l1_hp !== undefined && (
+                          <tr>
+                            <td style={{ color: '#eab308', fontWeight: 600 }}>{t("Banda de Paso (Mid)")}</td>
+                            <td><strong>L1_HP</strong></td>
+                            <td>{t("Paralelo")} ({t("Sección Paso Alto")})</td>
+                            <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{bpFilter.l1_hp.toFixed(3)} mH</td>
+                          </tr>
+                        )}
+                        {bpFilter.l2_hp !== undefined && (
+                          <tr>
+                            <td style={{ color: '#eab308', fontWeight: 600 }}>{t("Banda de Paso (Mid)")}</td>
+                            <td><strong>L2_HP</strong></td>
+                            <td>{t("Paralelo")} ({t("Sección Paso Alto")})</td>
+                            <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{bpFilter.l2_hp.toFixed(3)} mH</td>
+                          </tr>
+                        )}
+                        {bpFilter.l1_lp !== undefined && (
+                          <tr>
+                            <td style={{ color: '#eab308', fontWeight: 600 }}>{t("Banda de Paso (Mid)")}</td>
+                            <td><strong>L1_LP</strong></td>
+                            <td>{t("Serie")} ({t("Sección Paso Bajo")})</td>
+                            <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{bpFilter.l1_lp.toFixed(3)} mH</td>
+                          </tr>
+                        )}
+                        {bpFilter.l2_lp !== undefined && (
+                          <tr>
+                            <td style={{ color: '#eab308', fontWeight: 600 }}>{t("Banda de Paso (Mid)")}</td>
+                            <td><strong>L2_LP</strong></td>
+                            <td>{t("Serie")} ({t("Sección Paso Bajo")})</td>
+                            <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{bpFilter.l2_lp.toFixed(3)} mH</td>
+                          </tr>
+                        )}
+                        {bpFilter.c1_lp !== undefined && (
+                          <tr>
+                            <td style={{ color: '#eab308', fontWeight: 600 }}>{t("Banda de Paso (Mid)")}</td>
+                            <td><strong>C1_LP</strong></td>
+                            <td>{t("Paralelo")} ({t("Sección Paso Bajo")})</td>
+                            <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{bpFilter.c1_lp.toFixed(2)} µF</td>
+                          </tr>
+                        )}
+                        {bpFilter.c2_lp !== undefined && (
+                          <tr>
+                            <td style={{ color: '#eab308', fontWeight: 600 }}>{t("Banda de Paso (Mid)")}</td>
+                            <td><strong>C2_LP</strong></td>
+                            <td>{t("Paralelo")} ({t("Sección Paso Bajo")})</td>
+                            <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{bpFilter.c2_lp.toFixed(2)} µF</td>
+                          </tr>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        {(bpFilter.c_hp !== undefined || bpFilter.c1_hp !== undefined) && (
+                          <tr>
+                            <td style={{ color: '#eab308', fontWeight: 600 }}>{t("Banda de Paso (Mid)")}</td>
+                            <td><strong>C_HP / C1</strong></td>
+                            <td>{t("Serie")} ({t("Paso Alto")})</td>
+                            <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>
+                              {((bpFilter.c_hp || bpFilter.c1_hp) as number).toFixed(2)} µF
+                            </td>
+                          </tr>
+                        )}
+                        {(bpFilter.l_lp !== undefined || bpFilter.l1_lp !== undefined) && (
+                          <tr>
+                            <td style={{ color: '#eab308', fontWeight: 600 }}>{t("Banda de Paso (Mid)")}</td>
+                            <td><strong>L_LP / L1</strong></td>
+                            <td>{t("Serie")} ({t("Paso Bajo")})</td>
+                            <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>
+                              {((bpFilter.l_lp || bpFilter.l1_lp) as number).toFixed(3)} mH
+                            </td>
+                          </tr>
+                        )}
+                        {bpFilter.l_hp !== undefined && bpFilter.l_hp !== null && (
+                          <tr>
+                            <td style={{ color: '#eab308', fontWeight: 600 }}>{t("Banda de Paso (Mid)")}</td>
+                            <td><strong>L_HP / L2</strong></td>
+                            <td>{t("Paralelo")} ({t("Paso Alto")})</td>
+                            <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{bpFilter.l_hp.toFixed(3)} mH</td>
+                          </tr>
+                        )}
+                        {bpFilter.c_lp !== undefined && bpFilter.c_lp !== null && (
+                          <tr>
+                            <td style={{ color: '#eab308', fontWeight: 600 }}>{t("Banda de Paso (Mid)")}</td>
+                            <td><strong>C_LP / C2</strong></td>
+                            <td>{t("Paralelo")} ({t("Paso Bajo")})</td>
+                            <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{bpFilter.c_lp.toFixed(2)} µF</td>
+                          </tr>
+                        )}
+                      </>
+                    )
+                  )}
+
+                  {/* WOOFER */}
+                  {lpFilter?.l1 !== null && lpFilter?.l1 !== undefined && (
+                    <tr>
+                      <td style={{ color: 'var(--ported-color)', fontWeight: 600 }}>{t("Paso Bajo (Woofer)")}</td>
+                      <td><strong>L1</strong></td>
+                      <td>{t("Serie")}</td>
+                      <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{lpFilter.l1.toFixed(3)} mH</td>
+                    </tr>
+                  )}
+                  {lpFilter?.l2 && (
+                    <tr>
+                      <td style={{ color: 'var(--ported-color)', fontWeight: 600 }}>{t("Paso Bajo (Woofer)")}</td>
+                      <td><strong>L2</strong></td>
+                      <td>{t("Serie")}</td>
+                      <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{lpFilter.l2.toFixed(3)} mH</td>
+                    </tr>
+                  )}
+                  {lpFilter?.c1 !== null && lpFilter?.c1 !== undefined && (
+                    <tr>
+                      <td style={{ color: 'var(--ported-color)', fontWeight: 600 }}>{t("Paso Bajo (Woofer)")}</td>
+                      <td><strong>C1</strong></td>
+                      <td>{t("Paralelo")}</td>
+                      <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{lpFilter.c1.toFixed(2)} µF</td>
+                    </tr>
+                  )}
+                  {lpFilter?.c2 && (
+                    <tr>
+                      <td style={{ color: 'var(--ported-color)', fontWeight: 600 }}>{t("Paso Bajo (Woofer)")}</td>
+                      <td><strong>C2</strong></td>
+                      <td>{t("Paralelo")}</td>
+                      <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{lpFilter.c2.toFixed(2)} µF</td>
+                    </tr>
+                  )}
+
+                  {/* RED ZOBEL */}
+                  {enableZobel && zobelResults && (
+                    <>
+                      <tr>
+                        <td style={{ color: 'var(--warning)', fontWeight: 600 }}>{t("Red Zobel (Woofer)")}</td>
+                        <td><strong>Rz</strong></td>
+                        <td>{t("Serie")}</td>
+                        <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{zobelResults.rz.toFixed(2)} Ω</td>
+                      </tr>
+                      <tr>
+                        <td style={{ color: 'var(--warning)', fontWeight: 600 }}>{t("Red Zobel (Woofer)")}</td>
+                        <td><strong>Cz</strong></td>
+                        <td>{t("Paralelo")}</td>
+                        <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{zobelResults.cz.toFixed(2)} µF</td>
+                      </tr>
+                    </>
+                  )}
+
+                  {/* L-PAD */}
+                  {enableLPad && lpadResults && (
+                    <>
+                      <tr>
+                        <td style={{ color: '#38bdf8', fontWeight: 600 }}>{t("Atenuador L-Pad (Tweeter)")}</td>
+                        <td><strong>R_ser</strong></td>
+                        <td>{t("Serie")}</td>
+                        <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{lpadResults.r1.toFixed(2)} Ω</td>
+                      </tr>
+                      <tr>
+                        <td style={{ color: '#38bdf8', fontWeight: 600 }}>{t("Atenuador L-Pad (Tweeter)")}</td>
+                        <td><strong>R_par</strong></td>
+                        <td>{t("Paralelo")}</td>
+                        <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{lpadResults.r2.toFixed(2)} Ω</td>
+                      </tr>
+                    </>
+                  )}
+                </tbody>
+              </table>
+
+      </div>
+    );
+  };
+
   if (readOnly) {
     return (
-      <div className="read-only-crossover-tab" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%', boxSizing: 'border-box' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%', boxSizing: 'border-box' }}>
         {/* Esquema de conexión */}
         <div style={{ width: '100%', marginTop: '0.25rem' }}>
           {renderSchematic()}
@@ -1177,34 +1175,11 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({
 
         {/* Componentes Calculados */}
         {xoverResults && (
-          <div className="pro-calc-panel" style={{ marginTop: '0rem' }}>
-            <span className="pro-calc-title">
+          <div className="pro-calc-panel" style={{ marginTop: '0rem', padding: '0rem', overflowX: 'auto' }}>
+            <span className="pro-calc-title" style={{ display: 'block', marginBottom: '0rem', color: 'var(--success)' }}>
               {t("Componentes del Filtro")} ({crossoverWays === '2way' ? '2 Vías' : '3 Vías'}, {crossoverType === '2nd_lr' ? 'L-R' : crossoverType === '2nd_butter' ? 'Butterworth' : crossoverType === '1st_order' ? '1er Orden' : '4to Orden'})
             </span>
-            <div style={{ overflowX: 'auto', width: '100%', marginTop: '0.5rem' }}>
-              <table className="crossover-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: '15%' }}>{t("Componente")}</th>
-                    <th style={{ width: '30%' }}>{t("Vía / Sección")}</th>
-                    <th style={{ width: '30%' }}>{t("Tipo / Conexión")}</th>
-                    <th style={{ width: '25%' }}>{t("Valor Calculado")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {getComponentRows().map((row, index) => (
-                    <tr key={index}>
-                      <td style={{ fontWeight: 'bold', color: row.colorClass }}>
-                        {row.name}
-                      </td>
-                      <td>{row.section}</td>
-                      <td style={{ color: 'var(--text-muted)' }}>{row.type}</td>
-                      <td style={{ fontWeight: 'bold', color: 'var(--text-main)' }}>{row.value}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            {renderComponentsTable()}
           </div>
         )}
       </div>
@@ -1212,16 +1187,16 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({
   }
 
   return (
-    <div className="tab-content active" id="tab-crossover" style={{ padding: '1.5rem' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div className="tab-content active" id="tab-crossover" style={{ padding: '0.5rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         
         {/* PANEL DE CALCULOS Y CONFIGURACIONES */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
           
           {/* CALCULADORA DE CROSSOVER (Fila 1, Col 1) */}
-          <div className="panel" style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', padding: '1.5rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', backdropFilter: 'blur(16px)', boxShadow: '0 4px 30px rgba(0, 0, 0, 0.2)', gridRow: 'span 2' }}>
+          <div className="panel" style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', padding: '0.5rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', backdropFilter: 'blur(16px)', boxShadow: '0 4px 30px rgba(0, 0, 0, 0.2)', gridRow: 'span 2' }}>
             <div>
-              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', borderBottom: '1px solid var(--card-border)', paddingBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', borderBottom: '1px solid var(--card-border)', paddingBottom: '0.5rem' }}>
                 <button 
                   className={`preset-select ${crossoverWays === '2way' ? 'active' : ''}`}
                   style={{ flex: 1, padding: '0.4rem 0.8rem', background: crossoverWays === '2way' ? 'var(--primary)' : 'transparent', color: crossoverWays === '2way' ? '#fff' : 'var(--text-main)', border: '1px solid var(--card-border)', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
@@ -1238,7 +1213,7 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({
                 </button>
               </div>
 
-              <span className="control-title" style={{ display: 'block', marginBottom: '1rem', color: 'var(--primary)' }}>
+              <span className="control-title" style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--primary)' }}>
                 {crossoverWays === '2way' ? t("Calculadora de Crossover pasivo de 2 Vías") : t("Calculadora de Crossover pasivo de 3 Vías")}
               </span>
 
@@ -1492,37 +1467,73 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({
 
         {/* COMPONENTES DEL FILTRO DEBAJO DEL DIAGRAMA */}
         <div className="panel" style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', padding: '1.5rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', backdropFilter: 'blur(16px)', boxShadow: '0 4px 30px rgba(0, 0, 0, 0.2)', marginTop: '0rem' }}>
-          <span className="control-title" style={{ display: 'block', marginBottom: '1rem', color: 'var(--success)', fontSize: '1rem', fontWeight: 600 }}>
+          <span className="control-title" style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--success)' }}>
             {t("Componentes del Filtro")} ({t(crossoverType)})
           </span>
 
           {xoverResults ? (
-            <div style={{ overflowX: 'auto', width: '100%' }}>
-              <table className="crossover-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: '15%' }}>{t("Componente")}</th>
-                    <th style={{ width: '30%' }}>{t("Vía / Sección")}</th>
-                    <th style={{ width: '30%' }}>{t("Tipo / Conexión")}</th>
-                    <th style={{ width: '25%' }}>{t("Valor Calculado")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {getComponentRows().map((row, index) => (
-                    <tr key={index}>
-                      <td style={{ fontWeight: 'bold', color: row.colorClass }}>
-                        {row.name}
-                      </td>
-                      <td>{row.section}</td>
-                      <td style={{ color: 'var(--text-muted)' }}>{row.type}</td>
-                      <td style={{ fontWeight: 'bold', color: 'var(--text-main)', fontSize: '0.85rem' }}>{row.value}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            renderComponentsTable()
           ) : (
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{t("Completa los valores del crossover.")}</p>
+          )}
+        </div>
+
+        {/* CALCULADORA DE INDUCTORES */}
+        <div className="panel" style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', padding: '1.5rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', backdropFilter: 'blur(16px)', boxShadow: '0 4px 30px rgba(0, 0, 0, 0.2)', marginTop: '0.5rem' }}>
+          <span className="control-title" style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--warning)' }}>
+            {t("Calculadora de Inductores (Fórmula de Wheeler)")}
+          </span>
+          <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginBottom: '1rem', lineHeight: '1.3' }}>
+            {t("Calcula el número de vueltas (espiras) necesarias para construir una bobina con núcleo de aire dado su valor en mH y las dimensiones físicas de la formaleta.")}
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+            <div className="input-group">
+              <label>{t("Inductancia Objetivo (L)")}</label>
+              <div className="input-wrapper">
+                <input 
+                  type="number" 
+                  value={indCalcTargetL} 
+                  onChange={(e) => setIndCalcTargetL(e.target.value === '' ? '' : parseFloat(e.target.value))} 
+                  step="0.01"
+                  min="0.01"
+                />
+                <span className="unit-badge">mH</span>
+              </div>
+            </div>
+            <div className="input-group">
+              <label>{t("Diámetro Promedio (d)")}</label>
+              <div className="input-wrapper">
+                <input 
+                  type="number" 
+                  value={indCalcD} 
+                  onChange={(e) => setIndCalcD(e.target.value === '' ? '' : parseFloat(e.target.value))} 
+                  step="0.1"
+                  min="1"
+                />
+                <span className="unit-badge">mm</span>
+              </div>
+            </div>
+            <div className="input-group">
+              <label>{t("Longitud de Bobina (l)")}</label>
+              <div className="input-wrapper">
+                <input 
+                  type="number" 
+                  value={indCalcLen} 
+                  onChange={(e) => setIndCalcLen(e.target.value === '' ? '' : parseFloat(e.target.value))} 
+                  step="0.1"
+                  min="0.1"
+                />
+                <span className="unit-badge">cm</span>
+              </div>
+            </div>
+          </div>
+
+          {indCalcN !== null && (
+            <div style={{ marginTop: '1rem', background: 'rgba(245, 158, 11, 0.03)', border: '1px solid rgba(245, 158, 11, 0.15)', padding: '1rem', borderRadius: '8px', fontSize: '0.9rem', textAlign: 'center' }}>
+              <span style={{ color: 'var(--text-muted)' }}>{t("Vueltas requeridas (aprox):")}</span>{' '}
+              <strong style={{ color: 'var(--text-main)', fontSize: '1.2rem' }}>{Math.round(indCalcN)} {t("espiras")}</strong>
+            </div>
           )}
         </div>
 
@@ -1530,3 +1541,6 @@ export const CrossoverTab: React.FC<CrossoverTabProps> = ({
     </div>
   );
 };
+
+export const CrossoverTab = React.memo(CrossoverTabComponent);
+
