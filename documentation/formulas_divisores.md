@@ -108,7 +108,7 @@ Donde \(\mu_0 = 4\pi \times 10^{-7} \) H/m.
 ## 9️⃣ Referencias
 1. **pronine.ca – Inductors**: https://www.pronine.ca/multind.htm
 2. **V‑Cap – Speaker Crossover Calculator**: https://www.v-cap.com/speaker-crossover-calculator.php
-3. **BassBox Pro** – Código fuente analizado en el proyecto `cajas_acusticas`.
+3. **Modelos electroacústicos estándar de la industria** (Small, Keele, Margolis y D'Appolito).
 
 ---
 

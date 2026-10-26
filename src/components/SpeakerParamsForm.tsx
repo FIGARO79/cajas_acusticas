@@ -468,7 +468,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
   };
 
   return (
-    <aside className="panel">
+    <aside className="panel speaker-panel">
       {/* Selector de Pestañas de Altavoz (Menú de Texto Plano) */}
       <div className="driver-menu-links" style={{ display: 'flex', gap: '1.5rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--card-border)', paddingBottom: '0.5rem' }}>
         <button 
@@ -622,16 +622,16 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
             {currentCustomDriver ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <div style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 650, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <span>📁</span> {t("Modificando altavoz guardado")}
+                  {t("Modificando altavoz guardado")}
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <button 
                     type="button" 
                     className="btn btn-primary" 
                     onClick={handleUpdateCustomDriver}
-                    style={{ flex: 1, fontSize: '0.8rem', padding: '0.45rem 0.6rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+                    style={{ flex: 1, fontSize: '0.8rem', padding: '0.45rem 0.6rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                   >
-                    <span>💾</span> {t("Guardar Cambios")}
+                    {t("Guardar Cambios")}
                   </button>
                   <button 
                     type="button" 
@@ -662,9 +662,9 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
                 type="button" 
                 className="btn btn-primary" 
                 onClick={handleSaveCustomDriver}
-                style={{ fontSize: '0.8rem', padding: '0.5rem 0.6rem', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+                style={{ fontSize: '0.8rem', padding: '0.5rem 0.6rem', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >
-                <span>💾</span> {t("Guardar como Altavoz Personalizado")}
+                {t("Guardar como Altavoz Personalizado")}
               </button>
             )}
           </div>

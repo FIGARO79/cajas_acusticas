@@ -15,6 +15,13 @@ import {
 import type { CalculatedSealed, CalculatedPorted, CalculatedBandpass, SpeakerParams } from '../types';
 import { type Lang, translate } from '../utils/translations';
 import { calcSealedCurve, calcPortedCurve, calcBandpass4Curve, calcBandpass6Curve } from '../wasm/index';
+import {
+  calcConeExcursion,
+  calcVentAirVelocity,
+  calcSystemImpedance,
+  calcPhaseResponse,
+  calcGroupDelayCurve,
+} from '../utils/acousticMath';
 
 ChartJS.register(
   LinearScale,
@@ -179,6 +186,148 @@ const lineAnnotationPlugin = {
   }
 };
 
+// Plugin de Estilo CAD Blueprint / Analizador Técnico de Audio
+const cadBlueprintPlugin = {
+  id: 'cadBlueprint',
+  beforeDraw: (chart: ChartJS) => {
+    const { ctx, chartArea } = chart;
+    if (!chartArea) return;
+    const { left, top, right, bottom, width, height } = chartArea;
+    const isLight = ((chart.options.plugins as any)?.cadBlueprint?.theme === 'light');
+
+    ctx.save();
+    // Fondo de plano CAD Blueprint de alta fidelidad
+    ctx.fillStyle = isLight ? '#f8fafc' : '#060e1d';
+    ctx.fillRect(left, top, width, height);
+
+    // Retícula secundaria fina milimétrica estilo CAD
+    ctx.strokeStyle = isLight ? 'rgba(14, 165, 233, 0.08)' : 'rgba(56, 189, 248, 0.05)';
+    ctx.lineWidth = 1;
+    const step = 20;
+    for (let xPos = left; xPos <= right; xPos += step) {
+      ctx.beginPath();
+      ctx.moveTo(xPos, top);
+      ctx.lineTo(xPos, bottom);
+      ctx.stroke();
+    }
+    for (let yPos = top; yPos <= bottom; yPos += step) {
+      ctx.beginPath();
+      ctx.moveTo(left, yPos);
+      ctx.lineTo(right, yPos);
+      ctx.stroke();
+    }
+
+    // Marco perimetral tipo plotter CAD
+    ctx.strokeStyle = isLight ? 'rgba(14, 165, 233, 0.3)' : 'rgba(56, 189, 248, 0.35)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(left, top, width, height);
+
+    // Marcas de escala milimétrica en los 4 bordes
+    const tickLen = 4;
+    ctx.strokeStyle = isLight ? 'rgba(14, 165, 233, 0.4)' : 'rgba(56, 189, 248, 0.45)';
+    for (let xPos = left; xPos <= right; xPos += step) {
+      ctx.beginPath();
+      ctx.moveTo(xPos, top);
+      ctx.lineTo(xPos, top + tickLen);
+      ctx.moveTo(xPos, bottom);
+      ctx.lineTo(xPos, bottom - tickLen);
+      ctx.stroke();
+    }
+    for (let yPos = top; yPos <= bottom; yPos += step) {
+      ctx.beginPath();
+      ctx.moveTo(left, yPos);
+      ctx.lineTo(left + tickLen, yPos);
+      ctx.moveTo(right, yPos);
+      ctx.lineTo(right - tickLen, yPos);
+      ctx.stroke();
+    }
+    ctx.restore();
+  },
+  afterDraw: (chart: ChartJS) => {
+    const { ctx, chartArea, scales: { x, y } } = chart;
+    if (!chartArea) return;
+    const { left, top, right, bottom } = chartArea;
+    const isLight = ((chart.options.plugins as any)?.cadBlueprint?.theme === 'light');
+
+    ctx.save();
+    // Cruces de mira técnica en las intersecciones de ticks principales (+)
+    ctx.strokeStyle = isLight ? 'rgba(14, 165, 233, 0.25)' : 'rgba(56, 189, 248, 0.25)';
+    ctx.lineWidth = 1;
+    const crossSize = 3;
+    const xTicks = x.ticks;
+    const yTicks = y.ticks;
+    if (xTicks && yTicks) {
+      xTicks.forEach(tX => {
+        const pX = x.getPixelForValue(tX.value);
+        if (pX >= left && pX <= right) {
+          yTicks.forEach(tY => {
+            const pY = y.getPixelForValue(tY.value);
+            if (pY >= top && pY <= bottom) {
+              ctx.beginPath();
+              ctx.moveTo(pX - crossSize, pY);
+              ctx.lineTo(pX + crossSize, pY);
+              ctx.moveTo(pX, pY - crossSize);
+              ctx.lineTo(pX, pY + crossSize);
+              ctx.stroke();
+            }
+          });
+        }
+      });
+    }
+
+    // Crosshair / Retículo CAD interactivo con visor HUD
+    const tooltip = chart.tooltip;
+    if (tooltip && tooltip.opacity > 0 && tooltip.dataPoints && tooltip.dataPoints.length > 0) {
+      const activePoint = tooltip.dataPoints[0];
+      const px = activePoint.element.x;
+      const py = activePoint.element.y;
+
+      if (px >= left && px <= right && py >= top && py <= bottom) {
+        // Líneas guía crosshair
+        ctx.strokeStyle = isLight ? 'rgba(2, 132, 199, 0.7)' : 'rgba(56, 189, 248, 0.7)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 3]);
+
+        ctx.beginPath();
+        ctx.moveTo(left, py);
+        ctx.lineTo(right, py);
+        ctx.moveTo(px, top);
+        ctx.lineTo(px, bottom);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Micro-mira en la intersección
+        ctx.strokeStyle = isLight ? '#0284c7' : '#38bdf8';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(px, py, 4, 0, 2 * Math.PI);
+        ctx.stroke();
+
+        // Mini HUD digital CAD en esquina superior derecha
+        const hudW = 184;
+        const hudH = 22;
+        const hudX = right - hudW - 8;
+        const hudY = top + 8;
+        ctx.fillStyle = isLight ? 'rgba(255, 255, 255, 0.92)' : 'rgba(6, 14, 29, 0.9)';
+        ctx.strokeStyle = isLight ? 'rgba(2, 132, 199, 0.5)' : 'rgba(56, 189, 248, 0.5)';
+        ctx.lineWidth = 1;
+        ctx.fillRect(hudX, hudY, hudW, hudH);
+        ctx.strokeRect(hudX, hudY, hudW, hudH);
+
+        ctx.font = "9px 'JetBrains Mono', 'Fira Code', 'Consolas', monospace";
+        ctx.fillStyle = isLight ? '#0284c7' : '#38bdf8';
+        ctx.textAlign = 'left';
+        const xVal = typeof activePoint.parsed.x === 'number' ? activePoint.parsed.x.toFixed(1) : '0';
+        const yVal = typeof activePoint.parsed.y === 'number' ? activePoint.parsed.y.toFixed(1) : '0';
+        ctx.fillText(`FREQ: ${xVal}Hz | VAL: ${yVal}`, hudX + 8, hudY + 14);
+      }
+    }
+    ctx.restore();
+  }
+};
+
+export type SimulationChartMode = 'spl' | 'excursion' | 'velocity' | 'impedance' | 'phase' | 'delay';
+
 interface SimulationChartProps {
   lang: Lang;
   theme: 'dark' | 'light';
@@ -192,6 +341,7 @@ interface SimulationChartProps {
   fc?: number;
   fcLow?: number;
   fcHigh?: number;
+  portAreaM2?: number;
 }
 
 const SimulationChartComponent: React.FC<SimulationChartProps> = ({
@@ -206,8 +356,13 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
   fc = 2500,
   fcLow = 500,
   fcHigh = 4000,
+  portAreaM2 = 0.0044,
 }) => {
   const t = useCallback((text: string) => translate(text, lang), [lang]);
+
+  // Acoustic Simulation Suite Mode
+  const [chartMode, setChartMode] = useState<SimulationChartMode>('spl');
+  const [simPower, setSimPower] = useState<number>(params.pe || 100);
 
   // Range and Annotation modes
   const [rangeMode, setRangeMode] = useState<'bass' | 'full'>('bass');
@@ -579,11 +734,6 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
   const dynamicMax = highestY > 6 ? Math.ceil((highestY + 1.5) / 3) * 3 : 6;
   const dynamicMin = lowestY < -24 ? Math.floor(lowestY / 6) * 6 : -24;
 
-  const chartGridColor = theme === 'light' ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.08)';
-  const chartTextColor = theme === 'light' ? '#475569' : '#94a3b8';
-  const chartLegendColor = theme === 'light' ? '#0f172a' : '#f8fafc';
-  const chartTooltipBg = theme === 'light' ? '#ffffff' : 'rgba(15, 23, 42, 0.95)';
-  const chartTooltipBorder = theme === 'light' ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.15)';
   const chartSealedBg = 'rgba(14, 165, 233, 0.05)';
   const chartPortedBg = 'rgba(16, 185, 129, 0.05)';
   const chartBandpassBg = 'rgba(245, 158, 11, 0.05)';
@@ -591,42 +741,303 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
   const portedBorderColor = '#10b981';
   const bandpassBorderColor = '#f59e0b';
 
-  const data = {
-    datasets: rangeMode === 'bass' ? [
-      ...(sealedData && sealedData.valid ? [{
-        label: `${t("Caja Sellada")} (Vb ${sealedData.Vb.toFixed(1)}L, Qtc ${sealedData.Qtc.toFixed(2)})`,
-        data: sealedPoints,
+  // --- ACOUSTIC SIMULATION DATASETS ---
+  const excursionDatasets = React.useMemo(() => {
+    if (chartMode !== 'excursion') return [];
+    const list: Record<string, unknown>[] = [];
+    if (sealedData && sealedData.valid) {
+      list.push({
+        label: `${t("Caja Sellada")} - Excursión (${simPower}W)`,
+        data: frequencies.map(f => ({
+          x: f,
+          y: Math.round(calcConeExcursion(f, params, sealedData.Vb, sealedData.Fc, false, simPower) * 100) / 100
+        })),
         borderColor: sealedBorderColor,
-        backgroundColor: chartSealedBg,
         borderWidth: 2.5,
         pointRadius: 0,
-        fill: true,
-        tension: 0.2,
-      }] : []),
-      ...(portedData && portedData.valid ? [{
-        label: `${t("Caja Ventilada")} (Vb ${portedData.Vb.toFixed(1)}L, Fb ${portedData.Fb.toFixed(1)}Hz)`,
-        data: portedPoints,
+        fill: false,
+      });
+    }
+    if (portedData && portedData.valid) {
+      list.push({
+        label: `${t("Caja Ventilada")} - Excursión (${simPower}W)`,
+        data: frequencies.map(f => ({
+          x: f,
+          y: Math.round(calcConeExcursion(f, params, portedData.Vb, portedData.Fb, true, simPower) * 100) / 100
+        })),
+        borderColor: portedBorderColor,
+        borderWidth: 2.5,
+        pointRadius: 0,
+        fill: false,
+      });
+    }
+    if (params.xmax && params.xmax > 0) {
+      list.push({
+        label: `Límite Lineal Xmax (${params.xmax} mm)`,
+        data: frequencies.map(f => ({ x: f, y: params.xmax })),
+        borderColor: '#ef4444',
+        borderWidth: 1.8,
+        pointRadius: 0,
+        fill: false,
+        borderDash: [5, 4]
+      });
+    }
+    return list;
+  }, [chartMode, sealedData, portedData, params, simPower, t]);
+
+  const velocityDatasets = React.useMemo(() => {
+    if (chartMode !== 'velocity') return [];
+    const list: Record<string, unknown>[] = [];
+    const pArea = portAreaM2 || 0.0044;
+    if (portedData && portedData.valid) {
+      list.push({
+        label: `${t("Velocidad Aire Puerto")} (${simPower}W)`,
+        data: frequencies.map(f => ({
+          x: f,
+          y: Math.round(calcVentAirVelocity(f, params, portedData.Vb, portedData.Fb, pArea, simPower) * 100) / 100
+        })),
         borderColor: portedBorderColor,
         backgroundColor: chartPortedBg,
         borderWidth: 2.5,
         pointRadius: 0,
         fill: true,
-        tension: 0.2,
-      }] : []),
-      ...(bandpassData && bandpassData.valid ? [{
-        label: bandpassData.order === 4 
-          ? `${t("Caja Paso Banda 4.º")} (Vf ${bandpassData.Vf.toFixed(1)}L, Vr ${bandpassData.Vr.toFixed(1)}L, Fb ${bandpassData.Fb.toFixed(1)}Hz)`
-          : `${t("Caja Paso Banda 6.º")} (Vf ${bandpassData.Vf.toFixed(1)}L, Fl ${bandpassData.Fl?.toFixed(1)}Hz, Fh ${bandpassData.Fh?.toFixed(1)}Hz)`,
-        data: bandpassPoints,
-        borderColor: bandpassBorderColor,
-        backgroundColor: chartBandpassBg,
+      });
+    }
+    list.push({
+      label: `Límite 5% c (17 m/s - Audiófilo)`,
+      data: frequencies.map(f => ({ x: f, y: 17 })),
+      borderColor: '#f59e0b',
+      borderWidth: 1.5,
+      pointRadius: 0,
+      fill: false,
+      borderDash: [4, 4]
+    });
+    list.push({
+      label: `Límite 10% c (34 m/s - Turbulencia/Chuffing)`,
+      data: frequencies.map(f => ({ x: f, y: 34 })),
+      borderColor: '#ef4444',
+      borderWidth: 1.8,
+      pointRadius: 0,
+      fill: false,
+      borderDash: [6, 3]
+    });
+    return list;
+  }, [chartMode, portedData, params, portAreaM2, simPower, t]);
+
+  const impedanceDatasets = React.useMemo(() => {
+    if (chartMode !== 'impedance') return [];
+    const list: Record<string, unknown>[] = [];
+    if (sealedData && sealedData.valid) {
+      list.push({
+        label: `${t("Impedancia Caja Sellada")} (Ω)`,
+        data: frequencies.map(f => ({
+          x: f,
+          y: Math.round(calcSystemImpedance(f, params, sealedData.Vb, sealedData.Fc, false) * 100) / 100
+        })),
+        borderColor: sealedBorderColor,
         borderWidth: 2.5,
         pointRadius: 0,
-        fill: true,
-        tension: 0.2,
-      }] : []),
-    ] : fullRangeDatasets,
+        fill: false,
+      });
+    }
+    if (portedData && portedData.valid) {
+      list.push({
+        label: `${t("Impedancia Caja Ventilada")} (Ω)`,
+        data: frequencies.map(f => ({
+          x: f,
+          y: Math.round(calcSystemImpedance(f, params, portedData.Vb, portedData.Fb, true) * 100) / 100
+        })),
+        borderColor: portedBorderColor,
+        borderWidth: 2.5,
+        pointRadius: 0,
+        fill: false,
+      });
+    }
+    if (params.re && params.re > 0) {
+      list.push({
+        label: `Re (${params.re.toFixed(1)} Ω)`,
+        data: frequencies.map(f => ({ x: f, y: params.re })),
+        borderColor: '#94a3b8',
+        borderWidth: 1.2,
+        pointRadius: 0,
+        fill: false,
+        borderDash: [3, 3]
+      });
+    }
+    return list;
+  }, [chartMode, sealedData, portedData, params, t]);
+
+  const phaseDatasets = React.useMemo(() => {
+    if (chartMode !== 'phase') return [];
+    const list: Record<string, unknown>[] = [];
+    if (sealedData && sealedData.valid) {
+      list.push({
+        label: `${t("Fase Caja Sellada")} (°)`,
+        data: frequencies.map(f => ({
+          x: f,
+          y: Math.round(calcPhaseResponse(f, params, sealedData.Vb, sealedData.Fc, false) * 10) / 10
+        })),
+        borderColor: sealedBorderColor,
+        borderWidth: 2.5,
+        pointRadius: 0,
+        fill: false,
+      });
+    }
+    if (portedData && portedData.valid) {
+      list.push({
+        label: `${t("Fase Caja Ventilada")} (°)`,
+        data: frequencies.map(f => ({
+          x: f,
+          y: Math.round(calcPhaseResponse(f, params, portedData.Vb, portedData.Fb, true) * 10) / 10
+        })),
+        borderColor: portedBorderColor,
+        borderWidth: 2.5,
+        pointRadius: 0,
+        fill: false,
+      });
+    }
+    return list;
+  }, [chartMode, sealedData, portedData, params, t]);
+
+  const delayDatasets = React.useMemo(() => {
+    if (chartMode !== 'delay') return [];
+    const list: Record<string, unknown>[] = [];
+    if (sealedData && sealedData.valid) {
+      const delays = calcGroupDelayCurve(frequencies, params, sealedData.Vb, sealedData.Fc, false);
+      list.push({
+        label: `${t("Retardo Grupo Sellada")} (ms)`,
+        data: frequencies.map((f, idx) => ({ x: f, y: delays[idx] })),
+        borderColor: sealedBorderColor,
+        borderWidth: 2.5,
+        pointRadius: 0,
+        fill: false,
+      });
+    }
+    if (portedData && portedData.valid) {
+      const delays = calcGroupDelayCurve(frequencies, params, portedData.Vb, portedData.Fb, true);
+      list.push({
+        label: `${t("Retardo Grupo Ventilada")} (ms)`,
+        data: frequencies.map((f, idx) => ({ x: f, y: delays[idx] })),
+        borderColor: portedBorderColor,
+        borderWidth: 2.5,
+        pointRadius: 0,
+        fill: false,
+      });
+    }
+    return list;
+  }, [chartMode, sealedData, portedData, params, t]);
+
+  const activeDatasets = React.useMemo(() => {
+    switch (chartMode) {
+      case 'excursion':
+        return excursionDatasets;
+      case 'velocity':
+        return velocityDatasets;
+      case 'impedance':
+        return impedanceDatasets;
+      case 'phase':
+        return phaseDatasets;
+      case 'delay':
+        return delayDatasets;
+      case 'spl':
+      default:
+        return rangeMode === 'bass' ? [
+          ...(sealedData && sealedData.valid ? [{
+            label: `${t("Caja Sellada")} (Vb ${sealedData.Vb.toFixed(1)}L, Qtc ${sealedData.Qtc.toFixed(2)})`,
+            data: sealedPoints,
+            borderColor: sealedBorderColor,
+            backgroundColor: chartSealedBg,
+            borderWidth: 2.5,
+            pointRadius: 0,
+            fill: true,
+            tension: 0.2,
+          }] : []),
+          ...(portedData && portedData.valid ? [{
+            label: `${t("Caja Ventilada")} (Vb ${portedData.Vb.toFixed(1)}L, Fb ${portedData.Fb.toFixed(1)}Hz)`,
+            data: portedPoints,
+            borderColor: portedBorderColor,
+            backgroundColor: chartPortedBg,
+            borderWidth: 2.5,
+            pointRadius: 0,
+            fill: true,
+            tension: 0.2,
+          }] : []),
+          ...(bandpassData && bandpassData.valid ? [{
+            label: bandpassData.order === 4 
+              ? `${t("Caja Paso Banda 4.º")} (Vf ${bandpassData.Vf.toFixed(1)}L, Vr ${bandpassData.Vr.toFixed(1)}L, Fb ${bandpassData.Fb.toFixed(1)}Hz)`
+              : `${t("Caja Paso Banda 6.º")} (Vf ${bandpassData.Vf.toFixed(1)}L, Fl ${bandpassData.Fl?.toFixed(1)}Hz, Fh ${bandpassData.Fh?.toFixed(1)}Hz)`,
+            data: bandpassPoints,
+            borderColor: bandpassBorderColor,
+            backgroundColor: chartBandpassBg,
+            borderWidth: 2.5,
+            pointRadius: 0,
+            fill: true,
+            tension: 0.2,
+          }] : []),
+        ] : fullRangeDatasets;
+    }
+  }, [chartMode, rangeMode, sealedData, portedData, bandpassData, sealedPoints, portedPoints, bandpassPoints, fullRangeDatasets, excursionDatasets, velocityDatasets, impedanceDatasets, phaseDatasets, delayDatasets, t]);
+
+  const data = {
+    datasets: activeDatasets,
   };
+
+  // Dynamic Y Axis parameters
+  const yAxisConfig = React.useMemo(() => {
+    switch (chartMode) {
+      case 'excursion':
+        return {
+          min: 0,
+          max: Math.max(12, Math.ceil(((params.xmax || 8) * 1.6) / 2) * 2),
+          stepSize: 2,
+          title: t('Desplazamiento Pico (mm)'),
+          unit: 'mm',
+        };
+      case 'velocity':
+        return {
+          min: 0,
+          max: 40,
+          stepSize: 5,
+          title: t('Velocidad del Aire (m/s)'),
+          unit: 'm/s',
+        };
+      case 'impedance':
+        return {
+          min: 0,
+          max: Math.max(30, Math.ceil(((params.re || 4) * 7) / 10) * 10),
+          stepSize: 5,
+          title: t('Impedancia (Ω)'),
+          unit: 'Ω',
+        };
+      case 'phase':
+        return {
+          min: -180,
+          max: 180,
+          stepSize: 45,
+          title: t('Fase Acústica (°)'),
+          unit: '°',
+        };
+      case 'delay':
+        return {
+          min: 0,
+          max: 40,
+          stepSize: 5,
+          title: t('Retardo de Grupo (ms)'),
+          unit: 'ms',
+        };
+      case 'spl':
+      default:
+        return {
+          min: dynamicMin,
+          max: dynamicMax,
+          stepSize: 3,
+          title: t('Ganancia (dB)'),
+          unit: 'dB',
+        };
+    }
+  }, [chartMode, params.xmax, params.re, dynamicMin, dynamicMax, t]);
+
+  const cadFontFamily = "'JetBrains Mono', 'Fira Code', 'Consolas', monospace";
 
   const options = {
     responsive: true,
@@ -635,43 +1046,43 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
       x: {
         type: 'logarithmic' as const,
         min: 10,
-        max: rangeMode === 'bass' ? 500 : 20000,
-        grid: { color: chartGridColor },
+        max: (chartMode === 'spl' && rangeMode === 'full') ? 20000 : 500,
+        grid: { color: 'rgba(56, 189, 248, 0.12)' },
         title: {
           display: true,
           text: t('Frecuencia (Hz)'),
-          color: chartTextColor,
-          font: { family: 'Inter', size: 11 },
+          color: 'rgba(125, 211, 252, 0.85)',
+          font: { family: cadFontFamily, size: 10, weight: 600 },
         },
         ticks: {
-          color: chartTextColor,
-          font: { family: 'Inter', size: 10 },
-           callback: function (value: string | number) {
-            const targets = rangeMode === 'bass'
-              ? [10, 20, 30, 50, 70, 100, 200, 300, 500]
-              : [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000];
+          color: 'rgba(125, 211, 252, 0.75)',
+          font: { family: cadFontFamily, size: 9 },
+          callback: function (value: string | number) {
+            const targets = (chartMode === 'spl' && rangeMode === 'full')
+              ? [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]
+              : [10, 20, 30, 50, 70, 100, 200, 300, 500];
             const numVal = Number(value);
             if (targets.includes(numVal)) {
-              return numVal >= 1000 ? (numVal / 1000) + 'k Hz' : numVal + ' Hz';
+              return numVal >= 1000 ? (numVal / 1000) + 'k' : String(numVal);
             }
             return null;
           },
         },
       },
       y: {
-        min: dynamicMin,
-        max: dynamicMax,
-        grid: { color: chartGridColor },
+        min: yAxisConfig.min,
+        max: yAxisConfig.max,
+        grid: { color: 'rgba(56, 189, 248, 0.12)' },
         title: {
           display: true,
-          text: t('Ganancia (dB)'),
-          color: chartTextColor,
-          font: { family: 'Inter', size: 11 },
+          text: yAxisConfig.title,
+          color: 'rgba(125, 211, 252, 0.85)',
+          font: { family: cadFontFamily, size: 10, weight: 600 },
         },
         ticks: {
-          color: chartTextColor,
-          font: { family: 'Inter', size: 10 },
-          stepSize: 3,
+          color: 'rgba(125, 211, 252, 0.75)',
+          font: { family: cadFontFamily, size: 9 },
+          stepSize: yAxisConfig.stepSize,
         },
       },
     },
@@ -680,73 +1091,165 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
         labels: {
           usePointStyle: true,
           pointStyle: 'line' as const,
-          color: chartLegendColor,
-          font: { family: 'Inter', size: 11 },
+          color: '#e0f2fe',
+          font: { family: cadFontFamily, size: 10, weight: 600 },
         },
       },
       tooltip: {
-        backgroundColor: chartTooltipBg,
-        titleColor: chartLegendColor,
-        bodyColor: chartTextColor,
-        titleFont: { family: 'Plus Jakarta Sans' },
-        bodyFont: { family: 'Inter' },
-        borderColor: chartTooltipBorder,
+        backgroundColor: 'rgba(6, 14, 29, 0.95)',
+        titleColor: '#38bdf8',
+        bodyColor: '#e0f2fe',
+        titleFont: { family: cadFontFamily, size: 10, weight: 700 },
+        bodyFont: { family: cadFontFamily, size: 9 },
+        borderColor: 'rgba(56, 189, 248, 0.4)',
+        borderWidth: 1,
         callbacks: {
           label: function (context: TooltipItem<'line'>) {
             const yVal = context.parsed.y !== null && context.parsed.y !== undefined ? context.parsed.y.toFixed(1) : '0.0';
             const xVal = context.parsed.x !== null && context.parsed.x !== undefined ? context.parsed.x : 0;
-            return `${context.dataset.label}: ${yVal} dB ${t('a')} ${xVal >= 1000 ? (xVal/1000).toFixed(1)+'k' : xVal} Hz`;
+            return `${context.dataset.label}: ${yVal} ${yAxisConfig.unit} @ ${xVal >= 1000 ? (xVal/1000).toFixed(1)+'k' : xVal} Hz`;
           },
         },
       },
       lineAnnotation: {
-        annotations: annotations
+        annotations: chartMode === 'spl' ? annotations : []
+      },
+      cadBlueprint: {
+        theme
       }
     },
   };
 
   return (
     <div className="panel chart-card" style={{ display: 'flex', flexDirection: 'column' }}>
+      {/* Header Superior con Selector de Modos y Controles */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-        <h3 className="panel-title" style={{ margin: 0 }}>{t("Simulación de Respuesta en Frecuencia (dB vs Hz)")}</h3>
-        
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+          <h3 className="panel-title" style={{ margin: 0 }}>
+            {chartMode === 'spl' && t("Simulación SPL (dB vs Hz)")}
+            {chartMode === 'excursion' && t("Desplazamiento del Cono (mm vs Xmax)")}
+            {chartMode === 'velocity' && t("Velocidad de Aire en Conducto (m/s)")}
+            {chartMode === 'impedance' && t("Impedancia Eléctrica del Sistema (Ω)")}
+            {chartMode === 'phase' && t("Respuesta de Fase Acústica (°)")}
+            {chartMode === 'delay' && t("Retardo de Grupo (ms vs Hz)")}
+          </h3>
+
+          {/* Ajuste de Potencia Eléctrica */}
+          {(chartMode === 'excursion' || chartMode === 'velocity') && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'rgba(255,255,255,0.04)', padding: '2px 8px', borderRadius: '6px', border: '1px solid var(--card-border)' }}>
+              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>{t("Potencia:")}</span>
+              <input
+                type="number"
+                min="1"
+                max="5000"
+                value={simPower}
+                onChange={(e) => setSimPower(Math.max(1, parseFloat(e.target.value) || 1))}
+                style={{ width: '55px', height: '22px', fontSize: '0.72rem', background: 'transparent', border: '1px solid var(--card-border)', color: 'var(--accent)', borderRadius: '4px', textAlign: 'center', fontWeight: 600 }}
+              />
+              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>W</span>
+            </div>
+          )}
+        </div>
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-          {/* Segmented range selector */}
-          <div className="segmented-control" style={{ padding: '2px', borderRadius: '8px', display: 'flex', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--card-border)' }}>
-            <button
-              type="button"
-              className={rangeMode === 'bass' ? 'active' : ''}
-              onClick={() => setRangeMode('bass')}
-              style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem', borderRadius: '6px', cursor: 'pointer', border: 'none', background: rangeMode === 'bass' ? 'var(--primary)' : 'transparent', color: '#ffffff', fontWeight: 600 }}
-            >
-              {t("Graves")}
-            </button>
-            <button
-              type="button"
-              className={rangeMode === 'full' ? 'active' : ''}
-              onClick={() => setRangeMode('full')}
-              style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem', borderRadius: '6px', cursor: 'pointer', border: 'none', background: rangeMode === 'full' ? 'var(--primary)' : 'transparent', color: '#ffffff', fontWeight: 600 }}
-            >
-              {t("Filtros / 20kHz")}
-            </button>
-          </div>
+          {/* Segmented range selector solo en modo SPL */}
+          {chartMode === 'spl' && (
+            <div className="segmented-control" style={{ padding: '2px', borderRadius: '8px', display: 'flex', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--card-border)' }}>
+              <button
+                type="button"
+                className={rangeMode === 'bass' ? 'active' : ''}
+                onClick={() => setRangeMode('bass')}
+                style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem', borderRadius: '6px', cursor: 'pointer', border: 'none', background: rangeMode === 'bass' ? 'var(--primary)' : 'transparent', color: '#ffffff', fontWeight: 600 }}
+              >
+                {t("Graves")}
+              </button>
+              <button
+                type="button"
+                className={rangeMode === 'full' ? 'active' : ''}
+                onClick={() => setRangeMode('full')}
+                style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem', borderRadius: '6px', cursor: 'pointer', border: 'none', background: rangeMode === 'full' ? 'var(--primary)' : 'transparent', color: '#ffffff', fontWeight: 600 }}
+              >
+                {t("Filtros / 20kHz")}
+              </button>
+            </div>
+          )}
 
           {/* Toggle Reference Lines */}
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.7rem', color: 'var(--text-main)', cursor: 'pointer', margin: 0, fontWeight: 500 }}>
-            <input
-              type="checkbox"
-              checked={showRefLines}
-              onChange={(e) => setShowRefLines(e.target.checked)}
-              style={{ width: '13px', height: '13px', accentColor: 'var(--accent)', cursor: 'pointer' }}
-            />
-            {t("Líneas Ref.")}
-          </label>
+          {chartMode === 'spl' && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.7rem', color: 'var(--text-main)', cursor: 'pointer', margin: 0, fontWeight: 500 }}>
+              <input
+                type="checkbox"
+                checked={showRefLines}
+                onChange={(e) => setShowRefLines(e.target.checked)}
+                style={{ width: '13px', height: '13px', accentColor: 'var(--accent)', cursor: 'pointer' }}
+              />
+              {t("Líneas Ref.")}
+            </label>
+          )}
         </div>
+      </div>
+
+      {/* Barra de Modos de Simulación Avanzada */}
+      <div className="segmented-control" style={{ marginBottom: '0.6rem', padding: '2px', display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+        <button
+          type="button"
+          className={chartMode === 'spl' ? 'active' : ''}
+          onClick={() => setChartMode('spl')}
+          style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', borderRadius: '6px', fontWeight: chartMode === 'spl' ? 700 : 500 }}
+          title="Respuesta de Amplitud Normalizada en Frecuencia (dB)"
+        >
+          SPL (dB)
+        </button>
+        <button
+          type="button"
+          className={chartMode === 'excursion' ? 'active' : ''}
+          onClick={() => setChartMode('excursion')}
+          style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', borderRadius: '6px', fontWeight: chartMode === 'excursion' ? 700 : 500 }}
+          title="Desplazamiento pico del diafragma vs límite lineal Xmax (mm)"
+        >
+          Excursión (mm)
+        </button>
+        <button
+          type="button"
+          className={chartMode === 'velocity' ? 'active' : ''}
+          onClick={() => setChartMode('velocity')}
+          style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', borderRadius: '6px', fontWeight: chartMode === 'velocity' ? 700 : 500 }}
+          title="Velocidad del aire a través del conducto sintonizador (m/s)"
+        >
+          Velocidad Aire (m/s)
+        </button>
+        <button
+          type="button"
+          className={chartMode === 'impedance' ? 'active' : ''}
+          onClick={() => setChartMode('impedance')}
+          style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', borderRadius: '6px', fontWeight: chartMode === 'impedance' ? 700 : 500 }}
+          title="Curva de impedancia eléctrica del sistema de altavoz y caja (Ω)"
+        >
+          Impedancia (Ω)
+        </button>
+        <button
+          type="button"
+          className={chartMode === 'phase' ? 'active' : ''}
+          onClick={() => setChartMode('phase')}
+          style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', borderRadius: '6px', fontWeight: chartMode === 'phase' ? 700 : 500 }}
+          title="Respuesta de fase acústica (grados)"
+        >
+          Fase (°)
+        </button>
+        <button
+          type="button"
+          className={chartMode === 'delay' ? 'active' : ''}
+          onClick={() => setChartMode('delay')}
+          style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', borderRadius: '6px', fontWeight: chartMode === 'delay' ? 700 : 500 }}
+          title="Retardo de grupo en milisegundos (ms)"
+        >
+          Retardo Grupo (ms)
+        </button>
       </div>
 
       <div className="chart-container" style={{ flex: 1, minHeight: '260px' }}>
         {data.datasets.length > 0 ? (
-          <Line data={data as any} options={options as any} plugins={[lineAnnotationPlugin]} />
+          <Line data={data as any} options={options as any} plugins={[cadBlueprintPlugin, lineAnnotationPlugin]} />
         ) : (
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'var(--text-muted)' }}>
             {t("Completa los parámetros mínimos del altavoz (Fs, Vas, Qts).")}

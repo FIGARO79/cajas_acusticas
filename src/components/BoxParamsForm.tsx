@@ -19,12 +19,14 @@ interface BoxParamsFormProps {
   portedData: CalculatedPorted;
   sealedData: CalculatedSealed;
   bandpassData: CalculatedBandpass;
-  cabinetData: WoodCabinetData | null;
+  cabinetData?: WoodCabinetData | null;
   isLinkedToCabinet: boolean;
 
   // Ajustes de alineación
   targetQtc: number;
   setTargetQtc: (val: number) => void;
+  ventedAlignment?: 'QB3' | 'B4' | 'SBB4';
+  setVentedAlignment?: (align: 'QB3' | 'B4' | 'SBB4') => void;
   bandpassOrder: 4 | 6;
   setBandpassOrder: (val: 4 | 6) => void;
   bandpassS: number;
@@ -68,8 +70,8 @@ interface BoxParamsFormProps {
   prMasaAnadidaG: number;
 
   // SUBPESTAÑAS DE CONTROL CENTRAL
-  activeTab: 'wood' | 'damping' | 'crossover';
-  setActiveTab: (tab: 'wood' | 'damping' | 'crossover') => void;
+  activeTab: 'wood' | 'port' | 'damping' | 'crossover';
+  setActiveTab: (tab: 'wood' | 'port' | 'damping' | 'crossover') => void;
 
   // Ebanistería (Woodworking)
   woodMode: 'calc' | 'input';
@@ -196,6 +198,8 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
 
   targetQtc,
   setTargetQtc,
+  ventedAlignment = 'QB3',
+  setVentedAlignment,
   bandpassOrder,
   setBandpassOrder,
   bandpassS,
@@ -554,26 +558,59 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
   };
 
   const ebpValue = params.qes ? (params.fs / params.qes) : null;
+  const ebpPct = ebpValue !== null ? Math.min(100, Math.max(0, (ebpValue / 160) * 100)) : 50;
+  const ebpStatus = ebpValue === null ? 'none' : ebpValue < 50 ? 'sealed' : ebpValue > 90 ? 'ported' : 'hybrid';
 
   return (
-    <aside className="panel" style={{ borderLeft: 'none' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem', borderBottom: '1px solid var(--card-border)', paddingBottom: '0.25rem' }}>
+    <aside className="panel box-design-panel" style={{ borderLeft: 'none' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', borderBottom: '1px solid var(--card-border)', paddingBottom: '0.25rem' }}>
         <h3 className="panel-title" style={{ marginBottom: 0, borderBottom: 'none', paddingBottom: 0, fontSize: '12px', fontWeight: 700 }}>{t("Diseño")}</h3>
       </div>
 
-      {/* EBP Status Bar */}
-      <div 
-        className={`ebp-badge-card ${ebpValue ? (ebpValue < 50 ? 'ebp-sealed' : ebpValue > 90 ? 'ebp-ported' : 'ebp-normal') : 'ebp-normal'}`}
-        style={{ padding: '0.3rem 0.65rem', marginBottom: '0.5rem' }}
-      >
-        <span style={{ fontSize: '0.78rem', fontWeight: 700 }}>EBP: {ebpValue ? ebpValue.toFixed(1) : 'N/A'}</span>
-        <span style={{ fontSize: '0.72rem', opacity: 0.85, fontWeight: 500 }}>
+      {/* Medidor Visual de EBP (Thiele-Small) */}
+      <div className="ebp-meter-card">
+        <div className="ebp-meter-header">
+          <div className="ebp-meter-title-wrap">
+            <span className="ebp-meter-title">EBP</span>
+            <span className="ebp-meter-val">{ebpValue ? ebpValue.toFixed(1) : '---'}</span>
+          </div>
+          <div className={`ebp-meter-chip chip-${ebpStatus}`}>
+            {ebpStatus === 'sealed' && t("Sellada Óptima")}
+            {ebpStatus === 'hybrid' && t("Sellada / Ventilada")}
+            {ebpStatus === 'ported' && t("Ventilada Óptima")}
+            {ebpStatus === 'none' && t("Requiere Qes")}
+          </div>
+        </div>
+
+        {/* Pista graduada con 3 zonas y puntero */}
+        <div className="ebp-meter-track">
+          <div className="ebp-zone-sealed" title="0 - 50: Caja Sellada" />
+          <div className="ebp-zone-hybrid" title="50 - 90: Caja Sellada o Ventilada" />
+          <div className="ebp-zone-ported" title="> 90: Caja Ventilada" />
+          {ebpValue !== null && (
+            <div
+              className="ebp-meter-pin"
+              style={{ left: `${ebpPct}%` }}
+              title={`EBP: ${ebpValue.toFixed(1)}`}
+            />
+          )}
+        </div>
+
+        {/* Marcas de escala */}
+        <div className="ebp-meter-labels">
+          <span>0</span>
+          <span style={{ color: '#38bdf8' }}>50 (Sellada)</span>
+          <span style={{ color: '#34d399' }}>90 (Ventilada)</span>
+          <span>160+</span>
+        </div>
+
+        <div className="ebp-meter-footer">
           {getEbpRecommendation()}
-        </span>
+        </div>
       </div>
 
       {/* Segmented Control de Tipo de Caja */}
-      <div className="segmented-control" style={{ marginBottom: '0.6rem', padding: '2px' }}>
+      <div className="segmented-control" style={{ marginBottom: '0.55rem', padding: '2px' }}>
         <button
           type="button"
           className={boxType === 'sealed' ? 'active' : ''}
@@ -601,20 +638,27 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
       </div>
 
       {/* Pestañas de Control Central */}
-      <div className="sub-tabs-header" style={{ marginBottom: '0.6rem', padding: '2px' }}>
+      <div className="sub-tabs-header" style={{ marginBottom: '0.65rem' }}>
         <button
           type="button"
           onClick={() => setActiveTab('wood')}
           className={activeTab === 'wood' ? 'active' : ''}
-          style={{ padding: '0.3rem 0.2rem' }}
         >
           {t("Medidas")}
         </button>
+        {boxType !== 'sealed' && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('port')}
+            className={activeTab === 'port' ? 'active' : ''}
+          >
+            {t("Puerto")}
+          </button>
+        )}
         <button
           type="button"
           onClick={() => setActiveTab('damping')}
           className={activeTab === 'damping' ? 'active' : ''}
-          style={{ padding: '0.3rem 0.2rem' }}
         >
           {t("Damping")}
         </button>
@@ -622,9 +666,8 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
           type="button"
           onClick={() => setActiveTab('crossover')}
           className={activeTab === 'crossover' ? 'active' : ''}
-          style={{ padding: '0.3rem 0.2rem' }}
         >
-          XOVER
+          Crossover
         </button>
       </div>
 
@@ -978,7 +1021,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                         outline: 'none',
                         userSelect: 'none'
                       }}>
-                        ℹ️ {t("Guía de Diseño de Cámaras de Medios (Ver más)")}
+                        {t("Guía de Diseño de Cámaras de Medios (Ver más)")}
                       </summary>
                       <ul style={{ paddingLeft: '1rem', marginTop: '0.3rem', marginBottom: 0, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                         <li><strong>{t("Aislamiento Hermético:")}</strong> {t("Debe ser completamente hermética para que la presión de aire del woofer no interfiera con el cono de medios.")}</li>
@@ -1147,7 +1190,130 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
               </div>
             )}
 
-            {/* Dimensionamiento y alineación acústica del cajón */}
+            {/* Si es Caja Sellada: Ajuste de Vb y Qtc Objetivo */}
+            {boxType === 'sealed' && (
+              <div className="premium-form-card" style={{ marginBottom: '0.65rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                  <div className="form-subsection-title" style={{ margin: 0 }}>{t("Alineación Sellada (Vb / Qtc)")}</div>
+                  {customPorted && (
+                    <button
+                      type="button"
+                      onClick={() => setCustomPorted(false)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--accent)',
+                        fontSize: '0.7rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        padding: 0
+                      }}
+                    >
+                      {t("Restablecer Óptima")}
+                    </button>
+                  )}
+                </div>
+                <div className="input-grid">
+                  <div className="input-group">
+                    <label>{t("Volumen Neto (Vb)")}</label>
+                    <div className="input-wrapper">
+                      <input
+                        type="number"
+                        value={Number(convertTo(sealedData.valid ? sealedData.Vb : customVb, 'volume', unitSystem).toFixed(2))}
+                        onChange={(e) => {
+                          const valLitres = convertFrom(parseFloat(e.target.value) || 0, 'volume', unitSystem);
+                          setCustomVb(valLitres);
+                          setCustomPorted(true);
+                        }}
+                        disabled={isLinkedToCabinet}
+                        step="any"
+                      />
+                      <span className="unit-badge">{getUnitLabel('volume', unitSystem)}</span>
+                    </div>
+                  </div>
+                  <div className="input-group">
+                    <label>{t("Q del Sistema (Qtc)")}</label>
+                    <div className="input-wrapper">
+                      <input
+                        type="number"
+                        value={targetQtc}
+                        onChange={(e) => setTargetQtc(parseFloat(e.target.value) || 0.707)}
+                        step="0.01"
+                      />
+                      <span className="unit-badge">Qtc</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Distribución en Bafle Frontal (Ubicación de Altavoces) */}
+            <div className="premium-form-card" style={{ marginTop: '0.5rem' }}>
+              <div className="form-subsection-title" style={{ marginTop: 0, marginBottom: '0.35rem' }}>{t("Distribución en Bafle Frontal")}</div>
+              
+              <div className="input-group" style={{ marginBottom: '0.5rem' }}>
+                <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem' }}>
+                  <span>{t("Posición Vertical Woofer")}</span>
+                  <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{speakerYPct}%</span>
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input
+                    type="range"
+                    min="15"
+                    max="90"
+                    value={speakerYPct}
+                    onChange={(e) => setSpeakerYPct(parseInt(e.target.value))}
+                    style={{ flex: 1, accentColor: 'var(--accent)', cursor: 'pointer' }}
+                  />
+                </div>
+              </div>
+
+              {crossoverWays >= 2 && (
+                <div className="input-group" style={{ marginBottom: '0.5rem' }}>
+                  <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem' }}>
+                    <span>{t("Posición Vertical Tweeter")}</span>
+                    <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{tweeterYPct}%</span>
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <input
+                      type="range"
+                      min="5"
+                      max="60"
+                      value={tweeterYPct}
+                      onChange={(e) => setTweeterYPct(parseInt(e.target.value))}
+                      style={{ flex: 1, accentColor: 'var(--accent)', cursor: 'pointer' }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {crossoverWays === 3 && (
+                <div className="input-group" style={{ marginBottom: '0.5rem' }}>
+                  <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem' }}>
+                    <span>{t("Posición Vertical Medio")}</span>
+                    <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{midrangeYPct}%</span>
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <input
+                      type="range"
+                      min="15"
+                      max="80"
+                      value={midrangeYPct}
+                      onChange={(e) => setMidrangeYPct(parseInt(e.target.value))}
+                      style={{ flex: 1, accentColor: 'var(--accent)', cursor: 'pointer' }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* PESTAÑA B: PUERTO / SINTONIZACIÓN BASS REFLEX & PASO BANDA */}
+        {activeTab === 'port' && (
+          <>
+            {/* Dimensionamiento y alineación acústica del cajón ventilado */}
             <div className="premium-form-card">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
                 <div className="form-subsection-title" style={{ margin: 0 }}>{t("Alineación Acústica (Vb/Fb)")}</div>
@@ -1170,15 +1336,65 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                   </button>
                 )}
               </div>
+
+              {boxType === 'ported' && setVentedAlignment && (
+                <div style={{ marginBottom: '0.75rem', background: 'rgba(255,255,255,0.02)', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--card-border)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
+                      {t("Alineación Acústica")}
+                    </label>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--accent)', fontWeight: 600 }}>
+                      {ventedAlignment === 'QB3' ? 'High Output (QB3)' : ventedAlignment === 'B4' ? 'High Fidelity (B4)' : 'Extended Bass (SBB4)'}
+                    </span>
+                  </div>
+                  <div className="segmented-control" style={{ padding: '2px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '2px' }}>
+                    <button
+                      type="button"
+                      className={ventedAlignment === 'QB3' ? 'active' : ''}
+                      onClick={() => {
+                        setVentedAlignment('QB3');
+                        setCustomPorted(false);
+                      }}
+                      style={{ padding: '0.28rem 0.2rem', fontSize: '0.68rem', textAlign: 'center' }}
+                      title="Quasi-Butterworth 3: Máxima potencia y control de cono"
+                    >
+                      High Output (QB3)
+                    </button>
+                    <button
+                      type="button"
+                      className={ventedAlignment === 'B4' ? 'active' : ''}
+                      onClick={() => {
+                        setVentedAlignment('B4');
+                        setCustomPorted(false);
+                      }}
+                      style={{ padding: '0.28rem 0.2rem', fontSize: '0.68rem', textAlign: 'center' }}
+                      title="Butterworth B4: Respuesta máximamente plana (Hi-Fi)"
+                    >
+                      Hi-Fi (B4)
+                    </button>
+                    <button
+                      type="button"
+                      className={ventedAlignment === 'SBB4' ? 'active' : ''}
+                      onClick={() => {
+                        setVentedAlignment('SBB4');
+                        setCustomPorted(false);
+                      }}
+                      style={{ padding: '0.28rem 0.2rem', fontSize: '0.68rem', textAlign: 'center' }}
+                      title="Super Boom Box 4: Máxima extensión de subgraves profundos"
+                    >
+                      Ext. Bass (SBB4)
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="input-grid">
                 <div className="input-group">
                   <label>{t("Volumen Neto (Vb)")}</label>
-
-
                   <div className="input-wrapper">
                     <input
                       type="number"
-                      value={Number(convertTo(boxType === 'sealed' ? (sealedData.valid ? sealedData.Vb : customVb) : boxType === 'ported' ? (portedData.valid ? portedData.Vb : customVb) : (bandpassData.valid ? (bandpassData.Vf + bandpassData.Vr) : customVb), 'volume', unitSystem).toFixed(2))}
+                      value={Number(convertTo(boxType === 'ported' ? (portedData.valid ? portedData.Vb : customVb) : (bandpassData.valid ? (bandpassData.Vf + bandpassData.Vr) : customVb), 'volume', unitSystem).toFixed(2))}
                       onChange={(e) => {
                         const valLitres = convertFrom(parseFloat(e.target.value) || 0, 'volume', unitSystem);
                         setCustomVb(valLitres);
@@ -1191,41 +1407,22 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                   </div>
                 </div>
 
-                {boxType !== 'sealed' && (
-                  <div className="input-group">
-                    <label>{boxType === 'bandpass' ? t("Sintonía Frontal (Fb)") : t("Sintonía (Fb)")}</label>
-
-
-                    <div className="input-wrapper">
-                      <input
-                        type="number"
-                        value={Number((boxType === 'ported' ? (portedData.valid ? portedData.Fb : customFb) : (bandpassData.valid ? bandpassData.Fb : customFb)).toFixed(1))}
-                        onChange={(e) => {
-                          setCustomFb(parseFloat(e.target.value) || 0);
-                          setCustomPorted(true);
-                        }}
-                        step="any"
-                      />
-                      <span className="unit-badge">Hz</span>
-                    </div>
+                <div className="input-group">
+                  <label>{boxType === 'bandpass' ? t("Sintonía Frontal (Fb)") : t("Sintonía (Fb)")}</label>
+                  <div className="input-wrapper">
+                    <input
+                      type="number"
+                      value={Number((boxType === 'ported' ? (portedData.valid ? portedData.Fb : customFb) : (bandpassData.valid ? bandpassData.Fb : customFb)).toFixed(1))}
+                      onChange={(e) => {
+                        setCustomFb(parseFloat(e.target.value) || 0);
+                        setCustomPorted(true);
+                      }}
+                      step="any"
+                    />
+                    <span className="unit-badge">Hz</span>
                   </div>
-                )}
-                {boxType === 'sealed' && (
-                  <div className="input-group">
-                    <label>{t("Q del Sistema Objetivo (Qtc)")}</label>
-
-                    <div className="input-wrapper">
-                      <input
-                        type="number"
-                        value={targetQtc}
-                        onChange={(e) => setTargetQtc(parseFloat(e.target.value) || 0.707)}
-                        step="0.01"
-                      />
-                    </div>
-                  </div>
-                )}
+                </div>
               </div>
-
 
               {boxType === 'bandpass' && (
                 <div className="input-grid" style={{ marginTop: '0.5rem' }}>
@@ -1427,39 +1624,89 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       </label>
                     </div>
 
-                    <div className="input-group" style={{ marginBottom: '0.5rem' }}>
-                      <label>{t("Extremos Redondeados (Flared)")}</label>
-                      <div className="input-wrapper">
-                        <select
-                          value={flaredEnds}
-                          onChange={(e) => setFlaredEnds(parseInt(e.target.value) as 0 | 1 | 2)}
-                          style={{
-                            width: '100%',
-                            height: '34px',
-                            background: 'rgba(255, 255, 255, 0.03)',
-                            color: 'var(--text-main)',
-                            border: '1px solid var(--card-border)',
-                            borderRadius: '6px',
-                            padding: '0 0.5rem',
-                            fontSize: '0.78rem'
-                          }}
+                    {/* Corrección de Extremos de Conducto */}
+                    <div className="input-group" style={{ marginBottom: '0.65rem' }}>
+                      <label>{t("Corrección de Extremos")}</label>
+                      <div className="port-ends-grid">
+                        <button
+                          type="button"
+                          className={`port-end-opt ${flaredEnds === 0 ? 'active' : ''}`}
+                          onClick={() => setFlaredEnds(0)}
                         >
-                          <option value={0} style={{ background: 'var(--card-bg)' }}>{t("Ninguno (Rectos)")}</option>
-                          <option value={1} style={{ background: 'var(--card-bg)' }}>{t("1 Extremo Redondeado")}</option>
-                          <option value={2} style={{ background: 'var(--card-bg)' }}>{t("Ambos Extremos Redondeados")}</option>
-                        </select>
+                          <div className="port-end-opt-title">
+                            <span>{t("Recto / Estándar")}</span>
+                            <span style={{ fontSize: '0.62rem', color: 'var(--accent)' }}>k = 0.732</span>
+                          </div>
+                          <span className="port-end-opt-desc">{t("1 extremo a ras")}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className={`port-end-opt ${flaredEnds === 1 ? 'active' : ''}`}
+                          onClick={() => setFlaredEnds(1)}
+                        >
+                          <div className="port-end-opt-title">
+                            <span>{t("Dos a Ras")}</span>
+                            <span style={{ fontSize: '0.62rem', color: 'var(--accent)' }}>k = 0.850</span>
+                          </div>
+                          <span className="port-end-opt-desc">{t("Ambos adosados")}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className={`port-end-opt ${flaredEnds === 2 ? 'active' : ''}`}
+                          onClick={() => setFlaredEnds(2)}
+                          style={{ gridColumn: 'span 2' }}
+                        >
+                          <div className="port-end-opt-title">
+                            <span>{t("Abocinado (Aeroport / Flared)")}</span>
+                            <span style={{ fontSize: '0.62rem', color: 'var(--accent)' }}>k = 0.968</span>
+                          </div>
+                          <span className="port-end-opt-desc">{t("Extremos redondeados con perfil cónico anti-turbulencias")}</span>
+                        </button>
                       </div>
                     </div>
 
-                    {/* Alerta de Velocidad y Sugerencias de Puerto */}
-                    <div style={{ marginTop: '0.6rem', marginBottom: '0.5rem' }} className={vPeak !== null ? (vPeak < 10 ? 'alert-box success' : vPeak <= 17 ? 'alert-box warn' : 'alert-box danger') : 'alert-box info'}>
-                      <span dangerouslySetInnerHTML={{ __html: vPeak !== null ? (vPeak < 10 ? `<strong>${t("Velocidad moderada/baja")}:</strong> ${vPeak.toFixed(1)} m/s. ${t("Silencioso.")}` : vPeak <= 17 ? `<strong>${t("Velocidad moderada")}:</strong> ${vPeak.toFixed(1)} m/s. ${t("Recomendado usar extremos redondeados.")}` : `<strong>${t("¡Velocidad crítica!")}:</strong> ${vPeak.toFixed(1)} m/s. ${t("Aumenta el diámetro.")}`) : t("Ingresa Sd y Xmax para calcular la velocidad.") }} />
+                    {/* Alerta de Velocidad y Chuffing */}
+                    <div className={`chuffing-badge ${vPeak !== null ? (vPeak < 10 ? 'quiet' : vPeak <= 17 ? 'moderate' : 'critical') : 'quiet'}`}>
+                      <span
+                        style={{
+                          width: '7px',
+                          height: '7px',
+                          borderRadius: '50%',
+                          background: vPeak !== null ? (vPeak < 10 ? '#34d399' : vPeak <= 17 ? '#fbbf24' : '#f87171') : 'var(--text-muted)',
+                          boxShadow: vPeak !== null ? `0 0 6px ${vPeak < 10 ? '#34d399' : vPeak <= 17 ? '#fbbf24' : '#f87171'}` : 'none',
+                          display: 'inline-block',
+                          flexShrink: 0
+                        }}
+                      />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 700, letterSpacing: '0.02em' }}>
+                          {vPeak !== null 
+                            ? (vPeak < 10 
+                                ? `${t("Flujo silencioso")}: ${vPeak.toFixed(1)} m/s` 
+                                : vPeak <= 17 
+                                  ? `${t("Velocidad moderada")}: ${vPeak.toFixed(1)} m/s` 
+                                  : `${t("¡Turbulencia Crítica (Chuffing)!")}: ${vPeak.toFixed(1)} m/s`)
+                            : t("Ingresa Sd y Xmax para calcular velocidad")
+                          }
+                        </div>
+                        <div style={{ fontSize: '0.64rem', opacity: 0.85 }}>
+                          {vPeak !== null 
+                            ? (vPeak < 10 
+                                ? t("Sin soplidos ni ruidos de aire audibles.") 
+                                : vPeak <= 17 
+                                  ? t("Aceptable. Se recomienda usar extremos abocinados.") 
+                                  : t("Aumenta el diámetro del conducto para evitar distorsión por viento."))
+                            : t("Permite modelar el comportamiento aerodinámico del puerto.")
+                          }
+                        </div>
+                      </div>
                     </div>
 
+                    {/* Sugerencias Comerciales de Puerto */}
                     {suggestions && 'options' in suggestions && suggestions.options && suggestions.options.length > 0 && (
-                      <div style={{ marginTop: '0.5rem', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--card-border)', borderRadius: '6px', padding: '0.5rem' }}>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>{t("SUGERENCIAS DE PUERTOS")}:</span>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                      <div style={{ marginTop: '0.65rem', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--card-border)', borderRadius: '6px', padding: '0.5rem' }}>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '0.35rem' }}>{t("SUGERENCIAS DE PUERTOS")}:</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
                           {suggestions.options.map((s: { numPorts: number; diameter: number; length: number }, idx: number) => {
                             const displayOptDia = convertTo(s.diameter, 'length', unitSystem);
                             const displayOptLen = convertTo(s.length, 'length', unitSystem);
@@ -1471,7 +1718,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                                   type="button"
                                   onClick={() => handleApplyPort(s.numPorts, s.diameter)}
                                   className="preset-select"
-                                  style={{ padding: '0.15rem 0.4rem', fontSize: '0.68rem', cursor: 'pointer' }}
+                                  style={{ padding: '0.15rem 0.45rem', fontSize: '0.68rem', cursor: 'pointer' }}
                                 >
                                   {t("Aplicar")}
                                 </button>
@@ -1481,6 +1728,47 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                         </div>
                       </div>
                     )}
+
+                    {/* Ubicación y posición del puerto en el bafle */}
+                    <div style={{ borderTop: '1px solid var(--card-border)', paddingTop: '0.5rem', marginTop: '0.65rem' }}>
+                      <div className="input-group" style={{ marginBottom: '0.35rem' }}>
+                        <label style={{ fontSize: '0.7rem' }}>{t("Ubicación del Puerto")}</label>
+                        <div className="segmented-control segmented-control-mini" style={{ width: '100%' }}>
+                          <button
+                            type="button"
+                            className={portLocation === 'front' ? 'active' : ''}
+                            onClick={() => setPortLocation('front')}
+                          >
+                            {t("Frente")}
+                          </button>
+                          <button
+                            type="button"
+                            className={portLocation === 'rear' ? 'active' : ''}
+                            onClick={() => setPortLocation('rear')}
+                          >
+                            {t("Atrás")}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="input-group" style={{ marginBottom: '0.25rem' }}>
+                        <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem' }}>
+                          <span>{t("Posición Vertical Puerto(s)")}</span>
+                          <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{portYPct}%</span>
+                        </label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <input
+                            type="range"
+                            min="15"
+                            max="85"
+                            value={portYPct}
+                            onChange={(e) => setPortYPct(parseInt(e.target.value))}
+                            className="slider-mini"
+                            style={{ flex: 1, accentColor: 'var(--accent)', cursor: 'pointer' }}
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </>
                 ) : (
                   // Radiador Pasivo
@@ -1524,108 +1812,6 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 )}
               </div>
             )}
-
-            {/* Distribución en Bafle Frontal (Ubicación de Woofer y Puerto) */}
-            <div className="premium-form-card" style={{ marginTop: '0.5rem' }}>
-              <div className="form-subsection-title" style={{ marginTop: 0, marginBottom: '0.35rem' }}>{t("Distribución en Bafle Frontal")}</div>
-              
-              <div className="input-group" style={{ marginBottom: '0.5rem' }}>
-                <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem' }}>
-                  <span>{t("Posición Vertical Woofer")}</span>
-                  <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{speakerYPct}%</span>
-                </label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <input
-                    type="range"
-                    min="15"
-                    max="90"
-                    value={speakerYPct}
-                    onChange={(e) => setSpeakerYPct(parseInt(e.target.value))}
-                    style={{ flex: 1, accentColor: 'var(--accent)', cursor: 'pointer' }}
-                  />
-                </div>
-              </div>
-
-              {crossoverWays >= 2 && (
-                <div className="input-group" style={{ marginBottom: '0.5rem' }}>
-                  <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem' }}>
-                    <span>{t("Posición Vertical Tweeter")}</span>
-                    <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{tweeterYPct}%</span>
-                  </label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <input
-                      type="range"
-                      min="5"
-                      max="60"
-                      value={tweeterYPct}
-                      onChange={(e) => setTweeterYPct(parseInt(e.target.value))}
-                      style={{ flex: 1, accentColor: 'var(--accent)', cursor: 'pointer' }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {crossoverWays === 3 && (
-                <div className="input-group" style={{ marginBottom: '0.5rem' }}>
-                  <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem' }}>
-                    <span>{t("Posición Vertical Medio")}</span>
-                    <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{midrangeYPct}%</span>
-                  </label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <input
-                      type="range"
-                      min="15"
-                      max="80"
-                      value={midrangeYPct}
-                      onChange={(e) => setMidrangeYPct(parseInt(e.target.value))}
-                      style={{ flex: 1, accentColor: 'var(--accent)', cursor: 'pointer' }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {boxType === 'ported' && prTuning === 'port' && (
-                <>
-                  <div className="input-group" style={{ marginBottom: '0.25rem' }}>
-                    <label style={{ fontSize: '0.65rem' }}>{t("Ubicación del Puerto")}</label>
-                    <div className="segmented-control segmented-control-mini" style={{ width: '100%' }}>
-                      <button
-                        type="button"
-                        className={portLocation === 'front' ? 'active' : ''}
-                        onClick={() => setPortLocation('front')}
-                      >
-                        {t("Frente")}
-                      </button>
-                      <button
-                        type="button"
-                        className={portLocation === 'rear' ? 'active' : ''}
-                        onClick={() => setPortLocation('rear')}
-                      >
-                        {t("Atrás")}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="input-group" style={{ marginBottom: '0.25rem' }}>
-                    <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem' }}>
-                      <span>{t("Posición Vertical Puerto(s)")}</span>
-                      <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{portYPct}%</span>
-                    </label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <input
-                        type="range"
-                        min="15"
-                        max="85"
-                        value={portYPct}
-                        onChange={(e) => setPortYPct(parseInt(e.target.value))}
-                        className="slider-mini"
-                        style={{ flex: 1, accentColor: 'var(--accent)', cursor: 'pointer' }}
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
           </>
         )}
 

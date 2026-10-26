@@ -7,6 +7,7 @@ import { calcPortLength } from '../utils/acousticMath';
 
 
 interface CabinetTabProps {
+  theme?: 'dark' | 'light';
   lang: Lang;
   unitSystem: UnitSystem;
   params: SpeakerParams;
@@ -67,6 +68,7 @@ interface CabinetTabProps {
 }
 
 const CabinetTabComponent: React.FC<CabinetTabProps> = ({
+  theme = 'dark',
   lang,
   unitSystem,
   params,
@@ -545,6 +547,7 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%', boxSizing: 'border-box' }}>
         {/* Diagrama dinámico Corte A-A (Alineado arriba bajo la gráfica) */}
         <CabinetDiagram
+          theme={theme}
           lang={lang}
           unitSystem={unitSystem}
           shape={woodShape}
@@ -795,7 +798,7 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
               <button
                 onClick={handleApplySuggestedCabinet}
                 className="preset-select"
-                style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', background: 'var(--primary)', border: '1px solid var(--primary)', color: '#ffffff', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
+                style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', background: 'var(--primary)', border: '1px solid var(--primary)', color: '#ffffff', borderRadius: '0px', cursor: 'pointer', fontWeight: 600 }}
                 type="button"
                 disabled={!(woodSource === 'sealed' ? sealedData.valid : woodSource === 'ported' ? portedData.valid : bandpassData.valid)}
               >

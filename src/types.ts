@@ -79,6 +79,8 @@ export interface WoodCabinetData {
   dTrapTopExt?: number;
   dTrapBotExt?: number;
   thickness: number;
+  dMid?: number;
+  hMid?: number;
   pieces: WoodCutPiece[];
 }
 

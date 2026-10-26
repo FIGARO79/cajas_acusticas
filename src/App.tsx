@@ -21,9 +21,17 @@ function App({ wasmError }: AppProps) {
   const [lang, setLang] = useState<Lang>(() => (localStorage.getItem('lang') as Lang) || 'es');
   const [unitSystem, setUnitSystem] = useState<UnitSystem>(() => (localStorage.getItem('unitSystem') as UnitSystem) || 'metric');
   const [theme, setTheme] = useState<'dark' | 'light'>(() => (localStorage.getItem('theme') as 'dark' | 'light') || 'dark');
-  const [activeTab, setActiveTab] = useState<'wood' | 'damping' | 'crossover'>('wood');
+  const [activeTab, setActiveTab] = useState<'wood' | 'port' | 'damping' | 'crossover'>('wood');
   const [boxType, setBoxType] = useState<'sealed' | 'ported' | 'bandpass'>('sealed');
+  const [ventedAlignment, setVentedAlignment] = useState<'QB3' | 'B4' | 'SBB4'>('QB3');
   const t = (text: string) => translate(text, lang);
+
+  const handleBoxTypeChange = (newType: 'sealed' | 'ported' | 'bandpass') => {
+    setBoxType(newType);
+    if (newType === 'sealed' && activeTab === 'port') {
+      setActiveTab('wood');
+    }
+  };
 
   // Crossover State
   const [crossoverWays, setCrossoverWays] = useState<number>(2);
@@ -151,10 +159,25 @@ function App({ wasmError }: AppProps) {
   const [speakerYPct, setSpeakerYPct] = useState<number>(50);
   const [portYPct, setPortYPct] = useState<number>(85);
 
+  // Midrange & Positioning state
+  const [midFs, setMidFs] = useState<number>(120);
+  const [midVas, setMidVas] = useState<number>(5);
+  const [midQts, setMidQts] = useState<number>(0.45);
+  const [midTargetQtc, setMidTargetQtc] = useState<number>(0.707);
+  const [useCustomMidVol, setUseCustomMidVol] = useState<boolean>(false);
+  const [customMidVol, setCustomMidVol] = useState<number | ''>('');
+  const [tweeterYPct, setTweeterYPct] = useState<number>(20);
+  const [midrangeYPct, setMidrangeYPct] = useState<number>(45);
+  const [portLocation, setPortLocation] = useState<'front' | 'rear'>('front');
+  const [midCabinetDepth, setMidCabinetDepth] = useState<number | ''>('');
+  const [midSealed, setMidSealed] = useState<boolean>(true);
+
   // Shared state for technical report exporting
   const cabinetRef = useRef<WoodCabinetData | null>(null);
+  const [cabinetData, setCabinetData] = useState<WoodCabinetData | null>(null);
   const handleCabinetDataChange = useCallback((data: WoodCabinetData | null) => {
     cabinetRef.current = data;
+    setCabinetData(data);
   }, []);
   const crossoverRef = useRef<(() => CrossoverExportData) | null>(null);
   const handleRegisterCrossover = useCallback((exp: () => CrossoverExportData) => {
@@ -403,11 +426,11 @@ function App({ wasmError }: AppProps) {
         F3Ported = estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas);
         alignmentActive = 'Manual';
       } else {
-        const result = wasm.calc_alineacion_ventilada(adjParams.fs, adjParams.vas, adjParams.qts, "QB3");
+        const result = wasm.calc_alineacion_ventilada(adjParams.fs, adjParams.vas, adjParams.qts, ventedAlignment);
         VbPorted = result.vb;
         FbPorted = result.fb;
         F3Ported = result.f3;
-        alignmentActive = 'Óptima (QB3 Wasm)';
+        alignmentActive = `${ventedAlignment === 'QB3' ? 'High Output (QB3)' : ventedAlignment === 'B4' ? 'High Fidelity (B4)' : 'Extended Bass (SBB4)'}`;
       }
     }
 
@@ -730,6 +753,16 @@ function App({ wasmError }: AppProps) {
           onPresetChange={handlePresetChange}
           customDrivers={customDrivers}
           onCustomDriversChange={handleCustomDriversChange}
+          crossoverWays={crossoverWays}
+          setCrossoverWays={setCrossoverWays}
+          midFs={midFs}
+          setMidFs={setMidFs}
+          midVas={midVas}
+          setMidVas={setMidVas}
+          midQts={midQts}
+          setMidQts={setMidQts}
+          midTargetQtc={midTargetQtc}
+          setMidTargetQtc={setMidTargetQtc}
         />
 
         {/* PARÁMETROS CENTRO: CAJA DE DISEÑO */}
@@ -737,7 +770,7 @@ function App({ wasmError }: AppProps) {
           lang={lang}
           unitSystem={unitSystem}
           boxType={boxType}
-          setBoxType={setBoxType}
+          setBoxType={handleBoxTypeChange}
           customVb={customVb}
           setCustomVb={setCustomVb}
           customFb={customFb}
@@ -748,6 +781,9 @@ function App({ wasmError }: AppProps) {
           portedData={portedData}
           sealedData={sealedData}
           bandpassData={bandpassData}
+          cabinetData={cabinetData}
+          ventedAlignment={ventedAlignment}
+          setVentedAlignment={setVentedAlignment}
           isLinkedToCabinet={woodMode === 'input' && manualNetVol > 0}
           targetQtc={targetQtc}
           setTargetQtc={setTargetQtc}
@@ -866,6 +902,28 @@ function App({ wasmError }: AppProps) {
           setSpeakerYPct={setSpeakerYPct}
           portYPct={portYPct}
           setPortYPct={setPortYPct}
+          portLocation={portLocation}
+          setPortLocation={setPortLocation}
+          midFs={midFs}
+          setMidFs={setMidFs}
+          midVas={midVas}
+          setMidVas={setMidVas}
+          midQts={midQts}
+          setMidQts={setMidQts}
+          midTargetQtc={midTargetQtc}
+          setMidTargetQtc={setMidTargetQtc}
+          useCustomMidVol={useCustomMidVol}
+          setUseCustomMidVol={setUseCustomMidVol}
+          customMidVol={customMidVol}
+          setCustomMidVol={setCustomMidVol}
+          tweeterYPct={tweeterYPct}
+          setTweeterYPct={setTweeterYPct}
+          midrangeYPct={midrangeYPct}
+          setMidrangeYPct={setMidrangeYPct}
+          midCabinetDepth={midCabinetDepth}
+          setMidCabinetDepth={setMidCabinetDepth}
+          midSealed={midSealed}
+          setMidSealed={setMidSealed}
         />
 
         {/* CONTENIDOS DERECHA */}
@@ -883,6 +941,17 @@ function App({ wasmError }: AppProps) {
             fc={fc}
             fcLow={fcLow}
             fcHigh={fcHigh}
+            portAreaM2={
+              (() => {
+                const pDia = portShape === 'round'
+                  ? (Number(portDiameter) || 0)
+                  : portShape === 'custom'
+                    ? (2 * Math.sqrt((Number(portArea) || 0) / Math.PI))
+                    : (2 * Math.sqrt(((Number(portWidth) || 0) * (Number(portHeight) || 0)) / Math.PI));
+                const pCount = Number(portCount) || 1;
+                return pDia > 0 ? pCount * Math.PI * Math.pow(pDia / 200, 2) : 0.0044;
+              })()
+            }
           />
 
           {/* Grilla de Resultados y Diagramas en Paralelo */}
@@ -890,6 +959,7 @@ function App({ wasmError }: AppProps) {
             {/* Panel Izquierdo: Cajón y Plano Técnico */}
             <div className="panel" style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '0', padding: '0px' }}>
               <CabinetTab 
+                theme={theme}
                 lang={lang}
                 unitSystem={unitSystem}
                 params={adjParams}
@@ -948,6 +1018,7 @@ function App({ wasmError }: AppProps) {
             {/* Panel Derecho: Crossover y Circuito */}
             <div className="panel" style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '0', padding: '0px' }}>
               <CrossoverTab 
+                theme={theme}
                 lang={lang} 
                 onRegisterExporter={handleRegisterCrossover}
                 readOnly={true}
