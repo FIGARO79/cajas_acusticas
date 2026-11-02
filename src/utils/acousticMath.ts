@@ -563,3 +563,27 @@ export function getFilterGain(f: number, fcPoint: number, type: string, passType
   }
   return 0;
 }
+
+/**
+ * Calcula el espaciado horizontal (centro a centro en cm) entre múltiples puertos de sintonía.
+ * Garantiza una separación mínima para evitar solapamiento físico y colisiones de calado,
+ * respetando el ancho interno disponible de la caja acústica.
+ */
+export function calculatePortSpacing(
+  count: number,
+  innerW: number,
+  portShape: 'round' | 'rectangular' | 'custom',
+  portDimension: number,
+  spacingPct: number = 50
+): number {
+  if (count <= 1) return 0;
+  const pSize = Math.max(portDimension || (portShape === 'rectangular' ? 10 : 7.5), 1.5);
+  // Distancia mínima entre centros: diámetro/ancho + 1.2 cm de madera maciza de separación
+  const minSpacing = pSize + 1.2;
+  // Ancho máximo disponible entre centros exteriores respetando 1.5 cm de despeje con las paredes laterales
+  const maxAvailable = Math.max(innerW - pSize - 3.0, minSpacing * (count - 1));
+  const maxSpacing = Math.max(minSpacing, maxAvailable / (count - 1));
+  const clampedPct = Math.max(0, Math.min(100, spacingPct));
+  return minSpacing + (clampedPct / 100) * (maxSpacing - minSpacing);
+}
+

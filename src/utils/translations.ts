@@ -382,7 +382,9 @@ export const TRANSLATIONS: Record<Exclude<Lang, 'es'>, Record<string, string>> =
     "¡Turbulencia Crítica (Chuffing)!": "Critical Turbulence (Chuffing)!",
     "Aumenta el diámetro del conducto para evitar distorsión por viento.": "Increase port diameter to prevent air distortion.",
     "Ingresa Sd y Xmax para calcular velocidad": "Enter Sd and Xmax to calculate velocity",
-    "Permite modelar el comportamiento aerodinámico del puerto.": "Allows modeling port aerodynamic airflow behavior."
+    "Permite modelar el comportamiento aerodinámico del puerto.": "Allows modeling port aerodynamic airflow behavior.",
+    "Posición Vertical Puerto(s)": "Port(s) Vertical Position",
+    "Separación entre Puertos": "Port Spacing"
   },
   pt: {
     "Completa los parámetros mínimos del altavoz (Fs, Vas, Qts).": "Insira os parâmetros mínimos do alto-falante (Fs, Vas, Qts).",
@@ -728,7 +730,9 @@ export const TRANSLATIONS: Record<Exclude<Lang, 'es'>, Record<string, string>> =
     "¡Turbulencia Crítica (Chuffing)!": "Turbulência Crítica (Chuffing)!",
     "Aumenta el diámetro del conducto para evitar distorsión por viento.": "Aumente o diâmetro do duto para evitar distorção.",
     "Ingresa Sd y Xmax para calcular velocidad": "Insira Sd e Xmax para calcular a velocidade",
-    "Permite modelar el comportamiento aerodinámico del puerto.": "Permite modelar o comportamento aerodinâmico do duto."
+    "Permite modelar el comportamiento aerodinámico del puerto.": "Permite modelar o comportamento aerodinâmico do duto.",
+    "Posición Vertical Puerto(s)": "Posição Vertical do(s) Duto(s)",
+    "Separación entre Puertos": "Espaçamento entre Dutos"
   }
 };
 

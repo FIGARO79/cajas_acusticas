@@ -76,6 +76,7 @@ interface CabinetTabProps {
   midQts?: number;
   midTargetQtc?: number;
   portYPct?: number;
+  portSpacingPct?: number;
   portLocation?: 'front' | 'rear';
   useCustomPortLength?: boolean;
   customPortLength?: number | '';
@@ -145,6 +146,7 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
   midQts = 0.45,
   midTargetQtc = 0.707,
   portYPct = 85,
+  portSpacingPct = 50,
   portLocation = 'front',
   useCustomPortLength = false,
   customPortLength = '',
@@ -669,6 +671,7 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
           baffleCutout={params.baffleCutout}
           driverDepth={params.driverDepth}
           portYPct={portYPct}
+          portSpacingPct={portSpacingPct}
           portLocation={portLocation}
           bandpassOrder={bandpassData?.order}
           bandpassRatio={bandpassData && bandpassData.valid ? bandpassData.Vr / (bandpassData.Vf + bandpassData.Vr) : 0.5}

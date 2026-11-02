@@ -227,6 +227,7 @@ function App({ wasmError }: AppProps) {
 
   const [speakerYPct, setSpeakerYPct] = useState<number>(50);
   const [portYPct, setPortYPct] = useState<number>(85);
+  const [portSpacingPct, setPortSpacingPct] = useState<number>(50);
 
   // Midrange & Positioning state
   const [midFs, setMidFs] = useState<number>(120);
@@ -1001,6 +1002,8 @@ function App({ wasmError }: AppProps) {
           setSpeakerYPct={setSpeakerYPct}
           portYPct={portYPct}
           setPortYPct={setPortYPct}
+          portSpacingPct={portSpacingPct}
+          setPortSpacingPct={setPortSpacingPct}
           portLocation={portLocation}
           setPortLocation={setPortLocation}
           midFs={midFs}
@@ -1121,6 +1124,7 @@ function App({ wasmError }: AppProps) {
                 midQts={midQts}
                 midTargetQtc={midTargetQtc}
                 portYPct={portYPct}
+                portSpacingPct={portSpacingPct}
                 portLocation={portLocation}
                 useCustomPortLength={useCustomPortLength}
                 customPortLength={customPortLength}

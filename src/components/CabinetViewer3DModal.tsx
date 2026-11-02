@@ -4,6 +4,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { type Lang, translate } from '../utils/translations';
 import { type UnitSystem, convertTo, getUnitLabel } from '../utils/units';
 import type { WoodCabinetData } from '../types';
+import { calculatePortSpacing } from '../utils/acousticMath';
 
 interface CabinetViewer3DModalProps {
   theme?: 'dark' | 'light';
@@ -30,6 +31,7 @@ interface CabinetViewer3DModalProps {
   baffleCutout?: number;
   driverDepth?: number;
   portYPct?: number;
+  portSpacingPct?: number;
   portLocation?: 'front' | 'rear';
   bandpassOrder?: 4 | 6;
   bandpassRatio?: number;
@@ -63,6 +65,7 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
   baffleCutout,
   driverDepth,
   portYPct = 85,
+  portSpacingPct = 50,
   portLocation = 'front',
   bandpassOrder = 4,
   bandpassRatio = 0.5,
@@ -410,7 +413,10 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
     if (boxType === 'ported' || boxType === 'bandpass') {
       const portY = innerH * (0.5 - portYPct / 100);
       const count = Math.max(Number(portCount) || 1, 1);
-      const portSpacing = count > 1 ? Math.min((innerW * 0.45) / count, 12) : 0;
+      const pDim = (portShape === 'round' || portShape === 'custom')
+        ? (portDiameter || 7.5)
+        : (portWidth || 10);
+      const portSpacing = calculatePortSpacing(count, innerW, portShape, pDim, portSpacingPct);
       const isRearPort = boxType === 'bandpass' ? false : portLocation === 'rear';
       for (let pIdx = 0; pIdx < count; pIdx++) {
         const pCurX = count === 1 ? 0 : -((count - 1) * portSpacing) / 2 + pIdx * portSpacing;
@@ -850,7 +856,10 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
     const buildPortAssembly = (targetGroup: THREE.Group, isRear: boolean, effectiveLength: number) => {
       const portY = innerH * (0.5 - portYPct / 100);
       const count = Math.max(Number(portCount) || 1, 1);
-      const portSpacing = count > 1 ? Math.min((innerW * 0.45) / count, 12) : 0;
+      const pDim = (portShape === 'round' || portShape === 'custom')
+        ? (portDiameter || 7.5)
+        : (portWidth || 10);
+      const portSpacing = calculatePortSpacing(count, innerW, portShape, pDim, portSpacingPct);
       const tubeZ = isRear
         ? effectiveLength / 2 - thickness / 2
         : -effectiveLength / 2 + thickness / 2;
@@ -1136,6 +1145,49 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
       }
     }
 
+    // Material de Amortiguamiento Acústico 3D (Damping) para Cajas Selladas y Ventiladas
+    if (!isBandpass && dampingType !== 'none') {
+      const liningThick = dampingType === 'light' ? 1.4 : dampingType === 'moderate' ? 2.2 : 3.0;
+      const liningMat = new THREE.MeshStandardMaterial({
+        color: isLight ? 0x64748b : 0x475569,
+        roughness: 0.96,
+        metalness: 0.05,
+        wireframe: renderMode === 'wireframe',
+      });
+
+      // 1. Placa trasera de damping (en cara interna del bafle trasero)
+      const rearLiningGeo = createPerforatedPanelGeo(
+        innerW * 0.96,
+        innerH * 0.96,
+        liningThick,
+        rearHoleCircles,
+        rearHoleRects
+      );
+      const rearLiningMesh = new THREE.Mesh(rearLiningGeo, liningMat);
+      rearLiningMesh.position.set(0, 0, thickness / 2 + liningThick / 2);
+      rearGroup.add(rearLiningMesh);
+
+      // 2. Paneles laterales de damping (izquierdo y derecho)
+      const sideLiningGeo = new THREE.BoxGeometry(liningThick, innerH * 0.92, Math.max(innerD - liningThick, 2));
+      const leftLiningMesh = new THREE.Mesh(sideLiningGeo, liningMat);
+      leftLiningMesh.position.set(thickness / 2 + liningThick / 2, 0, 0);
+      if (panelMeshesRef.current.left) panelMeshesRef.current.left.add(leftLiningMesh);
+
+      const rightLiningMesh = new THREE.Mesh(sideLiningGeo, liningMat);
+      rightLiningMesh.position.set(-thickness / 2 - liningThick / 2, 0, 0);
+      if (panelMeshesRef.current.right) panelMeshesRef.current.right.add(rightLiningMesh);
+
+      // 3. Paneles superior e inferior de damping
+      const topBotLiningGeo = new THREE.BoxGeometry(innerW * 0.92, liningThick, Math.max(innerD - liningThick, 2));
+      const topLiningMesh = new THREE.Mesh(topBotLiningGeo, liningMat);
+      topLiningMesh.position.set(0, -thickness / 2 - liningThick / 2, 0);
+      if (panelMeshesRef.current.top) panelMeshesRef.current.top.add(topLiningMesh);
+
+      const botLiningMesh = new THREE.Mesh(topBotLiningGeo, liningMat);
+      botLiningMesh.position.set(0, thickness / 2 + liningThick / 2, 0);
+      if (panelMeshesRef.current.bottom) panelMeshesRef.current.bottom.add(botLiningMesh);
+    }
+
     panelsGroup.add(frontGroup);
     panelMeshesRef.current.front = frontGroup;
 
@@ -1195,6 +1247,7 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
     overallDiameter,
     driverDepth,
     portYPct,
+    portSpacingPct,
     portLocation,
     portShape,
     portDiameter,

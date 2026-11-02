@@ -29,6 +29,7 @@ interface CabinetDiagramProps {
   baffleCutout?: number;
   driverDepth?: number;
   portYPct?: number;
+  portSpacingPct?: number;
   portLocation?: 'front' | 'rear';
   bandpassOrder?: 4 | 6;
   bandpassRatio?: number;
@@ -61,6 +62,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
   baffleCutout,
   driverDepth,
   portYPct = 85,
+  portSpacingPct = 50,
   portLocation = 'front',
   bandpassOrder = 4,
   bandpassRatio = 0.5,
@@ -119,6 +121,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
         baffleCutout={baffleCutout}
         driverDepth={driverDepth}
         portYPct={portYPct}
+        portSpacingPct={portSpacingPct}
         portLocation={portLocation}
         bandpassOrder={bandpassOrder}
         bandpassRatio={bandpassRatio}
@@ -154,6 +157,7 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
         baffleCutout={baffleCutout}
         driverDepth={driverDepth}
         portYPct={portYPct}
+        portSpacingPct={portSpacingPct}
         portLocation={portLocation}
         bandpassOrder={bandpassOrder}
         bandpassRatio={bandpassRatio}

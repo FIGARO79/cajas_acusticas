@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { type Lang, translate } from '../utils/translations';
 import { type UnitSystem, convertTo, convertFrom, getUnitLabel } from '../utils/units';
 import type { CalculatedPorted, CalculatedSealed, CalculatedBandpass, SpeakerParams, PortSuggestions, WoodCabinetData } from '../types';
-import { suggestPortConfig, calcOptimalPortForSpeaker } from '../utils/acousticMath';
+import { suggestPortConfig, calcOptimalPortForSpeaker, calculatePortSpacing } from '../utils/acousticMath';
 import { getWasm } from '../wasm';
 
 interface BoxParamsFormProps {
@@ -153,6 +153,8 @@ interface BoxParamsFormProps {
   setSpeakerYPct: (val: number) => void;
   portYPct: number;
   setPortYPct: (val: number) => void;
+  portSpacingPct?: number;
+  setPortSpacingPct?: (val: number) => void;
   portLocation: 'front' | 'rear';
   setPortLocation: (val: 'front' | 'rear') => void;
 
@@ -315,6 +317,8 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
   setSpeakerYPct,
   portYPct,
   setPortYPct,
+  portSpacingPct = 50,
+  setPortSpacingPct,
   portLocation,
   setPortLocation,
   customPorted,
@@ -540,6 +544,16 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
     }
     return null;
   }, [portCount, portDiameter, portShape, portWidth, portHeight, portedData, params]);
+
+  const computedPortSpacingCm = useMemo(() => {
+    const pCount = typeof portCount === 'number' ? portCount : 1;
+    if (pCount < 2) return null;
+    const innerW = cabinetData?.wInt || 26;
+    const pSize = portShape === 'round'
+      ? (typeof portDiameter === 'number' ? portDiameter : 7.5)
+      : (typeof portWidth === 'number' ? portWidth : 10);
+    return calculatePortSpacing(pCount, innerW, portShape, pSize, portSpacingPct);
+  }, [portCount, cabinetData?.wInt, portShape, portDiameter, portWidth, portSpacingPct]);
 
   const handlePortCountChange = (valStr: string) => {
     if (valStr === '') {
@@ -2048,6 +2062,28 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                           />
                         </div>
                       </div>
+
+                      {(Number(portCount) || 1) >= 2 && (
+                        <div className="input-group" style={{ marginBottom: '0.75rem', paddingBottom: '0.35rem' }}>
+                          <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem' }}>
+                            <span>{t("Separación entre Puertos")}</span>
+                            <span style={{ fontWeight: 600, color: 'var(--accent)' }}>
+                              {portSpacingPct}% {computedPortSpacingCm ? `(${convertTo(computedPortSpacingCm, 'length', unitSystem).toFixed(1)} ${getUnitLabel('length', unitSystem)})` : ''}
+                            </span>
+                          </label>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+                            <input
+                              type="range"
+                              min="0"
+                              max="100"
+                              value={portSpacingPct}
+                              onChange={(e) => setPortSpacingPct && setPortSpacingPct(parseInt(e.target.value))}
+                              className="slider-mini"
+                              style={{ flex: 1, accentColor: 'var(--accent)', cursor: 'pointer' }}
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </>
                 ) : (

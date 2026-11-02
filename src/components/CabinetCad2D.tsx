@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { type Lang, translate } from '../utils/translations';
 import { type UnitSystem, convertTo, getUnitLabel } from '../utils/units';
 import type { WoodCabinetData } from '../types';
+import { calculatePortSpacing } from '../utils/acousticMath';
 
 interface CabinetCad2DProps {
   theme?: 'dark' | 'light';
@@ -27,6 +28,7 @@ interface CabinetCad2DProps {
   baffleCutout?: number;
   driverDepth?: number;
   portYPct?: number;
+  portSpacingPct?: number;
   portLocation?: 'front' | 'rear';
   bandpassOrder?: 4 | 6;
   bandpassRatio?: number;
@@ -60,6 +62,7 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
   baffleCutout,
   driverDepth,
   portYPct = 85,
+  portSpacingPct = 50,
   portLocation = 'front',
   bandpassOrder = 4,
   bandpassRatio = 0.5,
@@ -395,6 +398,7 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
     ctx.setLineDash([]);
 
     // Woofer, Midrange & Tweeter on Front Baffle
+    const innerW = fW - 2 * thickness;
     const innerH = fH - 2 * thickness;
     const defaultWooferDia = crossoverWays === 3
       ? Math.min(fW * 0.68, fH * 0.34)
@@ -596,7 +600,10 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
 
     if (boxType === 'ported' || boxType === 'bandpass') {
       const count = effectivePortCount;
-      const portSpacing = count > 1 ? Math.min((fW * 0.45) / count, 12) : 0;
+      const pDim = (portShape === 'round' || portShape === 'custom')
+        ? (portDiameter || 7.5)
+        : (portWidth || 10);
+      const portSpacing = calculatePortSpacing(count, innerW, portShape, pDim, portSpacingPct);
 
       for (let pIdx = 0; pIdx < count; pIdx++) {
         const pCurX = count === 1 
@@ -708,6 +715,44 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
           : Math.max(portHeight || 4, 1.5) / 2 + 2.4;
         ctx.fillText(`(${t("Atrás")})`, portCenterX, portCenterY + labelOffset);
       }
+
+      // Cotas de posicionamiento del puerto: desde el lado, entre puertos y desde el suelo
+      if (showDimensions) {
+        const pR = (portShape === 'round' || portShape === 'custom')
+          ? Math.max((portDiameter || 7.5) / 2, 1)
+          : Math.max((portHeight || 4) / 2, 1);
+        const pDimYOffset = pR + 1.2;
+
+        const pX0 = count === 1 
+          ? portCenterX 
+          : portCenterX - ((count - 1) * portSpacing) / 2;
+        
+        // 1. Cota horizontal desde el lateral izquierdo (fX) hasta el primer puerto
+        const distSide = pX0 - fX;
+        const sideLabel = distSide >= 6.5
+          ? `Lado: ${convertTo(distSide, 'length', unitSystem).toFixed(1)}`
+          : `${convertTo(distSide, 'length', unitSystem).toFixed(1)}`;
+        drawDimension(fX, portCenterY, pX0, portCenterY, sideLabel, pDimYOffset, true);
+
+        // 2. Cota de separación centro a centro entre puertos (cuando count >= 2)
+        if (count >= 2) {
+          const sepLabel = portSpacing >= 6.5
+            ? `Sep: ${convertTo(portSpacing, 'length', unitSystem).toFixed(1)}`
+            : `${convertTo(portSpacing, 'length', unitSystem).toFixed(1)}`;
+          for (let pIdx = 0; pIdx < count - 1; pIdx++) {
+            const pA = pX0 + pIdx * portSpacing;
+            const pB = pA + portSpacing;
+            drawDimension(pA, portCenterY, pB, portCenterY, sepLabel, pDimYOffset, true);
+          }
+        }
+
+        // 3. Cota vertical desde el suelo (botY) hasta el centro de los puertos
+        const portDistBot = botY - portCenterY;
+        const ptLabel = portDistBot >= 6.5
+          ? `Suelo: ${convertTo(portDistBot, 'length', unitSystem).toFixed(1)}`
+          : `Pt: ${convertTo(portDistBot, 'length', unitSystem).toFixed(1)}`;
+        drawDimension(fX + fW, portCenterY, fX + fW, botY, ptLabel, 1.8, false);
+      }
     }
 
     // Front View Label Header
@@ -722,10 +767,30 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
     drawDimension(fX, botY, fX + fW, botY, wDisp, 3.5, true);
     drawDimension(fX, topY, fX, botY, hDisp, -3.5, false);
 
-    // Woofer position dimension
+    // Driver Vertical Position Dimensions (from Top Edge)
+    // 1. Tweeter (2-Way & 3-Way, en cajas direct-radiator)
+    if (crossoverWays >= 2 && !isBandpass) {
+      const twDistTop = tweeterCenterY - topY;
+      const twLabel = twDistTop >= 6.5
+        ? `Tw: ${convertTo(twDistTop, 'length', unitSystem).toFixed(1)}`
+        : `${convertTo(twDistTop, 'length', unitSystem).toFixed(1)}`;
+      drawDimension(fX + fW, topY, fX + fW, tweeterCenterY, twLabel, 1.8, false);
+    }
+
+    // 2. Midrange Driver (3-Way)
+    if (crossoverWays === 3 && !isBandpass) {
+      const midDistTop = midCenterY - topY;
+      const midLabel = `Mid: ${convertTo(midDistTop, 'length', unitSystem).toFixed(1)}`;
+      drawDimension(fX + fW, topY, fX + fW, midCenterY, midLabel, 3.4, false);
+    }
+
+    // 3. Woofer position dimension
     const spkDistTop = wooferCenterY - topY;
-    const spkTopDisp = `${convertTo(spkDistTop, 'length', unitSystem).toFixed(1)}`;
-    drawDimension(fX + fW, topY, fX + fW, wooferCenterY, spkTopDisp, 2.2, false);
+    const wfLabel = (crossoverWays >= 2 && !isBandpass)
+      ? (spkDistTop >= 6.5 ? `Wf: ${convertTo(spkDistTop, 'length', unitSystem).toFixed(1)}` : `${convertTo(spkDistTop, 'length', unitSystem).toFixed(1)}`)
+      : `${convertTo(spkDistTop, 'length', unitSystem).toFixed(1)}`;
+    const wfOffset = crossoverWays === 3 && !isBandpass ? 5.0 : (crossoverWays >= 2 && !isBandpass ? 3.6 : 2.0);
+    drawDimension(fX + fW, topY, fX + fW, wooferCenterY, wfLabel, wfOffset, false);
 
     // ----------------------------------------------------
     // B. VISTA LATERAL (SECCIÓN DE CORTE A-A')
@@ -1413,19 +1478,31 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
       }
     }
 
-    // Damping Acoustic Lining Layer (along rear wall and bottom)
+    // Damping Acoustic Lining Layer (Revestimiento acústico en pared trasera, superior e inferior)
     if (dampingType !== 'none') {
-      const dLining = 1.5;
-      ctx.strokeStyle = isLight ? 'rgba(5, 150, 105, 0.45)' : 'rgba(16, 185, 129, 0.4)';
+      const dLining = dampingType === 'light' ? 1.4 : dampingType === 'moderate' ? 2.2 : 3.0;
+      ctx.save();
+      ctx.fillStyle = isLight ? 'rgba(5, 150, 105, 0.12)' : 'rgba(16, 185, 129, 0.15)';
+      ctx.strokeStyle = isLight ? 'rgba(5, 150, 105, 0.55)' : 'rgba(16, 185, 129, 0.5)';
       ctx.lineWidth = 1 / zoom;
-      ctx.setLineDash([0.8, 0.6]);
+      ctx.setLineDash([0.8 / zoom, 0.6 / zoom]);
 
-      // Rear wall lining
-      ctx.strokeRect(sX + thickness, topY + thickness, dLining, fH - 2 * thickness);
-      // Bottom lining (en caja paso banda sólo recubre la cámara trasera Vr)
-      const bottomLiningLen = isBandpass ? depthRear : (sW - 2 * thickness);
-      ctx.strokeRect(sX + thickness, botY - thickness - dLining, bottomLiningLen, dLining);
-      ctx.setLineDash([]);
+      // Longitud del revestimiento superior e inferior (en paso banda recubre la cámara trasera Vr)
+      const liningLen = isBandpass ? depthRear : (sW - 2 * thickness);
+
+      // 1. Revestimiento de pared trasera
+      ctx.fillRect(sX + thickness, topY + thickness + dLining, dLining, fH - 2 * thickness - 2 * dLining);
+      ctx.strokeRect(sX + thickness, topY + thickness + dLining, dLining, fH - 2 * thickness - 2 * dLining);
+
+      // 2. Revestimiento de techo interior
+      ctx.fillRect(sX + thickness, topY + thickness, liningLen, dLining);
+      ctx.strokeRect(sX + thickness, topY + thickness, liningLen, dLining);
+
+      // 3. Revestimiento de piso interior
+      ctx.fillRect(sX + thickness, botY - thickness - dLining, liningLen, dLining);
+      ctx.strokeRect(sX + thickness, botY - thickness - dLining, liningLen, dLining);
+
+      ctx.restore();
     }
 
     // Side View Dimension Lines
@@ -1478,26 +1555,94 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
     // C. HIGHLIGHT HOVERED CUT-PIECE (from cut list)
     // ----------------------------------------------------
     if (hoveredPieceIndex !== null && hoveredPieceIndex !== undefined) {
-      ctx.fillStyle = isLight ? 'rgba(16, 185, 129, 0.25)' : 'rgba(16, 185, 129, 0.35)';
+      ctx.save();
+      ctx.fillStyle = isLight ? 'rgba(16, 185, 129, 0.28)' : 'rgba(16, 185, 129, 0.40)';
       ctx.strokeStyle = isLight ? '#059669' : '#10b981';
-      ctx.lineWidth = 2 / zoom;
+      ctx.lineWidth = 2.5 / zoom;
 
-      // 0: Laterales, 1: Tapa Sup, 2: Tapa Inf, 3: Trasera, 4: Frontal
-      if (hoveredPieceIndex === 0) {
-        ctx.fillRect(sX, topY, sW, fH);
-        ctx.strokeRect(sX, topY, sW, fH);
-      } else if (hoveredPieceIndex === 1) {
-        ctx.fillRect(fX, topY, fW, thickness);
-        ctx.fillRect(sX, topY, sW, thickness);
-      } else if (hoveredPieceIndex === 2) {
-        ctx.fillRect(fX, botY - thickness, fW, thickness);
-        ctx.fillRect(sX, botY - thickness, sW, thickness);
-      } else if (hoveredPieceIndex === 3) {
-        ctx.fillRect(sX, topY + thickness, thickness, fH - 2 * thickness);
-      } else if (hoveredPieceIndex === 4) {
-        ctx.fillRect(fX, topY, fW, fH);
-        ctx.fillRect(baffleX, topY + thickness, thickness, fH - 2 * thickness);
+      if (shape === 'rectangular') {
+        // En cajas rectangulares:
+        // 0: Caras Laterales (Izquierda y Derecha)
+        // 1: Tapas (Superior e Inferior)
+        // 2: Caras (Frontal y Trasera)
+        // 3: Divisor Interno (Paso Banda)
+        if (hoveredPieceIndex === 0) {
+          // Vista lateral (representa el panel lateral)
+          ctx.fillRect(sX, topY, sW, fH);
+          ctx.strokeRect(sX, topY, sW, fH);
+          // Vista frontal (paredes laterales izquierda y derecha)
+          ctx.fillRect(fX, topY, thickness, fH);
+          ctx.strokeRect(fX, topY, thickness, fH);
+          ctx.fillRect(fX + fW - thickness, topY, thickness, fH);
+          ctx.strokeRect(fX + fW - thickness, topY, thickness, fH);
+        } else if (hoveredPieceIndex === 1) {
+          // Tapas (Superior e Inferior)
+          // Vista frontal
+          ctx.fillRect(fX + thickness, topY, fW - 2 * thickness, thickness);
+          ctx.strokeRect(fX + thickness, topY, fW - 2 * thickness, thickness);
+          ctx.fillRect(fX + thickness, botY - thickness, fW - 2 * thickness, thickness);
+          ctx.strokeRect(fX + thickness, botY - thickness, fW - 2 * thickness, thickness);
+          // Sección de corte lateral
+          ctx.fillRect(sX, topY, sW, thickness);
+          ctx.strokeRect(sX, topY, sW, thickness);
+          ctx.fillRect(sX, botY - thickness, sW, thickness);
+          ctx.strokeRect(sX, botY - thickness, sW, thickness);
+        } else if (hoveredPieceIndex === 2) {
+          // Caras (Frontal y Trasera)
+          // Vista frontal (bafle frontal)
+          ctx.fillRect(fX + thickness, topY + thickness, fW - 2 * thickness, fH - 2 * thickness);
+          ctx.strokeRect(fX + thickness, topY + thickness, fW - 2 * thickness, fH - 2 * thickness);
+          // Sección corte lateral: Pared Trasera + Bafle Frontal
+          ctx.fillRect(sX, topY + thickness, thickness, fH - 2 * thickness);
+          ctx.strokeRect(sX, topY + thickness, thickness, fH - 2 * thickness);
+          ctx.fillRect(baffleX, topY + thickness, thickness, fH - 2 * thickness);
+          ctx.strokeRect(baffleX, topY + thickness, thickness, fH - 2 * thickness);
+        } else if (hoveredPieceIndex === 3 && isBandpass) {
+          // Divisor Interno (Bafle de Montaje en Paso Banda)
+          ctx.fillRect(divX, topY + thickness, thickness, fH - 2 * thickness);
+          ctx.strokeRect(divX, topY + thickness, thickness, fH - 2 * thickness);
+          ctx.fillRect(fX + thickness, topY + thickness, fW - 2 * thickness, fH - 2 * thickness);
+          ctx.strokeRect(fX + thickness, topY + thickness, fW - 2 * thickness, fH - 2 * thickness);
+        }
+      } else {
+        // En cajas trapezoidales:
+        // 0: Caras Laterales (Trapecios Inclinados)
+        // 1: Tapa Superior
+        // 2: Tapa Inferior
+        // 3: Cara Trasera (Recta)
+        // 4: Cara Frontal (Inclinada - Bafle)
+        // 5: Divisor Interno (Paso Banda)
+        if (hoveredPieceIndex === 0) {
+          ctx.fillRect(sX, topY, sW, fH);
+          ctx.strokeRect(sX, topY, sW, fH);
+          ctx.fillRect(fX, topY, thickness, fH);
+          ctx.strokeRect(fX, topY, thickness, fH);
+          ctx.fillRect(fX + fW - thickness, topY, thickness, fH);
+          ctx.strokeRect(fX + fW - thickness, topY, thickness, fH);
+        } else if (hoveredPieceIndex === 1) {
+          ctx.fillRect(fX + thickness, topY, fW - 2 * thickness, thickness);
+          ctx.strokeRect(fX + thickness, topY, fW - 2 * thickness, thickness);
+          ctx.fillRect(sX, topY, sWTop, thickness);
+          ctx.strokeRect(sX, topY, sWTop, thickness);
+        } else if (hoveredPieceIndex === 2) {
+          ctx.fillRect(fX + thickness, botY - thickness, fW - 2 * thickness, thickness);
+          ctx.strokeRect(fX + thickness, botY - thickness, fW - 2 * thickness, thickness);
+          ctx.fillRect(sX, botY - thickness, sWBot, thickness);
+          ctx.strokeRect(sX, botY - thickness, sWBot, thickness);
+        } else if (hoveredPieceIndex === 3) {
+          ctx.fillRect(sX, topY + thickness, thickness, fH - 2 * thickness);
+          ctx.strokeRect(sX, topY + thickness, thickness, fH - 2 * thickness);
+        } else if (hoveredPieceIndex === 4) {
+          ctx.fillRect(fX + thickness, topY + thickness, fW - 2 * thickness, fH - 2 * thickness);
+          ctx.strokeRect(fX + thickness, topY + thickness, fW - 2 * thickness, fH - 2 * thickness);
+          ctx.fillRect(baffleX, topY + thickness, thickness, fH - 2 * thickness);
+          ctx.strokeRect(baffleX, topY + thickness, thickness, fH - 2 * thickness);
+        } else if (hoveredPieceIndex === 5 && isBandpass) {
+          ctx.fillRect(divX, topY + thickness, thickness, fH - 2 * thickness);
+          ctx.strokeRect(divX, topY + thickness, thickness, fH - 2 * thickness);
+        }
       }
+      ctx.restore();
     }
 
     ctx.restore(); // Restore world coords
@@ -1530,6 +1675,7 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
     baffleCutout,
     driverDepth,
     portYPct,
+    portSpacingPct,
     portLocation,
     bandpassRatio,
     dampingType,
