@@ -1038,6 +1038,7 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
   }, [chartMode, params.xmax, params.re, dynamicMin, dynamicMax, t]);
 
   const cadFontFamily = "'JetBrains Mono', 'Fira Code', 'Consolas', monospace";
+  const isLight = theme === 'light';
 
   const options = {
     responsive: true,
@@ -1047,16 +1048,16 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
         type: 'logarithmic' as const,
         min: 10,
         max: (chartMode === 'spl' && rangeMode === 'full') ? 20000 : 500,
-        grid: { color: 'rgba(56, 189, 248, 0.12)' },
+        grid: { color: isLight ? 'rgba(2, 132, 199, 0.14)' : 'rgba(56, 189, 248, 0.12)' },
         title: {
           display: true,
           text: t('Frecuencia (Hz)'),
-          color: 'rgba(125, 211, 252, 0.85)',
-          font: { family: cadFontFamily, size: 10, weight: 600 },
+          color: isLight ? '#0f172a' : '#bae6fd',
+          font: { family: cadFontFamily, size: 11, weight: 700 },
         },
         ticks: {
-          color: 'rgba(125, 211, 252, 0.75)',
-          font: { family: cadFontFamily, size: 9 },
+          color: isLight ? '#334155' : '#93c5fd',
+          font: { family: cadFontFamily, size: 10, weight: 600 },
           callback: function (value: string | number) {
             const targets = (chartMode === 'spl' && rangeMode === 'full')
               ? [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]
@@ -1072,16 +1073,16 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
       y: {
         min: yAxisConfig.min,
         max: yAxisConfig.max,
-        grid: { color: 'rgba(56, 189, 248, 0.12)' },
+        grid: { color: isLight ? 'rgba(2, 132, 199, 0.14)' : 'rgba(56, 189, 248, 0.12)' },
         title: {
           display: true,
           text: yAxisConfig.title,
-          color: 'rgba(125, 211, 252, 0.85)',
-          font: { family: cadFontFamily, size: 10, weight: 600 },
+          color: isLight ? '#0f172a' : '#bae6fd',
+          font: { family: cadFontFamily, size: 11, weight: 700 },
         },
         ticks: {
-          color: 'rgba(125, 211, 252, 0.75)',
-          font: { family: cadFontFamily, size: 9 },
+          color: isLight ? '#334155' : '#93c5fd',
+          font: { family: cadFontFamily, size: 10, weight: 600 },
           stepSize: yAxisConfig.stepSize,
         },
       },
@@ -1091,17 +1092,18 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
         labels: {
           usePointStyle: true,
           pointStyle: 'line' as const,
-          color: '#e0f2fe',
-          font: { family: cadFontFamily, size: 10, weight: 600 },
+          color: isLight ? '#0f172a' : '#f1f5f9',
+          font: { family: cadFontFamily, size: 11, weight: 700 },
+          padding: 12,
         },
       },
       tooltip: {
-        backgroundColor: 'rgba(6, 14, 29, 0.95)',
-        titleColor: '#38bdf8',
-        bodyColor: '#e0f2fe',
+        backgroundColor: isLight ? 'rgba(255, 255, 255, 0.96)' : 'rgba(6, 14, 29, 0.95)',
+        titleColor: isLight ? '#0284c7' : '#38bdf8',
+        bodyColor: isLight ? '#0f172a' : '#e0f2fe',
         titleFont: { family: cadFontFamily, size: 10, weight: 700 },
-        bodyFont: { family: cadFontFamily, size: 9 },
-        borderColor: 'rgba(56, 189, 248, 0.4)',
+        bodyFont: { family: cadFontFamily, size: 9, weight: 600 },
+        borderColor: isLight ? 'rgba(2, 132, 199, 0.45)' : 'rgba(56, 189, 248, 0.4)',
         borderWidth: 1,
         callbacks: {
           label: function (context: TooltipItem<'line'>) {
@@ -1121,9 +1123,9 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
   };
 
   return (
-    <div className="panel chart-card" style={{ display: 'flex', flexDirection: 'column' }}>
+    <div className="panel chart-card" style={{ display: 'flex', flexDirection: 'column', padding: '0.65rem 0.85rem' }}>
       {/* Header Superior con Selector de Modos y Controles */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.55rem', flexWrap: 'wrap', gap: '0.6rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
           <h3 className="panel-title" style={{ margin: 0 }}>
             {chartMode === 'spl' && t("Simulación SPL (dB vs Hz)")}
@@ -1151,15 +1153,15 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
           )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           {/* Segmented range selector solo en modo SPL */}
           {chartMode === 'spl' && (
-            <div className="segmented-control" style={{ padding: '2px', borderRadius: '8px', display: 'flex', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--card-border)' }}>
+            <div className="segmented-control" style={{ display: 'inline-flex', width: 'auto' }}>
               <button
                 type="button"
                 className={rangeMode === 'bass' ? 'active' : ''}
                 onClick={() => setRangeMode('bass')}
-                style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem', borderRadius: '6px', cursor: 'pointer', border: 'none', background: rangeMode === 'bass' ? 'var(--primary)' : 'transparent', color: '#ffffff', fontWeight: 600 }}
+                style={{ flex: '0 0 auto', padding: '0 0.7rem', whiteSpace: 'nowrap' }}
               >
                 {t("Graves")}
               </button>
@@ -1167,7 +1169,7 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
                 type="button"
                 className={rangeMode === 'full' ? 'active' : ''}
                 onClick={() => setRangeMode('full')}
-                style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem', borderRadius: '6px', cursor: 'pointer', border: 'none', background: rangeMode === 'full' ? 'var(--primary)' : 'transparent', color: '#ffffff', fontWeight: 600 }}
+                style={{ flex: '0 0 auto', padding: '0 0.7rem', whiteSpace: 'nowrap' }}
               >
                 {t("Filtros / 20kHz")}
               </button>
@@ -1176,26 +1178,25 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
 
           {/* Toggle Reference Lines */}
           {chartMode === 'spl' && (
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.7rem', color: 'var(--text-main)', cursor: 'pointer', margin: 0, fontWeight: 500 }}>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.72rem', color: 'var(--text-main)', cursor: 'pointer', margin: 0, fontWeight: 600, whiteSpace: 'nowrap' }}>
               <input
                 type="checkbox"
                 checked={showRefLines}
                 onChange={(e) => setShowRefLines(e.target.checked)}
-                style={{ width: '13px', height: '13px', accentColor: 'var(--accent)', cursor: 'pointer' }}
+                style={{ cursor: 'pointer' }}
               />
-              {t("Líneas Ref.")}
+              <span>{t("Líneas Ref.")}</span>
             </label>
           )}
         </div>
       </div>
 
       {/* Barra de Modos de Simulación Avanzada */}
-      <div className="segmented-control" style={{ marginBottom: '0.6rem', padding: '2px', display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+      <div className="segmented-control" style={{ marginBottom: '0.6rem', display: 'flex', flexWrap: 'wrap', gap: '3px', width: '100%' }}>
         <button
           type="button"
           className={chartMode === 'spl' ? 'active' : ''}
           onClick={() => setChartMode('spl')}
-          style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', borderRadius: '6px', fontWeight: chartMode === 'spl' ? 700 : 500 }}
           title="Respuesta de Amplitud Normalizada en Frecuencia (dB)"
         >
           SPL (dB)
@@ -1204,7 +1205,6 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
           type="button"
           className={chartMode === 'excursion' ? 'active' : ''}
           onClick={() => setChartMode('excursion')}
-          style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', borderRadius: '6px', fontWeight: chartMode === 'excursion' ? 700 : 500 }}
           title="Desplazamiento pico del diafragma vs límite lineal Xmax (mm)"
         >
           Excursión (mm)
@@ -1213,7 +1213,6 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
           type="button"
           className={chartMode === 'velocity' ? 'active' : ''}
           onClick={() => setChartMode('velocity')}
-          style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', borderRadius: '6px', fontWeight: chartMode === 'velocity' ? 700 : 500 }}
           title="Velocidad del aire a través del conducto sintonizador (m/s)"
         >
           Velocidad Aire (m/s)
@@ -1222,7 +1221,6 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
           type="button"
           className={chartMode === 'impedance' ? 'active' : ''}
           onClick={() => setChartMode('impedance')}
-          style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', borderRadius: '6px', fontWeight: chartMode === 'impedance' ? 700 : 500 }}
           title="Curva de impedancia eléctrica del sistema de altavoz y caja (Ω)"
         >
           Impedancia (Ω)
@@ -1231,7 +1229,6 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
           type="button"
           className={chartMode === 'phase' ? 'active' : ''}
           onClick={() => setChartMode('phase')}
-          style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', borderRadius: '6px', fontWeight: chartMode === 'phase' ? 700 : 500 }}
           title="Respuesta de fase acústica (grados)"
         >
           Fase (°)
@@ -1240,7 +1237,6 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
           type="button"
           className={chartMode === 'delay' ? 'active' : ''}
           onClick={() => setChartMode('delay')}
-          style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', borderRadius: '6px', fontWeight: chartMode === 'delay' ? 700 : 500 }}
           title="Retardo de grupo en milisegundos (ms)"
         >
           Retardo Grupo (ms)

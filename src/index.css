@@ -297,6 +297,7 @@ input, select, textarea {
   display: flex;
   flex-direction: column;
   gap: 0;
+  padding-bottom: 1.5rem;
 }
 
 .form-subsection-title {
@@ -1642,8 +1643,17 @@ html[data-theme="light"] .desktop-menu-separator {
     background: var(--bg-main);
   }
 
+  #root {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
   .container {
     max-width: 100%;
+    flex: 1;
+    min-height: 0;
     height: 100vh;
     display: flex;
     flex-direction: column;
@@ -1653,6 +1663,7 @@ html[data-theme="light"] .desktop-menu-separator {
   }
 
   .top-navbar {
+    flex-shrink: 0;
     border-radius: 0;
     margin-bottom: 0;
     background: var(--bg-secondary);
@@ -1661,7 +1672,9 @@ html[data-theme="light"] .desktop-menu-separator {
 
   .dashboard-grid {
     flex: 1;
+    height: 100%;
     min-height: 0;
+    grid-template-rows: minmax(0, 1fr);
     overflow: hidden;
     gap: 0;
   }
@@ -1670,11 +1683,12 @@ html[data-theme="light"] .desktop-menu-separator {
   .box-design-panel,
   .dashboard-grid > aside.panel {
     height: 100%;
-    max-height: calc(100vh - 46px);
+    max-height: 100%;
+    min-height: 0;
     overflow-y: auto !important;
     overflow-x: hidden !important;
     scrollbar-gutter: stable;
-    padding: 0.75rem 0.75rem;
+    padding: 0.75rem 0.75rem 4rem 0.75rem !important;
     background: var(--bg-secondary);
     border-right: 1px solid var(--card-border);
     border-radius: 0;
@@ -1687,8 +1701,10 @@ html[data-theme="light"] .desktop-menu-separator {
 
   .dashboard-main {
     height: 100%;
+    max-height: 100%;
+    min-height: 0;
     overflow-y: auto;
-    padding: 0;
+    padding: 0 0 2.5rem 0;
     background: var(--bg-main);
   }
 
@@ -1696,6 +1712,10 @@ html[data-theme="light"] .desktop-menu-separator {
     padding: 0 !important;
     border-radius: 0;
     border: none;
+  }
+
+  .dashboard-main .panel.chart-card {
+    padding: 0.65rem 0.85rem !important;
   }
 
   /* Ajustar scrollbar sutil de los paneles */
@@ -2075,14 +2095,16 @@ button,
   background: linear-gradient(to bottom, #090b0e, #14171f) !important;
   border: 1px solid #2a313e !important;
   border-radius: 4px !important;
-  padding: 1px !important;
-  gap: 4px !important;
+  padding: 2px !important;
+  gap: 3px !important;
   box-shadow: 
     inset 0 2px 4px rgba(0, 0, 0, 0.85), 
     0 1px 0 rgba(255, 255, 255, 0.05) !important;
   align-items: center !important;
-  overflow: visible !important;
-  height: 20px !important;
+  overflow: hidden !important;
+  min-height: 26px !important;
+  height: auto !important;
+  box-sizing: border-box !important;
 }
 
 /* La ranura metálica central del fader (QUITADA) */
@@ -2094,62 +2116,65 @@ button,
 .segmented-control button:not(.active) {
   position: relative !important;
   z-index: 1 !important;
-  flex: 1 !important;
-  height: 100% !important;
+  flex: 1 1 auto !important;
+  height: 20px !important;
+  margin: 0 !important;
   background: transparent !important;
-  border: none !important;
-  color: #64748b !important;
+  border: 1px solid transparent !important;
+  color: #94a3b8 !important;
   font-family: var(--font-sans), sans-serif !important;
   font-size: 0.7rem !important;
   font-weight: 700 !important;
   text-transform: uppercase !important;
-  letter-spacing: 0.05em !important;
+  letter-spacing: 0.04em !important;
   box-shadow: none !important;
   text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.6) !important;
-  transition: color 0.15s ease !important;
+  transition: color 0.15s ease, background 0.15s ease !important;
   cursor: pointer !important;
-  display: flex !important;
+  display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  padding: 0 !important;
+  padding: 0 0.6rem !important;
+  white-space: nowrap !important;
+  line-height: 1 !important;
+  box-sizing: border-box !important;
 }
 
 .segmented-control button:not(.active):hover {
-  color: #cbd5e1 !important;
+  color: #f1f5f9 !important;
   text-shadow: 0 0 3px rgba(255, 255, 255, 0.25) !important;
-  background: transparent !important;
+  background: rgba(255, 255, 255, 0.04) !important;
 }
 
-/* Perilla Deslizante Activa (Fader Cap) - Similar al thumb del range slider de volumen */
+/* Perilla Deslizante Activa (Fader Cap) */
 .segmented-control button.active {
   position: relative !important;
   z-index: 2 !important;
-  flex: 1 !important;
+  flex: 1 1 auto !important;
   height: 20px !important;
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-  background: 
-    repeating-linear-gradient(to right, transparent, transparent 3px, rgba(0, 0, 0, 0.28) 3px, rgba(0, 0, 0, 0.28) 4px, transparent 4px, transparent 6px) no-repeat center/14px 8px,
-    linear-gradient(to bottom, #ffffff 0%, #eaeaea 40%, #b8bcc2 50%, #d5d8dc 60%, #fcfcfc 100%) !important;
-  color: #0f172a !important; /* Texto oscuro sobre la perilla de metal */
+  margin: 0 !important;
+  background: linear-gradient(to bottom, #ffffff 0%, #eef2f6 45%, #cbd5e1 55%, #f8fafc 100%) !important;
+  color: #0f172a !important; /* Texto oscuro nítido sobre la perilla de metal */
   font-family: var(--font-sans), sans-serif !important;
   font-size: 0.7rem !important;
   font-weight: 800 !important;
   text-transform: uppercase !important;
-  letter-spacing: 0.05em !important;
+  letter-spacing: 0.04em !important;
   border: 1px solid #5a5f69 !important;
   border-radius: 3px !important;
   box-shadow: 
- 
     0 1px 2px rgba(0, 0, 0, 0.3), 
     inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.25) !important;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) !important;
-  display: flex !important;
+    inset 0 -1px 2px rgba(0, 0, 0, 0.2) !important;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.85) !important;
+  display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  padding: 0 !important;
+  padding: 0 0.6rem !important;
+  white-space: nowrap !important;
+  line-height: 1 !important;
   cursor: pointer !important;
+  box-sizing: border-box !important;
 }
 
 /* Línea indicadora central (QUITADA) */
@@ -2172,14 +2197,16 @@ button,
   background: linear-gradient(to bottom, #090b0e, #14171f) !important;
   border: 1px solid #2a313e !important;
   border-radius: 4px !important;
-  padding: 1px !important;
-  gap: 4px !important;
+  padding: 2px !important;
+  gap: 3px !important;
   box-shadow: 
     inset 0 2px 4px rgba(0, 0, 0, 0.85), 
     0 1px 0 rgba(255, 255, 255, 0.05) !important;
   align-items: center !important;
-  overflow: visible !important;
-  height: 20px !important;
+  overflow: hidden !important;
+  min-height: 26px !important;
+  height: auto !important;
+  box-sizing: border-box !important;
 }
 
 /* Ranura del sub-tab (QUITADA) */
@@ -2190,60 +2217,63 @@ button,
 .sub-tabs-header button:not(.active) {
   position: relative !important;
   z-index: 1 !important;
-  flex: 1 !important;
-  height: 100% !important;
+  flex: 1 1 auto !important;
+  height: 20px !important;
+  margin: 0 !important;
   background: transparent !important;
-  border: none !important;
-  color: #64748b !important;
+  border: 1px solid transparent !important;
+  color: #94a3b8 !important;
   font-family: var(--font-sans), sans-serif !important;
   font-size: 0.7rem !important;
   font-weight: 700 !important;
   text-transform: uppercase !important;
-  letter-spacing: 0.05em !important;
+  letter-spacing: 0.04em !important;
   box-shadow: none !important;
   text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.6) !important;
-  transition: color 0.15s ease !important;
+  transition: color 0.15s ease, background 0.15s ease !important;
   cursor: pointer !important;
-  display: flex !important;
+  display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  padding: 0 !important;
+  padding: 0 0.5rem !important;
+  white-space: nowrap !important;
+  line-height: 1 !important;
+  box-sizing: border-box !important;
 }
 
 .sub-tabs-header button:not(.active):hover {
-  color: #cbd5e1 !important;
+  color: #f1f5f9 !important;
   text-shadow: 0 0 3px rgba(255, 255, 255, 0.25) !important;
 }
 
 .sub-tabs-header button.active {
   position: relative !important;
   z-index: 2 !important;
-  flex: 1 !important;
+  flex: 1 1 auto !important;
   height: 20px !important;
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-  background: 
-    repeating-linear-gradient(to right, transparent, transparent 3px, rgba(0, 0, 0, 0.28) 3px, rgba(0, 0, 0, 0.28) 4px, transparent 4px, transparent 6px) no-repeat center/14px 8px,
-    linear-gradient(to bottom, #ffffff 0%, #eaeaea 40%, #b8bcc2 50%, #d5d8dc 60%, #fcfcfc 100%) !important;
+  margin: 0 !important;
+  background: linear-gradient(to bottom, #ffffff 0%, #eef2f6 45%, #cbd5e1 55%, #f8fafc 100%) !important;
   color: #0f172a !important;
   font-family: var(--font-sans), sans-serif !important;
   font-size: 0.7rem !important;
   font-weight: 800 !important;
   text-transform: uppercase !important;
-  letter-spacing: 0.05em !important;
+  letter-spacing: 0.04em !important;
   border: 1px solid #5a5f69 !important;
   border-radius: 3px !important;
   box-shadow: 
- 
     0 1px 2px rgba(0, 0, 0, 0.3), 
     inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.25) !important;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) !important;
-  display: flex !important;
+    inset 0 -1px 2px rgba(0, 0, 0, 0.2) !important;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.85) !important;
+  display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  padding: 0 !important;
+  padding: 0 0.5rem !important;
+  white-space: nowrap !important;
+  line-height: 1 !important;
   cursor: pointer !important;
+  box-sizing: border-box !important;
 }
 
 /* Línea indicadora (QUITADA) */
@@ -2416,28 +2446,26 @@ html[data-theme="light"] .sub-tabs-header::before {
 
 html[data-theme="light"] .segmented-control button:not(.active),
 html[data-theme="light"] .sub-tabs-header button:not(.active) {
-  color: #475569 !important;
+  color: #334155 !important;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.75) !important;
 }
 
 html[data-theme="light"] .segmented-control button:not(.active):hover,
 html[data-theme="light"] .sub-tabs-header button:not(.active):hover {
   color: #0f172a !important;
+  background: rgba(255, 255, 255, 0.45) !important;
 }
 
 html[data-theme="light"] .segmented-control button.active,
 html[data-theme="light"] .sub-tabs-header button.active {
-  background: 
-    repeating-linear-gradient(to right, transparent, transparent 3px, rgba(0, 0, 0, 0.15) 3px, rgba(0, 0, 0, 0.15) 4px, transparent 4px, transparent 6px) no-repeat center/14px 8px,
-    linear-gradient(to bottom, #ffffff 0%, #f1f5f9 40%, #cbd5e1 50%, #e2e8f0 60%, #ffffff 100%) !important;
-  border-color: #94a3b8 !important;
+  background: linear-gradient(to bottom, #ffffff 0%, #f1f5f9 45%, #e2e8f0 55%, #ffffff 100%) !important;
+  border-color: #64748b !important;
   color: #0f172a !important;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) !important;
   box-shadow: 
-    0 2px 4px rgba(0, 0, 0, 0.12), 
-    0 1px 1px rgba(0, 0, 0, 0.08), 
+    0 1px 3px rgba(0, 0, 0, 0.14), 
     inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.1) !important;
+    inset 0 -1px 2px rgba(0, 0, 0, 0.08) !important;
 }
 
 /* Checkboxes tema claro */
@@ -2516,24 +2544,28 @@ html[data-theme="light"] .premium-panel-btn.active::before {
    DISEÑOS MINI PARA COMPONENTES DE AJUSTES FINOS (14PX)
    ========================================================================== */
 
-/* Control Segmentado Mini (Altura: 14px) */
+/* Control Segmentado Mini (Altura: 18px) */
 .segmented-control-mini {
-  height: 14px !important;
-  padding: 0px !important;
+  min-height: 18px !important;
+  height: 18px !important;
+  padding: 1px !important;
   gap: 2px !important;
   border-radius: 2px !important;
 }
 
-.segmented-control-mini button {
+.segmented-control-mini button,
+.segmented-control-mini button:not(.active) {
   font-size: 0.62rem !important;
   font-weight: 700 !important;
   letter-spacing: 0.02em !important;
-  padding: 0 4px !important;
-  height: 100% !important;
+  padding: 0 5px !important;
+  height: 14px !important;
+  white-space: nowrap !important;
 }
 
 .segmented-control-mini button.active {
   height: 14px !important;
+  padding: 0 5px !important;
   border-radius: 2px !important;
   box-shadow: 
     0 1px 2px rgba(0, 0, 0, 0.4), 
@@ -2572,6 +2604,7 @@ input[type="range"].slider-mini::-moz-range-thumb {
     overflow-y: auto !important;
     border-bottom: 2px solid var(--card-border) !important;
     padding-right: 0.5rem !important;
+    padding-bottom: 2.5rem !important;
   }
 
   /* Contenedor de Ebanistería (CabinetTab) */

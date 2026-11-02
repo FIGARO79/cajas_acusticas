@@ -51,6 +51,174 @@ pub struct VentedResult {
 }
 
 #[wasm_bindgen]
+pub fn calc_k_puerto(flared_ends: u8) -> f64 {
+    match flared_ends {
+        1 | 3 => 0.850,
+        2 => 0.968,
+        _ => 0.732,
+    }
+}
+
+#[wasm_bindgen]
+pub fn calc_longitud_puerto(vb: f64, fb: f64, dv: f64, flared_ends: u8, num_ports: u32) -> f64 {
+    if vb <= 0.0 || fb <= 0.0 || dv <= 0.0 || num_ports == 0 {
+        return 0.0;
+    }
+    let k = calc_k_puerto(flared_ends);
+    let n = num_ports as f64;
+    let len = ((23562.5 * dv.powi(2) * n) / (fb.powi(2) * vb)) - (k * dv);
+    len.max(0.0)
+}
+
+#[wasm_bindgen]
+pub fn calc_velocidad_puerto(fb: f64, sd: f64, xmax: f64, num_ports: u32, dv: f64) -> f64 {
+    if fb <= 0.0 || sd <= 0.0 || xmax <= 0.0 || num_ports == 0 || dv <= 0.0 {
+        return 0.0;
+    }
+    (0.008 * fb * sd * xmax) / ((num_ports as f64) * dv.powi(2))
+}
+
+#[wasm_bindgen]
+pub fn calc_f3_ventilada(fs: f64, qts: f64, vb: f64, fb: f64, vas: f64) -> f64 {
+    if fs <= 0.0 || qts <= 0.0 || vb <= 0.0 || fb <= 0.0 || vas <= 0.0 {
+        return 0.0;
+    }
+    let h = fb / fs;
+    let alpha = vas / vb;
+    let ql = 7.0_f64;
+
+    let a3 = 1.0 / qts + h / ql;
+    let a2 = 1.0 + h * h * (1.0 + alpha) + h / (qts * ql);
+    let a1 = h * h / qts + h / ql;
+    let a0 = h * h;
+
+    let mut low = 10.0_f64;
+    let mut high = 500.0_f64;
+    for _ in 0..24 {
+        let mid = (low + high) / 2.0;
+        let y = mid / fs;
+        let real = y.powi(4) - a2 * y * y + a0;
+        let imag = a1 * y - a3 * y.powi(3);
+        let mag = y.powi(4) / (real * real + imag * imag + 1e-20).sqrt();
+        if mag < 0.70710678 {
+            low = mid;
+        } else {
+            high = mid;
+        }
+    }
+    (low + high) / 2.0
+}
+
+#[wasm_bindgen]
+#[derive(Clone, Copy)]
+pub struct OptimalPortWasm {
+    pub num_ports: u32,
+    pub diameter: f64,
+    pub length: f64,
+    pub v_peak: f64,
+    pub fits_in_box: bool,
+    pub d_min_silent: f64,
+}
+
+#[wasm_bindgen]
+pub fn calc_puerto_optimo(
+    vb: f64,
+    fb: f64,
+    sd: f64,
+    xmax: f64,
+    flared_ends: u8,
+    min_len_cm: f64,
+    max_len_cm: f64,
+) -> OptimalPortWasm {
+    let sd_val = if sd > 0.0 { sd } else { 215.0 };
+    let xmax_val = if xmax > 0.0 { xmax } else { 4.0 };
+    let fb_val = if fb > 0.0 { fb } else { 40.0 };
+    let vb_val = if vb > 0.0 { vb } else { 35.0 };
+
+    let target_silent_vel = if flared_ends >= 2 { 12.0 } else { 9.5 };
+    let d_silent_total = ((0.008 * fb_val * sd_val * xmax_val) / target_silent_vel).sqrt();
+    let d_min_total = ((0.008 * fb_val * sd_val * xmax_val) / 16.0).sqrt();
+
+    let commercial = [4.0_f64, 5.0, 6.5, 7.5, 8.5, 10.0, 12.5, 15.0];
+    let mut candidates: Vec<OptimalPortWasm> = Vec::new();
+
+    for num_ports in 1..=3_u32 {
+        let n_sqrt = (num_ports as f64).sqrt();
+        let exact_silent = ((d_silent_total / n_sqrt) * 10.0).round() / 10.0;
+        let exact_min = ((d_min_total / n_sqrt) * 10.0).round() / 10.0;
+
+        let mut test_dias = vec![exact_silent, exact_min];
+        test_dias.extend_from_slice(&commercial);
+        test_dias.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        test_dias.dedup_by(|a, b| (*a - *b).abs() < 0.05);
+
+        for dia in test_dias {
+            if !(2.5..=20.0).contains(&dia) {
+                continue;
+            }
+            let lv = calc_longitud_puerto(vb_val, fb_val, dia, flared_ends, num_ports);
+            let v_peak = calc_velocidad_puerto(fb_val, sd_val, xmax_val, num_ports, dia);
+            let fits_in_box = lv >= min_len_cm && lv <= max_len_cm;
+            candidates.push(OptimalPortWasm {
+                num_ports,
+                diameter: dia,
+                length: lv,
+                v_peak,
+                fits_in_box,
+                d_min_silent: d_silent_total,
+            });
+        }
+    }
+
+    // Prioridad 1: cabe en la caja y flujo silencioso (v_peak <= 10.0)
+    if let Some(best) = candidates
+        .iter()
+        .filter(|c| c.fits_in_box && c.v_peak <= 10.0)
+        .min_by(|a, b| {
+            a.num_ports
+                .cmp(&b.num_ports)
+                .then_with(|| a.diameter.partial_cmp(&b.diameter).unwrap_or(std::cmp::Ordering::Equal))
+        })
+    {
+        return *best;
+    }
+
+    // Prioridad 2: cabe en la caja y velocidad moderada (v_peak <= 17.0)
+    if let Some(best) = candidates
+        .iter()
+        .filter(|c| c.fits_in_box && c.v_peak <= 17.0)
+        .min_by(|a, b| {
+            a.v_peak
+                .partial_cmp(&b.v_peak)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.num_ports.cmp(&b.num_ports))
+        })
+    {
+        return *best;
+    }
+
+    // Prioridad 3: cualquiera que quepa en la caja con menor velocidad
+    if let Some(best) = candidates
+        .iter()
+        .filter(|c| c.fits_in_box)
+        .min_by(|a, b| a.v_peak.partial_cmp(&b.v_peak).unwrap_or(std::cmp::Ordering::Equal))
+    {
+        return *best;
+    }
+
+    let fallback_dia = ((d_min_total.max(4.0)) * 10.0).round() / 10.0;
+    let fallback_lv = calc_longitud_puerto(vb_val, fb_val, fallback_dia, flared_ends, 1);
+    OptimalPortWasm {
+        num_ports: 1,
+        diameter: fallback_dia,
+        length: fallback_lv,
+        v_peak: calc_velocidad_puerto(fb_val, sd_val, xmax_val, 1, fallback_dia),
+        fits_in_box: fallback_lv >= min_len_cm && fallback_lv <= max_len_cm,
+        d_min_silent: d_silent_total,
+    }
+}
+
+#[wasm_bindgen]
 pub fn calc_caja_ventilada(vb: f64, fb: f64, dv: f64) -> VentedResult {
     // dv en cm, vb en L, fb en Hz
     // Lv (cm) = (23407.2 * dv^2) / (fb^2 * vb) - 0.732 * dv

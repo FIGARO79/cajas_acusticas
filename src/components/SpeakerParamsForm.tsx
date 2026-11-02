@@ -35,7 +35,11 @@ const UNIT_TYPES: Record<string, 'volume' | 'volume_small' | 'length' | 'length_
   xmax: 'length_small',
   gapHeight: 'length_small',
   vcDiameter: 'length_small',
-  vd: 'volume_small'
+  vd: 'volume_small',
+  driverVolDisplaced: 'volume',
+  overallDiameter: 'length_small',
+  baffleCutout: 'length_small',
+  driverDepth: 'length_small',
 };
 
 export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
@@ -236,25 +240,32 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
 
   // Mapear campos de la base de datos a SpeakerParams
   const mapDriverToSpeakerParams = (driver: DatabaseWoofer): SpeakerParams => {
+    if (driver._isCustom && driver._rawParams) {
+      return { ...driver._rawParams };
+    }
     return {
       fs: driver.Fs || 0,
-      vas: (driver.Vas || 0) * 1000, // m³ a litros
+      vas: driver.Vas ? Math.round(driver.Vas * 1000 * 100) / 100 : 0, // m³ a litros
       qms: driver.Qms || 0,
       qes: driver.Qes || 0,
       qts: driver.Qts || 0,
-      sd: (driver.Sd || 0) * 10000, // m² a cm²
-      xmax: (driver.Xlin || 0) * 1000, // m a mm
+      sd: driver.Sd ? Math.round(driver.Sd * 10000 * 10) / 10 : 0, // m² a cm²
+      xmax: driver.Xlin ? Math.round(driver.Xlin * 1000 * 100) / 100 : 0, // m a mm
       re: driver.Re || 0,
-      le: (driver.Le || 0) * 1000, // H a mH
+      le: driver.Le ? Math.round(driver.Le * 1000 * 100) / 100 : 0, // H a mH
       bl: driver.BL || undefined,
-      mms: driver.Mms ? driver.Mms * 1000 : undefined,
-      cms: driver.Cms ? driver.Cms * 1000 : undefined,
+      mms: driver.Mms ? Math.round(driver.Mms * 1000 * 10) / 10 : undefined,
+      cms: driver.Cms ? Math.round(driver.Cms * 1000 * 100) / 100 : undefined,
       pe: driver.Pe || undefined,
-      xlim: driver.Xmech ? driver.Xmech * 1000 : undefined,
+      xlim: driver.Xmech ? Math.round(driver.Xmech * 1000 * 10) / 10 : undefined,
       diaNominal: driver["Dimen A1"] ? `${Math.round(driver["Dimen A1"] * 39.3701)}" (${Math.round(driver["Dimen A1"] * 1000)} mm)` : undefined,
       zNominal: driver.Z || undefined,
       sens: driver.SPL1 || undefined,
-      vd: driver["P-Vd"] ? driver["P-Vd"] * 1000000 : undefined,
+      vd: driver["P-Vd"] ? Math.round(driver["P-Vd"] * 1000000 * 10) / 10 : undefined,
+      driverVolDisplaced: driver["M-Vd"] ? Math.round(driver["M-Vd"] * 1000 * 100) / 100 : undefined,
+      overallDiameter: driver["Dimen A1"] ? Math.round(driver["Dimen A1"] * 1000 * 10) / 10 : undefined,
+      baffleCutout: driver["Dimen C1"] ? Math.round(driver["Dimen C1"] * 1000 * 10) / 10 : undefined,
+      driverDepth: driver["Dimen G"] ? Math.round(driver["Dimen G"] * 1000 * 10) / 10 : undefined,
     };
   };
 
@@ -268,6 +279,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
         "Company ID": -1, // Ficticio
         _customBrand: cd.brand,
         _isCustom: true,
+        _rawParams: cd.params,
         Fs: cd.params.fs,
         Vas: cd.params.vas / 1000, // De litros a m³
         Qms: cd.params.qms,
@@ -907,12 +919,64 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
             <div className="input-wrapper">
               <input 
                 type="number" 
-                value={params.vcDiameter ?? ''} 
+                value={displayValue('vcDiameter')} 
                 onChange={(e) => handleInputChange('vcDiameter', e.target.value)}
                 placeholder="38" 
                 step="any" 
               />
-              <span className="unit-badge">mm</span>
+              <span className="unit-badge">{getUnitLabel('length_small', unitSystem)}</span>
+            </div>
+          </div>
+          <div className="input-group">
+            <label>{t("Vol. Desplazado (Driver)")}</label>
+            <div className="input-wrapper">
+              <input 
+                type="number" 
+                value={displayValue('driverVolDisplaced')} 
+                onChange={(e) => handleInputChange('driverVolDisplaced', e.target.value)}
+                placeholder="0.95" 
+                step="any" 
+              />
+              <span className="unit-badge">{getUnitLabel('volume', unitSystem)}</span>
+            </div>
+          </div>
+          <div className="input-group">
+            <label>{t("Diámetro Total Ext.")}</label>
+            <div className="input-wrapper">
+              <input 
+                type="number" 
+                value={displayValue('overallDiameter')} 
+                onChange={(e) => handleInputChange('overallDiameter', e.target.value)}
+                placeholder="256.8" 
+                step="any" 
+              />
+              <span className="unit-badge">{getUnitLabel('length_small', unitSystem)}</span>
+            </div>
+          </div>
+          <div className="input-group">
+            <label>{t("Corte en Bafle (Ø)")}</label>
+            <div className="input-wrapper">
+              <input 
+                type="number" 
+                value={displayValue('baffleCutout')} 
+                onChange={(e) => handleInputChange('baffleCutout', e.target.value)}
+                placeholder="231.9" 
+                step="any" 
+              />
+              <span className="unit-badge">{getUnitLabel('length_small', unitSystem)}</span>
+            </div>
+          </div>
+          <div className="input-group">
+            <label>{t("Profundidad (Depth)")}</label>
+            <div className="input-wrapper">
+              <input 
+                type="number" 
+                value={displayValue('driverDepth')} 
+                onChange={(e) => handleInputChange('driverDepth', e.target.value)}
+                placeholder="99.1" 
+                step="any" 
+              />
+              <span className="unit-badge">{getUnitLabel('length_small', unitSystem)}</span>
             </div>
           </div>
         </div>
@@ -936,7 +1000,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
                 value={params.fs ?? ''} 
                 onChange={(e) => handleInputChange('fs', e.target.value)}
                 placeholder="45" 
-                step="any" 
+                step="0.1" 
                 required
               />
               <span className="unit-badge">Hz</span>

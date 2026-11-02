@@ -8,7 +8,7 @@ import { CrossoverTab } from './components/CrossoverTab';
 import { type Lang, translate } from './utils/translations';
 import { type UnitSystem, convertTo, getUnitLabel } from './utils/units';
 import type { SpeakerParams, CalculatedSealed, CalculatedPorted, CalculatedBandpass, CustomDriver, WoodCabinetData, CrossoverExportData } from './types';
-import { estimateF3, calcPortLength, getKCorrection } from './utils/acousticMath';
+import { estimateF3, calcPortLength, getKCorrection, calcOptimalPortForSpeaker } from './utils/acousticMath';
 import { getWasm, calcRadiadorPasivo } from './wasm/index.ts';
 import { generateReportHTML } from './utils/reportGenerator';
 
@@ -35,6 +35,21 @@ function App({ wasmError }: AppProps) {
 
   // Crossover State
   const [crossoverWays, setCrossoverWays] = useState<number>(2);
+  const handleCrossoverWaysChange = (ways: number) => {
+    setCrossoverWays(ways);
+    if (ways === 3) {
+      if (Math.abs(speakerYPct - midrangeYPct) < 15) {
+        setTweeterYPct(15);
+        setMidrangeYPct(36);
+        setSpeakerYPct(64);
+      }
+    } else if (ways === 2) {
+      if (speakerYPct === 64 && tweeterYPct === 15) {
+        setTweeterYPct(20);
+        setSpeakerYPct(50);
+      }
+    }
+  };
   const [crossoverType, setCrossoverType] = useState<'1st_order' | '2nd_butter' | '2nd_lr' | '4th_lr'>('2nd_lr');
   const [fc, setFc] = useState<number>(2500);
   const [fcLow, setFcLow] = useState<number>(500);
@@ -54,13 +69,67 @@ function App({ wasmError }: AppProps) {
   const [bandpassS, setBandpassS] = useState<number>(0.707);
   const [bandpassA, setBandpassA] = useState<number>(2.0);
 
-  // Altavoces personalizados guardados en localStorage
+  // Altavoces personalizados guardados en localStorage (con Eminence Alpha-10A completo por defecto)
   const [customDrivers, setCustomDrivers] = useState<CustomDriver[]>(() => {
+    const defaultAlpha10A: CustomDriver = {
+      id: 'custom_eminence_alpha_10a',
+      brand: 'Eminence',
+      model: 'Alpha-10A',
+      isCustom: true,
+      params: {
+        diaNominal: '10.0", 254 mm',
+        zNominal: 8,
+        pe: 150,
+        pProg: 300,
+        fs: 50,
+        freqMin: 57,
+        freqMax: 4500,
+        sens: 95.6,
+        magWeight: 20,
+        gapHeight: 6.4,
+        vcDiameter: 38,
+        re: 5.31,
+        le: 0.66,
+        qms: 5.21,
+        qes: 0.66,
+        qts: 0.59,
+        vas: 82.2,
+        vd: 114.0,
+        cms: 0.46,
+        bl: 7.5,
+        mms: 22,
+        xmax: 3.2,
+        sd: 355.4,
+        xlim: 9.1,
+        driverVolDisplaced: 0.95,
+        overallDiameter: 256.8,
+        baffleCutout: 231.9,
+        driverDepth: 99.1,
+      },
+    };
+
     try {
       const saved = localStorage.getItem('custom_drivers');
-      return saved ? JSON.parse(saved) : [];
+      const parsed: CustomDriver[] = saved ? JSON.parse(saved) : [];
+      let foundAlpha = false;
+      const enriched = parsed.map((d) => {
+        if (
+          d.brand.toLowerCase().includes('eminence') &&
+          d.model.toLowerCase().replace(/[-\s]/g, '').includes('alpha10')
+        ) {
+          foundAlpha = true;
+          return {
+            ...d,
+            params: { ...defaultAlpha10A.params, ...d.params },
+          };
+        }
+        return d;
+      });
+      const finalList = foundAlpha ? enriched : [defaultAlpha10A, ...enriched];
+      localStorage.setItem('custom_drivers', JSON.stringify(finalList));
+      return finalList;
     } catch {
-      return [];
+      return [defaultAlpha10A];
     }
   });
 
@@ -107,7 +176,7 @@ function App({ wasmError }: AppProps) {
   const [portWidth, setPortWidth] = useState<number | ''>(10);
   const [portHeight, setPortHeight] = useState<number | ''>(5);
   const [portArea, setPortArea] = useState<number | ''>(50);
-  const [flaredEnds, setFlaredEnds] = useState<0 | 1 | 2>(0);
+  const [flaredEnds, setFlaredEnds] = useState<0 | 1 | 2 | 3>(0);
   const [useCustomPortLength, setUseCustomPortLength] = useState<boolean>(false);
   const [customPortLength, setCustomPortLength] = useState<number | ''>('');
 
@@ -217,6 +286,59 @@ function App({ wasmError }: AppProps) {
         updatedParams.qts = Math.round((updatedParams.qms * updatedParams.qes) / (updatedParams.qms + updatedParams.qes) * 1000) / 1000;
       }
       setParams(updatedParams);
+
+      // Seleccionar alineación acústica óptima según el Qts del altavoz (Small / Keele)
+      let optAlign: 'QB3' | 'B4' | 'SBB4' = 'B4';
+      if (updatedParams.qts && updatedParams.qts > 0) {
+        if (updatedParams.qts < 0.38) {
+          optAlign = 'QB3'; // Para motores potentes con Qts bajo
+        } else if (updatedParams.qts <= 0.45) {
+          optAlign = 'B4';  // Alineación plana estándar (Fb = Fs)
+        } else {
+          optAlign = 'B4';  // Para Qts alto (> 0.45), B4 (Fb = Fs) evita la joroba de QB3
+        }
+        setVentedAlignment(optAlign);
+      }
+
+      // Auto-calcular puerto óptimo (sin soplidos) acorde a los parámetros del altavoz seleccionado
+      if (updatedParams.fs > 0 && updatedParams.vas > 0 && updatedParams.qts > 0) {
+        try {
+          const wasm = getWasm();
+          const res = wasm.calc_alineacion_ventilada(updatedParams.fs, updatedParams.vas, updatedParams.qts, optAlign);
+          const targetVb = (woodMode === 'input' && cabinetData?.valid && cabinetData.vNeto > 0)
+            ? cabinetData.vNeto
+            : (res.vb > 0 ? res.vb : 40);
+          const targetFb = (updatedParams.qts >= 0.45 && res.fb > updatedParams.fs * 1.1)
+            ? updatedParams.fs
+            : (res.fb > 0 ? res.fb : updatedParams.fs);
+          const maxLen = (cabinetData?.valid && cabinetData.dInt > 6)
+            ? Math.max(cabinetData.dInt - 3.5, 8)
+            : 38.0;
+          const optPort = calcOptimalPortForSpeaker(targetVb, targetFb, updatedParams, flaredEnds, 2.0, maxLen);
+          setPortCount(optPort.numPorts);
+          setPortDiameter(optPort.diameter);
+          if (optPort.length > 0) {
+            setCustomPortLength(Number(optPort.length.toFixed(1)));
+            setUseCustomPortLength(true);
+          }
+          setCustomFbState(Number(targetFb.toFixed(1)));
+        } catch {
+          // Mantiene configuración actual si el motor WASM aún no está listo
+        }
+      }
+
+      // Sincronizar impedancia del Woofer y parámetros de la Red Zobel con el altavoz seleccionado
+      if (updatedParams.zNominal && updatedParams.zNominal > 0) {
+        setZWoofer(updatedParams.zNominal);
+      } else if (updatedParams.re && updatedParams.re > 0) {
+        setZWoofer(updatedParams.re <= 4.2 ? 4 : 8);
+      }
+      if (updatedParams.re && updatedParams.re > 0) {
+        setZobelRe(updatedParams.re);
+      }
+      if (updatedParams.le && updatedParams.le > 0) {
+        setZobelLe(updatedParams.le);
+      }
       // Automatically toggle pro parameters if specifications exist
       if (updatedParams.diaNominal) {
         // Preset contains nominal specs, could enable pro calculations UI
@@ -260,7 +382,18 @@ function App({ wasmError }: AppProps) {
 
 
 
-  // Manual wood volume calculation (needed for link overrides)
+  // Frecuencia de sintonía óptima (Fb) según los parámetros Thiele-Small del altavoz y la alineación activa
+  const optimalDriverFb = useMemo<number>(() => {
+    if (validationError || !adjParams.fs || !adjParams.vas || !adjParams.qts) return 38;
+    try {
+      const wasm = getWasm();
+      const res = wasm.calc_alineacion_ventilada(adjParams.fs, adjParams.vas, adjParams.qts, ventedAlignment);
+      return res.fb > 0 ? Math.round(res.fb * 10) / 10 : 38;
+    } catch {
+      return 38;
+    }
+  }, [validationError, adjParams.fs, adjParams.vas, adjParams.qts, ventedAlignment]);
+
   // Manual wood volume calculation (needed for link overrides)
   const getManualWoodNetVolume = () => {
     const thickness = (woodThickness || 0) / 10;
@@ -293,18 +426,8 @@ function App({ wasmError }: AppProps) {
 
     if (bruto <= 0) return 0;
 
-    let targetFb = customFbState ?? 38;
-    if (!customPorted) {
-      try {
-        const wasm = getWasm();
-        if (wasm && adjParams.fs && adjParams.vas && adjParams.qts) {
-          const result = wasm.calc_alineacion_ventilada(adjParams.fs, adjParams.vas, adjParams.qts, "QB3");
-          targetFb = result.fb;
-        }
-      } catch (e) {
-        console.warn("Could not calculate optimal Vb/Fb from Wasm:", e);
-      }
-    }
+    // En modo de medidas manuales ('input'), usa customFbState si fue fijado por el usuario o la Fb óptima del altavoz
+    const targetFb = customFbState ?? optimalDriverFb;
 
     const pCount = Number(portCount) || 0;
     let portVol = 0;
@@ -354,7 +477,7 @@ function App({ wasmError }: AppProps) {
       }
     }
 
-    return Math.max(0, bruto - extra);
+    return Math.max(0, bruto - (extra + portVol));
   };
 
   const manualNetVol = getManualWoodNetVolume();
@@ -415,14 +538,16 @@ function App({ wasmError }: AppProps) {
 
     if (woodMode === 'input' && manualNetVol > 0) {
       VbPorted = manualNetVol * dampingFactor;
-      // Usar estado crudo directamente en el cálculo para evitar circulares
-      FbPorted = customFbState ?? 38; 
+      // Sintonizar a la Fb personalizada o a la Fb óptima calculada según el altavoz y alineación
+      FbPorted = customFbState ?? optimalDriverFb;
       F3Ported = estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas);
-      alignmentActive = 'Manual';
+      alignmentActive = customFbState !== null
+        ? 'Manual'
+        : `${ventedAlignment === 'QB3' ? 'High Output (QB3)' : ventedAlignment === 'B4' ? 'High Fidelity (B4)' : 'Extended Bass (SBB4)'}`;
     } else {
       if (customPorted) {
         VbPorted = customVbState ?? 45;
-        FbPorted = customFbState ?? 38;
+        FbPorted = customFbState ?? optimalDriverFb;
         F3Ported = estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas);
         alignmentActive = 'Manual';
       } else {
@@ -463,7 +588,7 @@ function App({ wasmError }: AppProps) {
       Vas: adjParams.vas,
       alignment: alignmentActive
     };
-  }, [validationError, adjParams.fs, adjParams.vas, adjParams.qts, woodMode, manualNetVol, dampingFactor, customPorted, customVbState, customFbState, useCustomPortLength, customPortLength, portShape, portDiameter, portArea, portWidth, portHeight, portCount, flaredEnds, lang]);
+  }, [validationError, adjParams.fs, adjParams.vas, adjParams.qts, woodMode, manualNetVol, dampingFactor, customPorted, customVbState, customFbState, optimalDriverFb, ventedAlignment, useCustomPortLength, customPortLength, portShape, portDiameter, portArea, portWidth, portHeight, portCount, flaredEnds, lang]);
 
   const customVb = customPorted ? (customVbState ?? Math.round((portedData.Vb || 45) * 10) / 10) : Math.round((portedData.Vb || 45) * 10) / 10;
   const customFb = customPorted ? (customFbState ?? Math.round((portedData.Fb || 38) * 10) / 10) : Math.round((portedData.Fb || 38) * 10) / 10;
@@ -871,7 +996,7 @@ function App({ wasmError }: AppProps) {
 
           // Crossover props
           crossoverWays={crossoverWays}
-          setCrossoverWays={setCrossoverWays}
+          setCrossoverWays={handleCrossoverWaysChange}
           crossoverType={crossoverType}
           setCrossoverType={setCrossoverType}
           fc={fc}
@@ -955,7 +1080,7 @@ function App({ wasmError }: AppProps) {
           />
 
           {/* Grilla de Resultados y Diagramas en Paralelo */}
-          <div className="results-diagrams-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '0px', marginTop: '0px' }}>
+          <div className="results-diagrams-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '0px', marginTop: '0px', alignItems: 'start' }}>
             {/* Panel Izquierdo: Cajón y Plano Técnico */}
             <div className="panel" style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '0', padding: '0px' }}>
               <CabinetTab 
@@ -1011,7 +1136,18 @@ function App({ wasmError }: AppProps) {
                 onCabinetDataChange={handleCabinetDataChange}
                 readOnly={true}
                 speakerYPct={speakerYPct}
+                tweeterYPct={tweeterYPct}
+                midrangeYPct={midrangeYPct}
+                crossoverWays={crossoverWays}
+                midSealed={midSealed}
+                midCabinetDepth={midCabinetDepth}
+                useCustomMidVol={useCustomMidVol}
+                customMidVol={customMidVol}
+                midVas={midVas}
+                midQts={midQts}
+                midTargetQtc={midTargetQtc}
                 portYPct={portYPct}
+                portLocation={portLocation}
               />
             </div>
 

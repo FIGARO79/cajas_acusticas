@@ -60,11 +60,22 @@ interface CabinetTabProps {
   portArea: number | '';
   dampingFactor: number;
   dampingType?: 'none' | 'light' | 'moderate' | 'heavy';
-  flaredEnds?: 0 | 1 | 2;
+  flaredEnds?: 0 | 1 | 2 | 3;
   onCabinetDataChange?: (data: WoodCabinetData | null) => void;
   readOnly?: boolean;
   speakerYPct?: number;
+  tweeterYPct?: number;
+  midrangeYPct?: number;
+  crossoverWays?: number;
+  midSealed?: boolean;
+  midCabinetDepth?: number | '';
+  useCustomMidVol?: boolean;
+  customMidVol?: number | '';
+  midVas?: number;
+  midQts?: number;
+  midTargetQtc?: number;
   portYPct?: number;
+  portLocation?: 'front' | 'rear';
 }
 
 const CabinetTabComponent: React.FC<CabinetTabProps> = ({
@@ -120,7 +131,18 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
   onCabinetDataChange,
   readOnly = false,
   speakerYPct = 50,
+  tweeterYPct = 20,
+  midrangeYPct = 40,
+  crossoverWays = 2,
+  midSealed = true,
+  midCabinetDepth = '',
+  useCustomMidVol = false,
+  customMidVol = '',
+  midVas = 5,
+  midQts = 0.45,
+  midTargetQtc = 0.707,
   portYPct = 85,
+  portLocation = 'front',
 }) => {
   const t = React.useCallback((text: string) => translate(text, lang), [lang]);
   const [hoveredPieceIndex, setHoveredPieceIndex] = useState<number | null>(null);
@@ -377,6 +399,28 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
         }
       }
 
+      let dMid: number | undefined;
+      let hMid: number | undefined;
+      if (crossoverWays === 3 && !midSealed) {
+        let vMid = 3.0;
+        if (useCustomMidVol) {
+          vMid = Number(customMidVol) > 0 ? Number(customMidVol) : 3.0;
+        } else if (midQts > 0 && midQts < midTargetQtc && midVas > 0) {
+          vMid = midVas / (Math.pow(midTargetQtc / midQts, 2) - 1);
+        }
+        const refDepthInt = woodShape === 'rectangular' ? dInt : Math.min(dTrapTopInt, dTrapBotInt);
+        dMid = Number(midCabinetDepth) > 0
+          ? Math.min(Number(midCabinetDepth), Math.max(refDepthInt - thickness - 2, 6))
+          : Math.min(Math.max(refDepthInt * 0.45, 8), 15);
+        hMid = Math.min(Math.max((vMid * 1000) / Math.max(wInt * dMid, 1), 8), Math.max(hInt * 0.35, 12));
+
+        pieces.push({
+          name: t("Cámara de Medios (Tapas Sup/Inf y Fondo)"),
+          qty: 3,
+          dimensions: `2x (${displayVal(wInt, 'length')} x ${displayVal(dMid, 'length')}) + 1x (${displayVal(hMid + 2 * thickness, 'length')} x ${displayVal(wInt, 'length')}) ${uLabel}`
+        });
+      }
+
       return {
         valid: true,
         vNeto: netVol,
@@ -387,6 +431,8 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
         hExt, wExt, dExt,
         dTrapTopExt, dTrapBotExt,
         thickness: woodThickness || 0,
+        dMid,
+        hMid,
         pieces
       };
     } else {
@@ -396,7 +442,9 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
     unitSystem, sealedData, portedData, bandpassData, dampingFactor, flaredEnds, woodMode, woodShape, woodConstraint, woodSource, woodRatio,
     woodLockVal1, woodLockVal2, woodLockVal3, woodExtHeight, woodExtWidth, woodExtDepth,
     woodTrapExtHeight, woodTrapExtWidth, woodTrapExtDepthTop, woodTrapExtDepthBot, woodThickness, woodExtra,
-    portCount, portDiameter, portShape, portWidth, portHeight, portArea, t, displayVal
+    portCount, portDiameter, portShape, portWidth, portHeight, portArea,
+    crossoverWays, midSealed, midCabinetDepth, useCustomMidVol, customMidVol, midVas, midQts, midTargetQtc,
+    t, displayVal
   ]);
 
   useEffect(() => {
@@ -434,8 +482,11 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
       }
 
       if (pDia > 0) {
-        const Lv = cabinetData.vNeto > 0 
-          ? calcPortLength(cabinetData.vNeto, portedData.Fb, pDia, flaredEnds, pCount)
+        const targetVol = woodMode === 'calc'
+          ? portedData.Vb
+          : (cabinetData.vNeto > 0 ? cabinetData.vNeto : portedData.Vb);
+        const Lv = targetVol > 0 
+          ? calcPortLength(targetVol, portedData.Fb, pDia, flaredEnds, pCount)
           : 0;
         
         const displayLv = convertTo(Lv, 'length', unitSystem);
@@ -535,7 +586,9 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
           ? (2 * Math.sqrt((Number(portArea) || 0) / Math.PI))
           : (2 * Math.sqrt(((Number(portWidth) || 0) * (Number(portHeight) || 0)) / Math.PI));
       if (pDia > 0 && pCount > 0) {
-        const targetVol = cabinetData.vNeto > 0 ? cabinetData.vNeto : portedData.Vb;
+        const targetVol = woodMode === 'calc'
+          ? portedData.Vb
+          : (cabinetData.vNeto > 0 ? cabinetData.vNeto : portedData.Vb);
         const Lv = targetVol > 0
           ? calcPortLength(targetVol, portedData.Fb, pDia, flaredEnds, pCount)
           : 0;
@@ -559,9 +612,18 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
           portHeight={Number(portHeight) || 0}
           portLength={numericPortLength}
           portCount={Number(portCount) || 0}
+          flaredEnds={flaredEnds}
           hoveredPieceIndex={hoveredPieceIndex}
           speakerYPct={speakerYPct}
+          tweeterYPct={tweeterYPct}
+          midrangeYPct={midrangeYPct}
+          crossoverWays={crossoverWays}
+          midSealed={midSealed}
+          overallDiameter={params.overallDiameter}
+          baffleCutout={params.baffleCutout}
+          driverDepth={params.driverDepth}
           portYPct={portYPct}
+          portLocation={portLocation}
           bandpassOrder={bandpassData?.order}
           bandpassRatio={bandpassData && bandpassData.valid ? bandpassData.Vr / (bandpassData.Vf + bandpassData.Vr) : 0.5}
           bandpassVf={bandpassData?.Vf}

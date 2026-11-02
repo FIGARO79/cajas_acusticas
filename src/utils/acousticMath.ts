@@ -1,13 +1,24 @@
 import type { SpeakerParams, PortSuggestions } from '../types';
+import { getWasm } from '../wasm';
 
 export const QL_LOSSES = 7.0;
 
 export function getKCorrection(flaredEnds: number): number {
-  return flaredEnds === 1 ? 0.850 : flaredEnds === 2 ? 0.968 : 0.732;
+  const wasm = getWasm();
+  if (wasm) {
+    return wasm.calc_k_puerto(flaredEnds);
+  }
+  if (flaredEnds === 1 || flaredEnds === 3) return 0.850;
+  if (flaredEnds === 2) return 0.968;
+  return 0.732;
 }
 
 export function calcPortLength(vb: number, fb: number, dv: number, flaredEnds: number, numPorts = 1): number {
   if (vb <= 0 || fb <= 0 || dv <= 0) return 0;
+  const wasm = getWasm();
+  if (wasm) {
+    return wasm.calc_longitud_puerto(vb, fb, dv, flaredEnds, numPorts);
+  }
   const k = getKCorrection(flaredEnds);
   const len = ((23562.5 * Math.pow(dv, 2) * numPorts) / (fb * fb * vb)) - (k * dv);
   return Math.max(0, len);
@@ -26,6 +37,10 @@ export const chartFrequencies: number[] = (() => {
 
 
 export function estimateF3(fs: number, qts: number, Vb: number, Fb: number, vas: number) {
+  const wasm = getWasm();
+  if (wasm) {
+    return wasm.calc_f3_ventilada(fs, qts, Vb, Fb, vas);
+  }
   const h = Fb / fs;
   const alpha = vas / Vb;
   const Ql = QL_LOSSES;
@@ -53,45 +68,156 @@ export function estimateF3(fs: number, qts: number, Vb: number, Fb: number, vas:
   return (low + high) / 2;
 }
 
-export function suggestPortConfig(Vb: number, Fb: number, params: SpeakerParams, flaredEnds: 0 | 1 | 2 = 0, minLength = 0): PortSuggestions {
+export interface OptimalPortResult {
+  numPorts: number;
+  diameter: number;
+  length: number;
+  vPeak: number;
+  fitsInBox: boolean;
+}
+
+/**
+ * Calcula el puerto óptimo (cantidad y diámetro) para un altavoz y caja (Vb, Fb)
+ * ejecutando el motor acústico en Rust/WebAssembly (`calc_puerto_optimo`).
+ */
+export function calcOptimalPortForSpeaker(
+  Vb: number,
+  Fb: number,
+  params: SpeakerParams,
+  flaredEnds: 0 | 1 | 2 | 3 = 0,
+  minLengthCm = 2.0,
+  maxLengthCm = 45.0
+): OptimalPortResult {
+  const sd = params.sd && params.sd > 0 ? params.sd : 215;
+  const xmax = params.xmax && params.xmax > 0 ? params.xmax : 4.0;
+  const wasm = getWasm();
+  if (wasm) {
+    const res = wasm.calc_puerto_optimo(Vb, Fb, sd, xmax, flaredEnds, minLengthCm, maxLengthCm);
+    const out: OptimalPortResult = {
+      numPorts: res.num_ports,
+      diameter: res.diameter,
+      length: res.length,
+      vPeak: res.v_peak,
+      fitsInBox: res.fits_in_box,
+    };
+    res.free();
+    return out;
+  }
+  // vPeak = (0.008 * Fb * Sd * Xmax) / (N * D^2)
+  // Para vPeakobjetivo = 9.5 m/s (Flujo silencioso < 10 m/s):
+  const targetSilentVel = flaredEnds >= 2 ? 12.0 : 9.5;
+  const dSilentTotal = Math.sqrt((0.008 * Fb * sd * xmax) / targetSilentVel);
+  // Mínimo absoluto anti-chuffing (~16 m/s):
+  const dMinTotal = Math.sqrt((0.008 * Fb * sd * xmax) / 16.0);
+
+  const candidateConfigs: OptimalPortResult[] = [];
+  const commercialDiameters = [4.0, 5.0, 6.5, 7.5, 8.5, 10.0, 12.5, 15.0];
+
+  // Evaluar 1, 2 y 3 puertos tanto con el diámetro silencioso exacto como medidas comerciales
+  for (const numPorts of [1, 2, 3]) {
+    const exactSilentDia = Number((dSilentTotal / Math.sqrt(numPorts)).toFixed(1));
+    const exactMinDia = Number((dMinTotal / Math.sqrt(numPorts)).toFixed(1));
+    const testDias = Array.from(new Set([exactSilentDia, exactMinDia, ...commercialDiameters])).sort((a, b) => a - b);
+
+    for (const dia of testDias) {
+      if (dia < 2.5 || dia > 20) continue;
+      const lv = calcPortLength(Vb, Fb, dia, flaredEnds, numPorts);
+      const vPeak = (0.008 * Fb * sd * xmax) / (numPorts * dia * dia);
+      const fitsInBox = lv >= minLengthCm && lv <= maxLengthCm;
+      candidateConfigs.push({
+        numPorts,
+        diameter: dia,
+        length: lv,
+        vPeak,
+        fitsInBox,
+      });
+    }
+  }
+
+  // Prioridad 1: Cabe en la caja y flujo silencioso (vPeak <= 10 m/s), prefiriendo menor número de puertos y longitud razonable
+  const silentFitting = candidateConfigs
+    .filter((c) => c.fitsInBox && c.vPeak <= 10.0)
+    .sort((a, b) => a.numPorts - b.numPorts || a.diameter - b.diameter);
+  if (silentFitting.length > 0) return silentFitting[0];
+
+  // Prioridad 2: Cabe en la caja y velocidad moderada sin soplido crítico (vPeak <= 17 m/s)
+  const moderateFitting = candidateConfigs
+    .filter((c) => c.fitsInBox && c.vPeak <= 17.0)
+    .sort((a, b) => a.vPeak - b.vPeak || a.numPorts - b.numPorts);
+  if (moderateFitting.length > 0) return moderateFitting[0];
+
+  // Fallback: el que mejor quepa en la caja con menor velocidad de aire
+  const anyFitting = candidateConfigs
+    .filter((c) => c.fitsInBox)
+    .sort((a, b) => a.vPeak - b.vPeak);
+  if (anyFitting.length > 0) return anyFitting[0];
+
+  const fallbackDia = Number(Math.max(4.0, dMinTotal).toFixed(1));
+  const fallbackLv = calcPortLength(Vb, Fb, fallbackDia, flaredEnds, 1);
+  return {
+    numPorts: 1,
+    diameter: fallbackDia,
+    length: fallbackLv,
+    vPeak: (0.008 * Fb * sd * xmax) / (fallbackDia * fallbackDia),
+    fitsInBox: fallbackLv >= minLengthCm && fallbackLv <= maxLengthCm,
+  };
+}
+
+export function suggestPortConfig(Vb: number, Fb: number, params: SpeakerParams, flaredEnds: 0 | 1 | 2 | 3 = 0, minLength = 0): PortSuggestions {
   if (!params.sd || !params.xmax) {
     return { valid: false, reason: "Ingresa el área del cono (Sd) y excursión (Xmax) en la barra lateral para recibir sugerencias de puertos sin ruido de viento." };
   }
 
-  const dMin = Math.sqrt((0.1 * params.sd * params.xmax) / Math.sqrt(Fb));
-  const standardSizes = [5.0, 7.5, 10.0, 15.0];
-  const options = [];
+  // Diámetro mínimo para flujo silencioso (< 10 m/s) según ecuación de velocidad pico en Fb
+  const dMinSilent = Math.sqrt((0.008 * Fb * params.sd * params.xmax) / 9.8);
+  const standardSizes = [4.5, 5.0, 6.0, 7.5, 10.0, 15.0];
+  const options: Array<{ numPorts: number; diameter: number; length: number; isCustom: boolean }> = [];
 
-  // Theoretical exact min option
-  const lvMin = calcPortLength(Vb, Fb, dMin, flaredEnds, 1);
-  if (lvMin >= minLength) {
+  // Opción óptima silenciosa (< 10 m/s)
+  const dOpt1 = Number(dMinSilent.toFixed(1));
+  const lvOpt1 = calcPortLength(Vb, Fb, dOpt1, flaredEnds, 1);
+  if (lvOpt1 >= minLength) {
     options.push({
       numPorts: 1,
-      diameter: dMin,
-      length: lvMin,
+      diameter: dOpt1,
+      length: lvOpt1,
       isCustom: false
     });
   }
 
-  // Commercial options
+  // Opción 2 puertos silenciosos (cuando 1 puerto queda muy ancho o largo)
+  const dOpt2 = Number((dMinSilent / Math.sqrt(2)).toFixed(1));
+  const lvOpt2 = calcPortLength(Vb, Fb, dOpt2, flaredEnds, 2);
+  if (dOpt2 >= 3.5 && lvOpt2 >= minLength) {
+    options.push({
+      numPorts: 2,
+      diameter: dOpt2,
+      length: lvOpt2,
+      isCustom: false
+    });
+  }
+
+  // Opciones comerciales estándar (evaluar 1 y 2 puertos)
   standardSizes.forEach(size => {
-    const numPorts = Math.ceil(Math.pow(dMin / size, 2));
-    if (numPorts > 0 && numPorts <= 4) {
-      const lv = calcPortLength(Vb, Fb, size, flaredEnds, numPorts);
-      if (lv >= minLength) {
-        options.push({
-          numPorts: numPorts,
-          diameter: size,
-          length: lv,
-          isCustom: true
-        });
+    for (const numPorts of [1, 2]) {
+      const vPeak = (0.008 * Fb * params.sd * params.xmax) / (numPorts * size * size);
+      if (vPeak <= 17.0) {
+        const lv = calcPortLength(Vb, Fb, size, flaredEnds, numPorts);
+        if (lv >= minLength && !options.some(o => o.numPorts === numPorts && Math.abs(o.diameter - size) < 0.2)) {
+          options.push({
+            numPorts: numPorts,
+            diameter: size,
+            length: lv,
+            isCustom: true
+          });
+        }
       }
     }
   });
 
   return {
     valid: true,
-    dMin,
+    dMin: dMinSilent,
     options
   };
 }
@@ -143,6 +269,25 @@ export function calcConeExcursion(
   powerWatts = 100
 ): number {
   if (f <= 0 || vb <= 0) return 0;
+  const wasm = getWasm();
+  if (wasm) {
+    return wasm.calc_excursion_cono(
+      f,
+      params.fs || 38,
+      params.qts || 0.38,
+      params.qes || 0.45,
+      params.vas || 45,
+      params.re || 6.0,
+      params.sd || 215,
+      params.mms || 0,
+      params.cms || 0,
+      params.bl || 0,
+      vb,
+      fb,
+      isPorted,
+      powerWatts
+    );
+  }
   const fs = params.fs || 38;
   const qts = params.qts || 0.38;
   const vas = params.vas || 45;
@@ -188,6 +333,25 @@ export function calcVentAirVelocity(
   powerWatts = 100
 ): number {
   if (f <= 0 || vb <= 0 || fb <= 0 || portAreaM2 <= 0) return 0;
+  const wasm = getWasm();
+  if (wasm) {
+    return wasm.calc_velocidad_aire_frec(
+      f,
+      params.fs || 38,
+      params.qts || 0.38,
+      params.qes || 0.45,
+      params.vas || 45,
+      params.re || 6.0,
+      params.sd || 215,
+      params.mms || 0,
+      params.cms || 0,
+      params.bl || 0,
+      vb,
+      fb,
+      portAreaM2,
+      powerWatts
+    );
+  }
   const fs = params.fs || 38;
   const qts = params.qts || 0.38;
   const vas = params.vas || 45;
@@ -223,6 +387,22 @@ export function calcSystemImpedance(
   isPorted: boolean
 ): number {
   if (f <= 0 || vb <= 0) return params.re || 4;
+  const wasm = getWasm();
+  if (wasm) {
+    return wasm.calc_impedancia_sistema(
+      f,
+      params.fs || 35,
+      params.qts || 0.38,
+      params.qes || 0.42,
+      params.qms || 4.0,
+      params.vas || 60,
+      params.re || 3.6,
+      params.le || 1.0,
+      vb,
+      fb,
+      isPorted
+    );
+  }
   const re = params.re || 3.6;
   const fs = params.fs || 35;
   const qes = params.qes || 0.42;
@@ -292,6 +472,18 @@ export function calcPhaseResponse(
   isPorted: boolean
 ): number {
   if (f <= 0 || vb <= 0) return 0;
+  const wasm = getWasm();
+  if (wasm) {
+    return wasm.calc_fase_acustica(
+      f,
+      params.fs || 38,
+      params.qts || 0.38,
+      params.vas || 45,
+      vb,
+      fb,
+      isPorted
+    );
+  }
   const fs = params.fs || 38;
   const qts = params.qts || 0.38;
   const vas = params.vas || 45;

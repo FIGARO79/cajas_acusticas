@@ -181,21 +181,30 @@ export const CrossoverCad2D: React.FC<CrossoverCad2DProps> = ({
     ctx.fillStyle = cBg;
     ctx.fillRect(0, 0, width, height);
 
-    // 2. Sub-pixel CAD Millimetric Grid
+    // 2. Sub-pixel CAD Millimetric Grid (Unified 6px fine / 30px major pitch with CabinetCad2D)
     if (showGrid) {
-      const fineSpacing = 20 * zoom;
-      const majorSpacing = 100 * zoom;
+      const logicalW = 860;
+      const logicalH = crossoverWays === '3way' ? 660 : 460;
+      const baseScale = Math.min((width - 40) / logicalW, (height - 40) / logicalH, 1.4) || 1;
+      const relativeZoom = Math.max(zoom / baseScale, 0.2);
+
+      const fineSpacing = 6 * relativeZoom;
+      const majorSpacing = 30 * relativeZoom;
+      const defaultPanX = (width - logicalW * baseScale) / 2;
+      const defaultPanY = (height - logicalH * baseScale) / 2;
+      const offsetX = pan.x - defaultPanX;
+      const offsetY = pan.y - defaultPanY;
 
       // Fine Grid
       ctx.strokeStyle = cGridFine;
       ctx.lineWidth = 0.5;
       ctx.beginPath();
-      const startX = pan.x % fineSpacing;
+      const startX = ((offsetX % fineSpacing) + fineSpacing) % fineSpacing;
       for (let x = startX; x < width; x += fineSpacing) {
         ctx.moveTo(x, 0);
         ctx.lineTo(x, height);
       }
-      const startY = pan.y % fineSpacing;
+      const startY = ((offsetY % fineSpacing) + fineSpacing) % fineSpacing;
       for (let y = startY; y < height; y += fineSpacing) {
         ctx.moveTo(0, y);
         ctx.lineTo(width, y);
@@ -206,12 +215,12 @@ export const CrossoverCad2D: React.FC<CrossoverCad2DProps> = ({
       ctx.strokeStyle = cGridMajor;
       ctx.lineWidth = 0.8;
       ctx.beginPath();
-      const majorStartX = pan.x % majorSpacing;
+      const majorStartX = ((offsetX % majorSpacing) + majorSpacing) % majorSpacing;
       for (let x = majorStartX; x < width; x += majorSpacing) {
         ctx.moveTo(x, 0);
         ctx.lineTo(x, height);
       }
-      const majorStartY = pan.y % majorSpacing;
+      const majorStartY = ((offsetY % majorSpacing) + majorSpacing) % majorSpacing;
       for (let y = majorStartY; y < height; y += majorSpacing) {
         ctx.moveTo(0, y);
         ctx.lineTo(width, y);
@@ -223,14 +232,6 @@ export const CrossoverCad2D: React.FC<CrossoverCad2DProps> = ({
     ctx.save();
     ctx.translate(pan.x, pan.y);
     ctx.scale(zoom, zoom);
-
-    // Plotter Boundary dashed box
-    const plotH = crossoverWays === '3way' ? 640 : 440;
-    ctx.strokeStyle = cGridMajor;
-    ctx.lineWidth = 1;
-    ctx.setLineDash([6, 3]);
-    ctx.strokeRect(10, 10, 830, plotH);
-    ctx.setLineDash([]);
 
     // Helper functions
     const drawLine = (x1: number, y1: number, x2: number, y2: number, color: string, w = 3.5) => {
@@ -979,20 +980,21 @@ export const CrossoverCad2D: React.FC<CrossoverCad2DProps> = ({
           <div
             style={{
               position: 'absolute',
-              bottom: 8,
-              right: 8,
-              background: isLight ? 'rgba(255, 255, 255, 0.92)' : 'rgba(10, 20, 36, 0.92)',
+              bottom: '0.5rem',
+              left: '0.75rem',
+              background: isLight ? 'rgba(255, 255, 255, 0.95)' : 'rgba(7, 16, 30, 0.85)',
               border: `1px solid ${isLight ? '#cbd5e1' : '#1e3a5f'}`,
-              color: isLight ? '#334155' : '#94a3b8',
-              padding: '0.2rem 0.45rem',
+              color: isLight ? '#0369a1' : '#38bdf8',
+              padding: '0.2rem 0.5rem',
               borderRadius: '0px',
               fontSize: '0.65rem',
               fontFamily: 'monospace',
               pointerEvents: 'none',
               userSelect: 'none',
+              backdropFilter: 'blur(4px)',
             }}
           >
-            X: {cursorPos.x} | Y: {cursorPos.y} | Zoom: {(zoom * 100).toFixed(0)}%
+            X: {cursorPos.x} | Y: {cursorPos.y} | ZOOM: {(zoom * 100).toFixed(0)}%
           </div>
         )}
 
@@ -1000,10 +1002,10 @@ export const CrossoverCad2D: React.FC<CrossoverCad2DProps> = ({
         <div
           style={{
             position: 'absolute',
-            bottom: 8,
-            left: 12,
-            color: isLight ? '#94a3b8' : '#334d6e',
-            fontSize: '0.65rem',
+            bottom: '0.5rem',
+            right: '0.75rem',
+            color: '#64748b',
+            fontSize: '0.62rem',
             fontFamily: 'monospace',
             pointerEvents: 'none',
             userSelect: 'none',

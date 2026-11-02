@@ -23,6 +23,10 @@ export interface SpeakerParams {
   gapHeight?: number;
   vcDiameter?: number;
   vd?: number;
+  driverVolDisplaced?: number; // L (Driver Volume Displaced)
+  overallDiameter?: number;    // mm (Overall Diameter)
+  baffleCutout?: number;       // mm (Baffle Hole Diameter)
+  driverDepth?: number;        // mm (Mounting Depth)
 }
 
 export interface CalculatedSealed {
@@ -175,7 +179,10 @@ export interface DatabaseWoofer {
   Cms?: number;
   Xmech?: number;
   "Dimen A1"?: number;
+  "Dimen C1"?: number;
+  "Dimen G"?: number;
   "P-Vd"?: number;
+  "M-Vd"?: number;
   Fs?: number;
   Qms?: number;
   Qes?: number;
@@ -187,6 +194,7 @@ export interface DatabaseWoofer {
   SPL1?: number;
   _isCustom?: boolean;
   _customBrand?: string;
+  _rawParams?: SpeakerParams;
 }
 
 

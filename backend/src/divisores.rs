@@ -59,6 +59,27 @@ pub fn calc_filtro_linkwitz_riley(fc: f64, r: f64) -> FilterLR {
 }
 
 #[wasm_bindgen]
+pub struct Filter4thOrderLR {
+    pub c1: f64,
+    pub c2: f64,
+    pub l1: f64,
+    pub l2: f64,
+}
+
+#[wasm_bindgen]
+pub fn calc_filtro_4to_orden_lr(fc: f64, r: f64) -> Filter4thOrderLR {
+    if fc <= 0.0 || r <= 0.0 {
+        return Filter4thOrderLR { c1: 0.0, c2: 0.0, l1: 0.0, l2: 0.0 };
+    }
+    let c1 = (0.0796 * 1_000_000.0) / (fc * r);
+    let c2 = (0.1592 * 1_000_000.0) / (fc * r);
+    let l1 = (0.1592 * r * 1000.0) / fc;
+    let l2 = (0.0796 * r * 1000.0) / fc;
+
+    Filter4thOrderLR { c1, c2, l1, l2 }
+}
+
+#[wasm_bindgen]
 pub struct ZobelResult {
     pub rz: f64,
     pub cz: f64,

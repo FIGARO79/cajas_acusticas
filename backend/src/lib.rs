@@ -11,7 +11,9 @@ pub mod isobaric;
 pub mod radiador;
 
 pub use crate::auto_params::*;
+pub use crate::cajas::*;
 pub use crate::curves::*;
+pub use crate::divisores::*;
 pub use crate::isobaric::*;
 pub use crate::radiador::*;
 

@@ -20,8 +20,17 @@ interface CabinetViewer3DModalProps {
   portHeight: number;
   portLength: number;
   portCount: number;
+  flaredEnds?: 0 | 1 | 2 | 3;
   speakerYPct?: number;
+  tweeterYPct?: number;
+  midrangeYPct?: number;
+  crossoverWays?: number;
+  midSealed?: boolean;
+  overallDiameter?: number;
+  baffleCutout?: number;
+  driverDepth?: number;
   portYPct?: number;
+  portLocation?: 'front' | 'rear';
   bandpassOrder?: 4 | 6;
   bandpassRatio?: number;
   dampingType?: 'none' | 'light' | 'moderate' | 'heavy';
@@ -42,8 +51,17 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
   portHeight,
   portLength,
   portCount,
+  flaredEnds = 0,
   speakerYPct = 50,
+  tweeterYPct = 20,
+  midrangeYPct = 40,
+  crossoverWays = 2,
+  midSealed = true,
+  overallDiameter,
+  baffleCutout,
+  driverDepth,
   portYPct = 85,
+  portLocation = 'front',
   bandpassRatio = 0.5,
   dampingType = 'none',
 }) => {
@@ -83,7 +101,7 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
     bottom?: THREE.Mesh;
     left?: THREE.Mesh;
     right?: THREE.Mesh;
-    rear?: THREE.Mesh;
+    rear?: THREE.Group;
     front?: THREE.Group;
     divider?: THREE.Mesh;
   }>({});
@@ -188,10 +206,10 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
     controls.minDistance = 10;
     controlsRef.current = controls;
 
-    // Initial Camera positioning
+    // Initial Camera positioning (slightly elevated target so cabinet & grid sit higher above bottom bar)
     const maxDim = Math.max(wExt, hExt, dExt);
-    camera.position.set(maxDim * 1.6, maxDim * 1.3, maxDim * 2.0);
-    controls.target.set(0, 0, 0);
+    camera.position.set(maxDim * 1.55, maxDim * 1.2, maxDim * 1.95);
+    controls.target.set(0, -maxDim * 0.12, 0);
     controls.update();
 
     // 5. Lighting
@@ -264,7 +282,7 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
 
     const addEdgeLines = (mesh: THREE.Mesh) => {
       if (!showWireEdges) return;
-      const edges = new THREE.EdgesGeometry(mesh.geometry);
+      const edges = new THREE.EdgesGeometry(mesh.geometry, 28);
       const line = new THREE.LineSegments(edges, edgeLineMaterial);
       mesh.add(line);
     };
@@ -272,6 +290,120 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
     const innerH = hExt - 2 * thickness;
     const innerW = wExt - 2 * thickness;
     const innerD = dExt - 2 * thickness;
+
+    // Pre-calculate driver & port positions/radii for true 3D baffle cutouts
+    const isBandpass = boxType === 'bandpass';
+    const defaultWooferDia = crossoverWays === 3
+      ? Math.min(innerW * 0.68, innerH * 0.34)
+      : Math.min(innerW * 0.74, innerH * 0.42);
+    const wooferDiameter = overallDiameter && overallDiameter > 0
+      ? Math.min(overallDiameter / 10, innerW - 1)
+      : defaultWooferDia;
+    const wooferRadius = wooferDiameter / 2;
+    const wooferY = innerH * (0.5 - speakerYPct / 100);
+    const cutoutRadius = baffleCutout && baffleCutout > 0
+      ? Math.min(baffleCutout / 20, wooferRadius * 0.88)
+      : wooferRadius * 0.84;
+
+    const tweeterRadius = Math.min(innerW * 0.26, innerH * 0.13, wooferDiameter * 0.42) / 2;
+    const tweeterY = innerH * (0.5 - tweeterYPct / 100);
+
+    const midDiameter = Math.min(innerW * 0.42, innerH * 0.20, wooferDiameter * 0.60);
+    const midRadius = midDiameter / 2;
+    const midY = innerH * (0.5 - midrangeYPct / 100);
+
+    // Helper to build a panel with circular/rectangular cutout holes
+    const createPerforatedPanelGeo = (
+      panelW: number,
+      panelH: number,
+      panelT: number,
+      circles: Array<{ x: number; y: number; r: number }>,
+      rects: Array<{ x: number; y: number; w: number; h: number }> = []
+    ) => {
+      if (circles.length === 0 && rects.length === 0) {
+        return new THREE.BoxGeometry(panelW, panelH, panelT);
+      }
+      const shape = new THREE.Shape();
+      const hw = panelW / 2;
+      const hh = panelH / 2;
+      shape.moveTo(-hw, -hh);
+      shape.lineTo(hw, -hh);
+      shape.lineTo(hw, hh);
+      shape.lineTo(-hw, hh);
+      shape.closePath();
+
+      const addedCircles: Array<{ x: number; y: number; r: number }> = [];
+      for (const c of circles) {
+        const safeR = Math.min(c.r, hw - Math.abs(c.x) - 0.3, hh - Math.abs(c.y) - 0.3);
+        if (safeR <= 0.4) continue;
+        const overlaps = addedCircles.some(
+          (other) => Math.hypot(c.x - other.x, c.y - other.y) < safeR + other.r + 0.2
+        );
+        if (overlaps) continue;
+        addedCircles.push({ x: c.x, y: c.y, r: safeR });
+        const holePath = new THREE.Path();
+        holePath.absarc(c.x, c.y, safeR, 0, Math.PI * 2, true);
+        shape.holes.push(holePath);
+      }
+
+      for (const rc of rects) {
+        const rhw = Math.min(rc.w / 2, hw - Math.abs(rc.x) - 0.3);
+        const rhh = Math.min(rc.h / 2, hh - Math.abs(rc.y) - 0.3);
+        if (rhw <= 0.3 || rhh <= 0.3) continue;
+        const overlapsCircle = addedCircles.some(
+          (other) => Math.hypot(rc.x - other.x, rc.y - other.y) < Math.hypot(rhw, rhh) + other.r + 0.2
+        );
+        if (overlapsCircle) continue;
+        const holePath = new THREE.Path();
+        holePath.moveTo(rc.x - rhw, rc.y - rhh);
+        holePath.lineTo(rc.x - rhw, rc.y + rhh);
+        holePath.lineTo(rc.x + rhw, rc.y + rhh);
+        holePath.lineTo(rc.x + rhw, rc.y - rhh);
+        holePath.closePath();
+        shape.holes.push(holePath);
+      }
+
+      const extrudeGeo = new THREE.ExtrudeGeometry(shape, {
+        depth: panelT,
+        bevelEnabled: false,
+        curveSegments: 48,
+      });
+      extrudeGeo.translate(0, 0, -panelT / 2);
+      return extrudeGeo;
+    };
+
+    const frontHoleCircles: Array<{ x: number; y: number; r: number }> = [];
+    const frontHoleRects: Array<{ x: number; y: number; w: number; h: number }> = [];
+    const rearHoleCircles: Array<{ x: number; y: number; r: number }> = [];
+    const rearHoleRects: Array<{ x: number; y: number; w: number; h: number }> = [];
+
+    if (!isBandpass) {
+      frontHoleCircles.push({ x: 0, y: wooferY, r: cutoutRadius });
+      if (crossoverWays === 3) {
+        frontHoleCircles.push({ x: 0, y: midY, r: midRadius * 0.84 });
+      }
+      if (crossoverWays >= 2) {
+        frontHoleCircles.push({ x: 0, y: tweeterY, r: tweeterRadius * 0.62 });
+      }
+    }
+
+    if (boxType === 'ported' || boxType === 'bandpass') {
+      const portY = innerH * (0.5 - portYPct / 100);
+      const count = Math.max(Number(portCount) || 1, 1);
+      const portSpacing = count > 1 ? Math.min((innerW * 0.45) / count, 12) : 0;
+      const isRearPort = portLocation === 'rear';
+      for (let pIdx = 0; pIdx < count; pIdx++) {
+        const pCurX = count === 1 ? 0 : -((count - 1) * portSpacing) / 2 + pIdx * portSpacing;
+        if (portShape === 'round' || portShape === 'custom') {
+          const pRadius = Math.max((portDiameter || 7.5) / 2, 1.5);
+          (isRearPort ? rearHoleCircles : frontHoleCircles).push({ x: pCurX, y: portY, r: pRadius });
+        } else {
+          const pW = Math.max(portWidth || 10, 2);
+          const pH = Math.max(portHeight || 4, 1.5);
+          (isRearPort ? rearHoleRects : frontHoleRects).push({ x: pCurX, y: portY, w: pW, h: pH });
+        }
+      }
+    }
 
     // --- TAPA SUPERIOR ---
     const topGeo = new THREE.BoxGeometry(wExt, thickness, dExt);
@@ -314,79 +446,375 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
     panelMeshesRef.current.right = rightMesh;
 
     // --- CARA TRASERA ---
-    const rearGeo = new THREE.BoxGeometry(innerW, innerH, thickness);
+    const rearGroup = new THREE.Group();
+    rearGroup.position.set(0, 0, -(dExt - thickness) / 2);
+
+    const rearGeo = createPerforatedPanelGeo(innerW, innerH, thickness, rearHoleCircles, rearHoleRects);
     const rearMesh = new THREE.Mesh(rearGeo, getWoodMaterial());
-    rearMesh.position.set(0, 0, -(dExt - thickness) / 2);
     rearMesh.castShadow = true;
     rearMesh.receiveShadow = true;
     addEdgeLines(rearMesh);
-    panelsGroup.add(rearMesh);
-    panelMeshesRef.current.rear = rearMesh;
+    rearGroup.add(rearMesh);
+    panelsGroup.add(rearGroup);
+    panelMeshesRef.current.rear = rearGroup;
 
     // --- BAFLE FRONTAL + COMPONENTES ---
     const frontGroup = new THREE.Group();
     frontGroup.position.set(0, 0, (dExt - thickness) / 2);
 
-    const frontGeo = new THREE.BoxGeometry(innerW, innerH, thickness);
+    const frontGeo = createPerforatedPanelGeo(innerW, innerH, thickness, frontHoleCircles, frontHoleRects);
     const frontMesh = new THREE.Mesh(frontGeo, getWoodMaterial());
     frontMesh.castShadow = true;
     frontMesh.receiveShadow = true;
     addEdgeLines(frontMesh);
     frontGroup.add(frontMesh);
 
-    // WOOFER MODEL
-    const isBandpass = boxType === 'bandpass';
-    const wooferDiameter = Math.min(innerW * 0.85, innerH * 0.55);
-    const wooferRadius = wooferDiameter / 2;
-    const wooferY = innerH * (0.5 - speakerYPct / 100);
+    // Helper function to build a realistic 3D Loudspeaker Driver (Woofer or Midrange)
+    const buildRealisticConeDriver = (
+      outerRadius: number,
+      holeRadius: number,
+      totalDepthCm: number,
+      boltCount: number
+    ) => {
+      const driverGroup = new THREE.Group();
 
-    const speakerGroup = new THREE.Group();
+      const chassisMat = new THREE.MeshStandardMaterial({
+        color: isLight ? 0x1e293b : 0x0f172a,
+        metalness: 0.78,
+        roughness: 0.28,
+        side: THREE.DoubleSide,
+      });
+      const surroundMat = new THREE.MeshStandardMaterial({
+        color: 0x0f172a,
+        roughness: 0.36,
+        metalness: 0.16,
+      });
+      const coneMat = new THREE.MeshStandardMaterial({
+        color: isLight ? 0x1e293b : 0x111827,
+        roughness: 0.56,
+        metalness: 0.2,
+        side: THREE.DoubleSide,
+      });
+      const chromeMat = new THREE.MeshStandardMaterial({
+        color: 0xcbd5e1,
+        metalness: 0.92,
+        roughness: 0.16,
+      });
+      const ferriteMat = new THREE.MeshStandardMaterial({
+        color: isLight ? 0x334155 : 0x1e293b,
+        metalness: 0.55,
+        roughness: 0.42,
+      });
+
+      // 1. Aro Exterior de Montaje + Junta (queda a ras del bafle z = 0..+0.22)
+      const flangeThickness = 0.22;
+      const flangeOuterGeo = new THREE.CylinderGeometry(outerRadius, outerRadius, flangeThickness, 48, 1, true);
+      flangeOuterGeo.rotateX(Math.PI / 2);
+      const flangeOuterMesh = new THREE.Mesh(flangeOuterGeo, chassisMat);
+      flangeOuterMesh.position.z = flangeThickness / 2;
+      driverGroup.add(flangeOuterMesh);
+
+      const flangeFaceGeo = new THREE.RingGeometry(holeRadius * 0.96, outerRadius, 48);
+      const flangeFaceMesh = new THREE.Mesh(flangeFaceGeo, chassisMat);
+      flangeFaceMesh.position.z = flangeThickness;
+      driverGroup.add(flangeFaceMesh);
+
+      const gasketLipGeo = new THREE.TorusGeometry(outerRadius * 0.93, outerRadius * 0.042, 14, 48);
+      const gasketLipMesh = new THREE.Mesh(gasketLipGeo, chassisMat);
+      gasketLipMesh.position.z = flangeThickness;
+      driverGroup.add(gasketLipMesh);
+
+      // Tornillos perimetrales de fijación
+      const boltGeo = new THREE.CylinderGeometry(outerRadius * 0.025, outerRadius * 0.025, 0.12, 12);
+      boltGeo.rotateX(Math.PI / 2);
+      for (let b = 0; b < boltCount; b++) {
+        const angle = (b * Math.PI * 2) / boltCount + Math.PI / boltCount;
+        const boltMesh = new THREE.Mesh(boltGeo, chromeMat);
+        boltMesh.position.set(
+          Math.cos(angle) * (outerRadius * 0.93),
+          Math.sin(angle) * (outerRadius * 0.93),
+          flangeThickness + 0.06
+        );
+        driverGroup.add(boltMesh);
+      }
+
+      // 2. Suspensión Perimetral Half-Roll (Surround a ras del bafle, sin sobresalir)
+      const surroundR = holeRadius * 0.90;
+      const surroundTubeR = Math.max((holeRadius - surroundR) * 0.55, outerRadius * 0.048);
+      const surroundGeo = new THREE.TorusGeometry(surroundR, surroundTubeR, 20, 48);
+      const surroundMesh = new THREE.Mesh(surroundGeo, surroundMat);
+      surroundMesh.position.z = 0.12;
+      driverGroup.add(surroundMesh);
+
+      // 3. Cono Curvo Exponencial que ENTRA hacia el interior de la caja (-Z)
+      const magLen = Math.max(totalDepthCm * 0.36, outerRadius * 0.28);
+      const magRadius = Math.min(outerRadius * 0.48, holeRadius * 0.68);
+      const basketEndZ = Math.max(totalDepthCm - magLen, thickness + outerRadius * 0.32);
+      const coneDepth = Math.min(basketEndZ * 0.72, outerRadius * 0.44);
+      const coneOuterR = surroundR - surroundTubeR * 0.65;
+      const coneInnerR = Math.max(outerRadius * 0.19, magRadius * 0.38);
+
+      const lathePoints: THREE.Vector2[] = [];
+      const segments = 18;
+      for (let i = 0; i <= segments; i++) {
+        const t = i / segments;
+        // Perfil exponencial realista: desde el cuello (-coneDepth) hasta la suspensión (+0.08)
+        const r = coneInnerR + (coneOuterR - coneInnerR) * Math.pow(t, 0.76);
+        const z = -coneDepth + (coneDepth + 0.08) * t;
+        lathePoints.push(new THREE.Vector2(r, z));
+      }
+      const coneGeo = new THREE.LatheGeometry(lathePoints, 48);
+      coneGeo.rotateX(Math.PI / 2);
+      const coneMesh = new THREE.Mesh(coneGeo, coneMat);
+      driverGroup.add(coneMesh);
+
+      // Anillos concéntricos de rigidez dentro del cono
+      const ribMat = new THREE.MeshStandardMaterial({
+        color: 0x334155,
+        roughness: 0.45,
+        metalness: 0.3,
+      });
+      [0.35, 0.6, 0.82].forEach((t) => {
+        const rRib = coneInnerR + (coneOuterR - coneInnerR) * Math.pow(t, 0.76);
+        const zRib = -coneDepth + (coneDepth + 0.08) * t + 0.02;
+        const ribGeo = new THREE.TorusGeometry(rRib, outerRadius * 0.007, 10, 48);
+        const ribMesh = new THREE.Mesh(ribGeo, ribMat);
+        ribMesh.position.z = zRib;
+        driverGroup.add(ribMesh);
+      });
+
+      // 4. Domo Central Guardapolvo (Dustcap convexo alojado al fondo del cono)
+      const capTheta = Math.PI * 0.38;
+      const capSphereR = (coneInnerR * 1.05) / Math.sin(capTheta);
+      const dustcapGeo = new THREE.SphereGeometry(capSphereR, 32, 16, 0, Math.PI * 2, 0, capTheta);
+      dustcapGeo.rotateX(Math.PI / 2);
+      const dustcapMat = new THREE.MeshStandardMaterial({
+        color: 0x0284c7,
+        roughness: 0.32,
+        metalness: 0.42,
+        side: THREE.DoubleSide,
+      });
+      const dustcapMesh = new THREE.Mesh(dustcapGeo, dustcapMat);
+      dustcapMesh.position.z = -coneDepth - capSphereR * Math.cos(capTheta) + 0.04;
+      driverGroup.add(dustcapMesh);
+
+      // 5. Bobina Móvil (Voice Coil Former) + Araña Corrugada (Spider)
+      const vcLen = Math.max(basketEndZ - coneDepth, 0.4);
+      const vcGeo = new THREE.CylinderGeometry(coneInnerR * 0.96, coneInnerR * 0.96, vcLen, 32);
+      vcGeo.rotateX(Math.PI / 2);
+      const vcMat = new THREE.MeshStandardMaterial({
+        color: 0xb45309,
+        metalness: 0.65,
+        roughness: 0.35,
+      });
+      const vcMesh = new THREE.Mesh(vcGeo, vcMat);
+      vcMesh.position.z = -coneDepth - vcLen / 2;
+      driverGroup.add(vcMesh);
+
+      const spiderOuterR = magRadius * 0.88;
+      const spiderGeo = new THREE.RingGeometry(coneInnerR * 0.95, spiderOuterR, 36, 3);
+      const spiderMat = new THREE.MeshStandardMaterial({
+        color: 0xd97706,
+        roughness: 0.6,
+        metalness: 0.15,
+        side: THREE.DoubleSide,
+      });
+      const spiderMesh = new THREE.Mesh(spiderGeo, spiderMat);
+      spiderMesh.position.z = -basketEndZ + 0.25;
+      driverGroup.add(spiderMesh);
+
+      // 6. Canasta Abierta con Brazos/Costillas (Open-Frame Spoked Basket)
+      // Anillo en el calado del bafle + anillo de asiento de araña + 8 brazos inclinados
+      const throatRingGeo = new THREE.CylinderGeometry(holeRadius * 0.97, holeRadius * 0.94, Math.min(thickness, 1.2), 48, 1, true);
+      throatRingGeo.rotateX(Math.PI / 2);
+      const throatRingMesh = new THREE.Mesh(throatRingGeo, chassisMat);
+      throatRingMesh.position.z = -Math.min(thickness, 1.2) / 2;
+      driverGroup.add(throatRingMesh);
+
+      const landingRingGeo = new THREE.CylinderGeometry(magRadius * 0.92, magRadius * 0.92, 0.32, 36);
+      landingRingGeo.rotateX(Math.PI / 2);
+      const landingRingMesh = new THREE.Mesh(landingRingGeo, chassisMat);
+      landingRingMesh.position.z = -basketEndZ + 0.16;
+      driverGroup.add(landingRingMesh);
+
+      const spokeCount = boltCount;
+      const spokeStartR = holeRadius * 0.92;
+      const spokeStartZ = -Math.min(thickness * 0.6, 0.8);
+      const spokeEndR = magRadius * 0.86;
+      const spokeEndZ = -basketEndZ + 0.2;
+      const dR = spokeEndR - spokeStartR;
+      const dZ = spokeEndZ - spokeStartZ;
+      const spokeLen = Math.hypot(dR, dZ);
+      const spokeWidth = Math.max(outerRadius * 0.085, 0.45);
+      const spokeThickness = Math.max(outerRadius * 0.035, 0.22);
+
+      for (let s = 0; s < spokeCount; s++) {
+        const angle = (s * Math.PI * 2) / spokeCount;
+        const spokePivot = new THREE.Group();
+        spokePivot.rotation.z = angle;
+
+        const spokeGeo = new THREE.BoxGeometry(spokeThickness, spokeWidth, spokeLen);
+        const spokeMesh = new THREE.Mesh(spokeGeo, chassisMat);
+        const midR = (spokeStartR + spokeEndR) / 2;
+        const midZ = (spokeStartZ + spokeEndZ) / 2;
+        spokeMesh.position.set(midR, 0, midZ);
+        spokeMesh.rotation.y = -Math.atan2(dR, -dZ);
+        spokePivot.add(spokeMesh);
+        driverGroup.add(spokePivot);
+      }
+
+      // 7. Motor Magnético en 3 Piezas (Placa Polar Superior + Imán de Ferrita + T-Yoke Biselado)
+      const plateThickness = Math.max(magLen * 0.18, 0.35);
+      const ferriteLen = Math.max(magLen - 2 * plateThickness, 0.7);
+
+      const topPlateGeo = new THREE.CylinderGeometry(magRadius * 0.92, magRadius * 0.92, plateThickness, 36);
+      topPlateGeo.rotateX(Math.PI / 2);
+      const topPlateMesh = new THREE.Mesh(topPlateGeo, chromeMat);
+      topPlateMesh.position.z = -basketEndZ - plateThickness / 2;
+      driverGroup.add(topPlateMesh);
+
+      const magnetGeo = new THREE.CylinderGeometry(magRadius * 1.02, magRadius * 1.02, ferriteLen, 36);
+      magnetGeo.rotateX(Math.PI / 2);
+      const magnetMesh = new THREE.Mesh(magnetGeo, ferriteMat);
+      magnetMesh.position.z = -basketEndZ - plateThickness - ferriteLen / 2;
+      driverGroup.add(magnetMesh);
+
+      const backPlateGeo = new THREE.CylinderGeometry(magRadius * 0.92, magRadius * 0.84, plateThickness * 1.15, 36);
+      backPlateGeo.rotateX(Math.PI / 2);
+      const backPlateMesh = new THREE.Mesh(backPlateGeo, chromeMat);
+      const backPlateZ = -basketEndZ - plateThickness - ferriteLen - (plateThickness * 1.15) / 2;
+      backPlateMesh.position.z = backPlateZ;
+      driverGroup.add(backPlateMesh);
+
+      // Orificio de ventilación del núcleo polar (Pole Piece Vent)
+      const poleVentGeo = new THREE.CircleGeometry(magRadius * 0.22, 24);
+      const poleVentMat = new THREE.MeshBasicMaterial({ color: 0x030712, side: THREE.DoubleSide });
+      const poleVentMesh = new THREE.Mesh(poleVentGeo, poleVentMat);
+      poleVentMesh.position.z = backPlateZ - (plateThickness * 1.15) / 2 - 0.02;
+      driverGroup.add(poleVentMesh);
+
+      return driverGroup;
+    };
+
+    // 1. TWEETER (2-Way & 3-Way)
+    if (crossoverWays >= 2 && !isBandpass) {
+      const tweeterGroup = new THREE.Group();
+      tweeterGroup.position.set(0, tweeterY, thickness / 2);
+
+      // Faceplate ring flush on baffle
+      const twPlateGeo = new THREE.CylinderGeometry(tweeterRadius, tweeterRadius, 0.22, 36);
+      twPlateGeo.rotateX(Math.PI / 2);
+      const twPlateMat = new THREE.MeshStandardMaterial({
+        color: isLight ? 0x1e293b : 0x0f172a,
+        metalness: 0.78,
+        roughness: 0.28,
+      });
+      const twPlateMesh = new THREE.Mesh(twPlateGeo, twPlateMat);
+      twPlateMesh.position.z = 0.11;
+      tweeterGroup.add(twPlateMesh);
+
+      // Tweeter mounting screws (4 screws)
+      const twScrewGeo = new THREE.CylinderGeometry(tweeterRadius * 0.045, tweeterRadius * 0.045, 0.08, 10);
+      twScrewGeo.rotateX(Math.PI / 2);
+      const twScrewMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, metalness: 0.9, roughness: 0.2 });
+      for (let s = 0; s < 4; s++) {
+        const angle = (s * Math.PI) / 2 + Math.PI / 4;
+        const screw = new THREE.Mesh(twScrewGeo, twScrewMat);
+        screw.position.set(Math.cos(angle) * tweeterRadius * 0.84, Math.sin(angle) * tweeterRadius * 0.84, 0.24);
+        tweeterGroup.add(screw);
+      }
+
+      // Waveguide trim ring
+      const twRingGeo = new THREE.TorusGeometry(tweeterRadius * 0.62, tweeterRadius * 0.065, 16, 36);
+      const twRingMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.65, roughness: 0.28 });
+      const twRingMesh = new THREE.Mesh(twRingGeo, twRingMat);
+      twRingMesh.position.z = 0.22;
+      tweeterGroup.add(twRingMesh);
+
+      // Silk/Titanium Dome
+      const twDomeGeo = new THREE.SphereGeometry(tweeterRadius * 0.38, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.42);
+      twDomeGeo.rotateX(Math.PI / 2);
+      const twDomeMat = new THREE.MeshStandardMaterial({
+        color: 0x38bdf8,
+        roughness: 0.22,
+        metalness: 0.55,
+      });
+      const twDomeMesh = new THREE.Mesh(twDomeGeo, twDomeMat);
+      twDomeMesh.position.z = -0.05;
+      tweeterGroup.add(twDomeMesh);
+
+      // Tweeter Baffle Neck + Rear Magnet Assembly (continuous through baffle cutout)
+      const twNeckLen = thickness + tweeterRadius * 0.25;
+      const twNeckGeo = new THREE.CylinderGeometry(tweeterRadius * 0.58, tweeterRadius * 0.58, twNeckLen, 28);
+      twNeckGeo.rotateX(Math.PI / 2);
+      const twNeckMesh = new THREE.Mesh(twNeckGeo, twPlateMat);
+      twNeckMesh.position.z = -twNeckLen / 2;
+      tweeterGroup.add(twNeckMesh);
+
+      const twMagLen = tweeterRadius * 0.65;
+      const twMagGeo = new THREE.CylinderGeometry(tweeterRadius * 0.64, tweeterRadius * 0.64, twMagLen, 28);
+      twMagGeo.rotateX(Math.PI / 2);
+      const twMagMat = new THREE.MeshStandardMaterial({
+        color: isLight ? 0x475569 : 0x334155,
+        metalness: 0.75,
+        roughness: 0.28,
+      });
+      const twMagMesh = new THREE.Mesh(twMagGeo, twMagMat);
+      twMagMesh.position.z = -twNeckLen - twMagLen / 2;
+      tweeterGroup.add(twMagMesh);
+
+      const twBackPlateGeo = new THREE.CylinderGeometry(tweeterRadius * 0.6, tweeterRadius * 0.56, 0.22, 28);
+      twBackPlateGeo.rotateX(Math.PI / 2);
+      const twBackPlateMesh = new THREE.Mesh(twBackPlateGeo, twScrewMat);
+      twBackPlateMesh.position.z = -twNeckLen - twMagLen - 0.11;
+      tweeterGroup.add(twBackPlateMesh);
+
+      frontGroup.add(tweeterGroup);
+    }
+
+    // 2. MIDRANGE DRIVER & SUB-ENCLOSURE (3-Way)
+    if (crossoverWays === 3 && !isBandpass) {
+      const midGroup = buildRealisticConeDriver(
+        midRadius,
+        midRadius * 0.84,
+        Math.max(midRadius * 0.95, thickness + 3.5),
+        6
+      );
+      midGroup.position.set(0, midY, thickness / 2);
+
+      // Internal Midrange Chamber (if !midSealed)
+      if (!midSealed) {
+        const dMidVal = Math.min(cabinetData?.dMid ?? Math.min(innerD * 0.45, 13), innerD - 2);
+        const hMidVal = Math.min(cabinetData?.hMid ?? Math.max(midDiameter + 3, 12), innerH * 0.42);
+        const midChamberMat = getWoodMaterial();
+
+        const mTopGeo = new THREE.BoxGeometry(innerW, thickness, dMidVal);
+        const mTopMesh = new THREE.Mesh(mTopGeo, midChamberMat);
+        mTopMesh.position.set(0, hMidVal / 2 + thickness / 2, -thickness - dMidVal / 2);
+        addEdgeLines(mTopMesh);
+        midGroup.add(mTopMesh);
+
+        const mBotMesh = new THREE.Mesh(mTopGeo, midChamberMat);
+        mBotMesh.position.set(0, -hMidVal / 2 - thickness / 2, -thickness - dMidVal / 2);
+        addEdgeLines(mBotMesh);
+        midGroup.add(mBotMesh);
+
+        const mBackGeo = new THREE.BoxGeometry(innerW, hMidVal + 2 * thickness, thickness);
+        const mBackMesh = new THREE.Mesh(mBackGeo, midChamberMat);
+        mBackMesh.position.set(0, 0, -thickness - dMidVal - thickness / 2);
+        addEdgeLines(mBackMesh);
+        midGroup.add(mBackMesh);
+      }
+
+      frontGroup.add(midGroup);
+    }
+
+    // 3. WOOFER PRINCIPAL (ALTA PRECISIÓN 3D)
+    const realDepthCm = driverDepth && driverDepth > 0
+      ? Math.max(driverDepth / 10, thickness + 3.5)
+      : Math.max(wooferRadius * 0.92, thickness + 4.5);
+    const speakerGroup = buildRealisticConeDriver(wooferRadius, cutoutRadius, realDepthCm, 8);
     speakerGroup.position.set(0, wooferY, thickness / 2);
-
-    // Woofer Outer Ring (Chasis)
-    const ringGeo = new THREE.TorusGeometry(wooferRadius, thickness * 0.25, 12, 32);
-    const ringMat = new THREE.MeshStandardMaterial({
-      color: isLight ? 0x334155 : 0x1e293b,
-      metalness: 0.8,
-      roughness: 0.3,
-    });
-    const ringMesh = new THREE.Mesh(ringGeo, ringMat);
-    speakerGroup.add(ringMesh);
-
-    // Woofer Inverted Cone
-    const coneGeo = new THREE.ConeGeometry(wooferRadius * 0.88, wooferRadius * 0.45, 32, 1, true);
-    coneGeo.rotateX(Math.PI);
-    const coneMat = new THREE.MeshStandardMaterial({
-      color: isLight ? 0x1e293b : 0x0f172a,
-      roughness: 0.7,
-      metalness: 0.1,
-    });
-    const coneMesh = new THREE.Mesh(coneGeo, coneMat);
-    coneMesh.position.z = -wooferRadius * 0.22;
-    speakerGroup.add(coneMesh);
-
-    // Dustcap (Domo central)
-    const dustcapGeo = new THREE.SphereGeometry(wooferRadius * 0.25, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2);
-    const dustcapMat = new THREE.MeshStandardMaterial({
-      color: 0x0284c7,
-      roughness: 0.4,
-      metalness: 0.3,
-    });
-    const dustcapMesh = new THREE.Mesh(dustcapGeo, dustcapMat);
-    dustcapMesh.position.z = -wooferRadius * 0.1;
-    speakerGroup.add(dustcapMesh);
-
-    // Magnet structure (Cilindro magnético dentro de la caja)
-    const magnetGeo = new THREE.CylinderGeometry(wooferRadius * 0.45, wooferRadius * 0.45, wooferRadius * 0.5, 24);
-    magnetGeo.rotateX(Math.PI / 2);
-    const magnetMat = new THREE.MeshStandardMaterial({
-      color: isLight ? 0x64748b : 0x334155,
-      metalness: 0.85,
-      roughness: 0.2,
-    });
-    const magnetMesh = new THREE.Mesh(magnetGeo, magnetMat);
-    magnetMesh.position.z = -wooferRadius * 0.55;
-    speakerGroup.add(magnetMesh);
 
     if (!isBandpass) {
       frontGroup.add(speakerGroup);
@@ -401,6 +829,15 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
       const effectiveLength = Math.max(portLength || 15, 5);
       const count = Math.max(Number(portCount) || 1, 1);
       const portSpacing = count > 1 ? Math.min((innerW * 0.45) / count, 12) : 0;
+      const isRearPort = portLocation === 'rear';
+      const targetPortGroup = isRearPort ? rearGroup : frontGroup;
+      const tubeZ = isRearPort
+        ? effectiveLength / 2 - thickness / 2
+        : -effectiveLength / 2 + thickness / 2;
+      const collarZ = isRearPort ? -thickness / 2 : thickness / 2;
+      const innerEndZ = isRearPort
+        ? effectiveLength - thickness / 2
+        : -effectiveLength + thickness / 2;
 
       for (let pIdx = 0; pIdx < count; pIdx++) {
         const pCurX = count === 1 
@@ -409,6 +846,19 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
 
         if (portShape === 'round' || portShape === 'custom') {
           const pRadius = Math.max((portDiameter || 7.5) / 2, 1.5);
+
+          // Borde del tubo en el bafle (siempre visible incluso en puerto recto sin flange)
+          const portLipGeo = new THREE.RingGeometry(pRadius * 0.92, pRadius * 1.06, 32);
+          const portLipMat = new THREE.MeshStandardMaterial({
+            color: 0x0284c7,
+            roughness: 0.3,
+            metalness: 0.4,
+            side: THREE.DoubleSide,
+          });
+          const portLipMesh = new THREE.Mesh(portLipGeo, portLipMat);
+          portLipMesh.position.set(pCurX, portY, collarZ + (isRearPort ? -0.07 : 0.07));
+          targetPortGroup.add(portLipMesh);
+
           const portTubeGeo = new THREE.CylinderGeometry(pRadius, pRadius, effectiveLength, 32, 1, true);
           portTubeGeo.rotateX(Math.PI / 2);
           const portTubeMat = new THREE.MeshStandardMaterial({
@@ -418,18 +868,59 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
             side: THREE.DoubleSide,
           });
           const portTubeMesh = new THREE.Mesh(portTubeGeo, portTubeMat);
-          portTubeMesh.position.set(pCurX, portY, -effectiveLength / 2 + thickness / 2);
-          frontGroup.add(portTubeMesh);
+          portTubeMesh.position.set(pCurX, portY, tubeZ);
+          targetPortGroup.add(portTubeMesh);
 
-          // Flared Outer Collar
-          const collarGeo = new THREE.TorusGeometry(pRadius * 1.15, thickness * 0.2, 12, 32);
-          const collarMat = new THREE.MeshStandardMaterial({ color: 0x0369a1 });
-          const collarMesh = new THREE.Mesh(collarGeo, collarMat);
-          collarMesh.position.set(pCurX, portY, thickness / 2);
-          frontGroup.add(collarMesh);
+          if (flaredEnds === 1) {
+            // 1: Dos a Ras (Flat annular flange ring at BOTH ends)
+            const flangeRingGeo = new THREE.RingGeometry(pRadius * 0.95, pRadius * 1.32, 32);
+            const flangeMat = new THREE.MeshStandardMaterial({
+              color: 0x0369a1,
+              roughness: 0.35,
+              metalness: 0.3,
+              side: THREE.DoubleSide,
+            });
+            const outerFlange = new THREE.Mesh(flangeRingGeo, flangeMat);
+            outerFlange.position.set(pCurX, portY, collarZ + (isRearPort ? -0.09 : 0.09));
+            targetPortGroup.add(outerFlange);
+
+            const innerFlange = new THREE.Mesh(flangeRingGeo, flangeMat);
+            innerFlange.position.set(pCurX, portY, innerEndZ);
+            targetPortGroup.add(innerFlange);
+          } else if (flaredEnds === 2 || flaredEnds === 3) {
+            // 2 or 3: Abocinado (Aeroport / Flared) — Rounded trumpet Torus collar on outer end (and inner end if flaredEnds === 2)
+            const collarGeo = new THREE.TorusGeometry(pRadius * 1.12, Math.max(thickness * 0.22, pRadius * 0.16), 16, 32);
+            const collarMat = new THREE.MeshStandardMaterial({
+              color: 0x0369a1,
+              roughness: 0.25,
+              metalness: 0.45,
+            });
+            const outerCollar = new THREE.Mesh(collarGeo, collarMat);
+            outerCollar.position.set(pCurX, portY, collarZ + (isRearPort ? -0.1 : 0.1));
+            targetPortGroup.add(outerCollar);
+
+            if (flaredEnds === 2) {
+              const innerCollar = new THREE.Mesh(collarGeo, collarMat);
+              innerCollar.position.set(pCurX, portY, innerEndZ);
+              targetPortGroup.add(innerCollar);
+            }
+          }
         } else {
           const pW = Math.max(portWidth || 10, 2);
           const pH = Math.max(portHeight || 4, 1.5);
+
+          // Fondo oscuro de la boca rectangular del puerto
+          if (renderMode === 'solid') {
+            const rectHoleGeo = new THREE.PlaneGeometry(pW * 0.96, pH * 0.96);
+            const rectHoleMat = new THREE.MeshBasicMaterial({
+              color: 0x030712,
+              side: THREE.DoubleSide,
+            });
+            const rectHoleMesh = new THREE.Mesh(rectHoleGeo, rectHoleMat);
+            rectHoleMesh.position.set(pCurX, portY, collarZ + (isRearPort ? -0.06 : 0.06));
+            targetPortGroup.add(rectHoleMesh);
+          }
+
           const portBoxGeo = new THREE.BoxGeometry(pW, pH, effectiveLength);
           const portBoxMat = new THREE.MeshStandardMaterial({
             color: 0x0284c7,
@@ -438,8 +929,29 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
             wireframe: renderMode === 'wireframe',
           });
           const portBoxMesh = new THREE.Mesh(portBoxGeo, portBoxMat);
-          portBoxMesh.position.set(pCurX, portY, -effectiveLength / 2 + thickness / 2);
-          frontGroup.add(portBoxMesh);
+          portBoxMesh.position.set(pCurX, portY, tubeZ);
+          targetPortGroup.add(portBoxMesh);
+
+          if (flaredEnds === 1 || flaredEnds === 2 || flaredEnds === 3) {
+            const fScale = (flaredEnds === 2 || flaredEnds === 3) ? 1.28 : 1.18;
+            const fDepth = (flaredEnds === 2 || flaredEnds === 3) ? Math.max(thickness * 0.35, 0.6) : 0.25;
+            const rectCollarGeo = new THREE.BoxGeometry(pW * fScale, pH * fScale, fDepth);
+            const rectCollarMat = new THREE.MeshStandardMaterial({
+              color: 0x0369a1,
+              roughness: 0.3,
+              metalness: 0.35,
+              wireframe: renderMode === 'wireframe',
+            });
+            const outerRectCollar = new THREE.Mesh(rectCollarGeo, rectCollarMat);
+            outerRectCollar.position.set(pCurX, portY, collarZ);
+            targetPortGroup.add(outerRectCollar);
+
+            if (flaredEnds === 1 || flaredEnds === 2) {
+              const innerRectCollar = new THREE.Mesh(rectCollarGeo, rectCollarMat);
+              innerRectCollar.position.set(pCurX, portY, innerEndZ);
+              targetPortGroup.add(innerRectCollar);
+            }
+          }
         }
       }
     }
@@ -507,13 +1019,21 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
     boxType,
     shape,
     speakerYPct,
+    tweeterYPct,
+    midrangeYPct,
+    crossoverWays,
+    midSealed,
+    overallDiameter,
+    driverDepth,
     portYPct,
+    portLocation,
     portShape,
     portDiameter,
     portWidth,
     portHeight,
     portLength,
     portCount,
+    flaredEnds,
     bandpassRatio,
     dampingType,
   ]);
@@ -544,9 +1064,9 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
         background: isLight ? 'rgba(15, 23, 42, 0.65)' : 'rgba(2, 6, 17, 0.88)',
         backdropFilter: 'blur(10px)',
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         justifyContent: 'center',
-        padding: '1.25rem',
+        padding: '0.4rem',
         boxSizing: 'border-box',
         animation: 'fadeIn 0.2s ease-out',
       }}
@@ -558,7 +1078,8 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
         style={{
           width: '100%',
           maxWidth: '1360px',
-          height: '90vh',
+          height: 'min(78vh, 640px)',
+          maxHeight: 'calc(100% - 0.8rem)',
           background: isLight ? '#ffffff' : '#070f1e',
           border: `1px solid ${isLight ? '#cbd5e1' : '#1e3a5f'}`,
           borderRadius: '0px',
@@ -574,10 +1095,13 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
         {/* Header Bar */}
         <div
           style={{
+            flexShrink: 0,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '0.75rem 1.25rem',
+            flexWrap: 'wrap',
+            gap: '0.4rem',
+            padding: '0.45rem 0.75rem',
             background: isLight 
               ? 'linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%)' 
               : 'linear-gradient(90deg, #091528 0%, #0c1c36 100%)',
@@ -585,41 +1109,41 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
             userSelect: 'none',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <span
               style={{
                 fontFamily: 'monospace',
-                fontSize: '0.7rem',
-                letterSpacing: '0.08em',
+                fontSize: '0.65rem',
+                letterSpacing: '0.06em',
                 background: '#0284c7',
                 color: '#ffffff',
-                padding: '0.2rem 0.55rem',
+                padding: '0.15rem 0.45rem',
                 borderRadius: '0px',
                 fontWeight: 700,
               }}
             >
-              3D CAD WEBGL
+              3D CAD
             </span>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '0.92rem', fontWeight: 700, color: isLight ? '#0f172a' : '#f1f5f9', letterSpacing: '0.02em' }}>
+              <span style={{ fontSize: '0.82rem', fontWeight: 700, color: isLight ? '#0f172a' : '#f1f5f9', letterSpacing: '0.01em' }}>
                 {t("Inspección Espacial 3D del Gabinete")}
               </span>
-              <span style={{ fontSize: '0.68rem', color: isLight ? '#64748b' : '#64748b', fontFamily: 'monospace' }}>
-                MOTOR THREE.JS | {boxType.toUpperCase()} | VOL NETO: {cabinetData?.valid ? convertTo(cabinetData.vNeto, 'volume', unitSystem).toFixed(1) : '--'} {vLabel}
+              <span style={{ fontSize: '0.62rem', color: isLight ? '#64748b' : '#64748b', fontFamily: 'monospace' }}>
+                | {boxType.toUpperCase()} | VOL NETO: {cabinetData?.valid ? convertTo(cabinetData.vNeto, 'volume', unitSystem).toFixed(1) : '--'} {vLabel}
               </span>
             </div>
           </div>
 
           {/* Quick HUD Metrics */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <div
               style={{
                 display: 'flex',
-                gap: '0.5rem',
-                fontSize: '0.7rem',
+                gap: '0.35rem',
+                fontSize: '0.65rem',
                 color: isLight ? '#334155' : '#94a3b8',
                 background: isLight ? '#f1f5f9' : 'rgba(15, 23, 42, 0.7)',
-                padding: '0.3rem 0.75rem',
+                padding: '0.2rem 0.5rem',
                 borderRadius: '0px',
                 border: `1px solid ${isLight ? '#cbd5e1' : '#1e293b'}`,
                 fontFamily: 'monospace',
@@ -641,9 +1165,9 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
                 background: isLight ? '#f1f5f9' : '#1e293b',
                 border: `1px solid ${isLight ? '#cbd5e1' : '#334155'}`,
                 color: isLight ? '#0f172a' : '#f8fafc',
-                fontSize: '0.75rem',
+                fontSize: '0.68rem',
                 fontWeight: 600,
-                padding: '0.35rem 0.85rem',
+                padding: '0.25rem 0.6rem',
                 borderRadius: '0px',
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
@@ -668,9 +1192,10 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
         <div
           ref={containerRef}
           style={{
-            flex: 1,
+            flex: '1 1 0%',
+            minHeight: 0,
             width: '100%',
-            height: '100%',
+            overflow: 'hidden',
             position: 'relative',
             cursor: 'grab',
           }}
@@ -682,30 +1207,29 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
           }}
         />
 
-        {/* Interactive CAD Toolbar (Overlay Inferior) */}
+        {/* Interactive CAD Toolbar (Fijada al borde inferior del modal) */}
         <div
           style={{
             position: 'absolute',
-            bottom: '1rem',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: isLight ? 'rgba(255, 255, 255, 0.96)' : 'rgba(7, 16, 30, 0.92)',
-            border: `1px solid ${isLight ? '#cbd5e1' : '#1e3a5f'}`,
-            borderRadius: '0px',
-            padding: '0.5rem 0.85rem',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            background: isLight ? 'rgba(248, 250, 252, 0.94)' : 'rgba(9, 21, 40, 0.94)',
+            borderTop: `1px solid ${isLight ? '#cbd5e1' : '#1e3a5f'}`,
+            padding: '0.35rem 0.55rem',
             display: 'flex',
             alignItems: 'center',
-            gap: '1rem',
-            backdropFilter: 'blur(12px)',
-            boxShadow: isLight ? '0 10px 30px rgba(0, 0, 0, 0.15)' : '0 10px 30px rgba(0, 0, 0, 0.6)',
+            justifyContent: 'center',
+            gap: '0.35rem 0.6rem',
+            backdropFilter: 'blur(8px)',
             zIndex: 10,
-            maxWidth: '94%',
             flexWrap: 'wrap',
+            boxSizing: 'border-box',
           }}
         >
           {/* Modo de Visualización */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-            <span style={{ fontSize: '0.65rem', color: isLight ? '#475569' : '#64748b', fontWeight: 700, fontFamily: 'monospace', marginRight: '0.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+            <span style={{ fontSize: '0.6rem', color: isLight ? '#475569' : '#64748b', fontWeight: 700, fontFamily: 'monospace' }}>
               MODO:
             </span>
             {(['solid', 'xray', 'wireframe'] as const).map((mode) => (
@@ -713,12 +1237,12 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
                 key={mode}
                 onClick={() => setRenderMode(mode)}
                 style={{
-                  background: renderMode === mode ? '#0284c7' : (isLight ? '#f1f5f9' : '#0f172a'),
+                  background: renderMode === mode ? '#0284c7' : (isLight ? '#ffffff' : '#0f172a'),
                   border: `1px solid ${renderMode === mode ? '#0284c7' : (isLight ? '#cbd5e1' : '#1e293b')}`,
                   color: renderMode === mode ? '#ffffff' : (isLight ? '#334155' : '#94a3b8'),
-                  padding: '0.25rem 0.6rem',
+                  padding: '0.18rem 0.42rem',
                   borderRadius: '0px',
-                  fontSize: '0.68rem',
+                  fontSize: '0.6rem',
                   fontWeight: renderMode === mode ? 700 : 500,
                   cursor: 'pointer',
                   fontFamily: 'monospace',
@@ -730,11 +1254,9 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
             ))}
           </div>
 
-          <div style={{ width: '1px', height: '22px', background: isLight ? '#cbd5e1' : '#1e3a5f' }} />
-
           {/* Despiece 3D (Exploded View Slider) */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ fontSize: '0.65rem', color: isLight ? '#475569' : '#64748b', fontWeight: 700, fontFamily: 'monospace' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+            <span style={{ fontSize: '0.6rem', color: isLight ? '#475569' : '#64748b', fontWeight: 700, fontFamily: 'monospace' }}>
               DESPIECE:
             </span>
             <input
@@ -744,21 +1266,19 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
               value={explodedPct}
               onChange={(e) => setExplodedPct(Number(e.target.value))}
               style={{
-                width: '100px',
+                width: '68px',
                 accentColor: '#0284c7',
                 cursor: 'pointer',
               }}
             />
-            <span style={{ fontSize: '0.68rem', color: '#0284c7', fontFamily: 'monospace', minWidth: '2.5rem', fontWeight: 700 }}>
+            <span style={{ fontSize: '0.6rem', color: '#0284c7', fontFamily: 'monospace', minWidth: '2rem', fontWeight: 700 }}>
               {explodedPct}%
             </span>
           </div>
 
-          <div style={{ width: '1px', height: '22px', background: isLight ? '#cbd5e1' : '#1e3a5f' }} />
-
           {/* Vistas Predefinidas */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-            <span style={{ fontSize: '0.65rem', color: isLight ? '#475569' : '#64748b', fontWeight: 700, fontFamily: 'monospace', marginRight: '0.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+            <span style={{ fontSize: '0.6rem', color: isLight ? '#475569' : '#64748b', fontWeight: 700, fontFamily: 'monospace' }}>
               CÁMARA:
             </span>
             {(['iso', 'front', 'side', 'top'] as const).map((p) => (
@@ -766,12 +1286,12 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
                 key={p}
                 onClick={() => applyPreset(p)}
                 style={{
-                  background: isLight ? '#f1f5f9' : '#0f172a',
+                  background: isLight ? '#ffffff' : '#0f172a',
                   border: `1px solid ${isLight ? '#cbd5e1' : '#1e293b'}`,
                   color: isLight ? '#334155' : '#94a3b8',
-                  padding: '0.25rem 0.5rem',
+                  padding: '0.18rem 0.38rem',
                   borderRadius: '0px',
-                  fontSize: '0.65rem',
+                  fontSize: '0.6rem',
                   cursor: 'pointer',
                   fontFamily: 'monospace',
                   textTransform: 'uppercase',
@@ -790,21 +1310,19 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
             ))}
           </div>
 
-          <div style={{ width: '1px', height: '22px', background: isLight ? '#cbd5e1' : '#1e3a5f' }} />
-
           {/* Auto-Rotación, Aristas & Captura */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
             <button
               onClick={() => setShowWireEdges(!showWireEdges)}
               style={{
                 background: showWireEdges 
                   ? (isLight ? 'rgba(2, 132, 199, 0.12)' : 'rgba(56, 189, 248, 0.2)') 
-                  : (isLight ? '#f1f5f9' : '#0f172a'),
+                  : (isLight ? '#ffffff' : '#0f172a'),
                 border: `1px solid ${showWireEdges ? '#0284c7' : (isLight ? '#cbd5e1' : '#1e293b')}`,
                 color: showWireEdges ? '#0284c7' : (isLight ? '#64748b' : '#64748b'),
-                padding: '0.25rem 0.6rem',
+                padding: '0.18rem 0.42rem',
                 borderRadius: '0px',
-                fontSize: '0.65rem',
+                fontSize: '0.6rem',
                 fontWeight: 600,
                 cursor: 'pointer',
                 fontFamily: 'monospace',
@@ -816,12 +1334,12 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
             <button
               onClick={() => setAutoRotate(!autoRotate)}
               style={{
-                background: autoRotate ? 'rgba(16, 185, 129, 0.2)' : (isLight ? '#f1f5f9' : '#0f172a'),
+                background: autoRotate ? 'rgba(16, 185, 129, 0.2)' : (isLight ? '#ffffff' : '#0f172a'),
                 border: `1px solid ${autoRotate ? '#10b981' : (isLight ? '#cbd5e1' : '#1e293b')}`,
                 color: autoRotate ? '#10b981' : (isLight ? '#334155' : '#94a3b8'),
-                padding: '0.25rem 0.6rem',
+                padding: '0.18rem 0.42rem',
                 borderRadius: '0px',
-                fontSize: '0.65rem',
+                fontSize: '0.6rem',
                 fontWeight: 600,
                 cursor: 'pointer',
                 fontFamily: 'monospace',
@@ -836,9 +1354,9 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
                 background: '#0369a1',
                 border: '1px solid #0284c7',
                 color: '#ffffff',
-                padding: '0.25rem 0.65rem',
+                padding: '0.18rem 0.48rem',
                 borderRadius: '0px',
-                fontSize: '0.65rem',
+                fontSize: '0.6rem',
                 fontWeight: 700,
                 cursor: 'pointer',
                 fontFamily: 'monospace',

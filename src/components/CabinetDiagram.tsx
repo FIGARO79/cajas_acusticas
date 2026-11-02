@@ -18,9 +18,18 @@ interface CabinetDiagramProps {
   portHeight: number;
   portLength: number;
   portCount: number;
+  flaredEnds?: 0 | 1 | 2 | 3;
   hoveredPieceIndex?: number | null;
   speakerYPct?: number;
+  tweeterYPct?: number;
+  midrangeYPct?: number;
+  crossoverWays?: number;
+  midSealed?: boolean;
+  overallDiameter?: number;
+  baffleCutout?: number;
+  driverDepth?: number;
   portYPct?: number;
+  portLocation?: 'front' | 'rear';
   bandpassOrder?: 4 | 6;
   bandpassRatio?: number;
   bandpassVf?: number;
@@ -41,9 +50,18 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
   portHeight,
   portLength,
   portCount,
+  flaredEnds = 0,
   hoveredPieceIndex = null,
   speakerYPct = 50,
+  tweeterYPct = 20,
+  midrangeYPct = 40,
+  crossoverWays = 2,
+  midSealed = true,
+  overallDiameter,
+  baffleCutout,
+  driverDepth,
   portYPct = 85,
+  portLocation = 'front',
   bandpassOrder = 4,
   bandpassRatio = 0.5,
   dampingType = 'none',
@@ -88,9 +106,18 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
         portHeight={portHeight}
         portLength={portLength}
         portCount={portCount}
+        flaredEnds={flaredEnds}
         hoveredPieceIndex={hoveredPieceIndex}
         speakerYPct={speakerYPct}
+        tweeterYPct={tweeterYPct}
+        midrangeYPct={midrangeYPct}
+        crossoverWays={crossoverWays}
+        midSealed={midSealed}
+        overallDiameter={overallDiameter}
+        baffleCutout={baffleCutout}
+        driverDepth={driverDepth}
         portYPct={portYPct}
+        portLocation={portLocation}
         bandpassOrder={bandpassOrder}
         bandpassRatio={bandpassRatio}
         dampingType={dampingType}
@@ -113,8 +140,17 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
         portHeight={portHeight}
         portLength={portLength}
         portCount={portCount}
+        flaredEnds={flaredEnds}
         speakerYPct={speakerYPct}
+        tweeterYPct={tweeterYPct}
+        midrangeYPct={midrangeYPct}
+        crossoverWays={crossoverWays}
+        midSealed={midSealed}
+        overallDiameter={overallDiameter}
+        baffleCutout={baffleCutout}
+        driverDepth={driverDepth}
         portYPct={portYPct}
+        portLocation={portLocation}
         bandpassOrder={bandpassOrder}
         bandpassRatio={bandpassRatio}
         dampingType={dampingType}

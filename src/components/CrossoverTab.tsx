@@ -176,22 +176,17 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
 
         // 4th Order Linkwitz-Riley (24 dB/oct)
         if (crossoverType === '4th_lr') {
-          const c1_t = 0.0796 * 1000000 / (f * Rt / 1000);
-          const c2_t = 0.1592 * 1000000 / (f * Rt / 1000);
-          const l1_t = 0.1592 * Rt * 1000 / (f / 1000);
-          const l2_t = 0.0796 * Rt * 1000 / (f / 1000);
-
-          const c1_w = 0.0796 * 1000000 / (f * Rw / 1000);
-          const c2_w = 0.1592 * 1000000 / (f * Rw / 1000);
-          const l1_w = 0.1592 * Rw * 1000 / (f / 1000);
-          const l2_w = 0.0796 * Rw * 1000 / (f / 1000);
-
-          return {
+          const hpRes = wasm.calc_filtro_4to_orden_lr(f, Rt);
+          const lpRes = wasm.calc_filtro_4to_orden_lr(f, Rw);
+          const out = {
             ways: '2way' as const,
             type: '4th_lr',
-            hp: { c1: c1_t / 1000, l1: l1_t / 1000, c2: c2_t / 1000, l2: l2_t / 1000 },
-            lp: { l1: l1_w / 1000, c1: c1_w / 1000, l2: l2_w / 1000, c2: c2_w / 1000 }
+            hp: { c1: hpRes.c1, l1: hpRes.l1, c2: hpRes.c2, l2: hpRes.l2 },
+            lp: { l1: lpRes.l1, c1: lpRes.c1, l2: lpRes.l2, c2: lpRes.c2 }
           };
+          hpRes.free();
+          lpRes.free();
+          return out;
         }
       } catch (e) {
         console.error("WASM crossover calculation error, falling back to JS:", e);
@@ -205,16 +200,79 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
         lp: { l1: (Rw * 1000) / (2 * Math.PI * f), c1: null }
       };
     } else {
-      // 3-way Crossover Calculations
-      // fL = fcLow, fH = fcHigh.
+      // 3-way Crossover Calculations (via Rust WASM)
       const fL = fcLow;
       const fH = fcHigh;
       if (!fL || !fH || fL <= 0 || fH <= 0 || fL >= fH || Rt <= 0 || Rm <= 0 || Rw <= 0) return null;
 
-      // We'll calculate components for:
-      // Tweeter (High Pass at fH)
-      // Midrange (Bandpass: High Pass at fL and Low Pass at fH)
-      // Woofer (Low Pass at fL)
+      try {
+        const wasm = getWasm();
+        if (crossoverType === '1st_order') {
+          const tRes = wasm.calc_filtro_1er_orden(fH, Rt);
+          const mHpRes = wasm.calc_filtro_1er_orden(fL, Rm);
+          const mLpRes = wasm.calc_filtro_1er_orden(fH, Rm);
+          const wRes = wasm.calc_filtro_1er_orden(fL, Rw);
+          const out: CrossoverResult = {
+            ways: '3way' as const,
+            type: '1st',
+            hp: { c1: tRes.c, l1: null },
+            bp: { c_hp: mHpRes.c, l_hp: null, l_lp: mLpRes.l, c_lp: null },
+            lp: { l1: wRes.l, c1: null }
+          };
+          tRes.free(); mHpRes.free(); mLpRes.free(); wRes.free();
+          return out;
+        }
+        if (crossoverType === '2nd_butter') {
+          const tRes = wasm.calc_filtro_2do_orden_butterworth(fH, Rt);
+          const mHpRes = wasm.calc_filtro_2do_orden_butterworth(fL, Rm);
+          const mLpRes = wasm.calc_filtro_2do_orden_butterworth(fH, Rm);
+          const wRes = wasm.calc_filtro_2do_orden_butterworth(fL, Rw);
+          const out: CrossoverResult = {
+            ways: '3way' as const,
+            type: '2nd_butter',
+            hp: { c1: tRes.c_hp, l1: tRes.l_hp },
+            bp: { c_hp: mHpRes.c_hp, l_hp: mHpRes.l_hp, l_lp: mLpRes.l_lp, c_lp: mLpRes.c_lp },
+            lp: { l1: wRes.l_lp, c1: wRes.c_lp }
+          };
+          tRes.free(); mHpRes.free(); mLpRes.free(); wRes.free();
+          return out;
+        }
+        if (crossoverType === '2nd_lr') {
+          const tRes = wasm.calc_filtro_linkwitz_riley(fH, Rt);
+          const mHpRes = wasm.calc_filtro_linkwitz_riley(fL, Rm);
+          const mLpRes = wasm.calc_filtro_linkwitz_riley(fH, Rm);
+          const wRes = wasm.calc_filtro_linkwitz_riley(fL, Rw);
+          const out: CrossoverResult = {
+            ways: '3way' as const,
+            type: '2nd_lr',
+            hp: { c1: tRes.c, l1: tRes.l },
+            bp: { c_hp: mHpRes.c, l_hp: mHpRes.l, l_lp: mLpRes.l, c_lp: mLpRes.c },
+            lp: { l1: wRes.l, c1: wRes.c }
+          };
+          tRes.free(); mHpRes.free(); mLpRes.free(); wRes.free();
+          return out;
+        }
+        if (crossoverType === '4th_lr') {
+          const tRes = wasm.calc_filtro_4to_orden_lr(fH, Rt);
+          const mHpRes = wasm.calc_filtro_4to_orden_lr(fL, Rm);
+          const mLpRes = wasm.calc_filtro_4to_orden_lr(fH, Rm);
+          const wRes = wasm.calc_filtro_4to_orden_lr(fL, Rw);
+          const out: CrossoverResult = {
+            ways: '3way' as const,
+            type: '4th_lr',
+            hp: { c1: tRes.c1, l1: tRes.l1, c2: tRes.c2, l2: tRes.l2 },
+            bp: {
+              c1_hp: mHpRes.c1, c2_hp: mHpRes.c2, l1_hp: mHpRes.l1, l2_hp: mHpRes.l2,
+              c1_lp: mLpRes.c1, c2_lp: mLpRes.c2, l1_lp: mLpRes.l1, l2_lp: mLpRes.l2
+            },
+            lp: { l1: wRes.l1, c1: wRes.c1, l2: wRes.l2, c2: wRes.c2 }
+          };
+          tRes.free(); mHpRes.free(); mLpRes.free(); wRes.free();
+          return out;
+        }
+      } catch (e) {
+        console.error("WASM 3-way crossover error, falling back to JS:", e);
+      }
       
       if (crossoverType === '1st_order') {
         // 1st order: 6dB/oct
@@ -639,7 +697,7 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%', boxSizing: 'border-box' }}>
         {/* Esquema de conexión CAD Canvas 2D */}
-        <div style={{ width: '100%', marginTop: '0.25rem' }}>
+        <div style={{ width: '100%', marginTop: '0px' }}>
           <CrossoverCad2D
             theme={effectiveTheme}
             lang={lang}

@@ -2,7 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { type Lang, translate } from '../utils/translations';
 import { type UnitSystem, convertTo, convertFrom, getUnitLabel } from '../utils/units';
 import type { CalculatedPorted, CalculatedSealed, CalculatedBandpass, SpeakerParams, PortSuggestions, WoodCabinetData } from '../types';
-import { suggestPortConfig } from '../utils/acousticMath';
+import { suggestPortConfig, calcOptimalPortForSpeaker } from '../utils/acousticMath';
+import { getWasm } from '../wasm';
 
 interface BoxParamsFormProps {
   lang: Lang;
@@ -48,8 +49,8 @@ interface BoxParamsFormProps {
   portArea: number | '';
   setPortArea: (a: number | '') => void;
   portLength: string;
-  flaredEnds: 0 | 1 | 2;
-  setFlaredEnds: (val: 0 | 1 | 2) => void;
+  flaredEnds: 0 | 1 | 2 | 3;
+  setFlaredEnds: (val: 0 | 1 | 2 | 3) => void;
   useCustomPortLength: boolean;
   setUseCustomPortLength: (v: boolean) => void;
   customPortLength: number | '';
@@ -397,56 +398,133 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
     const f = fc;
     const fL = fcLow;
     const fH = fcHigh;
+    const wasm = getWasm();
 
     if (crossoverWays === 2 && f > 0) {
       if (crossoverType === '1st_order') {
-        list.push({ label: `${t("Woofer L1")} (1er O)`, value: (Rw / (2 * Math.PI * f)) * 1000 });
+        const resW = wasm ? wasm.calc_filtro_1er_orden(f, Rw) : null;
+        list.push({ label: `${t("Woofer L1")} (1er O)`, value: resW ? resW.l : (Rw / (2 * Math.PI * f)) * 1000 });
+        resW?.free();
       } else if (crossoverType === '2nd_butter') {
-        list.push({ label: `${t("Tweeter L1")} (2do O Butter)`, value: ((Rt * Math.sqrt(2)) / (2 * Math.PI * f)) * 1000 });
-        list.push({ label: `${t("Woofer L1")} (2do O Butter)`, value: ((Rw * Math.sqrt(2)) / (2 * Math.PI * f)) * 1000 });
+        const resT = wasm ? wasm.calc_filtro_2do_orden_butterworth(f, Rt) : null;
+        const resW = wasm ? wasm.calc_filtro_2do_orden_butterworth(f, Rw) : null;
+        list.push({ label: `${t("Tweeter L1")} (2do O Butter)`, value: resT ? resT.l_hp : ((Rt * Math.sqrt(2)) / (2 * Math.PI * f)) * 1000 });
+        list.push({ label: `${t("Woofer L1")} (2do O Butter)`, value: resW ? resW.l_lp : ((Rw * Math.sqrt(2)) / (2 * Math.PI * f)) * 1000 });
+        resT?.free(); resW?.free();
       } else if (crossoverType === '2nd_lr') {
-        list.push({ label: `${t("Tweeter L1")} (2do O LR)`, value: (Rt / (Math.PI * f)) * 1000 });
-        list.push({ label: `${t("Woofer L1")} (2do O LR)`, value: (Rw / (Math.PI * f)) * 1000 });
+        const resT = wasm ? wasm.calc_filtro_linkwitz_riley(f, Rt) : null;
+        const resW = wasm ? wasm.calc_filtro_linkwitz_riley(f, Rw) : null;
+        list.push({ label: `${t("Tweeter L1")} (2do O LR)`, value: resT ? resT.l : (Rt / (Math.PI * f)) * 1000 });
+        list.push({ label: `${t("Woofer L1")} (2do O LR)`, value: resW ? resW.l : (Rw / (Math.PI * f)) * 1000 });
+        resT?.free(); resW?.free();
       } else if (crossoverType === '4th_lr') {
-        list.push({ label: `${t("Tweeter L1")} (4to O LR)`, value: (0.1592 * Rt * 1000) / f });
-        list.push({ label: `${t("Tweeter L2")} (4to O LR)`, value: (0.0796 * Rt * 1000) / f });
-        list.push({ label: `${t("Woofer L1")} (4to O LR)`, value: (0.1592 * Rw * 1000) / f });
-        list.push({ label: `${t("Woofer L2")} (4to O LR)`, value: (0.0796 * Rw * 1000) / f });
+        const resT = wasm ? wasm.calc_filtro_4to_orden_lr(f, Rt) : null;
+        const resW = wasm ? wasm.calc_filtro_4to_orden_lr(f, Rw) : null;
+        list.push({ label: `${t("Tweeter L1")} (4to O LR)`, value: resT ? resT.l1 : (0.1592 * Rt * 1000) / f });
+        list.push({ label: `${t("Tweeter L2")} (4to O LR)`, value: resT ? resT.l2 : (0.0796 * Rt * 1000) / f });
+        list.push({ label: `${t("Woofer L1")} (4to O LR)`, value: resW ? resW.l1 : (0.1592 * Rw * 1000) / f });
+        list.push({ label: `${t("Woofer L2")} (4to O LR)`, value: resW ? resW.l2 : (0.0796 * Rw * 1000) / f });
+        resT?.free(); resW?.free();
       }
     } else if (crossoverWays === 3 && fL > 0 && fH > 0) {
       if (crossoverType === '1st_order') {
-        list.push({ label: `${t("Woofer L1")} (1er O)`, value: (Rw / (2 * Math.PI * fL)) * 1000 });
+        const resW = wasm ? wasm.calc_filtro_1er_orden(fL, Rw) : null;
+        const resM = wasm ? wasm.calc_filtro_1er_orden(fH, Rm) : null;
+        list.push({ label: `${t("Woofer L1")} (1er O)`, value: resW ? resW.l : (Rw / (2 * Math.PI * fL)) * 1000 });
+        list.push({ label: `${t("Medio L1 (Paso Banda)")} (1er O)`, value: resM ? resM.l : (Rm / (2 * Math.PI * fH)) * 1000 });
+        resW?.free(); resM?.free();
       } else if (crossoverType === '2nd_butter') {
-        list.push({ label: `${t("Woofer L1")} (2do O Butter)`, value: ((Rw * Math.sqrt(2)) / (2 * Math.PI * fL)) * 1000 });
+        const resW = wasm ? wasm.calc_filtro_2do_orden_butterworth(fL, Rw) : null;
+        const resM = wasm ? wasm.calc_filtro_2do_orden_butterworth(fH, Rm) : null;
+        list.push({ label: `${t("Woofer L1")} (2do O Butter)`, value: resW ? resW.l_lp : ((Rw * Math.sqrt(2)) / (2 * Math.PI * fL)) * 1000 });
+        list.push({ label: `${t("Medio L1 (Paso Banda)")} (2do O Butter)`, value: resM ? resM.l_lp : ((Rm * Math.sqrt(2)) / (2 * Math.PI * fH)) * 1000 });
+        resW?.free(); resM?.free();
       } else if (crossoverType === '2nd_lr') {
-        list.push({ label: `${t("Woofer L1")} (2do O LR)`, value: (Rw / (Math.PI * fL)) * 1000 });
+        const resW = wasm ? wasm.calc_filtro_linkwitz_riley(fL, Rw) : null;
+        const resM = wasm ? wasm.calc_filtro_linkwitz_riley(fH, Rm) : null;
+        list.push({ label: `${t("Woofer L1")} (2do O LR)`, value: resW ? resW.l : (Rw / (Math.PI * fL)) * 1000 });
+        list.push({ label: `${t("Medio L1 (Paso Banda)")} (2do O LR)`, value: resM ? resM.l : (Rm / (Math.PI * fH)) * 1000 });
+        resW?.free(); resM?.free();
       } else if (crossoverType === '4th_lr') {
-        list.push({ label: `${t("Woofer L1")} (4to O LR)`, value: (0.1592 * Rw * 1000) / fL });
-        list.push({ label: `${t("Woofer L2")} (4to O LR)`, value: (0.0796 * Rw * 1000) / fL });
-      }
-
-      if (crossoverType === '1st_order') {
-        list.push({ label: `${t("Medio L1 (Paso Banda)")} (1er O)`, value: (Rm / (2 * Math.PI * fH)) * 1000 });
-      } else if (crossoverType === '2nd_butter') {
-        list.push({ label: `${t("Medio L1 (Paso Banda)")} (2do O Butter)`, value: ((Rm * Math.sqrt(2)) / (2 * Math.PI * fH)) * 1000 });
-      } else if (crossoverType === '2nd_lr') {
-        list.push({ label: `${t("Medio L1 (Paso Banda)")} (2do O LR)`, value: (Rm / (Math.PI * fH)) * 1000 });
-      } else if (crossoverType === '4th_lr') {
-        list.push({ label: `${t("Medio L1 (Paso Banda)")} (4to O LR)`, value: (0.1592 * Rm * 1000) / fH });
-        list.push({ label: `${t("Medio L2 (Paso Banda)")} (4to O LR)`, value: (0.0796 * Rm * 1000) / fH });
+        const resW = wasm ? wasm.calc_filtro_4to_orden_lr(fL, Rw) : null;
+        const resM = wasm ? wasm.calc_filtro_4to_orden_lr(fH, Rm) : null;
+        list.push({ label: `${t("Woofer L1")} (4to O LR)`, value: resW ? resW.l1 : (0.1592 * Rw * 1000) / fL });
+        list.push({ label: `${t("Woofer L2")} (4to O LR)`, value: resW ? resW.l2 : (0.0796 * Rw * 1000) / fL });
+        list.push({ label: `${t("Medio L1 (Paso Banda)")} (4to O LR)`, value: resM ? resM.l1 : (0.1592 * Rm * 1000) / fH });
+        list.push({ label: `${t("Medio L2 (Paso Banda)")} (4to O LR)`, value: resM ? resM.l2 : (0.0796 * Rm * 1000) / fH });
+        resW?.free(); resM?.free();
       }
     }
 
     return list;
   }, [crossoverWays, crossoverType, fc, fcLow, fcHigh, zTweeter, zMidrange, zWoofer, t]);
 
+  // Determinar la sintonía (Fb) óptima real recomendada para el altavoz y la caja:
+  // Si la alineación es B4 o el altavoz tiene Qts >= 0.45, la sintonía óptima real es Fs (50 Hz) para evitar jorobas.
+  const targetOptimalFb = useMemo(() => {
+    if (ventedAlignment === 'B4') {
+      return params.fs || 50;
+    }
+    if (useCustomPortLength && portedData.valid && portedData.Fb > 0) {
+      if (params.fs && portedData.Fb > params.fs * 1.2) {
+        return params.fs;
+      }
+      return portedData.Fb;
+    }
+    if (customPorted && customFb > 0) {
+      return customFb;
+    }
+    if (params.qts && params.qts >= 0.45 && params.fs && params.fs > 0) {
+      return params.fs;
+    }
+    return portedData.valid && portedData.Fb > 0 ? portedData.Fb : (params.fs || 50);
+  }, [ventedAlignment, useCustomPortLength, portedData.valid, portedData.Fb, customPorted, customFb, params.qts, params.fs]);
+
+  // Alineación sugerida óptima según el Qts del altavoz
+  const recommendedAlignment = useMemo<'QB3' | 'B4' | 'SBB4'>(() => {
+    if (!params.qts || params.qts <= 0) return 'B4';
+    if (params.qts < 0.38) return 'QB3';
+    if (params.qts <= 0.45) return 'B4';
+    return 'B4'; // Para Qts >= 0.45, B4 (Fb=Fs) es la ideal para evitar jorobas
+  }, [params.qts]);
+
+  // Sintonía Fb óptima sugerida según los parámetros Thiele-Small
+  const recommendedFbForDriver = useMemo<number>(() => {
+    if (!params.fs || params.fs <= 0) return 0;
+    if (params.qts && params.qts >= 0.45) {
+      return Math.round(params.fs * 10) / 10;
+    }
+    try {
+      const wasm = getWasm();
+      if (wasm && params.vas && params.qts) {
+        const res = wasm.calc_alineacion_ventilada(params.fs, params.vas, params.qts, ventedAlignment || 'B4');
+        if (res.fb > 0) return Math.round(res.fb * 10) / 10;
+      }
+    } catch {}
+    return Math.round(params.fs * 10) / 10;
+  }, [params.fs, params.qts, params.vas, ventedAlignment]);
+
+  const handleApplyOptimalFb = () => {
+    if (recommendedFbForDriver <= 0) return;
+    setCustomFb(recommendedFbForDriver);
+    setUseCustomPortLength(false);
+    setCustomPorted(true);
+  };
+
+  const targetOptimalVb = useMemo(() => {
+    if (cabinetData?.valid && cabinetData.vNeto > 0) {
+      return cabinetData.vNeto;
+    }
+    return portedData.valid && portedData.Vb > 0 ? portedData.Vb : (customVb || 35);
+  }, [cabinetData, portedData.valid, portedData.Vb, customVb]);
+
   const suggestions = useMemo<PortSuggestions | null>(() => {
-    if (portedData.valid && portedData.Vb > 0 && portedData.Fb > 0) {
+    if (targetOptimalVb > 0 && targetOptimalFb > 0) {
       const minLen = (Number(woodThickness) || 0) / 10;
-      return suggestPortConfig(portedData.Vb, portedData.Fb, params, flaredEnds, minLen);
+      return suggestPortConfig(targetOptimalVb, targetOptimalFb, params, flaredEnds, minLen);
     }
     return null;
-  }, [portedData, params, flaredEnds, woodThickness]);
+  }, [targetOptimalVb, targetOptimalFb, params, flaredEnds, woodThickness]);
 
   const vPeak = useMemo(() => {
     const pCount = typeof portCount === 'number' ? portCount : 0;
@@ -456,6 +534,10 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
         : 2 * Math.sqrt(((portWidth || 0) * (portHeight || 0)) / Math.PI);
 
       if (pDia > 0 && params.sd && params.xmax) {
+        const wasm = getWasm();
+        if (wasm) {
+          return wasm.calc_velocidad_puerto(portedData.Fb, params.sd, params.xmax, pCount, pDia);
+        }
         return (0.008 * portedData.Fb * params.sd * params.xmax) / (pCount * Math.pow(pDia, 2));
       }
     }
@@ -479,6 +561,40 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
     setPortShape('round');
     setPortCount(num);
     setPortDiameter(dia);
+    setUseCustomPortLength(false); // Mantener Fb bloqueada para que la longitud se adapte a cualquier ajuste
+    if (targetOptimalFb > 0) {
+      setCustomFb(Number(targetOptimalFb.toFixed(1)));
+      setCustomPorted(true);
+    }
+  };
+
+  const handleApplyOptimalPort = () => {
+    const targetVb = targetOptimalVb;
+    const targetFb = targetOptimalFb;
+    if (targetVb <= 0 || targetFb <= 0) return;
+
+    const minLen = Math.max((Number(woodThickness) || 15) / 10, 2.0);
+    const maxLen = cabinetData?.valid && cabinetData.dInt > 6
+      ? Math.max(cabinetData.dInt - 3.5, minLen + 2)
+      : 42.0;
+
+    const opt = calcOptimalPortForSpeaker(targetVb, targetFb, params, flaredEnds, minLen, maxLen);
+    setPortCount(opt.numPorts);
+    setUseCustomPortLength(false); // Mantener Fb bloqueada
+    setCustomFb(Number(targetFb.toFixed(1)));
+    setCustomPorted(true);
+
+    if (portShape === 'rectangular') {
+      const areaEach = Math.PI * Math.pow(opt.diameter / 2, 2);
+      const maxSlotW = cabinetData?.valid && cabinetData.wInt > 4 ? cabinetData.wInt * 0.75 : opt.diameter * 1.8;
+      const wSlot = Number(Math.min(maxSlotW, Math.max(opt.diameter * 1.4, 6)).toFixed(1));
+      const hSlot = Number(Math.max(1.5, areaEach / wSlot).toFixed(1));
+      setPortWidth(wSlot);
+      setPortHeight(hSlot);
+    } else {
+      setPortShape('round');
+      setPortDiameter(opt.diameter);
+    }
   };
 
   const displayVal = (val: number | '', type: 'length' | 'length_small' | 'volume') => {
@@ -1354,6 +1470,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       onClick={() => {
                         setVentedAlignment('QB3');
                         setCustomPorted(false);
+                        setUseCustomPortLength(false);
                       }}
                       style={{ padding: '0.28rem 0.2rem', fontSize: '0.68rem', textAlign: 'center' }}
                       title="Quasi-Butterworth 3: Máxima potencia y control de cono"
@@ -1366,6 +1483,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       onClick={() => {
                         setVentedAlignment('B4');
                         setCustomPorted(false);
+                        setUseCustomPortLength(false);
                       }}
                       style={{ padding: '0.28rem 0.2rem', fontSize: '0.68rem', textAlign: 'center' }}
                       title="Butterworth B4: Respuesta máximamente plana (Hi-Fi)"
@@ -1378,6 +1496,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       onClick={() => {
                         setVentedAlignment('SBB4');
                         setCustomPorted(false);
+                        setUseCustomPortLength(false);
                       }}
                       style={{ padding: '0.28rem 0.2rem', fontSize: '0.68rem', textAlign: 'center' }}
                       title="Super Boom Box 4: Máxima extensión de subgraves profundos"
@@ -1385,6 +1504,18 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       Ext. Bass (SBB4)
                     </button>
                   </div>
+                  {params.fs && params.qts && (
+                    <div style={{ fontSize: '0.64rem', color: 'var(--text-muted)', marginTop: '0.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>
+                        🎯 {t("Sugerida")}: <strong style={{ color: 'var(--accent)' }}>{recommendedAlignment === 'B4' ? 'Hi-Fi (B4)' : recommendedAlignment === 'QB3' ? 'High Output (QB3)' : 'Ext. Bass (SBB4)'}</strong> (Qts: {params.qts.toFixed(2)})
+                      </span>
+                      {recommendedFbForDriver > 0 && (
+                        <span>
+                          Fb óptima: <strong style={{ color: 'var(--accent)' }}>{recommendedFbForDriver.toFixed(1)} Hz</strong>
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1401,14 +1532,35 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                         setCustomPorted(true);
                       }}
                       disabled={isLinkedToCabinet}
-                      step="any"
+                      step="0.1"
                     />
                     <span className="unit-badge">{getUnitLabel('volume', unitSystem)}</span>
                   </div>
                 </div>
 
                 <div className="input-group">
-                  <label>{boxType === 'bandpass' ? t("Sintonía Frontal (Fb)") : t("Sintonía (Fb)")}</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.15rem' }}>
+                    <label style={{ margin: 0 }}>{boxType === 'bandpass' ? t("Sintonía Frontal (Fb)") : t("Sintonía (Fb)")}</label>
+                    {recommendedFbForDriver > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleApplyOptimalFb}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--accent)',
+                          fontSize: '0.66rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          padding: 0,
+                          textDecoration: 'underline'
+                        }}
+                        title={`Ajustar a la sintonía óptima recomendada para este altavoz (${recommendedFbForDriver.toFixed(1)} Hz)`}
+                      >
+                        ⚡ {t("Fb Óptima")}: {recommendedFbForDriver.toFixed(1)} Hz
+                      </button>
+                    )}
+                  </div>
                   <div className="input-wrapper">
                     <input
                       type="number"
@@ -1417,10 +1569,18 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                         setCustomFb(parseFloat(e.target.value) || 0);
                         setCustomPorted(true);
                       }}
-                      step="any"
+                      step="0.1"
                     />
                     <span className="unit-badge">Hz</span>
                   </div>
+                  {recommendedFbForDriver > 0 && (
+                    <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                      {params.qts && params.qts >= 0.45 
+                        ? `💡 Sugerida: ${recommendedFbForDriver.toFixed(1)} Hz (cerca de Fs por tener Qts=${params.qts.toFixed(2)} para evitar jorobas)`
+                        : `💡 Sugerida según altavoz y alineación: ${recommendedFbForDriver.toFixed(1)} Hz`
+                      }
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1469,7 +1629,28 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
 
             {boxType === 'ported' && (
               <div className="premium-form-card">
-                <div className="form-subsection-title" style={{ marginTop: 0 }}>{t("Configuración del Puerto")}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem' }}>
+                  <div className="form-subsection-title" style={{ margin: 0 }}>{t("Configuración del Puerto")}</div>
+                  {prTuning === 'port' && (
+                    <button
+                      type="button"
+                      onClick={handleApplyOptimalPort}
+                      style={{
+                        background: 'var(--accent)',
+                        color: '#ffffff',
+                        border: 'none',
+                        padding: '0.22rem 0.55rem',
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        borderRadius: '4px',
+                      }}
+                      title={t("Calcula cantidad y diámetro de puerto para flujo silencioso (< 10 m/s) que quepa en la profundidad de la caja")}
+                    >
+                      {t("Puerto Óptimo (Sin Soplido)")}
+                    </button>
+                  )}
+                </div>
                 <div className="input-group" style={{ marginBottom: '0.75rem' }}>
                   <label>{t("Sintonización mediante")}</label>
                   <div className="segmented-control" style={{ padding: '2px', borderRadius: '0px' }}>
@@ -1516,6 +1697,18 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       </div>
                     </div>
 
+                    <div style={{ fontSize: '0.67rem', marginBottom: '0.45rem', padding: '0.25rem 0.45rem', borderRadius: '4px', background: !useCustomPortLength ? 'rgba(52, 211, 153, 0.08)' : 'rgba(251, 191, 36, 0.08)', border: `1px solid ${!useCustomPortLength ? 'rgba(52, 211, 153, 0.25)' : 'rgba(251, 191, 36, 0.25)'}` }}>
+                      {!useCustomPortLength ? (
+                        <span style={{ color: '#34d399', fontWeight: 600 }}>
+                          🔒 {t("Sintonía bloqueada en")} {(portedData.valid ? portedData.Fb : customFb).toFixed(1)} Hz — {t("La longitud se recalcula al modificar decimales de diámetro o cantidad.")}
+                        </span>
+                      ) : (
+                        <span style={{ color: '#fbbf24', fontWeight: 600 }}>
+                          📏 {t("Longitud personalizada activa — La sintonía (Fb) cambia según la medida del tubo.")}
+                        </span>
+                      )}
+                    </div>
+
                     <div style={{ display: 'grid', gridTemplateColumns: portShape === 'rectangular' ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr', gap: '0.45rem', marginBottom: '0.5rem' }}>
                       <div className="input-group">
                         <label>{t("Cantidad")}</label>
@@ -1524,6 +1717,9 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                             type="number"
                             value={portCount}
                             onChange={(e) => handlePortCountChange(e.target.value)}
+                            min={1}
+                            max={6}
+                            step="1"
                           />
                         </div>
                       </div>
@@ -1537,7 +1733,8 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                                 type="number"
                                 value={portDiameter}
                                 onChange={(e) => setPortDiameter(e.target.value === '' ? '' : Math.max(0.1, parseFloat(e.target.value) || 0))}
-                                step="any"
+                                step="0.1"
+                                min={1}
                               />
                               <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                             </div>
@@ -1550,14 +1747,14 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                                   type="number"
                                   value={displayVal(customPortLength, 'length')}
                                   onChange={(e) => handleInputChange(e.target.value, setCustomPortLength, 'length')}
-                                  step="any"
+                                  step="0.1"
                                   placeholder="Auto"
                                 />
                                 <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                               </div>
                             ) : (
                               <div className="input-wrapper">
-                                <input type="text" value={portLength} disabled style={{ background: 'rgba(255,255,255,0.03)' }} />
+                                <input type="text" value={portLength} disabled style={{ background: 'rgba(255,255,255,0.03)', fontWeight: 600, color: 'var(--text-main)' }} />
                               </div>
                             )}
                           </div>
@@ -1571,7 +1768,8 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                                   type="number"
                                   value={portWidth}
                                   onChange={(e) => setPortWidth(e.target.value === '' ? '' : Math.max(0.1, parseFloat(e.target.value) || 0))}
-                                  step="any"
+                                  step="0.1"
+                                  min={1}
                               />
                               <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                             </div>
@@ -1583,7 +1781,8 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                                   type="number"
                                   value={portHeight}
                                   onChange={(e) => setPortHeight(e.target.value === '' ? '' : Math.max(0.1, parseFloat(e.target.value) || 0))}
-                                  step="any"
+                                  step="0.1"
+                                  min={1}
                               />
                               <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                             </div>
@@ -1596,14 +1795,14 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                                   type="number"
                                   value={displayVal(customPortLength, 'length')}
                                   onChange={(e) => handleInputChange(e.target.value, setCustomPortLength, 'length')}
-                                  step="any"
+                                  step="0.1"
                                   placeholder="Auto"
                                 />
                                 <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                               </div>
                             ) : (
                               <div className="input-wrapper">
-                                <input type="text" value={portLength} disabled style={{ background: 'rgba(255,255,255,0.03)' }} />
+                                <input type="text" value={portLength} disabled style={{ background: 'rgba(255,255,255,0.03)', fontWeight: 600, color: 'var(--text-main)' }} />
                               </div>
                             )}
                           </div>
@@ -1650,18 +1849,47 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                           </div>
                           <span className="port-end-opt-desc">{t("Ambos adosados")}</span>
                         </button>
-                        <button
-                          type="button"
-                          className={`port-end-opt ${flaredEnds === 2 ? 'active' : ''}`}
-                          onClick={() => setFlaredEnds(2)}
-                          style={{ gridColumn: 'span 2' }}
+                        <div
+                          role="group"
+                          aria-label={t("Abocinado (Aeroport / Flared)")}
+                          className={`port-end-opt ${flaredEnds === 2 || flaredEnds === 3 ? 'active' : ''}`}
+                          onClick={() => {
+                            if (flaredEnds !== 2 && flaredEnds !== 3) {
+                              setFlaredEnds(2);
+                            }
+                          }}
+                          style={{ gridColumn: 'span 2', cursor: 'pointer' }}
                         >
                           <div className="port-end-opt-title">
                             <span>{t("Abocinado (Aeroport / Flared)")}</span>
-                            <span style={{ fontSize: '0.62rem', color: 'var(--accent)' }}>k = 0.968</span>
+                            <span style={{ fontSize: '0.62rem', color: 'var(--accent)' }}>
+                              {flaredEnds === 3 ? 'k = 0.850' : flaredEnds === 2 ? 'k = 0.968' : 'k = 0.850 / 0.968'}
+                            </span>
                           </div>
                           <span className="port-end-opt-desc">{t("Extremos redondeados con perfil cónico anti-turbulencias")}</span>
-                        </button>
+                          <div
+                            className="segmented-control segmented-control-mini"
+                            style={{ marginTop: '0.4rem', width: '100%' }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              type="button"
+                              className={flaredEnds === 3 ? 'active' : ''}
+                              onClick={() => setFlaredEnds(3)}
+                              style={{ fontSize: '0.66rem', padding: '0.22rem 0.35rem' }}
+                            >
+                              {t("1 Extremo")} (k = 0.850)
+                            </button>
+                            <button
+                              type="button"
+                              className={flaredEnds === 2 ? 'active' : ''}
+                              onClick={() => setFlaredEnds(2)}
+                              style={{ fontSize: '0.66rem', padding: '0.22rem 0.35rem' }}
+                            >
+                              {t("2 Extremos")} (k = 0.968)
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
@@ -1679,15 +1907,36 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                         }}
                       />
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 700, letterSpacing: '0.02em' }}>
-                          {vPeak !== null 
-                            ? (vPeak < 10 
-                                ? `${t("Flujo silencioso")}: ${vPeak.toFixed(1)} m/s` 
-                                : vPeak <= 17 
-                                  ? `${t("Velocidad moderada")}: ${vPeak.toFixed(1)} m/s` 
-                                  : `${t("¡Turbulencia Crítica (Chuffing)!")}: ${vPeak.toFixed(1)} m/s`)
-                            : t("Ingresa Sd y Xmax para calcular velocidad")
-                          }
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.4rem' }}>
+                          <span style={{ fontWeight: 700, letterSpacing: '0.02em' }}>
+                            {vPeak !== null 
+                              ? (vPeak < 10 
+                                  ? `${t("Flujo silencioso")}: ${vPeak.toFixed(1)} m/s` 
+                                  : vPeak <= 17 
+                                    ? `${t("Velocidad moderada")}: ${vPeak.toFixed(1)} m/s` 
+                                    : `${t("¡Turbulencia Crítica (Chuffing)!")}: ${vPeak.toFixed(1)} m/s`)
+                              : t("Ingresa Sd y Xmax para calcular velocidad")
+                            }
+                          </span>
+                          {vPeak !== null && vPeak >= 10 && (
+                            <button
+                              type="button"
+                              onClick={handleApplyOptimalPort}
+                              style={{
+                                background: 'var(--accent)',
+                                color: '#fff',
+                                border: 'none',
+                                padding: '0.15rem 0.45rem',
+                                fontSize: '0.64rem',
+                                fontWeight: 700,
+                                borderRadius: '3px',
+                                cursor: 'pointer',
+                                flexShrink: 0,
+                              }}
+                            >
+                              {t("Corregir Soplido")}
+                            </button>
+                          )}
                         </div>
                         <div style={{ fontSize: '0.64rem', opacity: 0.85 }}>
                           {vPeak !== null 
@@ -1705,20 +1954,36 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     {/* Sugerencias Comerciales de Puerto */}
                     {suggestions && 'options' in suggestions && suggestions.options && suggestions.options.length > 0 && (
                       <div style={{ marginTop: '0.65rem', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--card-border)', borderRadius: '6px', padding: '0.5rem' }}>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '0.35rem' }}>{t("SUGERENCIAS DE PUERTOS")}:</span>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '0.35rem' }}>{t("SUGERENCIAS DE PUERTOS (ANTI-SOPLIDO)")}:</span>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
                           {suggestions.options.map((s: { numPorts: number; diameter: number; length: number }, idx: number) => {
                             const displayOptDia = convertTo(s.diameter, 'length', unitSystem);
                             const displayOptLen = convertTo(s.length, 'length', unitSystem);
                             const unitLabel = getUnitLabel('length', unitSystem);
+                            const optVel = (params.sd && params.xmax && portedData.Fb > 0)
+                              ? (0.008 * portedData.Fb * params.sd * params.xmax) / (s.numPorts * s.diameter * s.diameter)
+                              : null;
+                            const fitsDepth = !cabinetData?.valid || s.length <= (cabinetData.dInt - 2.5);
                             return (
-                              <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.74rem' }}>
-                                <span>{s.numPorts}x Ø {displayOptDia.toFixed(1)} {unitLabel} (L: {displayOptLen.toFixed(1)} {unitLabel})</span>
+                              <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', gap: '0.35rem' }}>
+                                <span>
+                                  <strong>{s.numPorts}x Ø {displayOptDia.toFixed(1)} {unitLabel}</strong> (L: {displayOptLen.toFixed(1)} {unitLabel})
+                                  {optVel !== null && (
+                                    <span style={{ marginLeft: '0.35rem', fontSize: '0.65rem', color: optVel < 10 ? '#34d399' : optVel <= 17 ? '#fbbf24' : '#f87171', fontWeight: 600 }}>
+                                      • {optVel.toFixed(1)} m/s
+                                    </span>
+                                  )}
+                                  {!fitsDepth && (
+                                    <span style={{ marginLeft: '0.3rem', fontSize: '0.62rem', color: '#f87171' }}>
+                                      ({t("Excede prof.")})
+                                    </span>
+                                  )}
+                                </span>
                                 <button
                                   type="button"
                                   onClick={() => handleApplyPort(s.numPorts, s.diameter)}
                                   className="preset-select"
-                                  style={{ padding: '0.15rem 0.45rem', fontSize: '0.68rem', cursor: 'pointer' }}
+                                  style={{ padding: '0.15rem 0.45rem', fontSize: '0.68rem', cursor: 'pointer', flexShrink: 0 }}
                                 >
                                   {t("Aplicar")}
                                 </button>
@@ -1751,12 +2016,12 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                         </div>
                       </div>
 
-                      <div className="input-group" style={{ marginBottom: '0.25rem' }}>
+                      <div className="input-group" style={{ marginBottom: '0.75rem', paddingBottom: '0.35rem' }}>
                         <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem' }}>
                           <span>{t("Posición Vertical Puerto(s)")}</span>
                           <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{portYPct}%</span>
                         </label>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
                           <input
                             type="range"
                             min="15"
@@ -1784,7 +2049,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       <div className="input-group">
                         <label>{t("Vas PR")}</label>
                         <div className="input-wrapper">
-                          <input type="number" value={prVas} onChange={(e) => setPrVas(parseFloat(e.target.value) || 0)} step="any" />
+                          <input type="number" value={prVas} onChange={(e) => setPrVas(parseFloat(e.target.value) || 0)} step="0.1" />
                           <span className="unit-badge">L</span>
                         </div>
                       </div>
@@ -1793,7 +2058,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       <div className="input-group">
                         <label>{t("Fs PR")}</label>
                         <div className="input-wrapper">
-                          <input type="number" value={prFs} onChange={(e) => setPrFs(parseFloat(e.target.value) || 0)} step="any" />
+                          <input type="number" value={prFs} onChange={(e) => setPrFs(parseFloat(e.target.value) || 0)} step="0.1" />
                           <span className="unit-badge">Hz</span>
                         </div>
                       </div>
