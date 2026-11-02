@@ -30,6 +30,8 @@ interface CabinetCad2DProps {
   portLocation?: 'front' | 'rear';
   bandpassOrder?: 4 | 6;
   bandpassRatio?: number;
+  bandpassVf?: number;
+  bandpassVr?: number;
   dampingType?: 'none' | 'light' | 'moderate' | 'heavy';
   onOpen3DModal: () => void;
 }
@@ -59,7 +61,10 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
   driverDepth,
   portYPct = 85,
   portLocation = 'front',
+  bandpassOrder = 4,
   bandpassRatio = 0.5,
+  bandpassVf,
+  bandpassVr,
   dampingType = 'none',
   onOpen3DModal,
 }) => {
@@ -100,6 +105,7 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
   const [showDimensions, setShowDimensions] = useState<boolean>(true);
 
   const uLabel = getUnitLabel('length', unitSystem);
+  const vLabel = getUnitLabel('volume', unitSystem);
 
   // Dimensions in cm
   const wExt = cabinetData?.wExt || 35;
@@ -505,49 +511,83 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
       ctx.setLineDash([]);
     }
 
-    // 3. Woofer Outer Ring, Baffle Cutout Ring & Cone
-    ctx.strokeStyle = isLight ? (isBandpass ? '#94a3b8' : '#0f172a') : (isBandpass ? '#64748b' : '#38bdf8');
-    ctx.lineWidth = 1.2 / zoom;
-    ctx.beginPath();
-    ctx.arc(wooferCenterX, wooferCenterY, wooferRadius, 0, Math.PI * 2);
-    ctx.stroke();
+    if (!isBandpass) {
+      // 3. Woofer en Bafle Frontal (Caja Sellada / Ventilada Estándar)
+      ctx.strokeStyle = isLight ? '#0f172a' : '#38bdf8';
+      ctx.lineWidth = 1.2 / zoom;
+      ctx.beginPath();
+      ctx.arc(wooferCenterX, wooferCenterY, wooferRadius, 0, Math.PI * 2);
+      ctx.stroke();
 
-    // Dashed Baffle Hole Cutout Circle (if baffleCutout is defined)
-    if (baffleCutout && baffleCutout > 0) {
-      ctx.save();
+      // Calado del bafle frontal
+      if (baffleCutout && baffleCutout > 0) {
+        ctx.save();
+        ctx.strokeStyle = isLight ? '#059669' : '#10b981';
+        ctx.lineWidth = 0.75 / zoom;
+        ctx.setLineDash([1.2, 0.8]);
+        ctx.beginPath();
+        ctx.arc(wooferCenterX, wooferCenterY, wooferCutoutRadius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Suspensión perimetral y guardapolvo
+      ctx.strokeStyle = isLight ? '#0284c7' : '#0284c7';
+      ctx.lineWidth = 0.8 / zoom;
+      ctx.beginPath();
+      ctx.arc(wooferCenterX, wooferCenterY, wooferRadius * 0.82, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(wooferCenterX, wooferCenterY, wooferRadius * 0.28, 0, Math.PI * 2);
+      ctx.fillStyle = isLight ? 'rgba(2, 132, 199, 0.15)' : 'rgba(56, 189, 248, 0.12)';
+      ctx.fill();
+      ctx.stroke();
+
+      // Cruz de centrado del woofer
       ctx.strokeStyle = isLight ? '#059669' : '#10b981';
-      ctx.lineWidth = 0.75 / zoom;
-      ctx.setLineDash([1.2, 0.8]);
+      ctx.lineWidth = 0.7 / zoom;
+      ctx.setLineDash([2, 0.8, 0.5, 0.8]);
+      ctx.beginPath();
+      ctx.moveTo(wooferCenterX - wooferRadius - 2, wooferCenterY);
+      ctx.lineTo(wooferCenterX + wooferRadius + 2, wooferCenterY);
+      ctx.moveTo(wooferCenterX, wooferCenterY - wooferRadius - 2);
+      ctx.lineTo(wooferCenterX, wooferCenterY + wooferRadius + 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    } else {
+      // Caja Paso Banda: El woofer está montado en el tabique interior (Proyección Oculta ISO)
+      ctx.save();
+      ctx.strokeStyle = isLight ? '#64748b' : '#38bdf8';
+      ctx.lineWidth = 0.85 / zoom;
+      ctx.setLineDash([1.4, 0.9]);
+
+      // Aro exterior del chasis en tabique
+      ctx.beginPath();
+      ctx.arc(wooferCenterX, wooferCenterY, wooferRadius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Calado circular en el tabique
+      ctx.strokeStyle = isLight ? '#059669' : '#10b981';
       ctx.beginPath();
       ctx.arc(wooferCenterX, wooferCenterY, wooferCutoutRadius, 0, Math.PI * 2);
       ctx.stroke();
+
+      // Cruz de centrado
+      ctx.beginPath();
+      ctx.moveTo(wooferCenterX - wooferRadius - 1.5, wooferCenterY);
+      ctx.lineTo(wooferCenterX + wooferRadius + 1.5, wooferCenterY);
+      ctx.moveTo(wooferCenterX, wooferCenterY - wooferRadius - 1.5);
+      ctx.lineTo(wooferCenterX, wooferCenterY + wooferRadius + 1.5);
+      ctx.stroke();
+
+      // Rótulo técnico de proyección oculta
+      ctx.font = `bold ${Math.max(7.5 / zoom, 2.0)}px monospace`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = isLight ? '#0369a1' : '#38bdf8';
+      ctx.fillText(t("[WOOFER EN TABIQUE INTERIOR]"), wooferCenterX, wooferCenterY - wooferRadius - 1.4);
       ctx.restore();
     }
-
-    // Cone suspension & Dustcap
-    ctx.strokeStyle = isLight ? '#0284c7' : '#0284c7';
-    ctx.lineWidth = 0.8 / zoom;
-    ctx.beginPath();
-    ctx.arc(wooferCenterX, wooferCenterY, wooferRadius * 0.82, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.arc(wooferCenterX, wooferCenterY, wooferRadius * 0.28, 0, Math.PI * 2);
-    ctx.fillStyle = isLight ? 'rgba(2, 132, 199, 0.15)' : 'rgba(56, 189, 248, 0.12)';
-    ctx.fill();
-    ctx.stroke();
-
-    // Center Crosshairs for Woofer
-    ctx.strokeStyle = isLight ? '#059669' : '#10b981';
-    ctx.lineWidth = 0.7 / zoom;
-    ctx.setLineDash([2, 0.8, 0.5, 0.8]);
-    ctx.beginPath();
-    ctx.moveTo(wooferCenterX - wooferRadius - 2, wooferCenterY);
-    ctx.lineTo(wooferCenterX + wooferRadius + 2, wooferCenterY);
-    ctx.moveTo(wooferCenterX, wooferCenterY - wooferRadius - 2);
-    ctx.lineTo(wooferCenterX, wooferCenterY + wooferRadius + 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
 
     // Port on Front Baffle (or projected dashed if mounted on Rear Panel)
     const portCenterY = topY + thickness + (portYPct / 100) * innerH;
@@ -786,30 +826,355 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
     const spkDepth = driverDepth && driverDepth > 0
       ? Math.min(driverDepth / 10, sW - 2 * thickness - 1)
       : Math.min(sW * 0.45, 16);
-    ctx.strokeStyle = isLight ? '#0369a1' : '#38bdf8';
-    ctx.lineWidth = 1.1 / zoom;
-    ctx.fillStyle = isLight ? 'rgba(2, 132, 199, 0.12)' : 'rgba(2, 132, 199, 0.15)';
 
-    // Woofer Cone & Chassis Side Profile
-    ctx.beginPath();
-    ctx.moveTo(baffleX, wooferCenterY - wooferRadius * 0.85);
-    ctx.lineTo(baffleX - spkDepth * 0.6, wooferCenterY - wooferRadius * 0.35);
-    ctx.lineTo(baffleX - spkDepth, wooferCenterY - wooferRadius * 0.35);
-    ctx.lineTo(baffleX - spkDepth, wooferCenterY + wooferRadius * 0.35);
-    ctx.lineTo(baffleX - spkDepth * 0.6, wooferCenterY + wooferRadius * 0.35);
-    ctx.lineTo(baffleX, wooferCenterY + wooferRadius * 0.85);
-    ctx.stroke();
+    const vrRatio = Math.max(0.12, Math.min(0.88, Number(bandpassRatio) || 0.5));
+    const innerDepth = sW - 2 * thickness;
+    const netDepth = Math.max(innerDepth - thickness, 5);
+    const depthRear = netDepth * vrRatio;
+    const depthFront = netDepth * (1 - vrRatio);
+    const divX = sX + thickness + depthRear;
+    const isDriverInverted = isBandpass && (depthRear < spkDepth + 1.5) && (depthFront > depthRear) && (depthFront >= spkDepth + 1.0);
 
-    // Magnet Cylinder inside Profile
-    ctx.fillStyle = isLight ? '#cbd5e1' : '#1e3a5f';
-    ctx.fillRect(baffleX - spkDepth, wooferCenterY - wooferRadius * 0.35, spkDepth * 0.4, wooferRadius * 0.7);
-    ctx.strokeStyle = isLight ? '#64748b' : '#38bdf8';
-    ctx.strokeRect(baffleX - spkDepth, wooferCenterY - wooferRadius * 0.35, spkDepth * 0.4, wooferRadius * 0.7);
+    // Función técnica para dibujar el corte lateral realista de un altavoz electroacústico (Woofer)
+    const drawRealisticWooferProfile = (
+      mountX: number,
+      cy: number,
+      rOuter: number,
+      rCutout: number,
+      depth: number,
+      direction: 'right' | 'left'
+    ) => {
+      const sgn = direction === 'right' ? 1 : -1;
+      ctx.save();
+
+      // Proporciones mecánicas estándar de transductores profesionales
+      const flangeThick = 0.42;
+      const rConeOuter = rCutout * 0.78;
+      const rVc = rOuter * 0.20;
+      const rDustCap = rVc * 1.35;
+      const rSpider = rOuter * 0.42;
+      const rMagnet = rOuter * 0.50;
+      const rGapIn = rVc - 0.14;
+      const rGapOut = rVc + 0.14;
+      const rVent = rOuter * 0.08;
+
+      const uApex = depth * 0.32;
+      const uSpider = depth * 0.38;
+      const uTopPlate = depth * 0.52;
+      const uMagnet = depth * 0.62;
+      const uBackPlate = depth * 0.86;
+      const uEnd = depth * 1.00;
+
+      const xApex = mountX - sgn * uApex;
+      const xSpider = mountX - sgn * uSpider;
+      const xTopPlate = mountX - sgn * uTopPlate;
+      const xMagnet = mountX - sgn * uMagnet;
+      const xBackPlate = mountX - sgn * uBackPlate;
+      const xRear = mountX - sgn * uEnd;
+
+      // Paleta cromática técnico-arquitectónica
+      const strokeMetal = isLight ? '#475569' : '#94a3b8';
+      const fillSteel = isLight ? '#cbd5e1' : '#334155';
+      const fillMagnet = isLight ? '#334155' : '#0f172a';
+      const strokeMagnet = isLight ? '#1e293b' : '#38bdf8';
+      const strokeCone = isLight ? '#0f172a' : '#38bdf8';
+      const fillCone = isLight ? 'rgba(15, 23, 42, 0.18)' : 'rgba(56, 189, 248, 0.12)';
+      const strokeSurround = isLight ? '#1e293b' : '#0284c7';
+      const fillSurround = isLight ? 'rgba(30, 41, 59, 0.45)' : 'rgba(14, 165, 233, 0.25)';
+      const strokeSpider = isLight ? '#d97706' : '#fbbf24';
+      const fillCopper = isLight ? '#ea580c' : '#f97316';
+
+      // 1. MOTOR ASSEMBLY (Placa superior, Imán, Culata y Núcleo Polar)
+      // 1.1 Placa Superior (Top Plate)
+      ctx.fillStyle = fillSteel;
+      ctx.strokeStyle = strokeMetal;
+      ctx.lineWidth = 1.0 / zoom;
+      const topPlateW = Math.abs(xTopPlate - xMagnet);
+      const topPlateLeft = Math.min(xTopPlate, xMagnet);
+      ctx.fillRect(topPlateLeft, cy - rMagnet, topPlateW, rMagnet - rGapOut);
+      ctx.strokeRect(topPlateLeft, cy - rMagnet, topPlateW, rMagnet - rGapOut);
+      ctx.fillRect(topPlateLeft, cy + rGapOut, topPlateW, rMagnet - rGapOut);
+      ctx.strokeRect(topPlateLeft, cy + rGapOut, topPlateW, rMagnet - rGapOut);
+
+      // 1.2 Imán Cerámico de Ferrita
+      const magW = Math.abs(xMagnet - xBackPlate);
+      const magLeft = Math.min(xMagnet, xBackPlate);
+      ctx.fillStyle = fillMagnet;
+      ctx.strokeStyle = strokeMagnet;
+      ctx.fillRect(magLeft, cy - rMagnet, magW, rMagnet - (rGapOut + 0.35));
+      ctx.strokeRect(magLeft, cy - rMagnet, magW, rMagnet - (rGapOut + 0.35));
+      ctx.fillRect(magLeft, cy + (rGapOut + 0.35), magW, rMagnet - (rGapOut + 0.35));
+      ctx.strokeRect(magLeft, cy + (rGapOut + 0.35), magW, rMagnet - (rGapOut + 0.35));
+
+      // 1.3 Placa Trasera y Culata (Back Plate & T-Yoke)
+      const bpW = Math.abs(xBackPlate - xRear);
+      const bpLeft = Math.min(xBackPlate, xRear);
+      ctx.fillStyle = fillSteel;
+      ctx.strokeStyle = strokeMetal;
+      ctx.fillRect(bpLeft, cy - rMagnet, bpW, rMagnet - rVent);
+      ctx.strokeRect(bpLeft, cy - rMagnet, bpW, rMagnet - rVent);
+      ctx.fillRect(bpLeft, cy + rVent, bpW, rMagnet - rVent);
+      ctx.strokeRect(bpLeft, cy + rVent, bpW, rMagnet - rVent);
+
+      // Culata abombada anti-tope en el centro
+      const bumpW = Math.max(0.25, bpW * 0.35);
+      const bumpLeft = sgn === 1 ? (bpLeft - bumpW) : (bpLeft + bpW);
+      ctx.fillRect(Math.min(bumpLeft, bpLeft), cy - rVc * 1.35, bumpW, rVc * 2.7);
+      ctx.strokeRect(Math.min(bumpLeft, bpLeft), cy - rVc * 1.35, bumpW, rVc * 2.7);
+
+      // Núcleo polar central (Pole Piece)
+      const poleW = Math.abs(xTopPlate - xBackPlate);
+      const poleLeft = Math.min(xTopPlate, xBackPlate);
+      ctx.fillRect(poleLeft, cy - rGapIn, poleW, rGapIn - rVent);
+      ctx.strokeRect(poleLeft, cy - rGapIn, poleW, rGapIn - rVent);
+      ctx.fillRect(poleLeft, cy + rVent, poleW, rGapIn - rVent);
+      ctx.strokeRect(poleLeft, cy + rVent, poleW, rGapIn - rVent);
+
+      // Orificio de ventilación polar central (eje X)
+      ctx.save();
+      ctx.strokeStyle = isLight ? 'rgba(100, 116, 139, 0.45)' : 'rgba(56, 189, 248, 0.35)';
+      ctx.setLineDash([1.4 / zoom, 1.0 / zoom]);
+      ctx.lineWidth = 0.8 / zoom;
+      ctx.beginPath();
+      ctx.moveTo(xRear - sgn * bumpW, cy);
+      ctx.lineTo(xTopPlate, cy);
+      ctx.stroke();
+      ctx.restore();
+
+      // 2. BOBINA MÓVIL Y DEVANADO DE COBRE
+      const xCoilEnd = xMagnet - sgn * (magW * 0.75);
+      ctx.strokeStyle = strokeMetal;
+      ctx.lineWidth = 1.0 / zoom;
+      ctx.beginPath();
+      ctx.moveTo(xApex, cy - rVc);
+      ctx.lineTo(xCoilEnd, cy - rVc);
+      ctx.moveTo(xApex, cy + rVc);
+      ctx.lineTo(xCoilEnd, cy + rVc);
+      ctx.stroke();
+
+      const coilW = magW * 0.65;
+      const coilLeft = Math.min(xTopPlate, xTopPlate - sgn * coilW);
+      ctx.fillStyle = fillCopper;
+      ctx.strokeStyle = fillCopper;
+      ctx.fillRect(coilLeft, cy - rVc - 0.08, coilW, 0.16);
+      ctx.strokeRect(coilLeft, cy - rVc - 0.08, coilW, 0.16);
+      ctx.fillRect(coilLeft, cy + rVc - 0.08, coilW, 0.16);
+      ctx.strokeRect(coilLeft, cy + rVc - 0.08, coilW, 0.16);
+
+      // 3. CANASTA / CHASIS METÁLICO (Basket Arms)
+      ctx.strokeStyle = strokeMetal;
+      ctx.lineWidth = 1.2 / zoom;
+      ctx.beginPath();
+      ctx.moveTo(mountX, cy - rCutout);
+      ctx.lineTo(xTopPlate, cy - rMagnet);
+      ctx.lineTo(xTopPlate + sgn * 0.3, cy - rMagnet);
+      ctx.lineTo(mountX, cy - (rCutout - 0.28));
+
+      ctx.moveTo(mountX, cy + rCutout);
+      ctx.lineTo(xTopPlate, cy + rMagnet);
+      ctx.lineTo(xTopPlate + sgn * 0.3, cy + rMagnet);
+      ctx.lineTo(mountX, cy + (rCutout - 0.28));
+      ctx.stroke();
+
+      // 4. ARAÑA CENTRADORA CORRUGADA (Spider Damper)
+      ctx.strokeStyle = strokeSpider;
+      ctx.lineWidth = 1.1 / zoom;
+      const spiderSteps = 6;
+      ctx.beginPath();
+      for (let s = 0; s <= spiderSteps; s++) {
+        const frac = s / spiderSteps;
+        const sy = (cy - rVc) - frac * (rSpider - rVc);
+        const wave = (s % 2 === 1 ? 0.22 : -0.22) * sgn;
+        const sx = (xApex - sgn * 0.2) + frac * (xSpider - xApex) + wave;
+        if (s === 0) ctx.moveTo(sx, sy);
+        else ctx.lineTo(sx, sy);
+      }
+      ctx.stroke();
+
+      ctx.beginPath();
+      for (let s = 0; s <= spiderSteps; s++) {
+        const frac = s / spiderSteps;
+        const sy = (cy + rVc) + frac * (rSpider - rVc);
+        const wave = (s % 2 === 1 ? 0.22 : -0.22) * sgn;
+        const sx = (xApex - sgn * 0.2) + frac * (xSpider - xApex) + wave;
+        if (s === 0) ctx.moveTo(sx, sy);
+        else ctx.lineTo(sx, sy);
+      }
+      ctx.stroke();
+
+      // 5. CONO EXPONENCIAL (Loudspeaker Cone)
+      const xConeBase = mountX + sgn * 0.12;
+      ctx.fillStyle = fillCone;
+      ctx.strokeStyle = strokeCone;
+      ctx.lineWidth = 1.2 / zoom;
+
+      // Cono superior
+      ctx.beginPath();
+      ctx.moveTo(xConeBase, cy - rConeOuter);
+      ctx.quadraticCurveTo(mountX - sgn * (uApex * 0.2), cy - (rConeOuter * 0.52 + rVc * 0.48), xApex, cy - rVc);
+      ctx.lineTo(xApex, cy - rVc + 0.12);
+      ctx.quadraticCurveTo(mountX - sgn * (uApex * 0.2), cy - (rConeOuter * 0.52 + rVc * 0.48) + 0.12, xConeBase, cy - rConeOuter + 0.12);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Cono inferior
+      ctx.beginPath();
+      ctx.moveTo(xConeBase, cy + rConeOuter);
+      ctx.quadraticCurveTo(mountX - sgn * (uApex * 0.2), cy + (rConeOuter * 0.52 + rVc * 0.48), xApex, cy + rVc);
+      ctx.lineTo(xApex, cy + rVc - 0.12);
+      ctx.quadraticCurveTo(mountX - sgn * (uApex * 0.2), cy + (rConeOuter * 0.52 + rVc * 0.48) - 0.12, xConeBase, cy + rConeOuter - 0.12);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // 6. CÚPULA CUBREPOLVO CENTRAL (Dust Cap Dome)
+      const domeH = rDustCap * 0.58;
+      ctx.fillStyle = fillCone;
+      ctx.strokeStyle = strokeCone;
+      ctx.beginPath();
+      ctx.moveTo(xApex, cy - rDustCap);
+      ctx.quadraticCurveTo(xApex + sgn * domeH, cy, xApex, cy + rDustCap);
+      ctx.stroke();
+
+      // 7. SUSPENSIÓN PERIMETRAL DE MEDIO ROLLO (Half-roll Surround)
+      const rollR = (rCutout - rConeOuter) / 2;
+      const rollCenterYTop = cy - (rCutout + rConeOuter) / 2;
+      const rollCenterYBot = cy + (rCutout + rConeOuter) / 2;
+      ctx.fillStyle = fillSurround;
+      ctx.strokeStyle = strokeSurround;
+      ctx.lineWidth = 1.1 / zoom;
+
+      ctx.beginPath();
+      ctx.moveTo(mountX + sgn * 0.08, cy - rCutout);
+      ctx.quadraticCurveTo(mountX + sgn * (rollR * 1.5), rollCenterYTop, xConeBase, cy - rConeOuter);
+      ctx.quadraticCurveTo(mountX + sgn * (rollR * 1.2), rollCenterYTop, mountX + sgn * 0.08, cy - rCutout);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(mountX + sgn * 0.08, cy + rCutout);
+      ctx.quadraticCurveTo(mountX + sgn * (rollR * 1.5), rollCenterYBot, xConeBase, cy + rConeOuter);
+      ctx.quadraticCurveTo(mountX + sgn * (rollR * 1.2), rollCenterYBot, mountX + sgn * 0.08, cy + rCutout);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // 8. BRIDA DE FIJACIÓN Y JUNTA (Chassis Flange Rim)
+      const fLeft = sgn === 1 ? mountX : (mountX - flangeThick);
+      ctx.fillStyle = isLight ? '#94a3b8' : '#334155';
+      ctx.strokeStyle = strokeMetal;
+      ctx.lineWidth = 1.1 / zoom;
+
+      ctx.fillRect(fLeft, cy - rOuter, flangeThick, rOuter - rCutout);
+      ctx.strokeRect(fLeft, cy - rOuter, flangeThick, rOuter - rCutout);
+      ctx.fillRect(fLeft, cy + rCutout, flangeThick, rOuter - rCutout);
+      ctx.strokeRect(fLeft, cy + rCutout, flangeThick, rOuter - rCutout);
+
+      ctx.restore();
+    };
+
+    if (!isBandpass) {
+      // Woofer en Bafle Frontal (Direct Radiator): Disparo a la derecha (+X)
+      drawRealisticWooferProfile(baffleX, wooferCenterY, wooferRadius, wooferCutoutRadius, spkDepth, 'right');
+    } else {
+      // CAJA PASO BANDA: El woofer está montado en el tabique divisor intermedio (divX)
+      // 1. Delineación y tintado de las cámaras acústicas
+      // Cámara Trasera Vr (Izquierda)
+      ctx.fillStyle = isLight ? 'rgba(2, 132, 199, 0.05)' : 'rgba(2, 132, 199, 0.08)';
+      ctx.fillRect(sX + thickness, topY + thickness, depthRear, fH - 2 * thickness);
+
+      // Cámara Frontal Vf (Derecha)
+      ctx.fillStyle = isLight ? 'rgba(16, 185, 129, 0.05)' : 'rgba(16, 185, 129, 0.08)';
+      ctx.fillRect(divX + thickness, topY + thickness, depthFront, fH - 2 * thickness);
+
+      // Rótulos técnicos de cámaras Vr y Vf con escalonamiento vertical inteligente
+      const isNarrowChamber = depthRear < 14 || depthFront < 14;
+      const vrY = isNarrowChamber ? (topY + thickness + 2.3) : (topY + thickness + 2.6);
+      const vfY = isNarrowChamber ? (topY + thickness + 5.5) : (topY + thickness + 2.6);
+
+      const vrSub = depthRear < 10 
+        ? (bandpassOrder === 6 ? t("(Vent.)") : t("(Sell.)"))
+        : `(${bandpassOrder === 6 ? t("Ventilada") : t("Sellada")})`;
+      const vfSub = depthFront < 10 ? t("(Sint.)") : `(${t("Sintonizada")})`;
+
+      const vrCenterX = sX + thickness + depthRear / 2;
+      const vfCenterX = divX + thickness + depthFront / 2;
+
+      // Vr badge
+      ctx.fillStyle = isLight ? 'rgba(255, 255, 255, 0.75)' : 'rgba(7, 16, 30, 0.75)';
+      ctx.fillRect(vrCenterX - 2.8, vrY - 0.9, 5.6, 2.7);
+      ctx.fillStyle = isLight ? '#0284c7' : '#38bdf8';
+      ctx.font = `bold ${Math.max(7.5 / zoom, 2.0)}px monospace`;
+      ctx.textAlign = 'center';
+      ctx.fillText(`Vr: ${convertTo(bandpassVr || 0, 'volume', unitSystem).toFixed(1)} ${vLabel}`, vrCenterX, vrY);
+      ctx.font = `${Math.max(6.5 / zoom, 1.8)}px monospace`;
+      ctx.fillText(vrSub, vrCenterX, vrY + 1.4);
+
+      // Vf badge
+      ctx.fillStyle = isLight ? 'rgba(255, 255, 255, 0.75)' : 'rgba(7, 16, 30, 0.75)';
+      ctx.fillRect(vfCenterX - 2.8, vfY - 0.9, 5.6, 2.7);
+      ctx.fillStyle = isLight ? '#059669' : '#10b981';
+      ctx.font = `bold ${Math.max(7.5 / zoom, 2.0)}px monospace`;
+      ctx.textAlign = 'center';
+      ctx.fillText(`Vf: ${convertTo(bandpassVf || 0, 'volume', unitSystem).toFixed(1)} ${vLabel}`, vfCenterX, vfY);
+      ctx.font = `${Math.max(6.5 / zoom, 1.8)}px monospace`;
+      ctx.fillText(vfSub, vfCenterX, vfY + 1.4);
+
+      // 2. Tabique Divisor con calado pasante para el Woofer
+      ctx.strokeStyle = isLight ? '#059669' : '#10b981';
+      ctx.lineWidth = 1.1 / zoom;
+      const holeTop = wooferCenterY - wooferCutoutRadius;
+      const holeBot = wooferCenterY + wooferCutoutRadius;
+      if (holeTop > topY + thickness) {
+        ctx.strokeRect(divX, topY + thickness, thickness, holeTop - (topY + thickness));
+        hatchRect(divX, topY + thickness, thickness, holeTop - (topY + thickness));
+      }
+      if (botY - thickness > holeBot) {
+        ctx.strokeRect(divX, holeBot, thickness, (botY - thickness) - holeBot);
+        hatchRect(divX, holeBot, thickness, (botY - thickness) - holeBot);
+      }
+
+      // 3. Montaje del Woofer en el Tabique
+      if (!isDriverInverted) {
+        // MONTAJE ESTÁNDAR: Brida en la cara frontal del tabique (divX + thickness)
+        // Cono dispara a Vf (+X, derecha), conjunto motor alojado en Vr (-X, izquierda)
+        const mountX = divX + thickness;
+        drawRealisticWooferProfile(mountX, wooferCenterY, wooferRadius, wooferCutoutRadius, spkDepth, 'right');
+
+        // Despeje trasero en Vr (medido en zona libre superior del imán)
+        const rearClear = (mountX - spkDepth) - (sX + thickness);
+        if (rearClear > 0) {
+          const clearY = wooferCenterY - wooferRadius * 0.55;
+          drawDimension(sX + thickness, clearY, mountX - spkDepth, clearY, `Despeje: ${convertTo(rearClear, 'length', unitSystem).toFixed(1)}`, -1.6, true);
+        }
+      } else {
+        // MONTAJE INVERTIDO (Sólo cuando Vf es significativamente más profunda que Vr)
+        // Brida en cara trasera del tabique (divX). Cono hacia Vr (-X), motor hacia Vf (+X)
+        const mountX = divX;
+        drawRealisticWooferProfile(mountX, wooferCenterY, wooferRadius, wooferCutoutRadius, spkDepth, 'left');
+
+        const frontClear = baffleX - (mountX + spkDepth);
+        if (frontClear > 0) {
+          const clearY = wooferCenterY - wooferRadius * 0.55;
+          drawDimension(mountX + spkDepth, clearY, baffleX, clearY, `Despeje Vf: ${convertTo(frontClear, 'length', unitSystem).toFixed(1)}`, -1.6, true);
+        }
+
+        ctx.font = `bold ${Math.max(7.5 / zoom, 2.0)}px monospace`;
+        ctx.fillStyle = isLight ? '#d97706' : '#fbbf24';
+        ctx.textAlign = 'center';
+        ctx.fillText(t("[Montaje Invertido: Motor en Vf para refrigeración y despeje]"), sX + sW / 2, botY - thickness - 1.2);
+      }
+    }
 
     // Port Tube Side Profile (extending into cavity from Front Baffle or Rear Panel)
     if (boxType === 'ported' || boxType === 'bandpass') {
       const pLen = Math.max(portLength || 15, 3);
-      const effectivePortLen = Math.min(pLen, sW - 2 * thickness - 2);
+      const maxStraightDepth = isBandpass 
+        ? Math.max(depthFront - 1.2, 2.0)
+        : (sW - 2 * thickness - 2);
+      const effectivePortLen = Math.min(pLen, maxStraightDepth);
       const pR = (portShape === 'round' || portShape === 'custom')
         ? Math.max((portDiameter || 7.5) / 2, 1.2)
         : Math.max((portHeight || 4) / 2, 1.0);
@@ -1041,17 +1406,11 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
         }
 
         // Port Dimension
-        const pLenDisp = `Lv: ${convertTo(effectivePortLen, 'length', unitSystem).toFixed(1)} ${uLabel}`;
+        const pLenDisp = (isBandpass && pLen > maxStraightDepth)
+          ? `Lv: ${convertTo(pLen, 'length', unitSystem).toFixed(1)} ${uLabel} (Codo)`
+          : `Lv: ${convertTo(effectivePortLen, 'length', unitSystem).toFixed(1)} ${uLabel}`;
         drawDimension(innerX, pTop - 1, baffleX, pTop - 1, pLenDisp, -1.8, true);
       }
-    }
-
-    // Bandpass internal divider if applicable
-    if (isBandpass) {
-      const divX = sX + thickness + (sW - 2 * thickness) * (1 - bandpassRatio);
-      ctx.strokeStyle = isLight ? '#059669' : '#10b981';
-      ctx.strokeRect(divX, topY + thickness, thickness, fH - 2 * thickness);
-      hatchRect(divX, topY + thickness, thickness, fH - 2 * thickness);
     }
 
     // Damping Acoustic Lining Layer (along rear wall and bottom)
@@ -1063,8 +1422,9 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
 
       // Rear wall lining
       ctx.strokeRect(sX + thickness, topY + thickness, dLining, fH - 2 * thickness);
-      // Bottom lining
-      ctx.strokeRect(sX + thickness, botY - thickness - dLining, sW - 2 * thickness, dLining);
+      // Bottom lining (en caja paso banda sólo recubre la cámara trasera Vr)
+      const bottomLiningLen = isBandpass ? depthRear : (sW - 2 * thickness);
+      ctx.strokeRect(sX + thickness, botY - thickness - dLining, bottomLiningLen, dLining);
       ctx.setLineDash([]);
     }
 
@@ -1077,17 +1437,41 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
       drawDimension(sX, botY, sX + sWBot, botY, dBotDisp, 3.5, true);
     } else {
       const dDisp = `${convertTo(sW, 'length', unitSystem).toFixed(1)} ${uLabel}`;
-      drawDimension(sX, botY, sX + sW, botY, dDisp, 3.5, true);
+      const totalDepthOffset = isBandpass ? 4.2 : 3.5;
+      drawDimension(sX, botY, sX + sW, botY, dDisp, totalDepthOffset, true);
     }
 
-    const thickDisp = `T: ${cabinetData?.thickness || 19} mm`;
-    drawDimension(sX, topY, sX, topY + thickness, thickDisp, -2.5, false);
+    // Cotas de profundidad de cámaras acústicas en Paso Banda
+    if (isBandpass) {
+      drawDimension(sX + thickness, botY, divX, botY, `${convertTo(depthRear, 'length', unitSystem).toFixed(1)}`, 1.6, true);
+      drawDimension(divX + thickness, botY, baffleX, botY, `${convertTo(depthFront, 'length', unitSystem).toFixed(1)}`, 1.6, true);
+    }
 
-    // Magnet Clearance to Rear Wall
-    const rearClearance = (baffleX - spkDepth) - (sX + thickness);
-    if (rearClearance > 0) {
-      const clearDisp = `Despeje: ${convertTo(rearClearance, 'length', unitSystem).toFixed(1)}`;
-      drawDimension(sX + thickness, wooferCenterY, baffleX - spkDepth, wooferCenterY, clearDisp, -wooferRadius * 0.4, true);
+    // Rótulo técnico del espesor del panel (T) insertado con fondo despejado en la tapa superior
+    ctx.save();
+    const tBadgeW = 5.2;
+    const tBadgeH = Math.min(thickness * 0.85, 1.4);
+    const tCenterX = sX + sW / 2;
+    const tCenterY = topY + thickness / 2;
+    ctx.fillStyle = isLight ? 'rgba(255, 255, 255, 0.85)' : 'rgba(7, 16, 30, 0.85)';
+    ctx.fillRect(tCenterX - tBadgeW / 2, tCenterY - tBadgeH / 2, tBadgeW, tBadgeH);
+    ctx.strokeStyle = isLight ? 'rgba(2, 132, 199, 0.4)' : 'rgba(56, 189, 248, 0.4)';
+    ctx.lineWidth = 0.8 / zoom;
+    ctx.strokeRect(tCenterX - tBadgeW / 2, tCenterY - tBadgeH / 2, tBadgeW, tBadgeH);
+    ctx.fillStyle = isLight ? '#0369a1' : '#38bdf8';
+    ctx.font = `bold ${Math.max(7.0 / zoom, 1.9)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`Espesor: ${cabinetData?.thickness || 19} mm`, tCenterX, tCenterY);
+    ctx.restore();
+
+    // Magnet Clearance to Rear Wall (en cajas tradicionales direct-radiator)
+    if (!isBandpass) {
+      const rearClearance = (baffleX - spkDepth) - (sX + thickness);
+      if (rearClearance > 0) {
+        const clearDisp = `Despeje: ${convertTo(rearClearance, 'length', unitSystem).toFixed(1)}`;
+        drawDimension(sX + thickness, wooferCenterY, baffleX - spkDepth, wooferCenterY, clearDisp, -wooferRadius * 0.4, true);
+      }
     }
 
     // ----------------------------------------------------

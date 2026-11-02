@@ -523,9 +523,9 @@ export function calculateBandpass4ResponseAt(f: number, fs: number, qts: number,
   const alpha_r = vas / vr;
   const ql = 7.0;
   const a3 = 1.0 / qts + h / ql;
-  const a2 = 1.0 + h * h * (1.0 + alpha_r) + alpha_f + h / (qts * ql);
-  const a1 = h * h / qts + (h / ql) * (1.0 + alpha_f);
-  const a0 = h * h;
+  const a2 = h * h + 1.0 + alpha_r + alpha_f + h / (qts * ql);
+  const a1 = (h * h) / qts + (h / ql) * (1.0 + alpha_r + alpha_f);
+  const a0 = h * h * (1.0 + alpha_r);
   const y = f / fs;
   const real = Math.pow(y, 4) - a2 * y * y + a0;
   const imag = a1 * y - a3 * Math.pow(y, 3);
