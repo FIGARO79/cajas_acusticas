@@ -108,7 +108,11 @@ El barrido estándar se evalúa en **101 puntos logarítmicos** entre $10\text{ 
   * $\text{Re}(y) = y^4 - a_2 y^2 + a_0, \quad \text{Im}(y) = a_1 y - a_3 y^3$
   * Magnitud Bass-Reflex: $|H(y)| = \frac{y^4}{\sqrt{\text{Re}(y)^2 + \text{Im}(y)^2}}$
 * **Polinomio de Paso de Banda 4.º Orden ($\alpha_f = V_{as}/V_f$, $\alpha_r = V_{as}/V_r$):**
-  * $a_2 = 1 + h^2(1 + \alpha_r) + \alpha_f + \frac{h}{Q_{ts} Q_L}, \quad a_1 = \frac{h^2}{Q_{ts}} + \frac{h}{Q_L}(1 + \alpha_f)$
+  * $a_3 = \frac{1}{Q_{ts}} + \frac{h}{Q_L}$
+  * $a_2 = h^2 + 1 + \alpha_r + \alpha_f + \frac{h}{Q_{ts} Q_L}$
+  * $a_1 = \frac{h^2}{Q_{ts}} + \frac{h}{Q_L}(1 + \alpha_r + \alpha_f)$
+  * $a_0 = h^2(1 + \alpha_r)$
+  * $\text{Re}(y) = y^4 - a_2 y^2 + a_0, \quad \text{Im}(y) = a_1 y - a_3 y^3$
   * Magnitud Bandpass 4th: $|H(y)| = \frac{y^2 \cdot \alpha_f}{\sqrt{\text{Re}(y)^2 + \text{Im}(y)^2}}$
 
 ### 3.2 Excursión Pico del Cono (`calcConeExcursion`, modelo Small-Margolis)

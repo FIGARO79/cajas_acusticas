@@ -271,3 +271,114 @@ export function calcVolumenNetoMadera(
     exceedsDepth: false,
   };
 }
+
+/**
+ * Curva de impedancia extendida con modelos Thorborg/Futtrup (Ke, Leb, Rss)
+ * y arrastre viscoelástico Knudsen LOG Creep (beta).
+ */
+export function calcExtendedImpedanceCurve(
+  fs: number,
+  qms: number,
+  qes: number,
+  re: number,
+  vas: number,
+  vb: number,
+  fb: number,
+  isPorted: boolean,
+  lebMh: number = 0.5,
+  keSh: number = 0.8,
+  rssOhm: number = 35.0,
+  beta: number = 0.015,
+  valid: boolean = true
+): number[] {
+  const w = getWasmSafe();
+  if (!w) return [];
+  const res = w.calc_extended_impedance_curve(
+    fs, qms, qes, re, vas, vb, fb, isPorted, lebMh, keSh, rssOhm, beta, valid
+  );
+  return Array.from(res);
+}
+
+/**
+ * Curva de difracción y efecto de bafle (Baffle Step + Edge Diffraction).
+ */
+export function calcBaffleDiffractionCurve(
+  widthCm: number,
+  heightCm: number,
+  offsetXCm: number = 0,
+  offsetYCm: number = 0,
+  valid: boolean = true
+): number[] {
+  const w = getWasmSafe();
+  if (!w) return [];
+  const res = w.calc_baffle_diffraction_curve(widthCm, heightCm, offsetXCm, offsetYCm, valid);
+  return Array.from(res);
+}
+
+/**
+ * Corrección de curva SPL aplicando la transición de Baffle Step real de la caja.
+ */
+export function applyBaffleStepToSpl(
+  splValues: number[],
+  widthCm: number,
+  heightCm: number,
+  offsetXCm: number = 0,
+  offsetYCm: number = 0
+): number[] {
+  const w = getWasmSafe();
+  if (!w) return splValues;
+  const res = w.apply_baffle_step_to_spl(
+    new Float64Array(splValues),
+    widthCm,
+    heightCm,
+    offsetXCm,
+    offsetYCm
+  );
+  return Array.from(res);
+}
+
+/**
+ * Curva de transferencia de Crossover Pasivo resuelta mediante Análisis Nodal Modificado (MNA).
+ */
+export function calcCrossoverLowpassCurve(
+  lMh: number,
+  dcrOhm: number,
+  cUf: number,
+  reOhm: number,
+  leMh: number,
+  rzOhm: number = 0,
+  czUf: number = 0,
+  useZobel: boolean = false,
+  valid: boolean = true
+): number[] {
+  const w = getWasmSafe();
+  if (!w) return [];
+  const res = w.calc_crossover_lowpass_curve(
+    lMh, dcrOhm, cUf, reOhm, leMh, rzOhm, czUf, useZobel, valid
+  );
+  return Array.from(res);
+}
+
+/**
+ * Optimizador Nelder-Mead Simplex en Rust para diseñar inductores y condensadores
+ * óptimos contra una frecuencia de corte objetivo.
+ */
+export function optimizeCrossoverLowpass(
+  targetFc: number,
+  reOhm: number,
+  leMh: number,
+  dcrOhm: number = 0.3
+): { lOptMh: number; cOptUf: number; rmsErrorDb: number; iterations: number } {
+  const w = getWasmSafe();
+  if (!w) {
+    return { lOptMh: 1.0, cOptUf: 10.0, rmsErrorDb: 0, iterations: 0 };
+  }
+  const res = w.optimize_crossover_lowpass(targetFc, reOhm, leMh, dcrOhm);
+  return {
+    lOptMh: res.l_opt_mh,
+    cOptUf: res.c_opt_uf,
+    rmsErrorDb: res.rms_error_db,
+    iterations: res.iterations,
+  };
+}
+

@@ -33,6 +33,8 @@ interface CabinetViewer3DModalProps {
   portLocation?: 'front' | 'rear';
   bandpassOrder?: 4 | 6;
   bandpassRatio?: number;
+  bandpassVf?: number;
+  bandpassVr?: number;
   dampingType?: 'none' | 'light' | 'moderate' | 'heavy';
 }
 
@@ -62,7 +64,10 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
   driverDepth,
   portYPct = 85,
   portLocation = 'front',
+  bandpassOrder = 4,
   bandpassRatio = 0.5,
+  bandpassVf,
+  bandpassVr,
   dampingType = 'none',
 }) => {
   const t = (text: string) => translate(text, lang);
@@ -103,14 +108,25 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
     right?: THREE.Mesh;
     rear?: THREE.Group;
     front?: THREE.Group;
-    divider?: THREE.Mesh;
+    divider?: THREE.Group | THREE.Mesh;
   }>({});
+  const dividerBaseZRef = useRef<number>(0);
+  const chambersRef = useRef<{ vr?: THREE.Mesh; vf?: THREE.Mesh }>({});
 
   // UI States
-  const [renderMode, setRenderMode] = useState<'solid' | 'xray' | 'wireframe'>('solid');
+  const [renderMode, setRenderMode] = useState<'solid' | 'xray' | 'wireframe'>(
+    boxType === 'bandpass' ? 'xray' : 'solid'
+  );
   const [explodedPct, setExplodedPct] = useState<number>(0);
   const [autoRotate, setAutoRotate] = useState<boolean>(false);
   const [showWireEdges, setShowWireEdges] = useState<boolean>(true);
+
+  // En cajas paso banda, abrir en modo rayos X para ver de inmediato el divisor, woofer y cámaras interiores
+  useEffect(() => {
+    if (isOpen && boxType === 'bandpass') {
+      setRenderMode('xray');
+    }
+  }, [isOpen, boxType]);
 
   // Handle ESC key to close
   useEffect(() => {
@@ -169,6 +185,10 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
     if (meshes.right) meshes.right.position.x = (wExt - thickness) / 2 + offset;
     if (meshes.rear) meshes.rear.position.z = -(dExt - thickness) / 2 - offset;
     if (meshes.front) meshes.front.position.z = (dExt - thickness) / 2 + offset;
+    if (meshes.divider) meshes.divider.position.z = dividerBaseZRef.current + offset * 0.22;
+
+    if (chambersRef.current.vr) chambersRef.current.vr.visible = explodedPct < 15;
+    if (chambersRef.current.vf) chambersRef.current.vf.visible = explodedPct < 15;
   }, [explodedPct, wExt, hExt, dExt, thickness]);
 
   // Main Three.js Scene Setup & Rebuild
@@ -391,16 +411,22 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
       const portY = innerH * (0.5 - portYPct / 100);
       const count = Math.max(Number(portCount) || 1, 1);
       const portSpacing = count > 1 ? Math.min((innerW * 0.45) / count, 12) : 0;
-      const isRearPort = portLocation === 'rear';
+      const isRearPort = boxType === 'bandpass' ? false : portLocation === 'rear';
       for (let pIdx = 0; pIdx < count; pIdx++) {
         const pCurX = count === 1 ? 0 : -((count - 1) * portSpacing) / 2 + pIdx * portSpacing;
         if (portShape === 'round' || portShape === 'custom') {
           const pRadius = Math.max((portDiameter || 7.5) / 2, 1.5);
           (isRearPort ? rearHoleCircles : frontHoleCircles).push({ x: pCurX, y: portY, r: pRadius });
+          if (boxType === 'bandpass' && bandpassOrder === 6) {
+            rearHoleCircles.push({ x: pCurX, y: portY, r: pRadius });
+          }
         } else {
           const pW = Math.max(portWidth || 10, 2);
           const pH = Math.max(portHeight || 4, 1.5);
           (isRearPort ? rearHoleRects : frontHoleRects).push({ x: pCurX, y: portY, w: pW, h: pH });
+          if (boxType === 'bandpass' && bandpassOrder === 6) {
+            rearHoleRects.push({ x: pCurX, y: portY, w: pW, h: pH });
+          }
         }
       }
     }
@@ -818,24 +844,18 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
 
     if (!isBandpass) {
       frontGroup.add(speakerGroup);
-    } else {
-      speakerGroup.position.set(0, wooferY, 0);
-      panelsGroup.add(speakerGroup);
     }
 
     // PUERTO DE SINTONÍA (VENT / PORT)
-    if (boxType === 'ported' || boxType === 'bandpass') {
+    const buildPortAssembly = (targetGroup: THREE.Group, isRear: boolean, effectiveLength: number) => {
       const portY = innerH * (0.5 - portYPct / 100);
-      const effectiveLength = Math.max(portLength || 15, 5);
       const count = Math.max(Number(portCount) || 1, 1);
       const portSpacing = count > 1 ? Math.min((innerW * 0.45) / count, 12) : 0;
-      const isRearPort = portLocation === 'rear';
-      const targetPortGroup = isRearPort ? rearGroup : frontGroup;
-      const tubeZ = isRearPort
+      const tubeZ = isRear
         ? effectiveLength / 2 - thickness / 2
         : -effectiveLength / 2 + thickness / 2;
-      const collarZ = isRearPort ? -thickness / 2 : thickness / 2;
-      const innerEndZ = isRearPort
+      const collarZ = isRear ? -thickness / 2 : thickness / 2;
+      const innerEndZ = isRear
         ? effectiveLength - thickness / 2
         : -effectiveLength + thickness / 2;
 
@@ -847,7 +867,7 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
         if (portShape === 'round' || portShape === 'custom') {
           const pRadius = Math.max((portDiameter || 7.5) / 2, 1.5);
 
-          // Borde del tubo en el bafle (siempre visible incluso en puerto recto sin flange)
+          // Borde del tubo en el bafle
           const portLipGeo = new THREE.RingGeometry(pRadius * 0.92, pRadius * 1.06, 32);
           const portLipMat = new THREE.MeshStandardMaterial({
             color: 0x0284c7,
@@ -856,8 +876,8 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
             side: THREE.DoubleSide,
           });
           const portLipMesh = new THREE.Mesh(portLipGeo, portLipMat);
-          portLipMesh.position.set(pCurX, portY, collarZ + (isRearPort ? -0.07 : 0.07));
-          targetPortGroup.add(portLipMesh);
+          portLipMesh.position.set(pCurX, portY, collarZ + (isRear ? -0.07 : 0.07));
+          targetGroup.add(portLipMesh);
 
           const portTubeGeo = new THREE.CylinderGeometry(pRadius, pRadius, effectiveLength, 32, 1, true);
           portTubeGeo.rotateX(Math.PI / 2);
@@ -869,10 +889,9 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
           });
           const portTubeMesh = new THREE.Mesh(portTubeGeo, portTubeMat);
           portTubeMesh.position.set(pCurX, portY, tubeZ);
-          targetPortGroup.add(portTubeMesh);
+          targetGroup.add(portTubeMesh);
 
           if (flaredEnds === 1) {
-            // 1: Dos a Ras (Flat annular flange ring at BOTH ends)
             const flangeRingGeo = new THREE.RingGeometry(pRadius * 0.95, pRadius * 1.32, 32);
             const flangeMat = new THREE.MeshStandardMaterial({
               color: 0x0369a1,
@@ -881,14 +900,13 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
               side: THREE.DoubleSide,
             });
             const outerFlange = new THREE.Mesh(flangeRingGeo, flangeMat);
-            outerFlange.position.set(pCurX, portY, collarZ + (isRearPort ? -0.09 : 0.09));
-            targetPortGroup.add(outerFlange);
+            outerFlange.position.set(pCurX, portY, collarZ + (isRear ? -0.09 : 0.09));
+            targetGroup.add(outerFlange);
 
             const innerFlange = new THREE.Mesh(flangeRingGeo, flangeMat);
             innerFlange.position.set(pCurX, portY, innerEndZ);
-            targetPortGroup.add(innerFlange);
+            targetGroup.add(innerFlange);
           } else if (flaredEnds === 2 || flaredEnds === 3) {
-            // 2 or 3: Abocinado (Aeroport / Flared) — Rounded trumpet Torus collar on outer end (and inner end if flaredEnds === 2)
             const collarGeo = new THREE.TorusGeometry(pRadius * 1.12, Math.max(thickness * 0.22, pRadius * 0.16), 16, 32);
             const collarMat = new THREE.MeshStandardMaterial({
               color: 0x0369a1,
@@ -896,20 +914,19 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
               metalness: 0.45,
             });
             const outerCollar = new THREE.Mesh(collarGeo, collarMat);
-            outerCollar.position.set(pCurX, portY, collarZ + (isRearPort ? -0.1 : 0.1));
-            targetPortGroup.add(outerCollar);
+            outerCollar.position.set(pCurX, portY, collarZ + (isRear ? -0.1 : 0.1));
+            targetGroup.add(outerCollar);
 
             if (flaredEnds === 2) {
               const innerCollar = new THREE.Mesh(collarGeo, collarMat);
               innerCollar.position.set(pCurX, portY, innerEndZ);
-              targetPortGroup.add(innerCollar);
+              targetGroup.add(innerCollar);
             }
           }
         } else {
           const pW = Math.max(portWidth || 10, 2);
           const pH = Math.max(portHeight || 4, 1.5);
 
-          // Fondo oscuro de la boca rectangular del puerto
           if (renderMode === 'solid') {
             const rectHoleGeo = new THREE.PlaneGeometry(pW * 0.96, pH * 0.96);
             const rectHoleMat = new THREE.MeshBasicMaterial({
@@ -917,8 +934,8 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
               side: THREE.DoubleSide,
             });
             const rectHoleMesh = new THREE.Mesh(rectHoleGeo, rectHoleMat);
-            rectHoleMesh.position.set(pCurX, portY, collarZ + (isRearPort ? -0.06 : 0.06));
-            targetPortGroup.add(rectHoleMesh);
+            rectHoleMesh.position.set(pCurX, portY, collarZ + (isRear ? -0.06 : 0.06));
+            targetGroup.add(rectHoleMesh);
           }
 
           const portBoxGeo = new THREE.BoxGeometry(pW, pH, effectiveLength);
@@ -930,7 +947,7 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
           });
           const portBoxMesh = new THREE.Mesh(portBoxGeo, portBoxMat);
           portBoxMesh.position.set(pCurX, portY, tubeZ);
-          targetPortGroup.add(portBoxMesh);
+          targetGroup.add(portBoxMesh);
 
           if (flaredEnds === 1 || flaredEnds === 2 || flaredEnds === 3) {
             const fScale = (flaredEnds === 2 || flaredEnds === 3) ? 1.28 : 1.18;
@@ -944,27 +961,179 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
             });
             const outerRectCollar = new THREE.Mesh(rectCollarGeo, rectCollarMat);
             outerRectCollar.position.set(pCurX, portY, collarZ);
-            targetPortGroup.add(outerRectCollar);
+            targetGroup.add(outerRectCollar);
 
             if (flaredEnds === 1 || flaredEnds === 2) {
               const innerRectCollar = new THREE.Mesh(rectCollarGeo, rectCollarMat);
               innerRectCollar.position.set(pCurX, portY, innerEndZ);
-              targetPortGroup.add(innerRectCollar);
+              targetGroup.add(innerRectCollar);
             }
           }
         }
       }
+    };
+
+    if (boxType === 'ported') {
+      const isRearPort = portLocation === 'rear';
+      buildPortAssembly(isRearPort ? rearGroup : frontGroup, isRearPort, Math.max(portLength || 15, 5));
+    } else if (boxType === 'bandpass') {
+      // En caja paso banda: la cámara frontal Vf siempre ventila a través del bafle frontal
+      buildPortAssembly(frontGroup, false, Math.max(portLength || 15, 5));
+      // Si es paso banda de 6.º orden, la cámara trasera Vr también ventila al exterior a través del bafle trasero
+      if (bandpassOrder === 6) {
+        buildPortAssembly(rearGroup, true, Math.max(portLength || 15, 5));
+      }
     }
 
-    // TABIQUE INTERNO BANDPASS (DIVIDER)
+    // TABIQUE INTERNO DIVISOR Y ARQUITECTURA BANDPASS (Vr / Vf)
     if (isBandpass) {
-      const dividerGeo = new THREE.BoxGeometry(innerW, innerH, thickness);
-      const dividerMesh = new THREE.Mesh(dividerGeo, getWoodMaterial());
-      const zRatio = (bandpassRatio - 0.5) * innerD;
-      dividerMesh.position.set(0, 0, zRatio);
+      const vrRatio = Math.max(0.12, Math.min(0.88, Number(bandpassRatio) || 0.5));
+      const netDepth = Math.max(innerD - thickness, 5);
+      const depthRear = netDepth * vrRatio;
+      const depthFront = netDepth * (1 - vrRatio);
+      const zDivider = -innerD / 2 + depthRear + thickness / 2;
+      dividerBaseZRef.current = zDivider;
+
+      const isDriverInverted = depthRear < realDepthCm + 2.0;
+
+      const dividerGroup = new THREE.Group();
+      dividerGroup.position.set(0, 0, zDivider);
+
+      // 1. Tabique estructural con calado pasante para el altavoz (Woofer Cutout)
+      const dividerCutoutCircles = [{ x: 0, y: wooferY, r: cutoutRadius }];
+      const dividerGeo = createPerforatedPanelGeo(innerW, innerH, thickness, dividerCutoutCircles, []);
+      const dividerMat = renderMode === 'wireframe'
+        ? new THREE.MeshBasicMaterial({ color: 0x0284c7, wireframe: true })
+        : renderMode === 'xray'
+        ? new THREE.MeshStandardMaterial({
+            color: 0x38bdf8,
+            transparent: true,
+            opacity: 0.35,
+            roughness: 0.25,
+            metalness: 0.1,
+            depthWrite: false,
+          })
+        : new THREE.MeshStandardMaterial({
+            color: isLight ? 0xb45309 : 0x92400e, // Tono madera estructural contrastada
+            roughness: 0.6,
+            metalness: 0.1,
+          });
+
+      const dividerMesh = new THREE.Mesh(dividerGeo, dividerMat);
+      dividerMesh.castShadow = true;
+      dividerMesh.receiveShadow = true;
       addEdgeLines(dividerMesh);
-      panelsGroup.add(dividerMesh);
-      panelMeshesRef.current.divider = dividerMesh;
+      dividerGroup.add(dividerMesh);
+
+      // Junta perimetral de estanqueidad entre el woofer y el tabique
+      const gasketGeo = new THREE.TorusGeometry(cutoutRadius * 1.01, Math.max(thickness * 0.12, 0.18), 12, 48);
+      const gasketMat = new THREE.MeshStandardMaterial({
+        color: 0x0f172a,
+        roughness: 0.88,
+        metalness: 0.1,
+      });
+      const gasketMesh = new THREE.Mesh(gasketGeo, gasketMat);
+      if (!isDriverInverted) {
+        gasketMesh.position.set(0, wooferY, thickness / 2 + 0.08);
+      } else {
+        gasketMesh.position.set(0, wooferY, -thickness / 2 - 0.08);
+      }
+      dividerGroup.add(gasketMesh);
+
+      // Listones de refuerzo estructural en los laterales del tabique
+      const cleatMat = getWoodMaterial();
+      const cleatW = Math.max(thickness * 1.1, 1.8);
+      [-innerW / 2 + cleatW / 2, innerW / 2 - cleatW / 2].forEach((cleatX) => {
+        const cleatGeo = new THREE.BoxGeometry(cleatW, innerH * 0.9, cleatW);
+        const cleatMesh = new THREE.Mesh(cleatGeo, cleatMat);
+        cleatMesh.position.set(cleatX, 0, -thickness / 2 - cleatW / 2);
+        dividerGroup.add(cleatMesh);
+      });
+
+      // Montar el woofer herméticamente en el tabique
+      if (!isDriverInverted) {
+        // MONTAJE ESTÁNDAR: Brida en cara frontal del tabique (+thickness/2), cono dispara hacia Vf (+Z), imán hacia Vr (-Z)
+        speakerGroup.position.set(0, wooferY, thickness / 2);
+        speakerGroup.rotation.y = 0;
+      } else {
+        // MONTAJE INVERTIDO: Para cuando la cámara trasera Vr es menos profunda que el altavoz
+        // Brida en cara trasera del tabique (-thickness/2), cono hacia Vr (-Z), imán hacia Vf (+Z)
+        speakerGroup.position.set(0, wooferY, -thickness / 2);
+        speakerGroup.rotation.y = Math.PI;
+      }
+      dividerGroup.add(speakerGroup);
+
+      panelsGroup.add(dividerGroup);
+      panelMeshesRef.current.divider = dividerGroup;
+
+      // 2. Delimitación Volumétrica 3D de las dos cámaras (Vr y Vf)
+      const chamberVrGeo = new THREE.BoxGeometry(innerW * 0.992, innerH * 0.992, depthRear * 0.992);
+      const chamberVrMat = new THREE.MeshBasicMaterial({
+        color: 0x0284c7, // Azul cian para Vr
+        transparent: true,
+        opacity: renderMode === 'wireframe' ? 0 : (isLight ? 0.07 : 0.11),
+        depthWrite: false,
+      });
+      const chamberVrMesh = new THREE.Mesh(chamberVrGeo, chamberVrMat);
+      chamberVrMesh.position.set(0, 0, -innerD / 2 + depthRear / 2);
+      panelsGroup.add(chamberVrMesh);
+      chambersRef.current.vr = chamberVrMesh;
+
+      const chamberVfGeo = new THREE.BoxGeometry(innerW * 0.992, innerH * 0.992, depthFront * 0.992);
+      const chamberVfMat = new THREE.MeshBasicMaterial({
+        color: 0x10b981, // Verde esmeralda para Vf
+        transparent: true,
+        opacity: renderMode === 'wireframe' ? 0 : (isLight ? 0.07 : 0.11),
+        depthWrite: false,
+      });
+      const chamberVfMesh = new THREE.Mesh(chamberVfGeo, chamberVfMat);
+      chamberVfMesh.position.set(0, 0, zDivider + thickness / 2 + depthFront / 2);
+      panelsGroup.add(chamberVfMesh);
+      chambersRef.current.vf = chamberVfMesh;
+
+      // 3. Material de Amortiguamiento Acústico (Damping) en la Cámara Trasera (Vr)
+      if (dampingType !== 'none' || bandpassOrder === 4) {
+        const liningThick = Math.min(1.6, depthRear * 0.15);
+        const liningMat = new THREE.MeshStandardMaterial({
+          color: isLight ? 0x64748b : 0x475569,
+          roughness: 0.96,
+          metalness: 0.05,
+          wireframe: renderMode === 'wireframe',
+        });
+
+        // Placa trasera de damping (en cara interna del bafle trasero)
+        const rearLiningGeo = createPerforatedPanelGeo(
+          innerW * 0.94,
+          innerH * 0.94,
+          liningThick,
+          rearHoleCircles,
+          rearHoleRects
+        );
+        const rearLiningMesh = new THREE.Mesh(rearLiningGeo, liningMat);
+        rearLiningMesh.position.set(0, 0, thickness / 2 + liningThick / 2);
+        rearGroup.add(rearLiningMesh);
+
+        // Paneles laterales de damping en Vr
+        const zRearCenter = -innerD / 2 + depthRear / 2;
+        const sideLiningGeo = new THREE.BoxGeometry(liningThick, innerH * 0.92, Math.max(depthRear - liningThick, 2));
+        const leftLiningMesh = new THREE.Mesh(sideLiningGeo, liningMat);
+        leftLiningMesh.position.set(thickness / 2 + liningThick / 2, 0, zRearCenter);
+        if (panelMeshesRef.current.left) panelMeshesRef.current.left.add(leftLiningMesh);
+
+        const rightLiningMesh = new THREE.Mesh(sideLiningGeo, liningMat);
+        rightLiningMesh.position.set(-thickness / 2 - liningThick / 2, 0, zRearCenter);
+        if (panelMeshesRef.current.right) panelMeshesRef.current.right.add(rightLiningMesh);
+
+        // Paneles superior e inferior de damping en Vr
+        const topBotLiningGeo = new THREE.BoxGeometry(innerW * 0.92, liningThick, Math.max(depthRear - liningThick, 2));
+        const topLiningMesh = new THREE.Mesh(topBotLiningGeo, liningMat);
+        topLiningMesh.position.set(0, -thickness / 2 - liningThick / 2, zRearCenter);
+        if (panelMeshesRef.current.top) panelMeshesRef.current.top.add(topLiningMesh);
+
+        const botLiningMesh = new THREE.Mesh(topBotLiningGeo, liningMat);
+        botLiningMesh.position.set(0, thickness / 2 + liningThick / 2, zRearCenter);
+        if (panelMeshesRef.current.bottom) panelMeshesRef.current.bottom.add(botLiningMesh);
+      }
     }
 
     panelsGroup.add(frontGroup);
@@ -1034,7 +1203,10 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
     portLength,
     portCount,
     flaredEnds,
+    bandpassOrder,
     bandpassRatio,
+    bandpassVf,
+    bandpassVr,
     dampingType,
   ]);
 
@@ -1052,6 +1224,19 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
 
   const uLabel = getUnitLabel('length', unitSystem);
   const vLabel = getUnitLabel('volume', unitSystem);
+
+  const innerDVal = dExt - 2 * thickness;
+  const netDepthVal = Math.max(innerDVal - thickness, 5);
+  const vrRatioVal = Math.max(0.12, Math.min(0.88, Number(bandpassRatio) || 0.5));
+  const depthRearVal = netDepthVal * vrRatioVal;
+  const depthFrontVal = netDepthVal * (1 - vrRatioVal);
+  const driverDepthCmVal = driverDepth && driverDepth > 0
+    ? Math.max(driverDepth / 10, thickness + 3.5)
+    : Math.max(overallDiameter ? (overallDiameter / 10) * 0.45 : 12, thickness + 4.5);
+  const isDriverInvertedVal = boxType === 'bandpass' && (depthRearVal < driverDepthCmVal + 2.0);
+  const clearanceVal = isDriverInvertedVal 
+    ? Math.max(0, depthFrontVal - driverDepthCmVal)
+    : Math.max(0, depthRearVal - driverDepthCmVal);
 
   return (
     <div
@@ -1189,23 +1374,76 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
         </div>
 
         {/* 3D Viewport Area */}
-        <div
-          ref={containerRef}
-          style={{
-            flex: '1 1 0%',
-            minHeight: 0,
-            width: '100%',
-            overflow: 'hidden',
-            position: 'relative',
-            cursor: 'grab',
-          }}
-          onMouseDown={(e) => {
-            if (e.button === 0) e.currentTarget.style.cursor = 'grabbing';
-          }}
-          onMouseUp={(e) => {
-            e.currentTarget.style.cursor = 'grab';
-          }}
-        />
+        <div style={{ position: 'relative', flex: '1 1 0%', minHeight: 0, width: '100%', overflow: 'hidden' }}>
+          <div
+            ref={containerRef}
+            style={{
+              width: '100%',
+              height: '100%',
+              overflow: 'hidden',
+              cursor: 'grab',
+            }}
+            onMouseDown={(e) => {
+              if (e.button === 0) e.currentTarget.style.cursor = 'grabbing';
+            }}
+            onMouseUp={(e) => {
+              e.currentTarget.style.cursor = 'grab';
+            }}
+          />
+
+          {/* Overlay HUD Técnico para Cajas Paso Banda */}
+          {boxType === 'bandpass' && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '0.6rem',
+                left: '0.75rem',
+                background: isLight ? 'rgba(255, 255, 255, 0.92)' : 'rgba(7, 15, 30, 0.92)',
+                border: `1px solid ${isLight ? '#cbd5e1' : '#1e3a5f'}`,
+                padding: '0.45rem 0.7rem',
+                fontFamily: 'monospace',
+                fontSize: '0.62rem',
+                lineHeight: '1.45',
+                zIndex: 5,
+                pointerEvents: 'none',
+                backdropFilter: 'blur(6px)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.22rem',
+                boxShadow: isLight ? '0 4px 12px rgba(0,0,0,0.06)' : '0 4px 12px rgba(0,0,0,0.4)',
+              }}
+            >
+              <div style={{ fontWeight: 700, color: '#0284c7', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                {t("Arquitectura Paso Banda")} ({bandpassOrder || 4}.º {t("Orden")})
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ width: '8px', height: '8px', background: '#0284c7', display: 'inline-block', flexShrink: 0 }} />
+                <span style={{ color: isLight ? '#0f172a' : '#e2e8f0' }}>
+                  {t("Cámara Trasera")} (Vr): <strong>{bandpassVr ? `${convertTo(bandpassVr, 'volume', unitSystem).toFixed(1)} ${vLabel}` : `${((Number(bandpassRatio) || 0.5) * 100).toFixed(0)}%`}</strong>
+                  <span style={{ color: isLight ? '#64748b' : '#94a3b8' }}> ({convertTo(depthRearVal, 'length', unitSystem).toFixed(1)} {uLabel} — {bandpassOrder === 6 ? t("Ventilada") : t("Sellada / Amortiguada")})</span>
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ width: '8px', height: '8px', background: '#10b981', display: 'inline-block', flexShrink: 0 }} />
+                <span style={{ color: isLight ? '#0f172a' : '#e2e8f0' }}>
+                  {t("Cámara Frontal")} (Vf): <strong>{bandpassVf ? `${convertTo(bandpassVf, 'volume', unitSystem).toFixed(1)} ${vLabel}` : `${((1 - (Number(bandpassRatio) || 0.5)) * 100).toFixed(0)}%`}</strong>
+                  <span style={{ color: isLight ? '#64748b' : '#94a3b8' }}> ({convertTo(depthFrontVal, 'length', unitSystem).toFixed(1)} {uLabel} — {t("Sintonizada")})</span>
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', borderTop: `1px dashed ${isLight ? '#cbd5e1' : '#1e3a5f'}`, paddingTop: '0.25rem', marginTop: '0.08rem' }}>
+                <span style={{ color: isDriverInvertedVal ? (isLight ? '#b45309' : '#f59e0b') : (isLight ? '#0369a1' : '#38bdf8'), fontWeight: 700 }}>
+                  {isDriverInvertedVal ? t("Montaje Invertido") : t("Montaje Estándar")}:
+                </span>
+                <span style={{ color: isLight ? '#334155' : '#cbd5e1' }}>
+                  {isDriverInvertedVal 
+                    ? t("Imán hacia Vf (Despeje y Ventilación)") 
+                    : t("Imán hacia Vr")}
+                  {' | '}{t("Despeje")}: {convertTo(clearanceVal, 'length', unitSystem).toFixed(1)} {uLabel}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Interactive CAD Toolbar (Fijada al borde inferior del modal) */}
         <div

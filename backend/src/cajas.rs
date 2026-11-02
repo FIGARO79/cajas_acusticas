@@ -359,8 +359,10 @@ pub fn calc_bandpass_4(fs: f64, vas: f64, qts: f64, s: f64) -> Bandpass4Result {
     let s_val = if s <= qts_val { qts_val + 0.001 } else { s };
     
     let denom = (s_val / qts_val).powi(2) - 1.0;
-    let vf = if denom <= 0.0 { 0.0 } else { vas_val / denom };
-    let vr = 2.0 * s_val.powi(2) * qts_val.powi(2) * vas_val;
+    // Vr es la cámara trasera sellada con factor Qtc = S
+    let vr = if denom <= 0.0 { 0.0 } else { vas_val / denom };
+    // Vf es la cámara frontal sintonizada según alineación simétrica Dickason/Keele
+    let vf = (2.0 * s_val * qts_val).powi(2) * vas_val;
     let fb = fs_val * (s_val / qts_val);
     let f0 = fb;
     let delta_f = (fs_val / qts_val) * s_val;

@@ -122,9 +122,9 @@ pub fn calc_bandpass4_response_at(f: f64, fs: f64, qts: f64, vas: f64, vf: f64, 
     let alpha_r = vas / vr;
     let ql = 7.0;
     let a3 = 1.0 / qts + h / ql;
-    let a2 = 1.0 + h * h * (1.0 + alpha_r) + alpha_f + h / (qts * ql);
-    let a1 = h * h / qts + (h / ql) * (1.0 + alpha_f);
-    let a0 = h * h;
+    let a2 = h * h + 1.0 + alpha_r + alpha_f + h / (qts * ql);
+    let a1 = (h * h) / qts + (h / ql) * (1.0 + alpha_r + alpha_f);
+    let a0 = h * h * (1.0 + alpha_r);
     let y = f / fs;
     let real = y.powi(4) - a2 * y * y + a0;
     let imag = a1 * y - a3 * y.powi(3);

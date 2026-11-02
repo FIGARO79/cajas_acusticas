@@ -23,3 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 SKILL_EN.md
+
+# Rust build target
+backend/target/
+**/target/

@@ -64,6 +64,8 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
   portLocation = 'front',
   bandpassOrder = 4,
   bandpassRatio = 0.5,
+  bandpassVf,
+  bandpassVr,
   dampingType = 'none',
 }) => {
   const t = (text: string) => translate(text, lang);
@@ -120,6 +122,8 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
         portLocation={portLocation}
         bandpassOrder={bandpassOrder}
         bandpassRatio={bandpassRatio}
+        bandpassVf={bandpassVf}
+        bandpassVr={bandpassVr}
         dampingType={dampingType}
         onOpen3DModal={() => setIs3DModalOpen(true)}
       />
@@ -153,6 +157,8 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
         portLocation={portLocation}
         bandpassOrder={bandpassOrder}
         bandpassRatio={bandpassRatio}
+        bandpassVf={bandpassVf}
+        bandpassVr={bandpassVr}
         dampingType={dampingType}
       />
     </div>
