@@ -3,7 +3,7 @@ import { type Lang, translate } from '../utils/translations';
 import { type UnitSystem, convertTo, convertFrom, getUnitLabel } from '../utils/units';
 import type { CalculatedPorted, CalculatedSealed, CalculatedBandpass, SpeakerParams, PortSuggestions, WoodCabinetData } from '../types';
 import { suggestPortConfig, calcOptimalPortForSpeaker, calculatePortSpacing } from '../utils/acousticMath';
-import { getWasm } from '../wasm';
+import { getWasm, optimizeCrossoverLowpass } from '../wasm';
 
 interface BoxParamsFormProps {
   lang: Lang;
@@ -352,6 +352,31 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
   const [whWireDia, setWhWireDia] = useState<number>(1.0); // mm (wire diameter)
   const [whCalcMode, setWhCalcMode] = useState<'turns' | 'inductance'>('turns');
   const [whTurns, setWhTurns] = useState<number>(100);
+
+  // Nelder-Mead Crossover Optimization State
+  const [optDcr, setOptDcr] = useState<number>(0.3);
+  const [optResult, setOptResult] = useState<{
+    lOptMh: number;
+    cOptUf: number;
+    rmsErrorDb: number;
+    iterations: number;
+  } | null>(null);
+  const [isOptimizing, setIsOptimizing] = useState<boolean>(false);
+
+  const handleRunOptimizer = () => {
+    setIsOptimizing(true);
+    try {
+      const targetFc = fc > 0 ? fc : 2500;
+      const reVal = (params.re && params.re > 0) ? params.re : (zobelRe > 0 ? zobelRe : (zWoofer > 0 ? zWoofer * 0.8 : 6.0));
+      const leVal = (params.le && params.le > 0) ? params.le : (zobelLe > 0 ? zobelLe : 0.8);
+      const res = optimizeCrossoverLowpass(targetFc, reVal, leVal, optDcr || 0.3);
+      setOptResult(res);
+    } catch (e) {
+      console.error("Nelder-Mead optimization error:", e);
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
 
   const whCalculations = useMemo(() => {
     const d = whCoilDia; // mm
@@ -2324,6 +2349,146 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Auto-Optimización MNA (Nelder-Mead en Rust) */}
+            <div className="premium-form-card" style={{ borderTop: '1px solid var(--card-border)', paddingTop: '0.75rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                <div className="form-subsection-title" style={{ margin: 0 }}>
+                  {t("Auto-Optimización de Crossover (Solver MNA)")}
+                </div>
+                <span style={{ fontSize: '0.62rem', border: '1px solid var(--card-border)', background: 'rgba(255, 255, 255, 0.03)', color: 'var(--text-muted)', padding: '1px 5px', fontWeight: 500, letterSpacing: '0.3px' }}>
+                  NELDER-MEAD / RUST
+                </span>
+              </div>
+
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '0.6rem', lineHeight: '1.35' }}>
+                {t("Resuelve la matriz nodal compleja MNA para compensar la inductancia Le del woofer y minimizar el error RMS respecto al corte objetivo.")}
+              </div>
+
+              <div className="input-grid" style={{ marginBottom: '0.65rem' }}>
+                <div className="input-group">
+                  <label>{t("Fc Objetivo")} (Hz)</label>
+                  <div className="input-wrapper">
+                    <input
+                      type="number"
+                      value={fc}
+                      onChange={(e) => setFc(Math.max(20, parseFloat(e.target.value) || 2500))}
+                      step="50"
+                      style={{ fontFamily: 'var(--font-mono)' }}
+                    />
+                  </div>
+                </div>
+
+                <div className="input-group">
+                  <label>{t("Re Woofer")} (Ω)</label>
+                  <div className="input-wrapper">
+                    <input
+                      type="number"
+                      value={(params.re && params.re > 0) ? params.re : (zWoofer * 0.8)}
+                      readOnly
+                      title="Tomado automáticamente de los parámetros Thiele-Small del altavoz"
+                      style={{ opacity: 0.85, fontFamily: 'var(--font-mono)' }}
+                    />
+                  </div>
+                </div>
+
+                <div className="input-group">
+                  <label>{t("Le Woofer")} (mH)</label>
+                  <div className="input-wrapper">
+                    <input
+                      type="number"
+                      value={(params.le && params.le > 0) ? params.le : 0.8}
+                      readOnly
+                      title="Tomado automáticamente de los parámetros Thiele-Small del altavoz"
+                      style={{ opacity: 0.85, fontFamily: 'var(--font-mono)' }}
+                    />
+                  </div>
+                </div>
+
+                <div className="input-group">
+                  <label>{t("DCR Bobina")} (Ω)</label>
+                  <div className="input-wrapper">
+                    <input
+                      type="number"
+                      value={optDcr}
+                      onChange={(e) => setOptDcr(Math.max(0, parseFloat(e.target.value) || 0.3))}
+                      step="0.05"
+                      style={{ fontFamily: 'var(--font-mono)' }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleRunOptimizer}
+                disabled={isOptimizing}
+                style={{
+                  width: '100%',
+                  height: '30px',
+                  background: 'var(--primary)',
+                  color: '#090d16',
+                  border: '1px solid var(--primary)',
+                  borderRadius: '0px',
+                  fontWeight: 600,
+                  fontSize: '0.74rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: 'none',
+                  transition: 'background 0.15s ease'
+                }}
+              >
+                {isOptimizing ? t("Optimizando...") : t("Optimizar Simplex")}
+              </button>
+
+              {optResult && (
+                <div style={{ marginTop: '0.65rem', background: 'rgba(255, 255, 255, 0.02)', padding: '0.55rem 0.75rem', border: '1px solid var(--card-border)', borderRadius: '0px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.45rem', fontSize: '0.72rem', marginBottom: '0.5rem' }}>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.64rem', textTransform: 'uppercase' }}>{t("L Óptimo")}</span>
+                      <strong style={{ color: 'var(--text-main)', fontSize: '0.92rem', fontFamily: 'var(--font-mono)' }}>{optResult.lOptMh.toFixed(3)} mH</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.64rem', textTransform: 'uppercase' }}>{t("C Óptimo")}</span>
+                      <strong style={{ color: 'var(--text-main)', fontSize: '0.92rem', fontFamily: 'var(--font-mono)' }}>{optResult.cOptUf.toFixed(2)} µF</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.64rem', textTransform: 'uppercase' }}>{t("Error RMS")}</span>
+                      <strong style={{ color: optResult.rmsErrorDb < 4 ? 'var(--success)' : 'var(--warning)', fontSize: '0.88rem', fontFamily: 'var(--font-mono)' }}>{optResult.rmsErrorDb.toFixed(2)} dB</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.64rem', textTransform: 'uppercase' }}>{t("Iteraciones")}</span>
+                      <strong style={{ color: 'var(--text-muted)', fontSize: '0.88rem', fontFamily: 'var(--font-mono)' }}>{optResult.iterations}</strong>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setWhLTarget(Number(optResult.lOptMh.toFixed(3)));
+                      setWhCalcMode('turns');
+                    }}
+                    style={{
+                      width: '100%',
+                      background: 'transparent',
+                      border: '1px solid var(--card-border)',
+                      color: 'var(--text-secondary)',
+                      padding: '4px 8px',
+                      borderRadius: '0px',
+                      fontSize: '0.68rem',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      transition: 'border-color 0.15s ease, color 0.15s ease'
+                    }}
+                    title={t("Copiar valor a la calculadora de bobinas de Wheeler")}
+                  >
+                    {t("Transferir L a Diseñador de Inductores")}
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Calculadora de Inductores (Fórmula de Wheeler) */}

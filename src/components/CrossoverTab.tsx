@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { type Lang, translate } from '../utils/translations';
-import { getWasm } from '../wasm/index.ts';
+import { getWasm, optimizeCrossoverLowpass } from '../wasm/index';
 import type { CrossoverResult, CrossoverExportData } from '../types';
 import { CrossoverCad2D } from './CrossoverCad2D';
 
@@ -124,6 +124,206 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
   const enableLPad = readOnly ? (enableLPadProp ?? false) : enableLPadLocal;
   const attenuation = readOnly ? (attenuationProp ?? 3) : attenuationLocal;
   const zLoad = readOnly ? (zLoadProp ?? 8) : zLoadLocal;
+
+  // 6. Nelder-Mead Optimization Inputs (Rust MNA Engine)
+  const [optFc, setOptFc] = useState<number>(typeof fc === 'number' && fc > 0 ? fc : 2500);
+  const [optRe, setOptRe] = useState<number>(re > 0 ? re : (zWoofer > 0 ? zWoofer * 0.8 : 6.0));
+  const [optLe, setOptLe] = useState<number>(le > 0 ? le : 0.8);
+  const [optimizerDcr, setOptimizerDcr] = useState<number>(0.3);
+  const [optimizerResult, setOptimizerResult] = useState<{
+    lOptMh: number;
+    cOptUf: number;
+    rmsErrorDb: number;
+    iterations: number;
+  } | null>(null);
+  const [isOptimizing, setIsOptimizing] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (typeof fc === 'number' && fc > 0) setOptFc(fc);
+  }, [fc]);
+
+  useEffect(() => {
+    if (re > 0) setOptRe(re);
+    else if (zWoofer > 0) setOptRe(zWoofer * 0.8);
+  }, [re, zWoofer]);
+
+  useEffect(() => {
+    if (le > 0) setOptLe(le);
+  }, [le]);
+
+  const handleOptimizeLowpass = () => {
+    setIsOptimizing(true);
+    try {
+      const targetFrequency = optFc > 0 ? optFc : 2500;
+      const wooferRe = optRe > 0 ? optRe : 6.0;
+      const wooferLe = optLe > 0 ? optLe : 0.8;
+      const res = optimizeCrossoverLowpass(targetFrequency, wooferRe, wooferLe, optimizerDcr || 0.3);
+      setOptimizerResult(res);
+    } catch (e) {
+      console.error("Nelder-Mead optimization error:", e);
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
+
+  const renderNelderMeadOptimizer = (isCompact: boolean = false) => (
+    <div 
+      className="panel" 
+      style={{ 
+        background: 'var(--card-bg)', 
+        border: '1px solid var(--card-border)', 
+        padding: isCompact ? '0.75rem 0.9rem' : '1rem 1.25rem', 
+        borderRadius: '0px', 
+        display: 'flex', 
+        flexDirection: 'column', 
+        backdropFilter: 'blur(16px)', 
+        boxShadow: 'none',
+        marginBottom: '0.5rem'
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+        <span className="control-title" style={{ color: 'var(--text-main)', margin: 0, fontSize: isCompact ? '0.82rem' : '0.9rem', fontWeight: 600 }}>
+          {t("Auto-Optimización de Crossover (Solver MNA)")}
+        </span>
+        <span style={{ fontSize: '0.64rem', border: '1px solid var(--card-border)', background: 'rgba(255, 255, 255, 0.03)', color: 'var(--text-muted)', padding: '1px 6px', borderRadius: '0px', fontWeight: 500, letterSpacing: '0.3px' }}>
+          NELDER-MEAD SIMPLEX / RUST
+        </span>
+      </div>
+
+      <p style={{ fontSize: isCompact ? '0.7rem' : '0.74rem', color: 'var(--text-muted)', marginBottom: '0.6rem', lineHeight: '1.35', margin: '0 0 0.6rem 0' }}>
+        {t("Calcula los valores óptimos de L y C resolviendo la matriz nodal compleja MNA para compensar la inductancia Le del woofer y minimizar el error RMS.")}
+      </p>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(105px, 1fr))', gap: '0.5rem', alignItems: 'end', marginBottom: '0.65rem' }}>
+        <div className="input-group" style={{ margin: 0 }}>
+          <label style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>{t("Fc Objetivo")}</label>
+          <div className="input-wrapper" style={{ height: '28px' }}>
+            <input 
+              type="number" 
+              value={optFc} 
+              onChange={(e) => setOptFc(parseFloat(e.target.value) || 2500)} 
+              min="50" 
+              max="10000"
+              style={{ fontSize: '0.74rem', height: '28px', padding: '0 6px', fontFamily: 'var(--font-mono)' }}
+            />
+            <span className="unit-badge" style={{ fontSize: '0.65rem', padding: '0 4px' }}>Hz</span>
+          </div>
+        </div>
+
+        <div className="input-group" style={{ margin: 0 }}>
+          <label style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>{t("Re Woofer")}</label>
+          <div className="input-wrapper" style={{ height: '28px' }}>
+            <input 
+              type="number" 
+              value={optRe} 
+              onChange={(e) => setOptRe(parseFloat(e.target.value) || 6.0)} 
+              step="0.1"
+              min="1"
+              style={{ fontSize: '0.74rem', height: '28px', padding: '0 6px', fontFamily: 'var(--font-mono)' }}
+            />
+            <span className="unit-badge" style={{ fontSize: '0.65rem', padding: '0 4px' }}>Ω</span>
+          </div>
+        </div>
+
+        <div className="input-group" style={{ margin: 0 }}>
+          <label style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>{t("Le Woofer")}</label>
+          <div className="input-wrapper" style={{ height: '28px' }}>
+            <input 
+              type="number" 
+              value={optLe} 
+              onChange={(e) => setOptLe(parseFloat(e.target.value) || 0.8)} 
+              step="0.05"
+              min="0.01"
+              style={{ fontSize: '0.74rem', height: '28px', padding: '0 6px', fontFamily: 'var(--font-mono)' }}
+            />
+            <span className="unit-badge" style={{ fontSize: '0.65rem', padding: '0 4px' }}>mH</span>
+          </div>
+        </div>
+
+        <div className="input-group" style={{ margin: 0 }}>
+          <label style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>{t("DCR Bobina")}</label>
+          <div className="input-wrapper" style={{ height: '28px' }}>
+            <input 
+              type="number" 
+              value={optimizerDcr} 
+              onChange={(e) => setOptimizerDcr(parseFloat(e.target.value) || 0.3)} 
+              step="0.05"
+              min="0"
+              style={{ fontSize: '0.74rem', height: '28px', padding: '0 6px', fontFamily: 'var(--font-mono)' }}
+            />
+            <span className="unit-badge" style={{ fontSize: '0.65rem', padding: '0 4px' }}>Ω</span>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleOptimizeLowpass}
+          disabled={isOptimizing}
+          style={{
+            background: 'var(--primary)',
+            color: '#090d16',
+            border: '1px solid var(--primary)',
+            height: '28px',
+            padding: '0 0.85rem',
+            borderRadius: '0px',
+            fontWeight: 600,
+            fontSize: '0.72rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: 'none',
+            transition: 'background 0.15s ease',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          {isOptimizing ? t("Optimizando...") : t("Optimizar Simplex")}
+        </button>
+      </div>
+
+      {optimizerResult && (
+        <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--card-border)', padding: '0.55rem 0.8rem', borderRadius: '0px', display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', gap: '1.2rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div>
+              <span style={{ fontSize: '0.64rem', color: 'var(--text-muted)', display: 'block', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{t("L Óptimo")}</span>
+              <strong style={{ color: 'var(--text-main)', fontSize: '0.92rem', fontFamily: 'var(--font-mono)' }}>{optimizerResult.lOptMh.toFixed(3)} mH</strong>
+            </div>
+            <div>
+              <span style={{ fontSize: '0.64rem', color: 'var(--text-muted)', display: 'block', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{t("C Óptimo")}</span>
+              <strong style={{ color: 'var(--text-main)', fontSize: '0.92rem', fontFamily: 'var(--font-mono)' }}>{optimizerResult.cOptUf.toFixed(2)} µF</strong>
+            </div>
+            <div>
+              <span style={{ fontSize: '0.64rem', color: 'var(--text-muted)', display: 'block', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{t("Error RMS")}</span>
+              <strong style={{ color: optimizerResult.rmsErrorDb < 4 ? 'var(--success)' : 'var(--warning)', fontSize: '0.92rem', fontFamily: 'var(--font-mono)' }}>{optimizerResult.rmsErrorDb.toFixed(2)} dB</strong>
+            </div>
+            <div>
+              <span style={{ fontSize: '0.64rem', color: 'var(--text-muted)', display: 'block', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{t("Iteraciones")}</span>
+              <strong style={{ color: 'var(--text-muted)', fontSize: '0.92rem', fontFamily: 'var(--font-mono)' }}>{optimizerResult.iterations}</strong>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIndCalcTargetL(Number(optimizerResult.lOptMh.toFixed(2)))}
+            style={{
+              background: 'transparent',
+              border: '1px solid var(--card-border)',
+              color: 'var(--text-secondary)',
+              padding: '3px 8px',
+              borderRadius: '0px',
+              fontSize: '0.68rem',
+              fontWeight: 500,
+              cursor: 'pointer',
+              transition: 'border-color 0.15s ease, color 0.15s ease'
+            }}
+            title={t("Copiar valor a calculadora de inductores de Wheeler")}
+          >
+            {t("Transferir a Wheeler")}
+          </button>
+        </div>
+      )}
+    </div>
+  );
 
   // --- CROSSOVER CALCULATIONS ---
   const calculateCrossover = (): CrossoverResult | null => {
@@ -997,6 +1197,9 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
           </div>
 
         </div>
+
+        {/* AUTO-OPTIMIZADOR NELDER-MEAD SIMPLEX EN RUST (MNA SOLVER) */}
+        {renderNelderMeadOptimizer(false)}
 
         {/* DIAGRAMA CAD EN CANVAS 2D DE ANCHO COMPLETO */}
         <div style={{ width: '100%' }}>

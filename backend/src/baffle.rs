@@ -135,6 +135,19 @@ pub fn apply_baffle_step_to_spl(
     offset_y_cm: f64,
 ) -> Array {
     let freqs = default_chart_frequencies();
+    apply_baffle_step_to_spl_custom(&freqs, spl_values, width_cm, height_cm, offset_x_cm, offset_y_cm)
+}
+
+/// Aplica el efecto de bafle a una curva SPL con frecuencias personalizadas (ej. rango completo hasta 20kHz)
+#[wasm_bindgen]
+pub fn apply_baffle_step_to_spl_custom(
+    freqs: &[f64],
+    spl_values: &[f64],
+    width_cm: f64,
+    height_cm: f64,
+    offset_x_cm: f64,
+    offset_y_cm: f64,
+) -> Array {
     let result = Array::new();
     if spl_values.is_empty() || width_cm <= 0.0 || height_cm <= 0.0 {
         for &v in spl_values {

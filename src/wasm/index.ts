@@ -299,6 +299,31 @@ export function calcExtendedImpedanceCurve(
   return Array.from(res);
 }
 
+export function calcExtendedImpedanceCurveCustom(
+  freqs: number[],
+  fs: number,
+  qms: number,
+  qes: number,
+  re: number,
+  vas: number,
+  vb: number,
+  fb: number,
+  isPorted: boolean,
+  lebMh: number = 0.5,
+  keSh: number = 0.8,
+  rssOhm: number = 35.0,
+  beta: number = 0.015,
+  valid: boolean = true
+): number[] {
+  const w = getWasmSafe();
+  if (!w) return [];
+  const res = w.calc_extended_impedance_curve_custom(
+    new Float64Array(freqs),
+    fs, qms, qes, re, vas, vb, fb, isPorted, lebMh, keSh, rssOhm, beta, valid
+  );
+  return Array.from(res);
+}
+
 /**
  * Curva de difracción y efecto de bafle (Baffle Step + Edge Diffraction).
  */
@@ -328,6 +353,27 @@ export function applyBaffleStepToSpl(
   const w = getWasmSafe();
   if (!w) return splValues;
   const res = w.apply_baffle_step_to_spl(
+    new Float64Array(splValues),
+    widthCm,
+    heightCm,
+    offsetXCm,
+    offsetYCm
+  );
+  return Array.from(res);
+}
+
+export function applyBaffleStepToSplCustom(
+  freqs: number[],
+  splValues: number[],
+  widthCm: number,
+  heightCm: number,
+  offsetXCm: number = 0,
+  offsetYCm: number = 0
+): number[] {
+  const w = getWasmSafe();
+  if (!w) return splValues;
+  const res = w.apply_baffle_step_to_spl_custom(
+    new Float64Array(freqs),
     new Float64Array(splValues),
     widthCm,
     heightCm,

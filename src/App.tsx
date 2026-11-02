@@ -1043,6 +1043,8 @@ function App({ wasmError }: AppProps) {
             fc={fc}
             fcLow={fcLow}
             fcHigh={fcHigh}
+            baffleWidth={cabinetData?.wExt || Number(woodExtWidth) || 32}
+            baffleHeight={cabinetData?.hExt || Number(woodExtHeight) || 42}
             portAreaM2={
               (() => {
                 const pDia = portShape === 'round'

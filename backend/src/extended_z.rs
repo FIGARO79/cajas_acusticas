@@ -251,6 +251,29 @@ pub fn calc_extended_impedance_curve(
     valid: bool,
 ) -> Array {
     let freqs = default_chart_frequencies();
+    calc_extended_impedance_curve_custom(
+        &freqs, fs, qms, qes, re, vas, vb, fb, is_ported, leb_mh, ke_sh, rss_ohm, beta, valid,
+    )
+}
+
+/// Genera la curva vectorial de impedancia extendida para cualquier conjunto de frecuencias
+#[wasm_bindgen]
+pub fn calc_extended_impedance_curve_custom(
+    freqs: &[f64],
+    fs: f64,
+    qms: f64,
+    qes: f64,
+    re: f64,
+    vas: f64,
+    vb: f64,
+    fb: f64,
+    is_ported: bool,
+    leb_mh: f64,
+    ke_sh: f64,
+    rss_ohm: f64,
+    beta: f64,
+    valid: bool,
+) -> Array {
     let result = Array::new();
     if !valid || vb <= 0.0 {
         return result;

@@ -14,7 +14,15 @@ import {
 } from 'chart.js';
 import type { CalculatedSealed, CalculatedPorted, CalculatedBandpass, SpeakerParams } from '../types';
 import { type Lang, translate } from '../utils/translations';
-import { calcSealedCurve, calcPortedCurve, calcBandpass4Curve, calcBandpass6Curve } from '../wasm/index';
+import {
+  calcSealedCurve,
+  calcPortedCurve,
+  calcBandpass4Curve,
+  calcBandpass6Curve,
+  applyBaffleStepToSpl,
+  applyBaffleStepToSplCustom,
+  calcExtendedImpedanceCurveCustom,
+} from '../wasm/index';
 import {
   calcExcursionCurve,
   calcAirVelocityCurve,
@@ -270,6 +278,8 @@ interface SimulationChartProps {
   fcLow?: number;
   fcHigh?: number;
   portAreaM2?: number;
+  baffleWidth?: number;
+  baffleHeight?: number;
 }
 
 const SimulationChartComponent: React.FC<SimulationChartProps> = ({
@@ -285,6 +295,8 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
   fcLow = 500,
   fcHigh = 4000,
   portAreaM2 = 0.0044,
+  baffleWidth = 32,
+  baffleHeight = 45,
 }) => {
   const t = useCallback((text: string) => translate(text, lang), [lang]);
 
@@ -295,6 +307,8 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
   // Range and Annotation modes
   const [rangeMode, setRangeMode] = useState<'bass' | 'full'>('bass');
   const [showRefLines, setShowRefLines] = useState<boolean>(true);
+  const [applyBaffleDiffraction, setApplyBaffleDiffraction] = useState<boolean>(false);
+  const [useExtendedZ, setUseExtendedZ] = useState<boolean>(true);
 
   // State for curve points (used in graves/bass mode)
   const [sealedPoints, setSealedPoints] = useState<{x:number,y:number}[]>([]);
@@ -305,8 +319,11 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
   useEffect(() => {
     let cancelled = false;
     if (sealedData) {
-      calcSealedCurve(sealedData, params).then(vals => {
+      calcSealedCurve(sealedData, params).then(rawVals => {
         if (!cancelled) {
+          const vals = applyBaffleDiffraction
+            ? applyBaffleStepToSpl(rawVals, baffleWidth, baffleHeight, 0, 0)
+            : rawVals;
           const pts = vals.map((y:number, idx:number) => ({ x: frequencies[idx], y: Math.max(-35, y) }));
           setSealedPoints(pts);
         }
@@ -317,8 +334,11 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
       }, 0);
     }
     if (portedData) {
-      calcPortedCurve(portedData, params).then(vals => {
+      calcPortedCurve(portedData, params).then(rawVals => {
         if (!cancelled) {
+          const vals = applyBaffleDiffraction
+            ? applyBaffleStepToSpl(rawVals, baffleWidth, baffleHeight, 0, 0)
+            : rawVals;
           const pts = vals.map((y:number, idx:number) => ({ x: frequencies[idx], y: Math.max(-35, y) }));
           setPortedPoints(pts);
         }
@@ -330,15 +350,21 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
     }
     if (bandpassData && bandpassData.valid) {
       if (bandpassData.order === 4) {
-        calcBandpass4Curve(bandpassData.Vf, bandpassData.Vr, bandpassData.Fb, params).then(vals => {
+        calcBandpass4Curve(bandpassData.Vf, bandpassData.Vr, bandpassData.Fb, params).then(rawVals => {
           if (!cancelled) {
+            const vals = applyBaffleDiffraction
+              ? applyBaffleStepToSpl(rawVals, baffleWidth, baffleHeight, 0, 0)
+              : rawVals;
             const pts = vals.map((y:number, idx:number) => ({ x: frequencies[idx], y: Math.max(-35, y) }));
             setBandpassPoints(pts);
           }
         });
       } else {
-        calcBandpass6Curve(bandpassData.Vf, bandpassData.Vr, bandpassData.Fl || 0, bandpassData.Fh || 0, params).then(vals => {
+        calcBandpass6Curve(bandpassData.Vf, bandpassData.Vr, bandpassData.Fl || 0, bandpassData.Fh || 0, params).then(rawVals => {
           if (!cancelled) {
+            const vals = applyBaffleDiffraction
+              ? applyBaffleStepToSpl(rawVals, baffleWidth, baffleHeight, 0, 0)
+              : rawVals;
             const pts = vals.map((y:number, idx:number) => ({ x: frequencies[idx], y: Math.max(-35, y) }));
             setBandpassPoints(pts);
           }
@@ -350,7 +376,7 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
       }, 0);
     }
     return () => { cancelled = true; };
-  }, [sealedData, portedData, bandpassData, params]);
+  }, [sealedData, portedData, bandpassData, params, applyBaffleDiffraction, baffleWidth, baffleHeight]);
 
   // Generate curves for full range if in 'full' mode
   const fullRangeDatasets = React.useMemo(() => {
@@ -401,8 +427,17 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
     }
 
     if (boxPoints.length > 0) {
+      if (applyBaffleDiffraction) {
+        const rawY = boxPoints.map(p => p.y);
+        const diffractedY = applyBaffleStepToSplCustom(frequenciesFull, rawY, baffleWidth, baffleHeight, 0, 0);
+        boxPoints = boxPoints.map((p, idx) => ({
+          x: p.x,
+          y: Math.max(-45, diffractedY[idx])
+        }));
+      }
+
       datasets.push({
-        label,
+        label: applyBaffleDiffraction ? `${label} + Baffle Step` : label,
         data: boxPoints,
         borderColor,
         backgroundColor,
@@ -522,7 +557,7 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
     }
 
     return datasets;
-  }, [rangeMode, params, sealedData, portedData, bandpassData, crossoverWays, crossoverType, fc, fcLow, fcHigh, t]);
+  }, [rangeMode, params, sealedData, portedData, bandpassData, crossoverWays, crossoverType, fc, fcLow, fcHigh, applyBaffleDiffraction, baffleWidth, baffleHeight, t]);
 
   // Construct reference line annotations
   const annotations = React.useMemo(() => {
@@ -759,9 +794,26 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
     if (chartMode !== 'impedance') return [];
     const list: Record<string, unknown>[] = [];
     if (sealedData && sealedData.valid) {
-      const vals = calcImpedanceCurve(params, sealedData.Vb, sealedData.Fc, false, true);
+      const vals = useExtendedZ
+        ? calcExtendedImpedanceCurveCustom(
+            frequencies,
+            params.fs || 35.0,
+            params.qms || 3.5,
+            params.qes || 0.38,
+            params.re || 6.0,
+            params.vas || 50.0,
+            sealedData.Vb,
+            0.0,
+            false,
+            params.le ? params.le * 0.7 : 0.5,
+            0.8,
+            35.0,
+            0.015,
+            true
+          )
+        : calcImpedanceCurve(params, sealedData.Vb, sealedData.Fc, false, true);
       list.push({
-        label: `${t("Impedancia Caja Sellada")} (Ω)`,
+        label: `${t("Impedancia Caja Sellada")}${useExtendedZ ? ' (Thorborg/Knudsen)' : ''} (Ω)`,
         data: frequencies.map((f, i) => ({
           x: f,
           y: vals[i] ?? 0
@@ -773,9 +825,26 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
       });
     }
     if (portedData && portedData.valid) {
-      const vals = calcImpedanceCurve(params, portedData.Vb, portedData.Fb, true, true);
+      const vals = useExtendedZ
+        ? calcExtendedImpedanceCurveCustom(
+            frequencies,
+            params.fs || 35.0,
+            params.qms || 3.5,
+            params.qes || 0.38,
+            params.re || 6.0,
+            params.vas || 50.0,
+            portedData.Vb,
+            portedData.Fb,
+            true,
+            params.le ? params.le * 0.7 : 0.5,
+            0.8,
+            35.0,
+            0.015,
+            true
+          )
+        : calcImpedanceCurve(params, portedData.Vb, portedData.Fb, true, true);
       list.push({
-        label: `${t("Impedancia Caja Ventilada")} (Ω)`,
+        label: `${t("Impedancia Caja Ventilada")}${useExtendedZ ? ' (Thorborg/Knudsen)' : ''} (Ω)`,
         data: frequencies.map((f, i) => ({
           x: f,
           y: vals[i] ?? 0
@@ -798,7 +867,7 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
       });
     }
     return list;
-  }, [chartMode, sealedData, portedData, params, t]);
+  }, [chartMode, sealedData, portedData, params, useExtendedZ, t]);
 
   const phaseDatasets = React.useMemo(() => {
     if (chartMode !== 'phase') return [];
@@ -1113,14 +1182,39 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
 
           {/* Toggle Reference Lines */}
           {chartMode === 'spl' && (
-            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.72rem', color: 'var(--text-main)', cursor: 'pointer', margin: 0, fontWeight: 600, whiteSpace: 'nowrap' }}>
+            <>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.72rem', color: 'var(--text-main)', cursor: 'pointer', margin: 0, fontWeight: 600, whiteSpace: 'nowrap' }} title="Difracción de bordes y transición Baffle Step 4pi a 2pi según ancho y alto del mueble">
+                <input
+                  type="checkbox"
+                  checked={applyBaffleDiffraction}
+                  onChange={(e) => setApplyBaffleDiffraction(e.target.checked)}
+                  style={{ cursor: 'pointer' }}
+                />
+                <span>{t("Baffle Step (Difracción)")}</span>
+              </label>
+
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.72rem', color: 'var(--text-main)', cursor: 'pointer', margin: 0, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                <input
+                  type="checkbox"
+                  checked={showRefLines}
+                  onChange={(e) => setShowRefLines(e.target.checked)}
+                  style={{ cursor: 'pointer' }}
+                />
+                <span>{t("Líneas Ref.")}</span>
+              </label>
+            </>
+          )}
+
+          {/* Toggle Modelo Extendido en modo Impedancia */}
+          {chartMode === 'impedance' && (
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.72rem', color: 'var(--text-main)', cursor: 'pointer', margin: 0, fontWeight: 600, whiteSpace: 'nowrap' }} title="Modelo extendido de Thorborg/Futtrup (semi-inductancia Ke, Leb, Rss) y viscoelasticidad de suspensión Knudsen LOG creep">
               <input
                 type="checkbox"
-                checked={showRefLines}
-                onChange={(e) => setShowRefLines(e.target.checked)}
+                checked={useExtendedZ}
+                onChange={(e) => setUseExtendedZ(e.target.checked)}
                 style={{ cursor: 'pointer' }}
               />
-              <span>{t("Líneas Ref.")}</span>
+              <span>{t("Modelo Extendido (Thorborg/Knudsen)")}</span>
             </label>
           )}
         </div>
