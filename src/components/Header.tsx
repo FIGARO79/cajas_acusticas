@@ -55,7 +55,13 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <div className="top-navbar">
       <div className="logo-area-nav">
-        <div className="logo-mark">A</div>
+        <img
+          src="/app-icon.png"
+          alt="AcousticLAB"
+          className="logo-mark-img"
+          width={28}
+          height={28}
+        />
         <div>
           <h1>Acoustic<span className="logo-highlight">LAB</span></h1>
           <div className="logo-badge">Premium acoustics</div>

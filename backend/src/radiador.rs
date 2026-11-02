@@ -11,7 +11,7 @@ pub struct PassiveRadiatorResult {
 }
 
 #[wasm_bindgen]
-pub fn calc_radiador_pasivo(vb: f64, vas: f64, fs: f64, cd: f64, mp: f64) -> PassiveRadiatorResult {
+pub fn calc_radiador_pasivo(vb: f64, vas: f64, _fs: f64, cd: f64, mp: f64) -> PassiveRadiatorResult {
     // Parámetros de aire y acústicos
     let cd_val = if cd <= 0.0 { 0.001 } else { cd };
     let mp_val = if mp <= 0.0 { 0.001 } else { mp };

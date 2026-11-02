@@ -11,23 +11,27 @@ export async function initWasm(): Promise<typeof wasm> {
   return wasmInstance;
 }
 
-export function getWasm() {
+export function getWasm(): typeof wasm {
   if (!wasmInstance) throw new Error("WASM not initialized yet");
   return wasmInstance;
 }
 
+export function getWasmSafe(): typeof wasm | null {
+  return wasmInstance;
+}
+
 // -----------------------
-// New wrappers for Rust functions
+// Wrappers for Rust functions
 // -----------------------
 
-/** Auto parameters calculation (runProCalculations replacement) */
+/** Auto parameters calculation (Delegado 100% al motor en Rust) */
 export async function calcAutoParams(params: {
   vas: number; sd: number; fs: number; re: number; qes: number; xmax: number;
   mms?: number; cms?: number; bl?: number; vd?: number;
   qms?: number; pe?: number; sens?: number;
 }) {
-  const wasm = await getWasm();
-  const res = wasm.calc_auto_params(
+  const w = await getWasm();
+  const res = w.calc_auto_params(
     params.vas,
     params.sd,
     params.fs,
@@ -37,33 +41,11 @@ export async function calcAutoParams(params: {
     params.mms ?? null,
     params.cms ?? null,
     params.bl ?? null,
-    params.vd ?? null
+    params.vd ?? null,
+    params.qms ?? null,
+    params.pe ?? null,
+    params.sens ?? null
   );
-
-  let eta0 = 0;
-  if (params.qes && params.fs && params.vas) {
-    eta0 = 9.64e-10 * Math.pow(params.fs, 3) * params.vas / params.qes;
-  }
-
-  let spl = params.sens;
-  if (!spl && eta0 > 0) {
-    spl = 112.2 + 10 * Math.log10(eta0);
-  }
-
-  let splMax = 0;
-  if (spl && params.pe) {
-    splMax = spl + 10 * Math.log10(params.pe);
-  }
-
-  let rms = 0;
-  if (params.fs && res.mms && params.qms) {
-    rms = (2 * Math.PI * params.fs * (res.mms / 1000)) / params.qms;
-  }
-
-  let zmax = 0;
-  if (params.re && params.qms && params.qes) {
-    zmax = params.re * (1 + params.qms / params.qes);
-  }
 
   return {
     cms: res.cms,
@@ -74,60 +56,58 @@ export async function calcAutoParams(params: {
     autoMms: res.auto_mms,
     autoBl: res.auto_bl,
     autoVd: res.auto_vd,
-    eta0,
-    spl,
-    splMax,
-    rms,
-    zmax,
+    eta0: res.eta0,
+    spl: res.spl,
+    splMax: res.spl_max,
+    rms: res.rms,
+    zmax: res.zmax,
   };
 }
 
-/** Suggested alignment for vented box (calculateSuggestedPorted replacement) */
+/** Suggested alignment for vented box */
 export async function calcSuggestedPorted(qts: number, fs: number, vas: number) {
-  const wasm = await getWasm();
+  const w = await getWasm();
   let tipo = "QB3";
   if (qts < 0.35) {
     tipo = "SBB4";
   } else if (qts >= 0.35 && qts <= 0.4) {
     tipo = "B4";
   }
-  const res = wasm.calc_alineacion_ventilada(fs, vas, qts, tipo);
+  const res = w.calc_alineacion_ventilada(fs, vas, qts, tipo);
   return { Vb: res.vb, Fb: res.fb, F3: res.f3, alignmentName: tipo };
 }
 
 /** Radiador pasivo calculation */
 export async function calcRadiadorPasivo(vb: number, vas: number, fs: number, cd: number, mp: number) {
-  const wasm = await getWasm();
-  const res = wasm.calc_radiador_pasivo(vb, vas, fs, cd, mp);
+  const w = await getWasm();
+  const res = w.calc_radiador_pasivo(vb, vas, fs, cd, mp);
   return { fb: res.fb, capAcustica: res.cap_acustica, masaAñadida: res.masa_añadida };
 }
 
 /** Isobaric configuration calculations */
 export async function calcIsobariMultiple(fs: number, vas: number, qts: number, n: number, tipo: string) {
-  const wasm = await getWasm();
-  const res = wasm.calc_isobari_multiple(fs, vas, qts, n, tipo);
+  const w = await getWasm();
+  const res = w.calc_isobari_multiple(fs, vas, qts, n, tipo);
   return { fs_eq: res.fs_eq, vas_eq: res.vas_eq, qts_eq: res.qts_eq, vb_eq: res.vb_eq };
 }
 
-/** Sealed box frequency response curve */
-export async function calcSealedCurve(sealed: CalculatedSealed, params: SpeakerParams) {
-  const wasm = await getWasm();
-  const res = wasm.calc_sealed_curve(
+/** Sealed box frequency response curve (10-500 Hz) */
+export async function calcSealedCurve(sealed: CalculatedSealed, params: SpeakerParams): Promise<number[]> {
+  const w = await getWasm();
+  const res = w.calc_sealed_curve(
     params.fs,
     params.qts,
     params.vas,
     sealed.Vb,
     sealed.valid
   );
-  const arr: number[] = [];
-  res.forEach((v: number) => arr.push(v));
-  return arr;
+  return Array.from(res);
 }
 
-/** Ported box frequency response curve */
-export async function calcPortedCurve(ported: CalculatedPorted, params: SpeakerParams) {
-  const wasm = await getWasm();
-  const res = wasm.calc_ported_curve(
+/** Ported box frequency response curve (10-500 Hz) */
+export async function calcPortedCurve(ported: CalculatedPorted, params: SpeakerParams): Promise<number[]> {
+  const w = await getWasm();
+  const res = w.calc_ported_curve(
     params.fs,
     params.qts,
     params.vas,
@@ -135,29 +115,27 @@ export async function calcPortedCurve(ported: CalculatedPorted, params: SpeakerP
     ported.Fb,
     ported.valid
   );
-  const arr: number[] = [];
-  res.forEach((v: number) => arr.push(v));
-  return arr;
+  return Array.from(res);
 }
 
 /** Bandpass 4th order calculations */
 export async function calcBandpass4(fs: number, vas: number, qts: number, s: number) {
-  const wasm = await getWasm();
-  const res = wasm.calc_bandpass_4(fs, vas, qts, s);
+  const w = await getWasm();
+  const res = w.calc_bandpass_4(fs, vas, qts, s);
   return { vf: res.vf, vr: res.vr, fb: res.fb, f0: res.f0, delta_f: res.delta_f };
 }
 
 /** Bandpass 6th order calculations */
 export async function calcBandpass6(fs: number, vas: number, qts: number, a: number) {
-  const wasm = await getWasm();
-  const res = wasm.calc_bandpass_6(fs, vas, qts, a);
+  const w = await getWasm();
+  const res = w.calc_bandpass_6(fs, vas, qts, a);
   return { vf: res.vf, vr: res.vr, fh: res.fh, fl: res.fl };
 }
 
-/** Bandpass 4th order frequency response curve */
-export async function calcBandpass4Curve(vf: number, vr: number, fb: number, params: SpeakerParams) {
-  const wasm = await getWasm();
-  const res = wasm.calc_bandpass4_curve(
+/** Bandpass 4th order frequency response curve (10-500 Hz) */
+export async function calcBandpass4Curve(vf: number, vr: number, fb: number, params: SpeakerParams): Promise<number[]> {
+  const w = await getWasm();
+  const res = w.calc_bandpass4_curve(
     params.fs,
     params.qts,
     params.vas,
@@ -166,15 +144,13 @@ export async function calcBandpass4Curve(vf: number, vr: number, fb: number, par
     fb,
     vf > 0 && vr > 0 && fb > 0
   );
-  const arr: number[] = [];
-  res.forEach((v: number) => arr.push(v));
-  return arr;
+  return Array.from(res);
 }
 
-/** Bandpass 6th order frequency response curve */
-export async function calcBandpass6Curve(vf: number, vr: number, fl: number, fh: number, params: SpeakerParams) {
-  const wasm = await getWasm();
-  const res = wasm.calc_bandpass6_curve(
+/** Bandpass 6th order frequency response curve (10-500 Hz) */
+export async function calcBandpass6Curve(vf: number, vr: number, fl: number, fh: number, params: SpeakerParams): Promise<number[]> {
+  const w = await getWasm();
+  const res = w.calc_bandpass6_curve(
     params.fs,
     params.qts,
     params.vas,
@@ -184,21 +160,114 @@ export async function calcBandpass6Curve(vf: number, vr: number, fl: number, fh:
     fh,
     vf > 0 && vr > 0 && fl > 0 && fh > 0
   );
-  const arr: number[] = [];
-  res.forEach((v: number) => arr.push(v));
-  return arr;
+  return Array.from(res);
 }
 
+/** Custom frequency curves (para Full-Range 10-20.000 Hz o cualquier lista arbitraria) */
+export function calcSealedCurveCustom(freqs: number[], fs: number, qts: number, vas: number, vb: number, valid = true): number[] {
+  const w = getWasm();
+  const floatArr = Float64Array.from(freqs);
+  return Array.from(w.calc_sealed_curve_custom(floatArr, fs, qts, vas, vb, valid));
+}
 
+export function calcPortedCurveCustom(freqs: number[], fs: number, qts: number, vas: number, vb: number, fb: number, valid = true): number[] {
+  const w = getWasm();
+  const floatArr = Float64Array.from(freqs);
+  return Array.from(w.calc_ported_curve_custom(floatArr, fs, qts, vas, vb, fb, valid));
+}
+
+export function calcBandpass4CurveCustom(freqs: number[], fs: number, qts: number, vas: number, vf: number, vr: number, fb: number, valid = true): number[] {
+  const w = getWasm();
+  const floatArr = Float64Array.from(freqs);
+  return Array.from(w.calc_bandpass4_curve_custom(floatArr, fs, qts, vas, vf, vr, fb, valid));
+}
+
+export function calcBandpass6CurveCustom(freqs: number[], vas: number, vf: number, vr: number, fl: number, fh: number, valid = true): number[] {
+  const w = getWasm();
+  const floatArr = Float64Array.from(freqs);
+  return Array.from(w.calc_bandpass6_curve_custom(floatArr, vas, vf, vr, fl, fh, valid));
+}
+
+/** Crossover filter gain in dB calculado por Rust */
+export function calcFilterGain(f: number, fcPoint: number, filterType: string, passType: 'LP' | 'HP'): number {
+  const w = getWasm();
+  return w.calc_filter_gain(f, fcPoint, filterType, passType);
+}
 
 /** Calculate number of turns needed for an inductor (Reverse Wheeler formula) */
 export async function calcVueltasInductor(l_mh: number, d_mm: number, l_cm: number) {
-  const wasm = await getWasm();
-  return wasm.calc_vueltas_inductor_wheeler(l_mh, d_mm, l_cm);
+  const w = await getWasm();
+  return w.calc_vueltas_inductor_wheeler(l_mh, d_mm, l_cm);
 }
 
 /** Calculate inductor value from physical dimensions (Wheeler formula) */
 export async function calcInductorWheeler(n: number, d_mm: number, l_cm: number) {
-  const wasm = await getWasm();
-  return wasm.calc_inductor_wheeler(n, d_mm, l_cm);
+  const w = await getWasm();
+  return w.calc_inductor_wheeler(n, d_mm, l_cm);
+}
+
+export interface VolumenNetoResultJS {
+  vBruto: number;
+  vExtra: number;
+  vPort: number;
+  vNetoFisico: number;
+  vNetoAcustico: number;
+  portLength: number;
+  exceedsDepth: boolean;
+}
+
+/**
+ * Cálculo del volumen neto de ebanistería y desplazamiento de puerto 100% en backend de Rust.
+ * Resuelve la interacción física entre volumen de caja, sintonía Fb y desplazamiento del tubo sin divergencias.
+ */
+export function calcVolumenNetoMadera(
+  vBruto: number,
+  vExtra: number,
+  boxType: string,
+  fb: number,
+  numPorts: number,
+  portDia: number,
+  flaredEnds: number,
+  maxDepthCm: number,
+  useCustomPortLen: boolean,
+  customPortLen: number,
+  dampingFactor: number
+): VolumenNetoResultJS {
+  const w = getWasmSafe();
+  if (w) {
+    const res = w.calc_volumen_neto_madera(
+      vBruto,
+      vExtra,
+      boxType,
+      fb,
+      numPorts,
+      portDia,
+      flaredEnds,
+      maxDepthCm,
+      useCustomPortLen,
+      customPortLen,
+      dampingFactor
+    );
+    const out: VolumenNetoResultJS = {
+      vBruto: res.v_bruto,
+      vExtra: res.v_extra,
+      vPort: res.v_port,
+      vNetoFisico: res.v_neto_fisico,
+      vNetoAcustico: res.v_neto_acustico,
+      portLength: res.port_length,
+      exceedsDepth: res.exceeds_depth,
+    };
+    res.free();
+    return out;
+  }
+  const vBase = Math.max(0.05, vBruto - vExtra);
+  return {
+    vBruto,
+    vExtra,
+    vPort: 0,
+    vNetoFisico: vBase,
+    vNetoAcustico: vBase * dampingFactor,
+    portLength: 0,
+    exceedsDepth: false,
+  };
 }

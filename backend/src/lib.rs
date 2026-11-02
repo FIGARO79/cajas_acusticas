@@ -1,7 +1,6 @@
 //! Biblioteca backend compilada a WebAssembly para usar en React.
 //! Exponemos funciones simples mediante `wasm-bindgen`.
-
-use wasm_bindgen::prelude::*;
+#![allow(clippy::too_many_arguments)]
 
 pub mod auto_params;
 pub mod cajas;

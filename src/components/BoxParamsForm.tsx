@@ -459,41 +459,9 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
     return list;
   }, [crossoverWays, crossoverType, fc, fcLow, fcHigh, zTweeter, zMidrange, zWoofer, t]);
 
-  // Determinar la sintonía (Fb) óptima real recomendada para el altavoz y la caja:
-  // Si la alineación es B4 o el altavoz tiene Qts >= 0.45, la sintonía óptima real es Fs (50 Hz) para evitar jorobas.
-  const targetOptimalFb = useMemo(() => {
-    if (ventedAlignment === 'B4') {
-      return params.fs || 50;
-    }
-    if (useCustomPortLength && portedData.valid && portedData.Fb > 0) {
-      if (params.fs && portedData.Fb > params.fs * 1.2) {
-        return params.fs;
-      }
-      return portedData.Fb;
-    }
-    if (customPorted && customFb > 0) {
-      return customFb;
-    }
-    if (params.qts && params.qts >= 0.45 && params.fs && params.fs > 0) {
-      return params.fs;
-    }
-    return portedData.valid && portedData.Fb > 0 ? portedData.Fb : (params.fs || 50);
-  }, [ventedAlignment, useCustomPortLength, portedData.valid, portedData.Fb, customPorted, customFb, params.qts, params.fs]);
-
-  // Alineación sugerida óptima según el Qts del altavoz
-  const recommendedAlignment = useMemo<'QB3' | 'B4' | 'SBB4'>(() => {
-    if (!params.qts || params.qts <= 0) return 'B4';
-    if (params.qts < 0.38) return 'QB3';
-    if (params.qts <= 0.45) return 'B4';
-    return 'B4'; // Para Qts >= 0.45, B4 (Fb=Fs) es la ideal para evitar jorobas
-  }, [params.qts]);
-
-  // Sintonía Fb óptima sugerida según los parámetros Thiele-Small
+  // Sintonía Fb óptima sugerida según la alineación acústica activa (QB3, B4, SBB4) y los parámetros Thiele-Small
   const recommendedFbForDriver = useMemo<number>(() => {
     if (!params.fs || params.fs <= 0) return 0;
-    if (params.qts && params.qts >= 0.45) {
-      return Math.round(params.fs * 10) / 10;
-    }
     try {
       const wasm = getWasm();
       if (wasm && params.vas && params.qts) {
@@ -503,6 +471,35 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
     } catch {}
     return Math.round(params.fs * 10) / 10;
   }, [params.fs, params.qts, params.vas, ventedAlignment]);
+
+  // Determinar la sintonía (Fb) objetivo para el cálculo de puertos:
+  // Si el usuario fijó una sintonía personalizada, la respeta; de lo contrario usa la Fb óptima de la alineación seleccionada
+  const targetOptimalFb = useMemo(() => {
+    if (!useCustomPortLength) {
+      if (customPorted && customFb > 0) {
+        return customFb;
+      }
+      if (recommendedFbForDriver > 0) {
+        return recommendedFbForDriver;
+      }
+      if (portedData.valid && portedData.Fb > 0) {
+        return portedData.Fb;
+      }
+    } else {
+      if (portedData.valid && portedData.Fb > 0) {
+        return portedData.Fb;
+      }
+    }
+    return params.fs || 50;
+  }, [useCustomPortLength, customPorted, customFb, recommendedFbForDriver, portedData.valid, portedData.Fb, params.fs]);
+
+  // Alineación sugerida óptima según el Qts del altavoz
+  const recommendedAlignment = useMemo<'QB3' | 'B4' | 'SBB4'>(() => {
+    if (!params.qts || params.qts <= 0) return 'B4';
+    if (params.qts < 0.38) return 'QB3';
+    if (params.qts <= 0.45) return 'B4';
+    return 'B4'; // Para Qts >= 0.45, B4 (Fb=Fs) es la ideal para evitar jorobas
+  }, [params.qts]);
 
   const handleApplyOptimalFb = () => {
     if (recommendedFbForDriver <= 0) return;
@@ -680,7 +677,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
   return (
     <aside className="panel box-design-panel" style={{ borderLeft: 'none' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', borderBottom: '1px solid var(--card-border)', paddingBottom: '0.25rem' }}>
-        <h3 className="panel-title" style={{ marginBottom: 0, borderBottom: 'none', paddingBottom: 0, fontSize: '12px', fontWeight: 700 }}>{t("Diseño")}</h3>
+        <h3 className="panel-title" style={{ marginBottom: 0, borderBottom: 'none', paddingBottom: 0, fontSize: '12px', fontWeight: 700 }}>{t("Caja Acústica")}</h3>
       </div>
 
       {/* Medidor Visual de EBP (Thiele-Small) */}
@@ -1507,7 +1504,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                   {params.fs && params.qts && (
                     <div style={{ fontSize: '0.64rem', color: 'var(--text-muted)', marginTop: '0.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span>
-                        🎯 {t("Sugerida")}: <strong style={{ color: 'var(--accent)' }}>{recommendedAlignment === 'B4' ? 'Hi-Fi (B4)' : recommendedAlignment === 'QB3' ? 'High Output (QB3)' : 'Ext. Bass (SBB4)'}</strong> (Qts: {params.qts.toFixed(2)})
+                        {t("Sugerida")}: <strong style={{ color: 'var(--accent)' }}>{recommendedAlignment === 'B4' ? 'Hi-Fi (B4)' : recommendedAlignment === 'QB3' ? 'High Output (QB3)' : 'Ext. Bass (SBB4)'}</strong> (Qts: {params.qts.toFixed(2)})
                       </span>
                       {recommendedFbForDriver > 0 && (
                         <span>
@@ -1519,9 +1516,11 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 </div>
               )}
 
-              <div className="input-grid">
+              <div className="input-grid" style={{ alignItems: 'flex-start' }}>
                 <div className="input-group">
-                  <label>{t("Volumen Neto (Vb)")}</label>
+                  <label style={{ height: '1.2rem', display: 'flex', alignItems: 'center', margin: 0 }}>
+                    {t("Volumen Neto (Vb)")}
+                  </label>
                   <div className="input-wrapper">
                     <input
                       type="number"
@@ -1539,28 +1538,9 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 </div>
 
                 <div className="input-group">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.15rem' }}>
-                    <label style={{ margin: 0 }}>{boxType === 'bandpass' ? t("Sintonía Frontal (Fb)") : t("Sintonía (Fb)")}</label>
-                    {recommendedFbForDriver > 0 && (
-                      <button
-                        type="button"
-                        onClick={handleApplyOptimalFb}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: 'var(--accent)',
-                          fontSize: '0.66rem',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          padding: 0,
-                          textDecoration: 'underline'
-                        }}
-                        title={`Ajustar a la sintonía óptima recomendada para este altavoz (${recommendedFbForDriver.toFixed(1)} Hz)`}
-                      >
-                        ⚡ {t("Fb Óptima")}: {recommendedFbForDriver.toFixed(1)} Hz
-                      </button>
-                    )}
-                  </div>
+                  <label style={{ height: '1.2rem', display: 'flex', alignItems: 'center', margin: 0 }}>
+                    {boxType === 'bandpass' ? t("Sintonía Frontal (Fb)") : t("Sintonía (Fb)")}
+                  </label>
                   <div className="input-wrapper">
                     <input
                       type="number"
@@ -1573,16 +1553,39 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     />
                     <span className="unit-badge">Hz</span>
                   </div>
-                  {recommendedFbForDriver > 0 && (
-                    <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                      {params.qts && params.qts >= 0.45 
-                        ? `💡 Sugerida: ${recommendedFbForDriver.toFixed(1)} Hz (cerca de Fs por tener Qts=${params.qts.toFixed(2)} para evitar jorobas)`
-                        : `💡 Sugerida según altavoz y alineación: ${recommendedFbForDriver.toFixed(1)} Hz`
-                      }
-                    </div>
-                  )}
                 </div>
               </div>
+
+              {recommendedFbForDriver > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.35rem', fontSize: '0.64rem', color: 'var(--text-muted)' }}>
+                  <span>
+                    {ventedAlignment === 'B4'
+                      ? `Sugerida B4: ${recommendedFbForDriver.toFixed(1)} Hz (plana Hi-Fi)`
+                      : ventedAlignment === 'QB3'
+                        ? `Sugerida QB3: ${recommendedFbForDriver.toFixed(1)} Hz (máxima potencia)`
+                        : `Sugerida SBB4: ${recommendedFbForDriver.toFixed(1)} Hz (extensión subgraves)`
+                    }
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleApplyOptimalFb}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid var(--card-border)',
+                      color: 'var(--accent)',
+                      borderRadius: '3px',
+                      padding: '0.15rem 0.45rem',
+                      fontSize: '0.64rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap'
+                    }}
+                    title={`Ajustar a la sintonía óptima recomendada para la alineación ${ventedAlignment || 'B4'} (${recommendedFbForDriver.toFixed(1)} Hz)`}
+                  >
+                    {t("Aplicar")} {recommendedFbForDriver.toFixed(1)} Hz
+                  </button>
+                </div>
+              )}
 
               {boxType === 'bandpass' && (
                 <div className="input-grid" style={{ marginTop: '0.5rem' }}>
@@ -1700,11 +1703,11 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     <div style={{ fontSize: '0.67rem', marginBottom: '0.45rem', padding: '0.25rem 0.45rem', borderRadius: '4px', background: !useCustomPortLength ? 'rgba(52, 211, 153, 0.08)' : 'rgba(251, 191, 36, 0.08)', border: `1px solid ${!useCustomPortLength ? 'rgba(52, 211, 153, 0.25)' : 'rgba(251, 191, 36, 0.25)'}` }}>
                       {!useCustomPortLength ? (
                         <span style={{ color: '#34d399', fontWeight: 600 }}>
-                          🔒 {t("Sintonía bloqueada en")} {(portedData.valid ? portedData.Fb : customFb).toFixed(1)} Hz — {t("La longitud se recalcula al modificar decimales de diámetro o cantidad.")}
+                          {t("Sintonía bloqueada en")} {(portedData.valid ? portedData.Fb : customFb).toFixed(1)} Hz — {t("La longitud se recalcula al modificar decimales de diámetro o cantidad.")}
                         </span>
                       ) : (
                         <span style={{ color: '#fbbf24', fontWeight: 600 }}>
-                          📏 {t("Longitud personalizada activa — La sintonía (Fb) cambia según la medida del tubo.")}
+                          {t("Longitud personalizada activa — La sintonía (Fb) cambia según la medida del tubo.")}
                         </span>
                       )}
                     </div>
@@ -1954,15 +1957,22 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     {/* Sugerencias Comerciales de Puerto */}
                     {suggestions && 'options' in suggestions && suggestions.options && suggestions.options.length > 0 && (
                       <div style={{ marginTop: '0.65rem', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--card-border)', borderRadius: '6px', padding: '0.5rem' }}>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '0.35rem' }}>{t("SUGERENCIAS DE PUERTOS (ANTI-SOPLIDO)")}:</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                            {t("SUGERENCIAS DE PUERTOS (ANTI-SOPLIDO)")}:
+                          </span>
+                          <span style={{ fontSize: '0.64rem', color: 'var(--accent)', fontWeight: 600 }}>
+                            Fb: {targetOptimalFb.toFixed(1)} Hz
+                          </span>
+                        </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                          {suggestions.options.map((s: { numPorts: number; diameter: number; length: number }, idx: number) => {
+                          {suggestions.options.map((s, idx: number) => {
                             const displayOptDia = convertTo(s.diameter, 'length', unitSystem);
                             const displayOptLen = convertTo(s.length, 'length', unitSystem);
                             const unitLabel = getUnitLabel('length', unitSystem);
-                            const optVel = (params.sd && params.xmax && portedData.Fb > 0)
+                            const optVel = s.vPeak ?? ((params.sd && params.xmax && portedData.Fb > 0)
                               ? (0.008 * portedData.Fb * params.sd * params.xmax) / (s.numPorts * s.diameter * s.diameter)
-                              : null;
+                              : null);
                             const fitsDepth = !cabinetData?.valid || s.length <= (cabinetData.dInt - 2.5);
                             return (
                               <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', gap: '0.35rem' }}>
@@ -1971,6 +1981,11 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                                   {optVel !== null && (
                                     <span style={{ marginLeft: '0.35rem', fontSize: '0.65rem', color: optVel < 10 ? '#34d399' : optVel <= 17 ? '#fbbf24' : '#f87171', fontWeight: 600 }}>
                                       • {optVel.toFixed(1)} m/s
+                                    </span>
+                                  )}
+                                  {s.areaRatio !== undefined && (
+                                    <span style={{ marginLeft: '0.25rem', fontSize: '0.62rem', color: s.areaRatio >= 14 ? '#34d399' : '#94a3b8' }}>
+                                      ({s.areaRatio}% Sd)
                                     </span>
                                   )}
                                   {!fitsDepth && (

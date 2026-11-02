@@ -159,3 +159,32 @@ pub fn calc_vueltas_inductor_wheeler(l_mh: f64, d_mm: f64, l_cm: f64) -> f64 {
     let n_squared = (l_uh * (9.0 * d_mm + 100.0 * l_cm)) / d_mm.powi(2);
     n_squared.sqrt()
 }
+
+#[wasm_bindgen]
+pub fn calc_filter_gain(f: f64, fc_point: f64, filter_type: &str, pass_type: &str) -> f64 {
+    if fc_point <= 0.0 || f <= 0.0 {
+        return 0.0;
+    }
+    let x = f / fc_point;
+    let is_lp = pass_type == "LP";
+    match filter_type {
+        "1st_order" => {
+            let factor = if is_lp { 1.0 } else { x };
+            20.0 * (factor / (1.0 + x * x).sqrt() + 1e-10).log10()
+        }
+        "2nd_butter" => {
+            let num = if is_lp { 1.0 } else { x * x };
+            20.0 * (num / ((1.0 - x * x).powi(2) + 2.0 * x * x).sqrt() + 1e-10).log10()
+        }
+        "2nd_lr" => {
+            let num = if is_lp { 1.0 } else { x * x };
+            20.0 * (num / (1.0 + x * x) + 1e-10).log10()
+        }
+        "4th_lr" => {
+            let num = if is_lp { 1.0 } else { x.powi(4) };
+            20.0 * (num / (1.0 + x * x).powi(2) + 1e-10).log10()
+        }
+        _ => 0.0,
+    }
+}
+

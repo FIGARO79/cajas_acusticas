@@ -1464,6 +1464,16 @@ html[data-theme="light"] textarea:focus {
   border: 1px solid var(--input-border);
 }
 
+.logo-mark-img {
+  width: 1.85rem;
+  height: 1.85rem;
+  object-fit: contain;
+  display: block;
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+}
+
 .logo-badge {
   display: none;
 }

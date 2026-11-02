@@ -1,0 +1,27 @@
+{
+  "name": "AcousticLAB - Calculadora de Cajas Acústicas",
+  "short_name": "AcousticLAB",
+  "description": "Diseño y simulación electroacústica avanzada de cajas acústicas y crossovers.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/favicon-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "/app-icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
+

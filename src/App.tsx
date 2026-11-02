@@ -9,7 +9,7 @@ import { type Lang, translate } from './utils/translations';
 import { type UnitSystem, convertTo, getUnitLabel } from './utils/units';
 import type { SpeakerParams, CalculatedSealed, CalculatedPorted, CalculatedBandpass, CustomDriver, WoodCabinetData, CrossoverExportData } from './types';
 import { estimateF3, calcPortLength, getKCorrection, calcOptimalPortForSpeaker } from './utils/acousticMath';
-import { getWasm, calcRadiadorPasivo } from './wasm/index.ts';
+import { getWasm, calcRadiadorPasivo, calcVolumenNetoMadera } from './wasm/index.ts';
 import { generateReportHTML } from './utils/reportGenerator';
 
 interface AppProps {
@@ -399,13 +399,14 @@ function App({ wasmError }: AppProps) {
     const thickness = (woodThickness || 0) / 10;
     const extra = woodExtra || 0;
     let bruto = 0;
+    let dInt = 0;
     if (woodShape === 'rectangular') {
       const hExt = woodExtHeight || 0;
       const wExt = woodExtWidth || 0;
       const dExt = woodExtDepth || 0;
       const hInt = hExt - (2 * thickness);
       const wInt = wExt - (2 * thickness);
-      const dInt = dExt - (2 * thickness);
+      dInt = dExt - (2 * thickness);
       if (hInt > 0 && wInt > 0 && dInt > 0) {
         bruto = (hInt * wInt * dInt) / 1000;
       }
@@ -419,8 +420,8 @@ function App({ wasmError }: AppProps) {
       const d1Int = Math.max(0, d1Ext - (2 * thickness));
       const d2Int = Math.max(0, d2Ext - (2 * thickness));
       if (hInt > 0 && wInt > 0 && d1Int > 0 && d2Int > 0) {
-        const dAvgInt = (d1Int + d2Int) / 2;
-        bruto = (hInt * wInt * dAvgInt) / 1000;
+        dInt = (d1Int + d2Int) / 2;
+        bruto = (hInt * wInt * dInt) / 1000;
       }
     }
 
@@ -428,56 +429,29 @@ function App({ wasmError }: AppProps) {
 
     // En modo de medidas manuales ('input'), usa customFbState si fue fijado por el usuario o la Fb óptima del altavoz
     const targetFb = customFbState ?? optimalDriverFb;
-
     const pCount = Number(portCount) || 0;
-    let portVol = 0;
-    if (pCount > 0 && boxType === 'ported' && targetFb > 0) {
-      const isRect = portShape === 'rectangular';
-      const pDia = portShape === 'round'
-        ? (Number(portDiameter) || 0)
-        : portShape === 'custom'
-          ? (2 * Math.sqrt((Number(portArea) || 0) / Math.PI))
-          : (2 * Math.sqrt(((Number(portWidth) || 0) * (Number(portHeight) || 0)) / Math.PI));
+    const pDia = portShape === 'round'
+      ? (Number(portDiameter) || 0)
+      : portShape === 'custom'
+        ? (2 * Math.sqrt((Number(portArea) || 0) / Math.PI))
+        : (2 * Math.sqrt(((Number(portWidth) || 0) * (Number(portHeight) || 0)) / Math.PI));
 
-      if (pDia > 0) {
-        if (useCustomPortLength && Number(customPortLength) > 0) {
-          const Lv = Number(customPortLength);
-          if (isRect) {
-            const w = Number(portWidth) || 0;
-            const h = Number(portHeight) || 0;
-            portVol = (pCount * w * h * Lv) / 1000;
-          } else {
-            portVol = (pCount * Math.PI * Math.pow(pDia / 2, 2) * Lv) / 1000;
-          }
-        } else {
-          let currentNetVol = bruto - extra; // Initial guess of physical net volume
-          
-          // Solve the circular reference (netVol -> targetVb -> portLength -> portVol -> netVol) iteratively
-          for (let iter = 0; iter < 4; iter++) {
-            const targetVb = currentNetVol * dampingFactor;
-            if (targetVb <= 0) {
-              portVol = 0;
-              break;
-            }
-            const Lv = calcPortLength(targetVb, targetFb, pDia, flaredEnds, pCount);
-            if (Lv > 0) {
-              if (isRect) {
-                const w = Number(portWidth) || 0;
-                const h = Number(portHeight) || 0;
-                portVol = (pCount * w * h * Lv) / 1000;
-              } else {
-                portVol = (pCount * Math.PI * Math.pow(pDia / 2, 2) * Lv) / 1000;
-              }
-            } else {
-              portVol = 0;
-            }
-            currentNetVol = Math.max(0, bruto - (extra + portVol));
-          }
-        }
-      }
-    }
+    // Delegación 100% al motor de Rust para resolver el volumen neto físico y volumen de puerto sin divergencias
+    const res = calcVolumenNetoMadera(
+      bruto,
+      extra,
+      boxType,
+      targetFb,
+      pCount,
+      pDia,
+      flaredEnds,
+      dInt,
+      useCustomPortLength,
+      Number(customPortLength) || 0,
+      dampingFactor
+    );
 
-    return Math.max(0, bruto - (extra + portVol));
+    return res.vNetoFisico;
   };
 
   const manualNetVol = getManualWoodNetVolume();
@@ -1148,6 +1122,8 @@ function App({ wasmError }: AppProps) {
                 midTargetQtc={midTargetQtc}
                 portYPct={portYPct}
                 portLocation={portLocation}
+                useCustomPortLength={useCustomPortLength}
+                customPortLength={customPortLength}
               />
             </div>
 

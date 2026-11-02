@@ -16,11 +16,16 @@ import type { CalculatedSealed, CalculatedPorted, CalculatedBandpass, SpeakerPar
 import { type Lang, translate } from '../utils/translations';
 import { calcSealedCurve, calcPortedCurve, calcBandpass4Curve, calcBandpass6Curve } from '../wasm/index';
 import {
-  calcConeExcursion,
-  calcVentAirVelocity,
-  calcSystemImpedance,
-  calcPhaseResponse,
+  calcExcursionCurve,
+  calcAirVelocityCurve,
+  calcImpedanceCurve,
+  calcPhaseCurve,
   calcGroupDelayCurve,
+  calculateSealedResponseAt,
+  calculatePortedResponseAt,
+  calculateBandpass4ResponseAt,
+  calculateBandpass6ResponseAt,
+  getFilterGain,
 } from '../utils/acousticMath';
 
 ChartJS.register(
@@ -52,83 +57,6 @@ const frequenciesFull = (() => {
   }
   return freqs;
 })();
-
-// JS formulas for full-range cabinet response calculations
-const calculateSealedResponseAt = (f: number, fs: number, qts: number, vas: number, vb: number) => {
-  const alpha = vas / vb;
-  const fc = fs * Math.sqrt(alpha + 1);
-  const qtc = qts * Math.sqrt(alpha + 1);
-  const fn_ = f / fc;
-  const response = Math.pow(fn_, 2) / Math.sqrt(Math.pow(Math.pow(fn_, 2) - 1, 2) + Math.pow(fn_ / qtc, 2) + 1e-20);
-  return 20 * Math.log10(response + 1e-10);
-};
-
-const calculatePortedResponseAt = (f: number, fs: number, qts: number, vas: number, vb: number, fb: number) => {
-  const h = fb / fs;
-  const alpha = vas / vb;
-  const ql = 7.0;
-  const a3 = 1.0 / qts + h / ql;
-  const a2 = 1.0 + h * h * (1.0 + alpha) + h / (qts * ql);
-  const a1 = h * h / qts + h / ql;
-  const a0 = h * h;
-  const y = f / fs;
-  const real = Math.pow(y, 4) - a2 * y * y + a0;
-  const imag = a1 * y - a3 * Math.pow(y, 3);
-  const response = Math.pow(y, 4) / Math.sqrt(real * real + imag * imag + 1e-20);
-  return 20 * Math.log10(response + 1e-10);
-};
-
-const calculateBandpass4ResponseAt = (f: number, fs: number, qts: number, vas: number, vf: number, vr: number, fb: number) => {
-  const h = fb / fs;
-  const alpha_f = vas / vf;
-  const alpha_r = vas / vr;
-  const ql = 7.0;
-  const a3 = 1.0 / qts + h / ql;
-  const a2 = 1.0 + h * h * (1.0 + alpha_r) + alpha_f + h / (qts * ql);
-  const a1 = h * h / qts + (h / ql) * (1.0 + alpha_f);
-  const a0 = h * h;
-  const y = f / fs;
-  const real = Math.pow(y, 4) - a2 * y * y + a0;
-  const imag = a1 * y - a3 * Math.pow(y, 3);
-  const denom = Math.sqrt(real * real + imag * imag + 1e-20);
-  const response = (y * y * alpha_f) / denom;
-  return 20 * Math.log10(response + 1e-10);
-};
-
-const calculateBandpass6ResponseAt = (f: number, vas: number, vf: number, vr: number, fl: number, fh: number) => {
-  const q = 0.707;
-  const y_l = f / fl;
-  const den_l = Math.sqrt(Math.pow(1.0 - y_l * y_l, 2) + Math.pow(y_l / q, 2) + 1e-20);
-  const hp = (y_l * y_l) / den_l;
-
-  const y_h = f / fh;
-  const den_h = Math.sqrt(Math.pow(1.0 - y_h * y_h, 2) + Math.pow(y_h / q, 2) + 1e-20);
-  const lp = 1.0 / den_h;
-
-  const alpha = vas / (vf + vr);
-  const response = hp * lp * Math.sqrt(1.0 + alpha);
-  return 20 * Math.log10(response + 1e-10);
-};
-
-// Crossover filter gain formula
-const getFilterGain = (f: number, fcPoint: number, type: string, passType: 'LP' | 'HP') => {
-  const x = f / fcPoint;
-  let gain = 0;
-  if (type === '1st_order') {
-    const factor = passType === 'LP' ? 1.0 : x;
-    gain = 20 * Math.log10(factor / Math.sqrt(1 + x * x) + 1e-10);
-  } else if (type === '2nd_butter') {
-    const factor = passType === 'LP' ? 1.0 : x * x;
-    gain = 20 * Math.log10(factor / Math.sqrt(1 + Math.pow(x, 4)) + 1e-10);
-  } else if (type === '2nd_lr') {
-    const factor = passType === 'LP' ? 1.0 : x * x;
-    gain = 20 * Math.log10(factor / (1 + x * x) + 1e-10);
-  } else if (type === '4th_lr') {
-    const factor = passType === 'LP' ? 1.0 : Math.pow(x, 4);
-    gain = 20 * Math.log10(factor / (1 + Math.pow(x, 4)) + 1e-10);
-  }
-  return Math.max(-60, gain); // clamp to -60dB min for neatness
-};
 
 // Custom annotation plugin for vertical reference lines
 interface AnnotationOption {
@@ -746,11 +674,12 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
     if (chartMode !== 'excursion') return [];
     const list: Record<string, unknown>[] = [];
     if (sealedData && sealedData.valid) {
+      const vals = calcExcursionCurve(params, sealedData.Vb, sealedData.Fc, false, simPower, true);
       list.push({
         label: `${t("Caja Sellada")} - Excursión (${simPower}W)`,
-        data: frequencies.map(f => ({
+        data: frequencies.map((f, i) => ({
           x: f,
-          y: Math.round(calcConeExcursion(f, params, sealedData.Vb, sealedData.Fc, false, simPower) * 100) / 100
+          y: vals[i] ?? 0
         })),
         borderColor: sealedBorderColor,
         borderWidth: 2.5,
@@ -759,11 +688,12 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
       });
     }
     if (portedData && portedData.valid) {
+      const vals = calcExcursionCurve(params, portedData.Vb, portedData.Fb, true, simPower, true);
       list.push({
         label: `${t("Caja Ventilada")} - Excursión (${simPower}W)`,
-        data: frequencies.map(f => ({
+        data: frequencies.map((f, i) => ({
           x: f,
-          y: Math.round(calcConeExcursion(f, params, portedData.Vb, portedData.Fb, true, simPower) * 100) / 100
+          y: vals[i] ?? 0
         })),
         borderColor: portedBorderColor,
         borderWidth: 2.5,
@@ -790,11 +720,12 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
     const list: Record<string, unknown>[] = [];
     const pArea = portAreaM2 || 0.0044;
     if (portedData && portedData.valid) {
+      const vals = calcAirVelocityCurve(params, portedData.Vb, portedData.Fb, pArea, simPower, true);
       list.push({
         label: `${t("Velocidad Aire Puerto")} (${simPower}W)`,
-        data: frequencies.map(f => ({
+        data: frequencies.map((f, i) => ({
           x: f,
-          y: Math.round(calcVentAirVelocity(f, params, portedData.Vb, portedData.Fb, pArea, simPower) * 100) / 100
+          y: vals[i] ?? 0
         })),
         borderColor: portedBorderColor,
         backgroundColor: chartPortedBg,
@@ -828,11 +759,12 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
     if (chartMode !== 'impedance') return [];
     const list: Record<string, unknown>[] = [];
     if (sealedData && sealedData.valid) {
+      const vals = calcImpedanceCurve(params, sealedData.Vb, sealedData.Fc, false, true);
       list.push({
         label: `${t("Impedancia Caja Sellada")} (Ω)`,
-        data: frequencies.map(f => ({
+        data: frequencies.map((f, i) => ({
           x: f,
-          y: Math.round(calcSystemImpedance(f, params, sealedData.Vb, sealedData.Fc, false) * 100) / 100
+          y: vals[i] ?? 0
         })),
         borderColor: sealedBorderColor,
         borderWidth: 2.5,
@@ -841,11 +773,12 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
       });
     }
     if (portedData && portedData.valid) {
+      const vals = calcImpedanceCurve(params, portedData.Vb, portedData.Fb, true, true);
       list.push({
         label: `${t("Impedancia Caja Ventilada")} (Ω)`,
-        data: frequencies.map(f => ({
+        data: frequencies.map((f, i) => ({
           x: f,
-          y: Math.round(calcSystemImpedance(f, params, portedData.Vb, portedData.Fb, true) * 100) / 100
+          y: vals[i] ?? 0
         })),
         borderColor: portedBorderColor,
         borderWidth: 2.5,
@@ -871,11 +804,12 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
     if (chartMode !== 'phase') return [];
     const list: Record<string, unknown>[] = [];
     if (sealedData && sealedData.valid) {
+      const vals = calcPhaseCurve(params, sealedData.Vb, sealedData.Fc, false, true);
       list.push({
         label: `${t("Fase Caja Sellada")} (°)`,
-        data: frequencies.map(f => ({
+        data: frequencies.map((f, i) => ({
           x: f,
-          y: Math.round(calcPhaseResponse(f, params, sealedData.Vb, sealedData.Fc, false) * 10) / 10
+          y: vals[i] ?? 0
         })),
         borderColor: sealedBorderColor,
         borderWidth: 2.5,
@@ -884,11 +818,12 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
       });
     }
     if (portedData && portedData.valid) {
+      const vals = calcPhaseCurve(params, portedData.Vb, portedData.Fb, true, true);
       list.push({
         label: `${t("Fase Caja Ventilada")} (°)`,
-        data: frequencies.map(f => ({
+        data: frequencies.map((f, i) => ({
           x: f,
-          y: Math.round(calcPhaseResponse(f, params, portedData.Vb, portedData.Fb, true) * 10) / 10
+          y: vals[i] ?? 0
         })),
         borderColor: portedBorderColor,
         borderWidth: 2.5,

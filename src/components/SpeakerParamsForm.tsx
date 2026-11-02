@@ -501,14 +501,14 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
             transition: 'color 0.15s ease'
           }}
         >
-          {t("Cargar Altavoz")}
+          {t("Driver")}
         </button>
         <button 
           type="button"
           onClick={() => setDriverTab('edit')}
           style={{ 
             background: 'none', 
-            border: 'none', 
+            border: 'none',   
             padding: 0, 
             margin: 0, 
             color: driverTab === 'edit' ? 'var(--text-main)' : 'var(--text-muted)', 

@@ -101,6 +101,8 @@ export interface PortSuggestionOption {
   diameter: number;
   length: number;
   isCustom: boolean;
+  vPeak?: number;
+  areaRatio?: number;
 }
 
 export type PortSuggestions = {
