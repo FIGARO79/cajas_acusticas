@@ -4,12 +4,23 @@ import { type UnitSystem } from '../utils/units';
 
 interface HeaderProps {
   lang: Lang;
-  setLang: (l: Lang) => void;
+  setLang: (lang: Lang) => void;
   unitSystem: UnitSystem;
-  setUnitSystem: (u: UnitSystem) => void;
+  setUnitSystem: (system: UnitSystem) => void;
   theme: 'dark' | 'light';
   toggleTheme: () => void;
   onExportReport?: () => void;
+  workspaceView?: 'split' | 'simulation' | 'cabinet' | 'crossover';
+  setWorkspaceView?: (view: 'split' | 'simulation' | 'cabinet' | 'crossover') => void;
+  boxType?: 'sealed' | 'ported' | 'bandpass';
+  setBoxType?: (type: 'sealed' | 'ported' | 'bandpass') => void;
+  ventedAlignment?: 'QB3' | 'B4' | 'SBB4';
+  setVentedAlignment?: (align: 'QB3' | 'B4' | 'SBB4') => void;
+  crossoverWays?: number;
+  setCrossoverWays?: (ways: number) => void;
+  onSaveProject?: () => void;
+  onLoadProject?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onNewProject?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -20,12 +31,24 @@ export const Header: React.FC<HeaderProps> = ({
   theme,
   toggleTheme,
   onExportReport,
+  workspaceView = 'split',
+  setWorkspaceView,
+  boxType = 'sealed',
+  setBoxType,
+  ventedAlignment = 'QB3',
+  setVentedAlignment,
+  crossoverWays = 2,
+  setCrossoverWays,
+  onSaveProject,
+  onLoadProject,
+  onNewProject,
 }) => {
   const t = (text: string) => translate(text, lang);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const menuBarRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Close menu when clicking outside
+  // Cerrar menú al hacer clic fuera
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (menuBarRef.current && !menuBarRef.current.contains(e.target as Node)) {
@@ -37,10 +60,15 @@ export const Header: React.FC<HeaderProps> = ({
   }, []);
 
   const handleMenuClick = (menu: string) => {
-    setOpenMenu(prev => (prev === menu ? null : menu));
+    setOpenMenu(openMenu === menu ? null : menu);
   };
 
   const closeMenu = () => setOpenMenu(null);
+
+  const handleOpenFileClick = () => {
+    fileInputRef.current?.click();
+    closeMenu();
+  };
 
   const handleResetConfig = () => {
     if (window.confirm(t("¿Restablecer toda la configuración a los valores predeterminados?"))) {
@@ -53,178 +81,560 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <div className="top-navbar">
-      <div className="logo-area-nav">
-        <img
-          src="/app-icon.png"
-          alt="AcousticLAB"
-          className="logo-mark-img"
-          width={28}
-          height={28}
-        />
-        <div>
-          <h1>Acoustic<span className="logo-highlight">LAB</span></h1>
-          <div className="logo-badge">Premium acoustics</div>
+    <header className="cad-desktop-header cad-single-bar">
+      {/* Input oculto para carga de archivos .aclab */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={onLoadProject}
+        accept=".aclab,.json"
+        style={{ display: 'none' }}
+      />
+
+      {/* BARRA ÚNICA CONSOLIDADA (34px) */}
+      <div className="cad-bar-row">
+        {/* 1. Brand Logo */}
+        <div className="cad-brand-block">
+          <img
+            src="/app-icon.png"
+            alt=""
+            className="cad-app-icon"
+            width={16}
+            height={16}
+          />
+          <span className="cad-app-brand">AcousticLAB</span>
+          <span className="cad-app-sub">CAD</span>
+        </div>
+
+        <div className="cad-header-vdiv" />
+
+        {/* 2. Menús desplegables estándar */}
+        <div className="cad-menubar-inline" ref={menuBarRef} role="menubar">
+          {/* ARCHIVO */}
+          <div className="cad-menu-item" role="none">
+            <button
+              className={`cad-menu-trigger ${openMenu === 'archivo' ? 'active' : ''}`}
+              onClick={() => handleMenuClick('archivo')}
+              onMouseEnter={() => openMenu && setOpenMenu('archivo')}
+              type="button"
+              role="menuitem"
+              aria-haspopup="true"
+              aria-expanded={openMenu === 'archivo'}
+            >
+              {t("Archivo")}
+            </button>
+            {openMenu === 'archivo' && (
+              <div className="cad-menu-dropdown" role="menu">
+                <button className="cad-menu-option" onClick={() => { onNewProject?.(); closeMenu(); }} type="button" role="menuitem">
+                  <span>{t("Nuevo Proyecto")}</span>
+                  <span className="cad-menu-shortcut">Ctrl+N</span>
+                </button>
+                <button className="cad-menu-option" onClick={handleOpenFileClick} type="button" role="menuitem">
+                  <span>{t("Abrir Proyecto (.aclab)...")}</span>
+                  <span className="cad-menu-shortcut">Ctrl+O</span>
+                </button>
+                <button className="cad-menu-option" onClick={() => { onSaveProject?.(); closeMenu(); }} type="button" role="menuitem">
+                  <span>{t("Guardar Proyecto (.aclab)")}</span>
+                  <span className="cad-menu-shortcut">Ctrl+S</span>
+                </button>
+                <div className="cad-menu-separator" role="separator" />
+                <button className="cad-menu-option" onClick={() => { onExportReport?.(); closeMenu(); }} type="button" role="menuitem">
+                  <span>{t("Exportar Reporte Técnico (PDF)")}</span>
+                  <span className="cad-menu-shortcut">Ctrl+P</span>
+                </button>
+                <div className="cad-menu-separator" role="separator" />
+                <button
+                  className="cad-menu-option"
+                  onClick={() => {
+                    alert(
+                      'AcousticLAB 3.0 Engineering CAD Suite\n\n' +
+                      'Simulador Electroacústico Thiele-Small, Redes de Cruce y Planos CAD de Fabricación.\n' +
+                      'Compatible con especificaciones VituixCAD 3 / BassBox 6 Pro.\n\n' +
+                      '© 2026 Fabio / AcousticLAB'
+                    );
+                    closeMenu();
+                  }}
+                  type="button"
+                  role="menuitem"
+                >
+                  <span>{t("Acerca de AcousticLAB")}</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* EDICIÓN */}
+          <div className="cad-menu-item" role="none">
+            <button
+              className={`cad-menu-trigger ${openMenu === 'edicion' ? 'active' : ''}`}
+              onClick={() => handleMenuClick('edicion')}
+              onMouseEnter={() => openMenu && setOpenMenu('edicion')}
+              type="button"
+              role="menuitem"
+              aria-haspopup="true"
+              aria-expanded={openMenu === 'edicion'}
+            >
+              {t("Edición")}
+            </button>
+            {openMenu === 'edicion' && (
+              <div className="cad-menu-dropdown" role="menu">
+                <button
+                  className="cad-menu-option"
+                  onClick={() => {
+                    navigator.clipboard.writeText(window.location.href);
+                    alert(t("Enlace del proyecto copiado al portapapeles."));
+                    closeMenu();
+                  }}
+                  type="button"
+                  role="menuitem"
+                >
+                  <span>{t("Copiar Enlace de Simulación")}</span>
+                </button>
+                <div className="cad-menu-separator" role="separator" />
+                <button className="cad-menu-option" onClick={handleResetConfig} type="button" role="menuitem">
+                  <span>{t("Restablecer Valores de Fábrica")}</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* VER */}
+          <div className="cad-menu-item" role="none">
+            <button
+              className={`cad-menu-trigger ${openMenu === 'ver' ? 'active' : ''}`}
+              onClick={() => handleMenuClick('ver')}
+              onMouseEnter={() => openMenu && setOpenMenu('ver')}
+              type="button"
+              role="menuitem"
+              aria-haspopup="true"
+              aria-expanded={openMenu === 'ver'}
+            >
+              {t("Ver")}
+            </button>
+            {openMenu === 'ver' && (
+              <div className="cad-menu-dropdown" role="menu">
+                <div className="cad-menu-section-label">{t("Vistas de Trabajo")}</div>
+                <button
+                  className={`cad-menu-option ${workspaceView === 'split' ? 'checked' : ''}`}
+                  onClick={() => { setWorkspaceView?.('split'); closeMenu(); }}
+                  type="button"
+                  role="menuitem"
+                >
+                  {workspaceView === 'split' && <span className="cad-menu-check">✓</span>}
+                  <span>{t("Estudio (Multi-Panel Completo)")}</span>
+                </button>
+                <button
+                  className={`cad-menu-option ${workspaceView === 'simulation' ? 'checked' : ''}`}
+                  onClick={() => { setWorkspaceView?.('simulation'); closeMenu(); }}
+                  type="button"
+                  role="menuitem"
+                >
+                  {workspaceView === 'simulation' && <span className="cad-menu-check">✓</span>}
+                  <span>{t("Simulación Acústica Maximizado")}</span>
+                </button>
+                <button
+                  className={`cad-menu-option ${workspaceView === 'cabinet' ? 'checked' : ''}`}
+                  onClick={() => { setWorkspaceView?.('cabinet'); closeMenu(); }}
+                  type="button"
+                  role="menuitem"
+                >
+                  {workspaceView === 'cabinet' && <span className="cad-menu-check">✓</span>}
+                  <span>{t("Gabinete 3D & Lista de Corte")}</span>
+                </button>
+                <button
+                  className={`cad-menu-option ${workspaceView === 'crossover' ? 'checked' : ''}`}
+                  onClick={() => { setWorkspaceView?.('crossover'); closeMenu(); }}
+                  type="button"
+                  role="menuitem"
+                >
+                  {workspaceView === 'crossover' && <span className="cad-menu-check">✓</span>}
+                  <span>{t("Crossover CAD Circuital")}</span>
+                </button>
+
+                <div className="cad-menu-separator" role="separator" />
+                <div className="cad-menu-section-label">{t("Apariencia")}</div>
+                <button
+                  className={`cad-menu-option ${theme === 'dark' ? 'checked' : ''}`}
+                  onClick={() => { if (theme !== 'dark') toggleTheme(); closeMenu(); }}
+                  type="button"
+                  role="menuitem"
+                >
+                  {theme === 'dark' && <span className="cad-menu-check">✓</span>}
+                  <span>{t("Modo Oscuro")}</span>
+                </button>
+                <button
+                  className={`cad-menu-option ${theme === 'light' ? 'checked' : ''}`}
+                  onClick={() => { if (theme !== 'light') toggleTheme(); closeMenu(); }}
+                  type="button"
+                  role="menuitem"
+                >
+                  {theme === 'light' && <span className="cad-menu-check">✓</span>}
+                  <span>{t("Modo Claro")}</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* ALINEACIÓN */}
+          <div className="cad-menu-item" role="none">
+            <button
+              className={`cad-menu-trigger ${openMenu === 'alineacion' ? 'active' : ''}`}
+              onClick={() => handleMenuClick('alineacion')}
+              onMouseEnter={() => openMenu && setOpenMenu('alineacion')}
+              type="button"
+              role="menuitem"
+              aria-haspopup="true"
+              aria-expanded={openMenu === 'alineacion'}
+            >
+              {t("Alineación")}
+            </button>
+            {openMenu === 'alineacion' && (
+              <div className="cad-menu-dropdown" role="menu">
+                <div className="cad-menu-section-label">{t("Cajas Cerradas / Selladas")}</div>
+                <button
+                  className={`cad-menu-option ${boxType === 'sealed' ? 'checked' : ''}`}
+                  onClick={() => { setBoxType?.('sealed'); closeMenu(); }}
+                  type="button"
+                  role="menuitem"
+                >
+                  {boxType === 'sealed' && <span className="cad-menu-check">✓</span>}
+                  <span>{t("Caja Sellada (Acoustic Suspension)")}</span>
+                </button>
+
+                <div className="cad-menu-separator" role="separator" />
+                <div className="cad-menu-section-label">{t("Cajas Ventiladas (Bass-Reflex)")}</div>
+                <button
+                  className={`cad-menu-option ${boxType === 'ported' && ventedAlignment === 'QB3' ? 'checked' : ''}`}
+                  onClick={() => {
+                    setBoxType?.('ported');
+                    setVentedAlignment?.('QB3');
+                    closeMenu();
+                  }}
+                  type="button"
+                  role="menuitem"
+                >
+                  {boxType === 'ported' && ventedAlignment === 'QB3' && <span className="cad-menu-check">✓</span>}
+                  <span>{t("Ventilada QB3 (Quasi-Butterworth 3)")}</span>
+                </button>
+                <button
+                  className={`cad-menu-option ${boxType === 'ported' && ventedAlignment === 'B4' ? 'checked' : ''}`}
+                  onClick={() => {
+                    setBoxType?.('ported');
+                    setVentedAlignment?.('B4');
+                    closeMenu();
+                  }}
+                  type="button"
+                  role="menuitem"
+                >
+                  {boxType === 'ported' && ventedAlignment === 'B4' && <span className="cad-menu-check">✓</span>}
+                  <span>{t("Ventilada B4 (Butterworth 4to Orden)")}</span>
+                </button>
+                <button
+                  className={`cad-menu-option ${boxType === 'ported' && ventedAlignment === 'SBB4' ? 'checked' : ''}`}
+                  onClick={() => {
+                    setBoxType?.('ported');
+                    setVentedAlignment?.('SBB4');
+                    closeMenu();
+                  }}
+                  type="button"
+                  role="menuitem"
+                >
+                  {boxType === 'ported' && ventedAlignment === 'SBB4' && <span className="cad-menu-check">✓</span>}
+                  <span>{t("Ventilada SBB4 (Super Boom-Box 4)")}</span>
+                </button>
+
+                <div className="cad-menu-separator" role="separator" />
+                <div className="cad-menu-section-label">{t("Paso de Banda (Bandpass)")}</div>
+                <button
+                  className={`cad-menu-option ${boxType === 'bandpass' ? 'checked' : ''}`}
+                  onClick={() => { setBoxType?.('bandpass'); closeMenu(); }}
+                  type="button"
+                  role="menuitem"
+                >
+                  {boxType === 'bandpass' && <span className="cad-menu-check">✓</span>}
+                  <span>{t("Paso Banda (4to / 6to Orden)")}</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* FILTROS */}
+          <div className="cad-menu-item" role="none">
+            <button
+              className={`cad-menu-trigger ${openMenu === 'filtros' ? 'active' : ''}`}
+              onClick={() => handleMenuClick('filtros')}
+              onMouseEnter={() => openMenu && setOpenMenu('filtros')}
+              type="button"
+              role="menuitem"
+              aria-haspopup="true"
+              aria-expanded={openMenu === 'filtros'}
+            >
+              {t("Filtros")}
+            </button>
+            {openMenu === 'filtros' && (
+              <div className="cad-menu-dropdown" role="menu">
+                <button
+                  className={`cad-menu-option ${crossoverWays === 2 ? 'checked' : ''}`}
+                  onClick={() => { setCrossoverWays?.(2); closeMenu(); }}
+                  type="button"
+                  role="menuitem"
+                >
+                  {crossoverWays === 2 && <span className="cad-menu-check">✓</span>}
+                  <span>{t("Divisor de Frecuencia 2 Vías")}</span>
+                </button>
+                <button
+                  className={`cad-menu-option ${crossoverWays === 3 ? 'checked' : ''}`}
+                  onClick={() => { setCrossoverWays?.(3); closeMenu(); }}
+                  type="button"
+                  role="menuitem"
+                >
+                  {crossoverWays === 3 && <span className="cad-menu-check">✓</span>}
+                  <span>{t("Divisor de Frecuencia 3 Vías")}</span>
+                </button>
+                <div className="cad-menu-separator" role="separator" />
+                <button
+                  className="cad-menu-option"
+                  onClick={() => { setWorkspaceView?.('crossover'); closeMenu(); }}
+                  type="button"
+                  role="menuitem"
+                >
+                  <span>{t("Abrir CAD Esquemático")}</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* HERRAMIENTAS */}
+          <div className="cad-menu-item" role="none">
+            <button
+              className={`cad-menu-trigger ${openMenu === 'herramientas' ? 'active' : ''}`}
+              onClick={() => handleMenuClick('herramientas')}
+              onMouseEnter={() => openMenu && setOpenMenu('herramientas')}
+              type="button"
+              role="menuitem"
+              aria-haspopup="true"
+              aria-expanded={openMenu === 'herramientas'}
+            >
+              {t("Herramientas")}
+            </button>
+            {openMenu === 'herramientas' && (
+              <div className="cad-menu-dropdown" role="menu">
+                <div className="cad-menu-section-label">{t("Sistema de Unidades")}</div>
+                <button
+                  className={`cad-menu-option ${unitSystem === 'metric' ? 'checked' : ''}`}
+                  onClick={() => { setUnitSystem('metric'); closeMenu(); }}
+                  type="button"
+                  role="menuitem"
+                >
+                  {unitSystem === 'metric' && <span className="cad-menu-check">✓</span>}
+                  <span>{t("Métrico (Litros, mm, cm)")}</span>
+                </button>
+                <button
+                  className={`cad-menu-option ${unitSystem === 'imperial' ? 'checked' : ''}`}
+                  onClick={() => { setUnitSystem('imperial'); closeMenu(); }}
+                  type="button"
+                  role="menuitem"
+                >
+                  {unitSystem === 'imperial' && <span className="cad-menu-check">✓</span>}
+                  <span>{t("Imperial (ft³, in)")}</span>
+                </button>
+
+                <div className="cad-menu-separator" role="separator" />
+                <div className="cad-menu-section-label">{t("Idioma")}</div>
+                <button
+                  className={`cad-menu-option ${lang === 'es' ? 'checked' : ''}`}
+                  onClick={() => { setLang('es'); closeMenu(); }}
+                  type="button"
+                  role="menuitem"
+                >
+                  {lang === 'es' && <span className="cad-menu-check">✓</span>}
+                  <span>Español (ES)</span>
+                </button>
+                <button
+                  className={`cad-menu-option ${lang === 'en' ? 'checked' : ''}`}
+                  onClick={() => { setLang('en'); closeMenu(); }}
+                  type="button"
+                  role="menuitem"
+                >
+                  {lang === 'en' && <span className="cad-menu-check">✓</span>}
+                  <span>English (EN)</span>
+                </button>
+                <button
+                  className={`cad-menu-option ${lang === 'pt' ? 'checked' : ''}`}
+                  onClick={() => { setLang('pt'); closeMenu(); }}
+                  type="button"
+                  role="menuitem"
+                >
+                  {lang === 'pt' && <span className="cad-menu-check">✓</span>}
+                  <span>Português (PT)</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* AYUDA */}
+          <div className="cad-menu-item" role="none">
+            <button
+              className={`cad-menu-trigger ${openMenu === 'ayuda' ? 'active' : ''}`}
+              onClick={() => handleMenuClick('ayuda')}
+              onMouseEnter={() => openMenu && setOpenMenu('ayuda')}
+              type="button"
+              role="menuitem"
+              aria-haspopup="true"
+              aria-expanded={openMenu === 'ayuda'}
+            >
+              {t("Ayuda")}
+            </button>
+            {openMenu === 'ayuda' && (
+              <div className="cad-menu-dropdown" role="menu">
+                <button
+                  className="cad-menu-option"
+                  onClick={() => {
+                    alert(
+                      'Atajos de Teclado:\n\n' +
+                      'Ctrl+S : Guardar Proyecto\n' +
+                      'Ctrl+O : Abrir Proyecto\n' +
+                      'Ctrl+P : Exportar Reporte PDF\n' +
+                      'Ctrl+N : Nuevo Proyecto'
+                    );
+                    closeMenu();
+                  }}
+                  type="button"
+                  role="menuitem"
+                >
+                  <span>{t("Atajos de Teclado")}</span>
+                </button>
+                <div className="cad-menu-separator" role="separator" />
+                <button
+                  className="cad-menu-option"
+                  onClick={() => {
+                    alert(
+                      'Guía Rápida AcousticLAB:\n\n' +
+                      '1. Selecciona o carga los parámetros Thiele-Small en la columna izquierda.\n' +
+                      '2. Configura el tipo de caja y dimensiones en la columna central.\n' +
+                      '3. Analiza las curvas SPL/Z y planos CAD 2D/3D a la derecha.\n' +
+                      '4. Exporta el reporte técnico de ingeniería con el botón PDF.'
+                    );
+                    closeMenu();
+                  }}
+                  type="button"
+                  role="menuitem"
+                >
+                  <span>{t("Guía de Usuario CAD")}</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="cad-header-vdiv" />
+
+        {/* 3. Grupo Vistas CAD */}
+        <div className="cad-ribbon-group">
+          <span className="cad-ribbon-tag">{t("VISTA:")}</span>
+          <div className="cad-ribbon-tools">
+            <button
+              type="button"
+              className={`cad-tool-btn ${workspaceView === 'split' ? 'active' : ''}`}
+              onClick={() => setWorkspaceView?.('split')}
+              title={t("Estudio Completo Multi-Panel")}
+            >
+              {t("Estudio")}
+            </button>
+            <button
+              type="button"
+              className={`cad-tool-btn ${workspaceView === 'simulation' ? 'active' : ''}`}
+              onClick={() => setWorkspaceView?.('simulation')}
+              title={t("Simulación SPL/Z")}
+            >
+              {t("Simulación")}
+            </button>
+            <button
+              type="button"
+              className={`cad-tool-btn ${workspaceView === 'cabinet' ? 'active' : ''}`}
+              onClick={() => setWorkspaceView?.('cabinet')}
+              title={t("Gabinete 3D y Lista de Corte")}
+            >
+              {t("Gabinete 3D")}
+            </button>
+            <button
+              type="button"
+              className={`cad-tool-btn ${workspaceView === 'crossover' ? 'active' : ''}`}
+              onClick={() => setWorkspaceView?.('crossover')}
+              title={t("Crossover CAD Circuital")}
+            >
+              {t("Crossover")}
+            </button>
+          </div>
+        </div>
+
+        <div className="cad-header-vdiv" />
+
+        {/* 4. Acciones rápidas (Reporte / Guardar) */}
+        <div className="cad-ribbon-group">
+          <button
+            type="button"
+            className="cad-tool-btn cad-btn-action"
+            onClick={() => onExportReport?.()}
+            title={t("Generar y Exportar Reporte Técnico de Ingeniería (PDF)")}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+            </svg>
+            <span>{t("PDF")}</span>
+          </button>
+          <button
+            type="button"
+            className="cad-tool-btn cad-btn-action"
+            onClick={() => onSaveProject?.()}
+            title={t("Guardar Proyecto .aclab (Ctrl+S)")}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+              <polyline points="17 21 17 13 7 13 7 21" />
+              <polyline points="7 3 7 8 15 8" />
+            </svg>
+            <span>{t("Guardar")}</span>
+          </button>
+        </div>
+
+        {/* 5. Lado Derecho: Controles de Ventana únicamente */}
+        <div className="cad-bar-right" style={{ marginLeft: 'auto' }}>
+          {/* Botones de control de ventana */}
+          <div className="cad-win-controls">
+            <button type="button" className="cad-win-btn win-min" title={t("Minimizar")} onClick={() => {}}>─</button>
+            <button
+              type="button"
+              className="cad-win-btn win-max"
+              title={t("Pantalla Completa")}
+              onClick={() => {
+                if (!document.fullscreenElement) {
+                  document.documentElement.requestFullscreen().catch(() => {});
+                } else {
+                  document.exitFullscreen().catch(() => {});
+                }
+              }}
+            >
+              □
+            </button>
+            <button
+              type="button"
+              className="cad-win-btn win-close"
+              title={t("Cerrar")}
+              onClick={() => {
+                if (window.confirm(t("¿Deseas cerrar AcousticLAB?"))) {
+                  window.close();
+                }
+              }}
+            >
+              ✕
+            </button>
+          </div>
         </div>
       </div>
-
-      {/* Menu bar */}
-      <div className="desktop-menu-bar" ref={menuBarRef} role="menubar">
-
-        {/* ARCHIVO */}
-        <div className="desktop-menu-item" role="none">
-          <button
-            className={`desktop-menu-trigger ${openMenu === 'archivo' ? 'active' : ''}`}
-            onClick={() => handleMenuClick('archivo')}
-            onMouseEnter={() => openMenu && setOpenMenu('archivo')}
-            type="button"
-            role="menuitem"
-            aria-haspopup="true"
-            aria-expanded={openMenu === 'archivo'}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') closeMenu();
-            }}
-          >
-            {t("Archivo")}
-          </button>
-          {openMenu === 'archivo' && (
-            <div className="desktop-menu-dropdown" role="menu" aria-label={t("Archivo")}>
-              <button
-                className="desktop-menu-option"
-                onClick={() => { onExportReport?.(); closeMenu(); }}
-                type="button"
-                role="menuitem"
-                onKeyDown={(e) => { if (e.key === 'Escape') closeMenu(); }}
-              >
-                {t("Exportar Reporte")}
-              </button>
-              <div className="desktop-menu-separator" role="separator" />
-              <button
-                className="desktop-menu-option"
-                onClick={() => {
-                  alert('AcousticLAB v1.0\n\nSimulador de cajas acústicas\nThiele/Small en tiempo real.\n\n© 2025 Fabio');
-                  closeMenu();
-                }}
-                type="button"
-                role="menuitem"
-                onKeyDown={(e) => { if (e.key === 'Escape') closeMenu(); }}
-              >
-                {t("Acerca de AcousticLAB")}
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* VENTANA */}
-        <div className="desktop-menu-item" role="none">
-          <button
-            className={`desktop-menu-trigger ${openMenu === 'ventana' ? 'active' : ''}`}
-            onClick={() => handleMenuClick('ventana')}
-            onMouseEnter={() => openMenu && setOpenMenu('ventana')}
-            type="button"
-            role="menuitem"
-            aria-haspopup="true"
-            aria-expanded={openMenu === 'ventana'}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') closeMenu();
-            }}
-          >
-            {t("Ventana")}
-          </button>
-          {openMenu === 'ventana' && (
-            <div className="desktop-menu-dropdown" role="menu" aria-label={t("Ventana")}>
-              <div className="desktop-menu-label" role="presentation">{t("Tema")}</div>
-              <button
-                className={`desktop-menu-option ${theme === 'dark' ? 'checked' : ''}`}
-                onClick={() => { if (theme !== 'dark') toggleTheme(); closeMenu(); }}
-                type="button"
-                role="menuitemcheckbox"
-                aria-checked={theme === 'dark'}
-                onKeyDown={(e) => { if (e.key === 'Escape') closeMenu(); }}
-              >
-                {theme === 'dark' && <span className="menu-check" aria-hidden="true">✓</span>}
-                {t("Modo Oscuro")}
-              </button>
-              <button
-                className={`desktop-menu-option ${theme === 'light' ? 'checked' : ''}`}
-
-                onClick={() => { if (theme !== 'light') toggleTheme(); closeMenu(); }}
-                type="button"
-              >
-                {theme === 'light' && <span className="menu-check">✓</span>}
-                {t("Modo Claro")}
-              </button>
-              <div className="desktop-menu-separator" />
-              <div className="desktop-menu-label">{t("Idioma")}</div>
-              <button
-                className={`desktop-menu-option ${lang === 'es' ? 'checked' : ''}`}
-                onClick={() => { setLang('es'); closeMenu(); }}
-                type="button"
-              >
-                {lang === 'es' && <span className="menu-check">✓</span>}
-                Español
-              </button>
-              <button
-                className={`desktop-menu-option ${lang === 'en' ? 'checked' : ''}`}
-                onClick={() => { setLang('en'); closeMenu(); }}
-                type="button"
-              >
-                {lang === 'en' && <span className="menu-check">✓</span>}
-                English
-              </button>
-              <button
-                className={`desktop-menu-option ${lang === 'pt' ? 'checked' : ''}`}
-                onClick={() => { setLang('pt'); closeMenu(); }}
-                type="button"
-              >
-                {lang === 'pt' && <span className="menu-check">✓</span>}
-                Português
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* OPCIONES */}
-        <div className="desktop-menu-item">
-          <button
-            className={`desktop-menu-trigger ${openMenu === 'opciones' ? 'active' : ''}`}
-            onClick={() => handleMenuClick('opciones')}
-            onMouseEnter={() => openMenu && setOpenMenu('opciones')}
-            type="button"
-          >
-            {t("Opciones")}
-          </button>
-          {openMenu === 'opciones' && (
-            <div className="desktop-menu-dropdown">
-              <div className="desktop-menu-label">{t("Sistema de Unidades")}</div>
-              <button
-                className={`desktop-menu-option ${unitSystem === 'metric' ? 'checked' : ''}`}
-                onClick={() => { setUnitSystem('metric'); closeMenu(); }}
-                type="button"
-              >
-                {unitSystem === 'metric' && <span className="menu-check">✓</span>}
-                {t("Métrico")} <span className="menu-shortcut">{t("Litros, cm, mm")}</span>
-              </button>
-              <button
-                className={`desktop-menu-option ${unitSystem === 'imperial' ? 'checked' : ''}`}
-                onClick={() => { setUnitSystem('imperial'); closeMenu(); }}
-                type="button"
-              >
-                {unitSystem === 'imperial' && <span className="menu-check">✓</span>}
-                {t("Imperial")} <span className="menu-shortcut">{t("ft³, in")}</span>
-              </button>
-              <div className="desktop-menu-separator" />
-              <button
-                className="desktop-menu-option"
-                onClick={handleResetConfig}
-                type="button"
-              >
-                {t("Restablecer Configuración")}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+    </header>
   );
 };

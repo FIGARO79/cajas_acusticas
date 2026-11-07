@@ -481,8 +481,19 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
 
   return (
     <aside className="panel speaker-panel">
+      {/* CAD Dock Header */}
+      <div className="cad-dock-header">
+        <div className="cad-dock-title">
+          <span className="cad-dock-icon">≡</span>
+          <span>{t("TRANSDUCTOR THIELE-SMALL")}</span>
+        </div>
+        <div className="cad-dock-actions">
+          <span className="cad-dock-tag">{preset ? t("PRESET") : t("PERSONALIZADO")}</span>
+        </div>
+      </div>
+
       {/* Selector de Pestañas de Altavoz (Menú de Texto Plano) */}
-      <div className="driver-menu-links" style={{ display: 'flex', gap: '1.5rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--card-border)', paddingBottom: '0.5rem' }}>
+      <div className="driver-menu-links" style={{ display: 'flex', gap: '1rem', marginBottom: '0.85rem', borderBottom: '1px solid var(--card-border)', paddingBottom: '0.4rem' }}>
         <button 
           type="button"
           onClick={() => setDriverTab('view')}

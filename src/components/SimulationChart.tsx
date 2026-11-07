@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -280,6 +280,7 @@ interface SimulationChartProps {
   portAreaM2?: number;
   baffleWidth?: number;
   baffleHeight?: number;
+  workspaceView?: 'split' | 'simulation' | 'cabinet' | 'crossover';
 }
 
 const SimulationChartComponent: React.FC<SimulationChartProps> = ({
@@ -297,11 +298,17 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
   portAreaM2 = 0.0044,
   baffleWidth = 32,
   baffleHeight = 45,
+  workspaceView = 'split',
 }) => {
   const t = useCallback((text: string) => translate(text, lang), [lang]);
 
+  // Si estamos en Modo Estudio ('split'), la vista es siempre Única (sin cuadrícula 2x2)
+  const isStudioMode = workspaceView === 'split' || !workspaceView;
+
   // Acoustic Simulation Suite Mode
   const [chartMode, setChartMode] = useState<SimulationChartMode>('spl');
+  const [displayLayout, setDisplayLayout] = useState<'quad' | 'single'>('quad');
+  const effectiveDisplayLayout = isStudioMode ? 'single' : displayLayout;
   const [simPower, setSimPower] = useState<number>(params.pe || 100);
 
   // Range and Annotation modes
@@ -706,7 +713,7 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
 
   // --- ACOUSTIC SIMULATION DATASETS ---
   const excursionDatasets = React.useMemo(() => {
-    if (chartMode !== 'excursion') return [];
+    if (effectiveDisplayLayout === 'single' && chartMode !== 'excursion') return [];
     const list: Record<string, unknown>[] = [];
     if (sealedData && sealedData.valid) {
       const vals = calcExcursionCurve(params, sealedData.Vb, sealedData.Fc, false, simPower, true);
@@ -717,7 +724,7 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
           y: vals[i] ?? 0
         })),
         borderColor: sealedBorderColor,
-        borderWidth: 2.5,
+        borderWidth: 2.2,
         pointRadius: 0,
         fill: false,
       });
@@ -731,27 +738,27 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
           y: vals[i] ?? 0
         })),
         borderColor: portedBorderColor,
-        borderWidth: 2.5,
+        borderWidth: 2.2,
         pointRadius: 0,
         fill: false,
       });
     }
     if (params.xmax && params.xmax > 0) {
       list.push({
-        label: `Límite Lineal Xmax (${params.xmax} mm)`,
+        label: `Xmax (${params.xmax} mm)`,
         data: frequencies.map(f => ({ x: f, y: params.xmax })),
         borderColor: '#ef4444',
-        borderWidth: 1.8,
+        borderWidth: 1.5,
         pointRadius: 0,
         fill: false,
         borderDash: [5, 4]
       });
     }
     return list;
-  }, [chartMode, sealedData, portedData, params, simPower, t]);
+  }, [effectiveDisplayLayout, chartMode, sealedData, portedData, params, simPower, t]);
 
   const velocityDatasets = React.useMemo(() => {
-    if (chartMode !== 'velocity') return [];
+    if (effectiveDisplayLayout === 'single' && chartMode !== 'velocity') return [];
     const list: Record<string, unknown>[] = [];
     const pArea = portAreaM2 || 0.0044;
     if (portedData && portedData.valid) {
@@ -764,13 +771,13 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
         })),
         borderColor: portedBorderColor,
         backgroundColor: chartPortedBg,
-        borderWidth: 2.5,
+        borderWidth: 2.2,
         pointRadius: 0,
         fill: true,
       });
     }
     list.push({
-      label: `Límite 5% c (17 m/s - Audiófilo)`,
+      label: `Límite 5% c (17 m/s)`,
       data: frequencies.map(f => ({ x: f, y: 17 })),
       borderColor: '#f59e0b',
       borderWidth: 1.5,
@@ -779,19 +786,19 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
       borderDash: [4, 4]
     });
     list.push({
-      label: `Límite 10% c (34 m/s - Turbulencia/Chuffing)`,
+      label: `Límite 10% c (34 m/s)`,
       data: frequencies.map(f => ({ x: f, y: 34 })),
       borderColor: '#ef4444',
-      borderWidth: 1.8,
+      borderWidth: 1.5,
       pointRadius: 0,
       fill: false,
       borderDash: [6, 3]
     });
     return list;
-  }, [chartMode, portedData, params, portAreaM2, simPower, t]);
+  }, [effectiveDisplayLayout, chartMode, portedData, params, portAreaM2, simPower, t]);
 
   const impedanceDatasets = React.useMemo(() => {
-    if (chartMode !== 'impedance') return [];
+    if (effectiveDisplayLayout === 'single' && chartMode !== 'impedance') return [];
     const list: Record<string, unknown>[] = [];
     if (sealedData && sealedData.valid) {
       const vals = useExtendedZ
@@ -813,13 +820,13 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
           )
         : calcImpedanceCurve(params, sealedData.Vb, sealedData.Fc, false, true);
       list.push({
-        label: `${t("Impedancia Caja Sellada")}${useExtendedZ ? ' (Thorborg/Knudsen)' : ''} (Ω)`,
+        label: `${t("Caja Sellada")}${useExtendedZ ? ' (Thorborg/Knudsen)' : ''} (Ω)`,
         data: frequencies.map((f, i) => ({
           x: f,
           y: vals[i] ?? 0
         })),
         borderColor: sealedBorderColor,
-        borderWidth: 2.5,
+        borderWidth: 2.2,
         pointRadius: 0,
         fill: false,
       });
@@ -844,13 +851,13 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
           )
         : calcImpedanceCurve(params, portedData.Vb, portedData.Fb, true, true);
       list.push({
-        label: `${t("Impedancia Caja Ventilada")}${useExtendedZ ? ' (Thorborg/Knudsen)' : ''} (Ω)`,
+        label: `${t("Caja Ventilada")}${useExtendedZ ? ' (Thorborg/Knudsen)' : ''} (Ω)`,
         data: frequencies.map((f, i) => ({
           x: f,
           y: vals[i] ?? 0
         })),
         borderColor: portedBorderColor,
-        borderWidth: 2.5,
+        borderWidth: 2.2,
         pointRadius: 0,
         fill: false,
       });
@@ -867,10 +874,10 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
       });
     }
     return list;
-  }, [chartMode, sealedData, portedData, params, useExtendedZ, t]);
+  }, [effectiveDisplayLayout, chartMode, sealedData, portedData, params, useExtendedZ, t]);
 
   const phaseDatasets = React.useMemo(() => {
-    if (chartMode !== 'phase') return [];
+    if (effectiveDisplayLayout === 'single' && chartMode !== 'phase') return [];
     const list: Record<string, unknown>[] = [];
     if (sealedData && sealedData.valid) {
       const vals = calcPhaseCurve(params, sealedData.Vb, sealedData.Fc, false, true);
@@ -881,7 +888,7 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
           y: vals[i] ?? 0
         })),
         borderColor: sealedBorderColor,
-        borderWidth: 2.5,
+        borderWidth: 2.2,
         pointRadius: 0,
         fill: false,
       });
@@ -895,16 +902,16 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
           y: vals[i] ?? 0
         })),
         borderColor: portedBorderColor,
-        borderWidth: 2.5,
+        borderWidth: 2.2,
         pointRadius: 0,
         fill: false,
       });
     }
     return list;
-  }, [chartMode, sealedData, portedData, params, t]);
+  }, [effectiveDisplayLayout, chartMode, sealedData, portedData, params, t]);
 
   const delayDatasets = React.useMemo(() => {
-    if (chartMode !== 'delay') return [];
+    if (effectiveDisplayLayout === 'single' && chartMode !== 'delay') return [];
     const list: Record<string, unknown>[] = [];
     if (sealedData && sealedData.valid) {
       const delays = calcGroupDelayCurve(frequencies, params, sealedData.Vb, sealedData.Fc, false);
@@ -912,7 +919,7 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
         label: `${t("Retardo Grupo Sellada")} (ms)`,
         data: frequencies.map((f, idx) => ({ x: f, y: delays[idx] })),
         borderColor: sealedBorderColor,
-        borderWidth: 2.5,
+        borderWidth: 2.2,
         pointRadius: 0,
         fill: false,
       });
@@ -923,13 +930,53 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
         label: `${t("Retardo Grupo Ventilada")} (ms)`,
         data: frequencies.map((f, idx) => ({ x: f, y: delays[idx] })),
         borderColor: portedBorderColor,
-        borderWidth: 2.5,
+        borderWidth: 2.2,
         pointRadius: 0,
         fill: false,
       });
     }
     return list;
-  }, [chartMode, sealedData, portedData, params, t]);
+  }, [effectiveDisplayLayout, chartMode, sealedData, portedData, params, t]);
+
+  const splDatasets = React.useMemo(() => {
+    if (rangeMode === 'bass') {
+      return [
+        ...(sealedData && sealedData.valid ? [{
+          label: `${t("Caja Sellada")} (Vb ${sealedData.Vb.toFixed(1)}L, Qtc ${sealedData.Qtc.toFixed(2)})`,
+          data: sealedPoints,
+          borderColor: sealedBorderColor,
+          backgroundColor: chartSealedBg,
+          borderWidth: 2.2,
+          pointRadius: 0,
+          fill: true,
+          tension: 0.2,
+        }] : []),
+        ...(portedData && portedData.valid ? [{
+          label: `${t("Caja Ventilada")} (Vb ${portedData.Vb.toFixed(1)}L, Fb ${portedData.Fb.toFixed(1)}Hz)`,
+          data: portedPoints,
+          borderColor: portedBorderColor,
+          backgroundColor: chartPortedBg,
+          borderWidth: 2.2,
+          pointRadius: 0,
+          fill: true,
+          tension: 0.2,
+        }] : []),
+        ...(bandpassData && bandpassData.valid ? [{
+          label: bandpassData.order === 4 
+            ? `${t("Caja Paso Banda 4.º")} (Vf ${bandpassData.Vf.toFixed(1)}L, Vr ${bandpassData.Vr.toFixed(1)}L, Fb ${bandpassData.Fb.toFixed(1)}Hz)`
+            : `${t("Caja Paso Banda 6.º")} (Vf ${bandpassData.Vf.toFixed(1)}L, Fl ${bandpassData.Fl?.toFixed(1)}Hz, Fh ${bandpassData.Fh?.toFixed(1)}Hz)`,
+          data: bandpassPoints,
+          borderColor: bandpassBorderColor,
+          backgroundColor: chartBandpassBg,
+          borderWidth: 2.2,
+          pointRadius: 0,
+          fill: true,
+          tension: 0.2,
+        }] : []),
+      ];
+    }
+    return fullRangeDatasets;
+  }, [rangeMode, sealedData, portedData, bandpassData, sealedPoints, portedPoints, bandpassPoints, fullRangeDatasets, t]);
 
   const activeDatasets = React.useMemo(() => {
     switch (chartMode) {
@@ -945,46 +992,9 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
         return delayDatasets;
       case 'spl':
       default:
-        return rangeMode === 'bass' ? [
-          ...(sealedData && sealedData.valid ? [{
-            label: `${t("Caja Sellada")} (Vb ${sealedData.Vb.toFixed(1)}L, Qtc ${sealedData.Qtc.toFixed(2)})`,
-            data: sealedPoints,
-            borderColor: sealedBorderColor,
-            backgroundColor: chartSealedBg,
-            borderWidth: 2.5,
-            pointRadius: 0,
-            fill: true,
-            tension: 0.2,
-          }] : []),
-          ...(portedData && portedData.valid ? [{
-            label: `${t("Caja Ventilada")} (Vb ${portedData.Vb.toFixed(1)}L, Fb ${portedData.Fb.toFixed(1)}Hz)`,
-            data: portedPoints,
-            borderColor: portedBorderColor,
-            backgroundColor: chartPortedBg,
-            borderWidth: 2.5,
-            pointRadius: 0,
-            fill: true,
-            tension: 0.2,
-          }] : []),
-          ...(bandpassData && bandpassData.valid ? [{
-            label: bandpassData.order === 4 
-              ? `${t("Caja Paso Banda 4.º")} (Vf ${bandpassData.Vf.toFixed(1)}L, Vr ${bandpassData.Vr.toFixed(1)}L, Fb ${bandpassData.Fb.toFixed(1)}Hz)`
-              : `${t("Caja Paso Banda 6.º")} (Vf ${bandpassData.Vf.toFixed(1)}L, Fl ${bandpassData.Fl?.toFixed(1)}Hz, Fh ${bandpassData.Fh?.toFixed(1)}Hz)`,
-            data: bandpassPoints,
-            borderColor: bandpassBorderColor,
-            backgroundColor: chartBandpassBg,
-            borderWidth: 2.5,
-            pointRadius: 0,
-            fill: true,
-            tension: 0.2,
-          }] : []),
-        ] : fullRangeDatasets;
+        return splDatasets;
     }
-  }, [chartMode, rangeMode, sealedData, portedData, bandpassData, sealedPoints, portedPoints, bandpassPoints, fullRangeDatasets, excursionDatasets, velocityDatasets, impedanceDatasets, phaseDatasets, delayDatasets, t]);
-
-  const data = {
-    datasets: activeDatasets,
-  };
+  }, [chartMode, splDatasets, excursionDatasets, velocityDatasets, impedanceDatasets, phaseDatasets, delayDatasets]);
 
   // Dynamic Y Axis parameters
   const yAxisConfig = React.useMemo(() => {
@@ -1044,243 +1054,397 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
   const cadFontFamily = "'JetBrains Mono', 'Fira Code', 'Consolas', monospace";
   const isLight = theme === 'light';
 
-  const options = {
-    responsive: true,
-    maintainAspectRatio: false,
-    scales: {
-      x: {
-        type: 'logarithmic' as const,
-        min: 10,
-        max: (chartMode === 'spl' && rangeMode === 'full') ? 20000 : 500,
-        grid: { color: isLight ? 'rgba(2, 132, 199, 0.14)' : 'rgba(56, 189, 248, 0.12)' },
-        title: {
-          display: true,
-          text: t('Frecuencia (Hz)'),
-          color: isLight ? '#0f172a' : '#bae6fd',
-          font: { family: cadFontFamily, size: 11, weight: 700 },
+  const createChartOptions = useCallback((
+    yMin: number,
+    yMax: number,
+    yStep: number,
+    yTitle: string,
+    yUnit: string,
+    isCompact: boolean = false,
+    annList: AnnotationOption[] = []
+  ) => {
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false as const,
+      scales: {
+        x: {
+          type: 'logarithmic' as const,
+          min: 10,
+          max: (chartMode === 'spl' && rangeMode === 'full' && !isCompact) ? 20000 : 500,
+          grid: { color: isLight ? 'rgba(2, 132, 199, 0.12)' : 'rgba(56, 189, 248, 0.08)' },
+          title: {
+            display: !isCompact,
+            text: t('Frecuencia (Hz)'),
+            color: isLight ? '#0f172a' : '#bae6fd',
+            font: { family: cadFontFamily, size: isCompact ? 9 : 11, weight: 700 },
+          },
+          ticks: {
+            color: isLight ? '#334155' : '#93c5fd',
+            font: { family: cadFontFamily, size: isCompact ? 8.5 : 10, weight: 600 },
+            callback: function (value: string | number) {
+              const targets = (chartMode === 'spl' && rangeMode === 'full' && !isCompact)
+                ? [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]
+                : [10, 20, 50, 100, 200, 500];
+              const numVal = Number(value);
+              if (targets.includes(numVal)) {
+                return numVal >= 1000 ? (numVal / 1000) + 'k' : String(numVal);
+              }
+              return null;
+            },
+          },
         },
-        ticks: {
-          color: isLight ? '#334155' : '#93c5fd',
-          font: { family: cadFontFamily, size: 10, weight: 600 },
-          callback: function (value: string | number) {
-            const targets = (chartMode === 'spl' && rangeMode === 'full')
-              ? [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]
-              : [10, 20, 30, 50, 70, 100, 200, 300, 500];
-            const numVal = Number(value);
-            if (targets.includes(numVal)) {
-              return numVal >= 1000 ? (numVal / 1000) + 'k' : String(numVal);
-            }
-            return null;
+        y: {
+          min: yMin,
+          max: yMax,
+          grid: { color: isLight ? 'rgba(2, 132, 199, 0.12)' : 'rgba(56, 189, 248, 0.08)' },
+          title: {
+            display: !isCompact,
+            text: yTitle,
+            color: isLight ? '#0f172a' : '#bae6fd',
+            font: { family: cadFontFamily, size: isCompact ? 9 : 11, weight: 700 },
+          },
+          ticks: {
+            color: isLight ? '#334155' : '#93c5fd',
+            font: { family: cadFontFamily, size: isCompact ? 8.5 : 10, weight: 600 },
+            stepSize: yStep,
           },
         },
       },
-      y: {
-        min: yAxisConfig.min,
-        max: yAxisConfig.max,
-        grid: { color: isLight ? 'rgba(2, 132, 199, 0.14)' : 'rgba(56, 189, 248, 0.12)' },
-        title: {
+      plugins: {
+        legend: {
           display: true,
-          text: yAxisConfig.title,
-          color: isLight ? '#0f172a' : '#bae6fd',
-          font: { family: cadFontFamily, size: 11, weight: 700 },
-        },
-        ticks: {
-          color: isLight ? '#334155' : '#93c5fd',
-          font: { family: cadFontFamily, size: 10, weight: 600 },
-          stepSize: yAxisConfig.stepSize,
-        },
-      },
-    },
-    plugins: {
-      legend: {
-        labels: {
-          usePointStyle: true,
-          pointStyle: 'line' as const,
-          color: isLight ? '#0f172a' : '#f1f5f9',
-          font: { family: cadFontFamily, size: 11, weight: 700 },
-          padding: 12,
-        },
-      },
-      tooltip: {
-        backgroundColor: isLight ? 'rgba(255, 255, 255, 0.96)' : 'rgba(6, 14, 29, 0.95)',
-        titleColor: isLight ? '#0284c7' : '#38bdf8',
-        bodyColor: isLight ? '#0f172a' : '#e0f2fe',
-        titleFont: { family: cadFontFamily, size: 10, weight: 700 },
-        bodyFont: { family: cadFontFamily, size: 9, weight: 600 },
-        borderColor: isLight ? 'rgba(2, 132, 199, 0.45)' : 'rgba(56, 189, 248, 0.4)',
-        borderWidth: 1,
-        callbacks: {
-          label: function (context: TooltipItem<'line'>) {
-            const yVal = context.parsed.y !== null && context.parsed.y !== undefined ? context.parsed.y.toFixed(1) : '0.0';
-            const xVal = context.parsed.x !== null && context.parsed.x !== undefined ? context.parsed.x : 0;
-            return `${context.dataset.label}: ${yVal} ${yAxisConfig.unit} @ ${xVal >= 1000 ? (xVal/1000).toFixed(1)+'k' : xVal} Hz`;
+          position: 'top' as const,
+          labels: {
+            usePointStyle: true,
+            pointStyle: 'line' as const,
+            boxWidth: isCompact ? 10 : 20,
+            color: isLight ? '#0f172a' : '#f1f5f9',
+            font: { family: cadFontFamily, size: isCompact ? 8.5 : 11, weight: 600 },
+            padding: isCompact ? 4 : 10,
           },
         },
+        tooltip: {
+          backgroundColor: isLight ? 'rgba(255, 255, 255, 0.96)' : 'rgba(6, 14, 29, 0.95)',
+          titleColor: isLight ? '#0284c7' : '#38bdf8',
+          bodyColor: isLight ? '#0f172a' : '#e0f2fe',
+          titleFont: { family: cadFontFamily, size: isCompact ? 9 : 10, weight: 700 },
+          bodyFont: { family: cadFontFamily, size: isCompact ? 8.5 : 9, weight: 600 },
+          borderColor: isLight ? 'rgba(2, 132, 199, 0.45)' : 'rgba(56, 189, 248, 0.4)',
+          borderWidth: 1,
+          callbacks: {
+            label: function (context: TooltipItem<'line'>) {
+              const yVal = context.parsed.y !== null && context.parsed.y !== undefined ? context.parsed.y.toFixed(1) : '0.0';
+              const xVal = context.parsed.x !== null && context.parsed.x !== undefined ? context.parsed.x : 0;
+              return `${context.dataset.label}: ${yVal} ${yUnit} @ ${xVal >= 1000 ? (xVal/1000).toFixed(1)+'k' : xVal} Hz`;
+            },
+          },
+        },
+        lineAnnotation: {
+          annotations: annList
+        },
+        cadBlueprint: {
+          theme
+        }
       },
-      lineAnnotation: {
-        annotations: chartMode === 'spl' ? annotations : []
-      },
-      cadBlueprint: {
-        theme
-      }
-    },
-  };
+    };
+  }, [chartMode, rangeMode, isLight, t, cadFontFamily, theme]);
+
+  const splOptionsQuad = useMemo(() => 
+    createChartOptions(dynamicMin, dynamicMax, 3, t('Ganancia (dB)'), 'dB', true, annotations),
+    [createChartOptions, dynamicMin, dynamicMax, annotations, t]
+  );
+
+  const impedanceOptionsQuad = useMemo(() => 
+    createChartOptions(0, Math.max(30, Math.ceil(((params.re || 4) * 7) / 10) * 10), 5, t('Impedancia (Ω)'), 'Ω', true, []),
+    [createChartOptions, params.re, t]
+  );
+
+  const excursionOptionsQuad = useMemo(() => 
+    createChartOptions(0, Math.max(12, Math.ceil(((params.xmax || 8) * 1.6) / 2) * 2), 2, t('Excursión (mm)'), 'mm', true, []),
+    [createChartOptions, params.xmax, t]
+  );
+
+  const velocityOptionsQuad = useMemo(() => 
+    createChartOptions(0, 40, 5, t('Velocidad (m/s)'), 'm/s', true, []),
+    [createChartOptions, t]
+  );
+
+  const optionsSingle = useMemo(() => 
+    createChartOptions(
+      yAxisConfig.min,
+      yAxisConfig.max,
+      yAxisConfig.stepSize,
+      yAxisConfig.title,
+      yAxisConfig.unit,
+      false,
+      chartMode === 'spl' ? annotations : []
+    ),
+    [createChartOptions, yAxisConfig, chartMode, annotations]
+  );
 
   return (
-    <div className="panel chart-card" style={{ display: 'flex', flexDirection: 'column', padding: '0.65rem 0.85rem' }}>
-      {/* Header Superior con Selector de Modos y Controles */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.55rem', flexWrap: 'wrap', gap: '0.6rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-          <h3 className="panel-title" style={{ margin: 0 }}>
-            {chartMode === 'spl' && t("Simulación SPL (dB vs Hz)")}
-            {chartMode === 'excursion' && t("Desplazamiento del Cono (mm vs Xmax)")}
-            {chartMode === 'velocity' && t("Velocidad de Aire en Conducto (m/s)")}
-            {chartMode === 'impedance' && t("Impedancia Eléctrica del Sistema (Ω)")}
-            {chartMode === 'phase' && t("Respuesta de Fase Acústica (°)")}
-            {chartMode === 'delay' && t("Retardo de Grupo (ms vs Hz)")}
-          </h3>
-
-          {/* Ajuste de Potencia Eléctrica */}
-          {(chartMode === 'excursion' || chartMode === 'velocity') && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'rgba(255,255,255,0.04)', padding: '2px 8px', borderRadius: '6px', border: '1px solid var(--card-border)' }}>
-              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>{t("Potencia:")}</span>
-              <input
-                type="number"
-                min="1"
-                max="5000"
-                value={simPower}
-                onChange={(e) => setSimPower(Math.max(1, parseFloat(e.target.value) || 1))}
-                style={{ width: '55px', height: '22px', fontSize: '0.72rem', background: 'transparent', border: '1px solid var(--card-border)', color: 'var(--accent)', borderRadius: '4px', textAlign: 'center', fontWeight: 600 }}
-              />
-              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>W</span>
+    <div className="panel chart-card" style={{ display: 'flex', flexDirection: 'column', padding: '0.4rem 0.65rem' }}>
+      {/* CAD Dock Header */}
+      <div className="cad-dock-header">
+        <div className="cad-dock-title">
+          <span className="cad-dock-icon">≡</span>
+          <span>{effectiveDisplayLayout === 'quad' ? t("SIMULACIÓN ELECTROACÚSTICA MULTIPANEL 2×2") : t("SIMULACIÓN ELECTROACÚSTICA")}</span>
+        </div>
+        <div className="cad-dock-actions">
+          {/* Switcher Cuadrícula vs Vista Única (Oculto en Modo Estudio) */}
+          {!isStudioMode && (
+            <div className="segmented-control" style={{ display: 'inline-flex', width: 'auto', padding: '1px' }}>
+              <button
+                type="button"
+                className={displayLayout === 'quad' ? 'active' : ''}
+                onClick={() => setDisplayLayout('quad')}
+                title={t("Cuadrícula sincronizada 2×2 (SPL, Z, Excursión, Velocidad)")}
+                style={{ padding: '0 0.5rem', fontSize: '0.67rem', height: '20px' }}
+              >
+                ⊞ {t("Cuadrícula 2×2")}
+              </button>
+              <button
+                type="button"
+                className={displayLayout === 'single' ? 'active' : ''}
+                onClick={() => setDisplayLayout('single')}
+                title={t("Vista maximizada de un solo gráfico")}
+                style={{ padding: '0 0.5rem', fontSize: '0.67rem', height: '20px' }}
+              >
+                □ {t("Vista Única")}
+              </button>
             </div>
           )}
+          <span className="cad-dock-tag tag-primary">96 kHz</span>
+        </div>
+      </div>
+
+      {/* Barra de Controles Globales (Potencia, Baffle Step, Extended Z, Rango) */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+          {/* Ajuste de Potencia Eléctrica */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'rgba(255,255,255,0.04)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--card-border)' }}>
+            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>{t("Potencia:")}</span>
+            <input
+              type="number"
+              min="1"
+              max="5000"
+              value={simPower}
+              onChange={(e) => setSimPower(Math.max(1, parseFloat(e.target.value) || 1))}
+              style={{ width: '50px', height: '20px', fontSize: '0.72rem', background: 'transparent', border: '1px solid var(--card-border)', color: 'var(--accent)', borderRadius: '2px', textAlign: 'center', fontWeight: 600 }}
+            />
+            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>W</span>
+          </div>
+
+          {/* Toggle Baffle Step */}
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.7rem', color: 'var(--text-main)', cursor: 'pointer', margin: 0, fontWeight: 600 }} title="Difracción de bordes y transición Baffle Step 4pi a 2pi según ancho y alto del mueble (+6dB)">
+            <input
+              type="checkbox"
+              checked={applyBaffleDiffraction}
+              onChange={(e) => setApplyBaffleDiffraction(e.target.checked)}
+              style={{ cursor: 'pointer' }}
+            />
+            <span>{t("Baffle Step (+6dB)")}</span>
+          </label>
+
+          {/* Toggle Modelo Extendido Z */}
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.7rem', color: 'var(--text-main)', cursor: 'pointer', margin: 0, fontWeight: 600 }} title="Modelo extendido de Thorborg/Futtrup (semi-inductancia Ke, Leb, Rss) y viscoelasticidad de suspensión Knudsen LOG creep">
+            <input
+              type="checkbox"
+              checked={useExtendedZ}
+              onChange={(e) => setUseExtendedZ(e.target.checked)}
+              style={{ cursor: 'pointer' }}
+            />
+            <span>{t("Modelo Extendido Z")}</span>
+          </label>
+
+          {/* Toggle Líneas Ref */}
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.7rem', color: 'var(--text-main)', cursor: 'pointer', margin: 0, fontWeight: 600 }}>
+            <input
+              type="checkbox"
+              checked={showRefLines}
+              onChange={(e) => setShowRefLines(e.target.checked)}
+              style={{ cursor: 'pointer' }}
+            />
+            <span>{t("Líneas Ref.")}</span>
+          </label>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          {/* Segmented range selector solo en modo SPL */}
-          {chartMode === 'spl' && (
+        {/* Controles exclusivos de Vista Única */}
+        {effectiveDisplayLayout === 'single' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {/* Segmented range selector solo en modo SPL */}
+            {chartMode === 'spl' && (
+              <div className="segmented-control" style={{ display: 'inline-flex', width: 'auto' }}>
+                <button
+                  type="button"
+                  className={rangeMode === 'bass' ? 'active' : ''}
+                  onClick={() => setRangeMode('bass')}
+                  style={{ flex: '0 0 auto', padding: '0 0.5rem', fontSize: '0.68rem', height: '20px' }}
+                >
+                  {t("Graves")}
+                </button>
+                <button
+                  type="button"
+                  className={rangeMode === 'full' ? 'active' : ''}
+                  onClick={() => setRangeMode('full')}
+                  style={{ flex: '0 0 auto', padding: '0 0.5rem', fontSize: '0.68rem', height: '20px' }}
+                >
+                  {t("Filtros / 20kHz")}
+                </button>
+              </div>
+            )}
+
+            {/* Pestañas de modo de simulación en Vista Única */}
             <div className="segmented-control" style={{ display: 'inline-flex', width: 'auto' }}>
               <button
                 type="button"
-                className={rangeMode === 'bass' ? 'active' : ''}
-                onClick={() => setRangeMode('bass')}
-                style={{ flex: '0 0 auto', padding: '0 0.7rem', whiteSpace: 'nowrap' }}
+                className={chartMode === 'spl' ? 'active' : ''}
+                onClick={() => setChartMode('spl')}
+                style={{ padding: '0 0.5rem', fontSize: '0.68rem', height: '20px' }}
               >
-                {t("Graves")}
+                SPL
               </button>
               <button
                 type="button"
-                className={rangeMode === 'full' ? 'active' : ''}
-                onClick={() => setRangeMode('full')}
-                style={{ flex: '0 0 auto', padding: '0 0.7rem', whiteSpace: 'nowrap' }}
+                className={chartMode === 'impedance' ? 'active' : ''}
+                onClick={() => setChartMode('impedance')}
+                style={{ padding: '0 0.5rem', fontSize: '0.68rem', height: '20px' }}
               >
-                {t("Filtros / 20kHz")}
+                Impedancia
+              </button>
+              <button
+                type="button"
+                className={chartMode === 'excursion' ? 'active' : ''}
+                onClick={() => setChartMode('excursion')}
+                style={{ padding: '0 0.5rem', fontSize: '0.68rem', height: '20px' }}
+              >
+                Excursión
+              </button>
+              <button
+                type="button"
+                className={chartMode === 'velocity' ? 'active' : ''}
+                onClick={() => setChartMode('velocity')}
+                style={{ padding: '0 0.5rem', fontSize: '0.68rem', height: '20px' }}
+              >
+                Velocidad
+              </button>
+              <button
+                type="button"
+                className={chartMode === 'phase' ? 'active' : ''}
+                onClick={() => setChartMode('phase')}
+                style={{ padding: '0 0.5rem', fontSize: '0.68rem', height: '20px' }}
+              >
+                Fase
+              </button>
+              <button
+                type="button"
+                className={chartMode === 'delay' ? 'active' : ''}
+                onClick={() => setChartMode('delay')}
+                style={{ padding: '0 0.5rem', fontSize: '0.68rem', height: '20px' }}
+              >
+                Retardo
               </button>
             </div>
-          )}
-
-          {/* Toggle Reference Lines */}
-          {chartMode === 'spl' && (
-            <>
-              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.72rem', color: 'var(--text-main)', cursor: 'pointer', margin: 0, fontWeight: 600, whiteSpace: 'nowrap' }} title="Difracción de bordes y transición Baffle Step 4pi a 2pi según ancho y alto del mueble">
-                <input
-                  type="checkbox"
-                  checked={applyBaffleDiffraction}
-                  onChange={(e) => setApplyBaffleDiffraction(e.target.checked)}
-                  style={{ cursor: 'pointer' }}
-                />
-                <span>{t("Baffle Step (Difracción)")}</span>
-              </label>
-
-              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.72rem', color: 'var(--text-main)', cursor: 'pointer', margin: 0, fontWeight: 600, whiteSpace: 'nowrap' }}>
-                <input
-                  type="checkbox"
-                  checked={showRefLines}
-                  onChange={(e) => setShowRefLines(e.target.checked)}
-                  style={{ cursor: 'pointer' }}
-                />
-                <span>{t("Líneas Ref.")}</span>
-              </label>
-            </>
-          )}
-
-          {/* Toggle Modelo Extendido en modo Impedancia */}
-          {chartMode === 'impedance' && (
-            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.72rem', color: 'var(--text-main)', cursor: 'pointer', margin: 0, fontWeight: 600, whiteSpace: 'nowrap' }} title="Modelo extendido de Thorborg/Futtrup (semi-inductancia Ke, Leb, Rss) y viscoelasticidad de suspensión Knudsen LOG creep">
-              <input
-                type="checkbox"
-                checked={useExtendedZ}
-                onChange={(e) => setUseExtendedZ(e.target.checked)}
-                style={{ cursor: 'pointer' }}
-              />
-              <span>{t("Modelo Extendido (Thorborg/Knudsen)")}</span>
-            </label>
-          )}
-        </div>
-      </div>
-
-      {/* Barra de Modos de Simulación Avanzada */}
-      <div className="segmented-control" style={{ marginBottom: '0.6rem', display: 'flex', flexWrap: 'wrap', gap: '3px', width: '100%' }}>
-        <button
-          type="button"
-          className={chartMode === 'spl' ? 'active' : ''}
-          onClick={() => setChartMode('spl')}
-          title="Respuesta de Amplitud Normalizada en Frecuencia (dB)"
-        >
-          SPL (dB)
-        </button>
-        <button
-          type="button"
-          className={chartMode === 'excursion' ? 'active' : ''}
-          onClick={() => setChartMode('excursion')}
-          title="Desplazamiento pico del diafragma vs límite lineal Xmax (mm)"
-        >
-          Excursión (mm)
-        </button>
-        <button
-          type="button"
-          className={chartMode === 'velocity' ? 'active' : ''}
-          onClick={() => setChartMode('velocity')}
-          title="Velocidad del aire a través del conducto sintonizador (m/s)"
-        >
-          Velocidad Aire (m/s)
-        </button>
-        <button
-          type="button"
-          className={chartMode === 'impedance' ? 'active' : ''}
-          onClick={() => setChartMode('impedance')}
-          title="Curva de impedancia eléctrica del sistema de altavoz y caja (Ω)"
-        >
-          Impedancia (Ω)
-        </button>
-        <button
-          type="button"
-          className={chartMode === 'phase' ? 'active' : ''}
-          onClick={() => setChartMode('phase')}
-          title="Respuesta de fase acústica (grados)"
-        >
-          Fase (°)
-        </button>
-        <button
-          type="button"
-          className={chartMode === 'delay' ? 'active' : ''}
-          onClick={() => setChartMode('delay')}
-          title="Retardo de grupo en milisegundos (ms)"
-        >
-          Retardo Grupo (ms)
-        </button>
-      </div>
-
-      <div className="chart-container" style={{ flex: 1, minHeight: '260px' }}>
-        {data.datasets.length > 0 ? (
-          <Line data={data as any} options={options as any} plugins={[cadBlueprintPlugin, lineAnnotationPlugin]} />
-        ) : (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'var(--text-muted)' }}>
-            {t("Completa los parámetros mínimos del altavoz (Fs, Vas, Qts).")}
           </div>
         )}
       </div>
+
+      {/* RENDER CONDICIONAL: CUADRÍCULA 2×2 vs VISTA ÚNICA */}
+      {effectiveDisplayLayout === 'quad' ? (
+        <div className="cad-quad-grid">
+          {/* Cuadrante 1: SPL */}
+          <div className="cad-quad-tile">
+            <div className="cad-quad-tile-header">
+              <span className="cad-quad-tile-title">
+                <span style={{ color: '#0ea5e9' }}>●</span> {t("Respuesta SPL (dB vs Hz)")}
+              </span>
+              <button
+                type="button"
+                className="cad-quad-tile-btn"
+                onClick={() => { setChartMode('spl'); setDisplayLayout('single'); }}
+                title={t("Ampliar a vista detallada")}
+              >
+                ⤢ {t("Ampliar")}
+              </button>
+            </div>
+            <div className="cad-quad-canvas-wrap">
+              <Line data={{ datasets: splDatasets as any }} options={splOptionsQuad as any} plugins={[cadBlueprintPlugin, lineAnnotationPlugin]} />
+            </div>
+          </div>
+
+          {/* Cuadrante 2: Impedancia */}
+          <div className="cad-quad-tile">
+            <div className="cad-quad-tile-header">
+              <span className="cad-quad-tile-title">
+                <span style={{ color: '#10b981' }}>●</span> {t("Impedancia Eléctrica |Z| (Ω)")}
+              </span>
+              <button
+                type="button"
+                className="cad-quad-tile-btn"
+                onClick={() => { setChartMode('impedance'); setDisplayLayout('single'); }}
+                title={t("Ampliar a vista detallada")}
+              >
+                ⤢ {t("Ampliar")}
+              </button>
+            </div>
+            <div className="cad-quad-canvas-wrap">
+              <Line data={{ datasets: impedanceDatasets as any }} options={impedanceOptionsQuad as any} plugins={[cadBlueprintPlugin]} />
+            </div>
+          </div>
+
+          {/* Cuadrante 3: Excursión */}
+          <div className="cad-quad-tile">
+            <div className="cad-quad-tile-header">
+              <span className="cad-quad-tile-title">
+                <span style={{ color: '#f59e0b' }}>●</span> {t("Excursión de Cono (mm vs Xmax)")}
+              </span>
+              <button
+                type="button"
+                className="cad-quad-tile-btn"
+                onClick={() => { setChartMode('excursion'); setDisplayLayout('single'); }}
+                title={t("Ampliar a vista detallada")}
+              >
+                ⤢ {t("Ampliar")}
+              </button>
+            </div>
+            <div className="cad-quad-canvas-wrap">
+              <Line data={{ datasets: excursionDatasets as any }} options={excursionOptionsQuad as any} plugins={[cadBlueprintPlugin]} />
+            </div>
+          </div>
+
+          {/* Cuadrante 4: Velocidad de Aire */}
+          <div className="cad-quad-tile">
+            <div className="cad-quad-tile-header">
+              <span className="cad-quad-tile-title">
+                <span style={{ color: '#ef4444' }}>●</span> {t("Velocidad de Aire en Conducto (m/s)")}
+              </span>
+              <button
+                type="button"
+                className="cad-quad-tile-btn"
+                onClick={() => { setChartMode('velocity'); setDisplayLayout('single'); }}
+                title={t("Ampliar a vista detallada")}
+              >
+                ⤢ {t("Ampliar")}
+              </button>
+            </div>
+            <div className="cad-quad-canvas-wrap">
+              <Line data={{ datasets: velocityDatasets as any }} options={velocityOptionsQuad as any} plugins={[cadBlueprintPlugin]} />
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* VISTA ÚNICA DETALLADA */
+        <div className="chart-container" style={{ flex: 1, minHeight: '300px' }}>
+          {activeDatasets.length > 0 ? (
+            <Line data={{ datasets: activeDatasets as any }} options={optionsSingle as any} plugins={[cadBlueprintPlugin, lineAnnotationPlugin]} />
+          ) : (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'var(--text-muted)' }}>
+              {t("Completa los parámetros mínimos del altavoz (Fs, Vas, Qts).")}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

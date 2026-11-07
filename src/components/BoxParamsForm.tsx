@@ -715,8 +715,15 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
 
   return (
     <aside className="panel box-design-panel" style={{ borderLeft: 'none' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', borderBottom: '1px solid var(--card-border)', paddingBottom: '0.25rem' }}>
-        <h3 className="panel-title" style={{ marginBottom: 0, borderBottom: 'none', paddingBottom: 0, fontSize: '12px', fontWeight: 700 }}>{t("Caja Acústica")}</h3>
+      {/* CAD Dock Header */}
+      <div className="cad-dock-header">
+        <div className="cad-dock-title">
+          <span className="cad-dock-icon">≡</span>
+          <span>{t("CONFIGURACIÓN DE CAJA & FILTRO")}</span>
+        </div>
+        <div className="cad-dock-actions">
+          <span className="cad-dock-tag tag-primary">{boxType.toUpperCase()}</span>
+        </div>
       </div>
 
       {/* Medidor Visual de EBP (Thiele-Small) */}
@@ -762,12 +769,12 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
       </div>
 
       {/* Segmented Control de Tipo de Caja */}
-      <div className="segmented-control" style={{ marginBottom: '0.55rem', padding: '2px' }}>
+      <div className="segmented-control" style={{ marginBottom: '0.45rem', padding: '2px' }}>
         <button
           type="button"
           className={boxType === 'sealed' ? 'active' : ''}
           onClick={() => setBoxType('sealed')}
-          style={{ padding: '0.35rem 0.25rem' }}
+          style={{ padding: '0.35rem 0.25rem', fontWeight: 600 }}
         >
           {t("Sellada")}
         </button>
@@ -775,7 +782,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
           type="button"
           className={boxType === 'ported' ? 'active' : ''}
           onClick={() => setBoxType('ported')}
-          style={{ padding: '0.35rem 0.25rem' }}
+          style={{ padding: '0.35rem 0.25rem', fontWeight: 600 }}
         >
           {t("Ventilada")}
         </button>
@@ -783,10 +790,154 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
           type="button"
           className={boxType === 'bandpass' ? 'active' : ''}
           onClick={() => setBoxType('bandpass')}
-          style={{ padding: '0.35rem 0.25rem' }}
+          style={{ padding: '0.35rem 0.25rem', fontWeight: 600 }}
         >
           {t("Paso Banda")}
         </button>
+      </div>
+
+      {/* Controles de Alineación & Vías del Sistema en Configuración de Caja */}
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.35rem',
+          marginBottom: '0.55rem',
+          background: 'rgba(0, 0, 0, 0.2)',
+          border: '1px solid var(--card-border)',
+          borderRadius: '4px',
+          padding: '0.35rem 0.45rem'
+        }}
+      >
+        {/* Fila 1: Alineación específica según tipo de caja */}
+        {boxType === 'ported' && setVentedAlignment && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem' }}>
+            <span style={{ fontSize: '0.67rem', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+              {t("Alineación:")}
+            </span>
+            <div className="segmented-control" style={{ display: 'inline-flex', width: 'auto', margin: 0, padding: '1px', flex: 1 }}>
+              <button
+                type="button"
+                className={ventedAlignment === 'QB3' ? 'active' : ''}
+                onClick={() => setVentedAlignment('QB3')}
+                title={t("Quasi-Butterworth 3: Salida SPL alta, caja compacta")}
+                style={{ padding: '0.15rem 0.35rem', fontSize: '0.67rem', height: '22px' }}
+              >
+                QB3
+              </button>
+              <button
+                type="button"
+                className={ventedAlignment === 'B4' ? 'active' : ''}
+                onClick={() => setVentedAlignment('B4')}
+                title={t("Butterworth 4to Orden: Máxima fidelidad y respuesta plana")}
+                style={{ padding: '0.15rem 0.35rem', fontSize: '0.67rem', height: '22px' }}
+              >
+                B4
+              </button>
+              <button
+                type="button"
+                className={ventedAlignment === 'SBB4' ? 'active' : ''}
+                onClick={() => setVentedAlignment('SBB4')}
+                title={t("Super Boom Box 4: Extensión profunda de graves")}
+                style={{ padding: '0.15rem 0.35rem', fontSize: '0.67rem', height: '22px' }}
+              >
+                SBB4
+              </button>
+            </div>
+          </div>
+        )}
+
+        {boxType === 'sealed' && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem' }}>
+            <span style={{ fontSize: '0.67rem', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+              {t("Alineación (Qtc):")}
+            </span>
+            <div className="segmented-control" style={{ display: 'inline-flex', width: 'auto', margin: 0, padding: '1px', flex: 1 }}>
+              <button
+                type="button"
+                className={Math.abs(targetQtc - 0.577) < 0.05 ? 'active' : ''}
+                onClick={() => setTargetQtc(0.577)}
+                title={t("Bessel (Qtc 0.577): Óptima respuesta transitoria")}
+                style={{ padding: '0.15rem 0.35rem', fontSize: '0.66rem', height: '22px' }}
+              >
+                0.577 (Bessel)
+              </button>
+              <button
+                type="button"
+                className={Math.abs(targetQtc - 0.707) < 0.05 ? 'active' : ''}
+                onClick={() => setTargetQtc(0.707)}
+                title={t("Butterworth (Qtc 0.707): Máxima planicidad")}
+                style={{ padding: '0.15rem 0.35rem', fontSize: '0.66rem', height: '22px' }}
+              >
+                0.707 (B4)
+              </button>
+              <button
+                type="button"
+                className={Math.abs(targetQtc - 1.0) < 0.05 ? 'active' : ''}
+                onClick={() => setTargetQtc(1.0)}
+                title={t("Chebyshev (Qtc 1.0): Compacta con realce")}
+                style={{ padding: '0.15rem 0.35rem', fontSize: '0.66rem', height: '22px' }}
+              >
+                1.0 (Boost)
+              </button>
+            </div>
+          </div>
+        )}
+
+        {boxType === 'bandpass' && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem' }}>
+            <span style={{ fontSize: '0.67rem', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+              {t("Alineación:")}
+            </span>
+            <div className="segmented-control" style={{ display: 'inline-flex', width: 'auto', margin: 0, padding: '1px', flex: 1 }}>
+              <button
+                type="button"
+                className={bandpassOrder === 4 ? 'active' : ''}
+                onClick={() => setBandpassOrder(4)}
+                title={t("Paso Banda de 4.º Orden (Cámara trasera sellada)")}
+                style={{ padding: '0.15rem 0.4rem', fontSize: '0.68rem', height: '22px' }}
+              >
+                {t("4.º Orden")}
+              </button>
+              <button
+                type="button"
+                className={bandpassOrder === 6 ? 'active' : ''}
+                onClick={() => setBandpassOrder(6)}
+                title={t("Paso Banda de 6.º Orden (Ambas cámaras sintonizadas)")}
+                style={{ padding: '0.15rem 0.4rem', fontSize: '0.68rem', height: '22px' }}
+              >
+                {t("6.º Orden")}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Fila 2: Vías del Sistema (2W vs 3W) */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem' }}>
+          <span style={{ fontSize: '0.67rem', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+            {t("Vías del Sistema:")}
+          </span>
+          <div className="segmented-control" style={{ display: 'inline-flex', width: 'auto', margin: 0, padding: '1px', flex: 1 }}>
+            <button
+              type="button"
+              className={crossoverWays === 2 ? 'active' : ''}
+              onClick={() => setCrossoverWays(2)}
+              title={t("Sistema de 2 Vías (Tweeter + Woofer)")}
+              style={{ padding: '0.15rem 0.4rem', fontSize: '0.68rem', height: '22px' }}
+            >
+              {t("2 Vías (2W)")}
+            </button>
+            <button
+              type="button"
+              className={crossoverWays === 3 ? 'active' : ''}
+              onClick={() => setCrossoverWays(3)}
+              title={t("Sistema de 3 Vías (Tweeter + Medio + Woofer)")}
+              style={{ padding: '0.15rem 0.4rem', fontSize: '0.68rem', height: '22px' }}
+            >
+              {t("3 Vías (3W)")}
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Pestañas de Control Central */}
@@ -2358,7 +2509,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                   {t("Auto-Optimización de Crossover (Solver MNA)")}
                 </div>
                 <span style={{ fontSize: '0.62rem', border: '1px solid var(--card-border)', background: 'rgba(255, 255, 255, 0.03)', color: 'var(--text-muted)', padding: '1px 5px', fontWeight: 500, letterSpacing: '0.3px' }}>
-                  NELDER-MEAD / RUST
+                  NELDER-MEAD SIMPLEX
                 </span>
               </div>
 

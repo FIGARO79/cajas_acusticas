@@ -186,7 +186,7 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
           {t("Auto-Optimización de Crossover (Solver MNA)")}
         </span>
         <span style={{ fontSize: '0.64rem', border: '1px solid var(--card-border)', background: 'rgba(255, 255, 255, 0.03)', color: 'var(--text-muted)', padding: '1px 6px', borderRadius: '0px', fontWeight: 500, letterSpacing: '0.3px' }}>
-          NELDER-MEAD SIMPLEX / RUST
+          NELDER-MEAD SIMPLEX
         </span>
       </div>
 

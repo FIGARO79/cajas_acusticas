@@ -8,9 +8,10 @@ import { CrossoverTab } from './components/CrossoverTab';
 import { type Lang, translate } from './utils/translations';
 import { type UnitSystem, convertTo, getUnitLabel } from './utils/units';
 import type { SpeakerParams, CalculatedSealed, CalculatedPorted, CalculatedBandpass, CustomDriver, WoodCabinetData, CrossoverExportData } from './types';
-import { estimateF3, calcPortLength, getKCorrection, calcOptimalPortForSpeaker } from './utils/acousticMath';
+import { estimateF3, calcPortLength, getKCorrection, calcOptimalPortForSpeaker, calcVentAirVelocity } from './utils/acousticMath';
 import { getWasm, calcRadiadorPasivo, calcVolumenNetoMadera } from './wasm/index.ts';
 import { generateReportHTML } from './utils/reportGenerator';
+import { StatusBar } from './components/StatusBar';
 
 interface AppProps {
   wasmError?: string | null;
@@ -22,6 +23,7 @@ function App({ wasmError }: AppProps) {
   const [unitSystem, setUnitSystem] = useState<UnitSystem>(() => (localStorage.getItem('unitSystem') as UnitSystem) || 'metric');
   const [theme, setTheme] = useState<'dark' | 'light'>(() => (localStorage.getItem('theme') as 'dark' | 'light') || 'dark');
   const [activeTab, setActiveTab] = useState<'wood' | 'port' | 'damping' | 'crossover'>('wood');
+  const [workspaceView, setWorkspaceView] = useState<'split' | 'simulation' | 'cabinet' | 'crossover'>('split');
   const [boxType, setBoxType] = useState<'sealed' | 'ported' | 'bandpass'>('sealed');
   const [ventedAlignment, setVentedAlignment] = useState<'QB3' | 'B4' | 'SBB4'>('QB3');
   const t = (text: string) => translate(text, lang);
@@ -827,6 +829,125 @@ function App({ wasmError }: AppProps) {
     );
   }
 
+  // Telemetry metrics for StatusBar
+  const activeVb = boxType === 'sealed' ? sealedData.Vb : boxType === 'ported' ? portedData.Vb : (bandpassData.Vf + bandpassData.Vr);
+  const activeF3 = boxType === 'sealed' ? sealedData.F3 : boxType === 'ported' ? portedData.F3 : (bandpassData.Fl || 0);
+  const activeFb = boxType === 'ported' ? portedData.Fb : boxType === 'bandpass' ? bandpassData.Fb : undefined;
+  const activeQtc = boxType === 'sealed' ? sealedData.Qtc : undefined;
+
+  const currentPortVelocity = useMemo(() => {
+    if (boxType !== 'ported' || !portedData.valid || portedData.Fb <= 0) return 0;
+    const pDia = portShape === 'round'
+      ? (Number(portDiameter) || 0)
+      : portShape === 'custom'
+        ? (2 * Math.sqrt((Number(portArea) || 0) / Math.PI))
+        : (2 * Math.sqrt(((Number(portWidth) || 0) * (Number(portHeight) || 0)) / Math.PI));
+    const pCount = Number(portCount) || 1;
+    const areaM2 = pDia > 0 ? pCount * Math.PI * Math.pow(pDia / 200, 2) : 0.0044;
+    return calcVentAirVelocity(portedData.Fb, deferredAdjParams, portedData.Vb, portedData.Fb, areaM2, deferredAdjParams.pe || 100);
+  }, [boxType, portedData, portShape, portDiameter, portArea, portWidth, portHeight, portCount, deferredAdjParams]);
+
+  // Guardar proyecto a archivo .aclab
+  const handleSaveProject = () => {
+    const projectData = {
+      format: 'AcousticLAB_Project',
+      version: '3.0',
+      timestamp: new Date().toISOString(),
+      params,
+      boxType,
+      customVb,
+      customFb,
+      customPorted,
+      ventedAlignment,
+      portCount,
+      portDiameter,
+      portShape,
+      portWidth,
+      portHeight,
+      portArea,
+      portLength,
+      flaredEnds,
+      useCustomPortLength,
+      customPortLength,
+      crossoverWays,
+      crossoverType,
+      fc,
+      fcLow,
+      fcHigh,
+      zTweeter,
+      zMidrange,
+      zWoofer,
+      enableZobel,
+      zobelRe,
+      zobelLe,
+      enableLPad,
+      lpadAttenuation,
+      lpadZLoad,
+      woodMode,
+      woodThickness,
+      dampingType,
+    };
+    const blob = new Blob([JSON.stringify(projectData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const activeDriver = customDrivers.find(d => d.id === preset);
+    const brandName = (activeDriver?.brand || 'Generic').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const modelName = (activeDriver?.model || 'Driver').replace(/[^a-zA-Z0-9_-]/g, '_');
+    a.download = `AcousticLAB_${brandName}_${modelName}.aclab`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Abrir proyecto desde archivo .aclab
+  const handleLoadProject = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = JSON.parse(event.target?.result as string);
+        if (data.params) setParams(data.params);
+        if (data.boxType) setBoxType(data.boxType);
+        if (data.customVb !== undefined) setCustomVb(data.customVb);
+        if (data.customFb !== undefined) setCustomFb(data.customFb);
+        if (data.customPorted !== undefined) setCustomPorted(data.customPorted);
+        if (data.ventedAlignment) setVentedAlignment(data.ventedAlignment);
+        if (data.crossoverWays !== undefined) setCrossoverWays(data.crossoverWays);
+        if (data.crossoverType) setCrossoverType(data.crossoverType);
+        if (data.fc !== undefined) setFc(data.fc);
+        if (data.fcLow !== undefined) setFcLow(data.fcLow);
+        if (data.fcHigh !== undefined) setFcHigh(data.fcHigh);
+        if (data.zTweeter !== undefined) setZTweeter(data.zTweeter);
+        if (data.zMidrange !== undefined) setZMidrange(data.zMidrange);
+        if (data.zWoofer !== undefined) setZWoofer(data.zWoofer);
+        if (data.enableZobel !== undefined) setEnableZobel(data.enableZobel);
+        if (data.zobelRe !== undefined) setZobelRe(data.zobelRe);
+        if (data.zobelLe !== undefined) setZobelLe(data.zobelLe);
+        if (data.enableLPad !== undefined) setEnableLPad(data.enableLPad);
+        if (data.lpadAttenuation !== undefined) setLpadAttenuation(data.lpadAttenuation);
+        if (data.lpadZLoad !== undefined) setLpadZLoad(data.lpadZLoad);
+        alert(t("Proyecto .aclab cargado con éxito."));
+      } catch (err) {
+        alert(t("Error al abrir el archivo de proyecto .aclab"));
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  // Iniciar nuevo proyecto
+  const handleNewProject = () => {
+    if (window.confirm(t("¿Deseas iniciar un nuevo proyecto? Se restablecerán los parámetros actuales."))) {
+      setBoxType('sealed');
+      setVentedAlignment('QB3');
+      setCustomVb(0);
+      setCustomFb(0);
+      setCustomPorted(false);
+      handlePresetChange('custom_eminence_alpha_10a', null);
+    }
+  };
+
   return (
     <div className="container">
       <Header 
@@ -837,6 +958,17 @@ function App({ wasmError }: AppProps) {
         theme={theme} 
         toggleTheme={toggleTheme}
         onExportReport={handleExportReport}
+        workspaceView={workspaceView}
+        setWorkspaceView={setWorkspaceView}
+        boxType={boxType}
+        setBoxType={handleBoxTypeChange}
+        ventedAlignment={ventedAlignment}
+        setVentedAlignment={setVentedAlignment}
+        crossoverWays={crossoverWays}
+        setCrossoverWays={handleCrossoverWaysChange}
+        onSaveProject={handleSaveProject}
+        onLoadProject={handleLoadProject}
+        onNewProject={handleNewProject}
       />
 
       <div className="dashboard-grid">
@@ -1029,136 +1161,182 @@ function App({ wasmError }: AppProps) {
         />
 
         {/* CONTENIDOS DERECHA */}
-        <main className="dashboard-main">
-          {/* Gráfico */}
-          <SimulationChart 
-            lang={lang}
-            theme={theme}
-            sealedData={boxType === 'sealed' && sealedData.valid ? deferredSealedData : null}
-            portedData={boxType === 'ported' && portedData.valid ? deferredPortedData : null}
-            bandpassData={boxType === 'bandpass' && bandpassData.valid ? deferredBandpassData : null}
-            params={deferredAdjParams}
-            crossoverWays={crossoverWays}
-            crossoverType={crossoverType}
-            fc={fc}
-            fcLow={fcLow}
-            fcHigh={fcHigh}
-            baffleWidth={cabinetData?.wExt || Number(woodExtWidth) || 32}
-            baffleHeight={cabinetData?.hExt || Number(woodExtHeight) || 42}
-            portAreaM2={
-              (() => {
-                const pDia = portShape === 'round'
-                  ? (Number(portDiameter) || 0)
-                  : portShape === 'custom'
-                    ? (2 * Math.sqrt((Number(portArea) || 0) / Math.PI))
-                    : (2 * Math.sqrt(((Number(portWidth) || 0) * (Number(portHeight) || 0)) / Math.PI));
-                const pCount = Number(portCount) || 1;
-                return pDia > 0 ? pCount * Math.PI * Math.pow(pDia / 200, 2) : 0.0044;
-              })()
-            }
-          />
+        <main className={`dashboard-main workspace-${workspaceView}`}>
+          {/* Gráfico de simulación acústica */}
+          {(workspaceView === 'split' || workspaceView === 'simulation') && (
+            <SimulationChart 
+              lang={lang}
+              theme={theme}
+              workspaceView={workspaceView}
+              sealedData={boxType === 'sealed' && sealedData.valid ? deferredSealedData : null}
+              portedData={boxType === 'ported' && portedData.valid ? deferredPortedData : null}
+              bandpassData={boxType === 'bandpass' && bandpassData.valid ? deferredBandpassData : null}
+              params={deferredAdjParams}
+              crossoverWays={crossoverWays}
+              crossoverType={crossoverType}
+              fc={fc}
+              fcLow={fcLow}
+              fcHigh={fcHigh}
+              baffleWidth={cabinetData?.wExt || Number(woodExtWidth) || 32}
+              baffleHeight={cabinetData?.hExt || Number(woodExtHeight) || 42}
+              portAreaM2={
+                (() => {
+                  const pDia = portShape === 'round'
+                    ? (Number(portDiameter) || 0)
+                    : portShape === 'custom'
+                      ? (2 * Math.sqrt((Number(portArea) || 0) / Math.PI))
+                      : (2 * Math.sqrt(((Number(portWidth) || 0) * (Number(portHeight) || 0)) / Math.PI));
+                  const pCount = Number(portCount) || 1;
+                  return pDia > 0 ? pCount * Math.PI * Math.pow(pDia / 200, 2) : 0.0044;
+                })()
+              }
+            />
+          )}
 
           {/* Grilla de Resultados y Diagramas en Paralelo */}
-          <div className="results-diagrams-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '0px', marginTop: '0px', alignItems: 'start' }}>
-            {/* Panel Izquierdo: Cajón y Plano Técnico */}
-            <div className="panel" style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '0', padding: '0px' }}>
-              <CabinetTab 
-                theme={theme}
-                lang={lang}
-                unitSystem={unitSystem}
-                params={adjParams}
-                sealedData={sealedData}
-                portedData={portedData}
-                bandpassData={bandpassData}
-                woodMode={woodMode}
-                setWoodMode={setWoodMode}
-                woodShape={woodShape}
-                setWoodShape={setWoodShape}
-                woodConstraint={woodConstraint}
-                setWoodConstraint={setWoodConstraint}
-                woodSource={boxType}
-                woodRatio={woodRatio}
-                setWoodRatio={setWoodRatio}
-                woodLockVal1={woodLockVal1}
-                setWoodLockVal1={setWoodLockVal1}
-                woodLockVal2={woodLockVal2}
-                setWoodLockVal2={setWoodLockVal2}
-                woodLockVal3={woodLockVal3}
-                setWoodLockVal3={setWoodLockVal3}
-                woodExtHeight={woodExtHeight}
-                setWoodExtHeight={setWoodExtHeight}
-                woodExtWidth={woodExtWidth}
-                setWoodExtWidth={setWoodExtWidth}
-                woodExtDepth={woodExtDepth}
-                setWoodExtDepth={setWoodExtDepth}
-                woodTrapExtHeight={woodTrapExtHeight}
-                setWoodTrapExtHeight={setWoodTrapExtHeight}
-                woodTrapExtWidth={woodTrapExtWidth}
-                setWoodTrapExtWidth={setWoodTrapExtWidth}
-                woodTrapExtDepthTop={woodTrapExtDepthTop}
-                setWoodTrapExtDepthTop={setWoodTrapExtDepthTop}
-                woodTrapExtDepthBot={woodTrapExtDepthBot}
-                setWoodTrapExtDepthBot={setWoodTrapExtDepthBot}
-                woodThickness={woodThickness}
-                setWoodThickness={setWoodThickness}
-                woodExtra={woodExtra}
-                setWoodExtra={setWoodExtra}
-                portCount={portCount}
-                portDiameter={portDiameter}
-                portShape={portShape}
-                portWidth={portWidth}
-                portHeight={portHeight}
-                portArea={portArea}
-                dampingFactor={dampingFactor}
-                dampingType={dampingType}
-                flaredEnds={flaredEnds}
-                onCabinetDataChange={handleCabinetDataChange}
-                readOnly={true}
-                speakerYPct={speakerYPct}
-                tweeterYPct={tweeterYPct}
-                midrangeYPct={midrangeYPct}
-                crossoverWays={crossoverWays}
-                midSealed={midSealed}
-                midCabinetDepth={midCabinetDepth}
-                useCustomMidVol={useCustomMidVol}
-                customMidVol={customMidVol}
-                midVas={midVas}
-                midQts={midQts}
-                midTargetQtc={midTargetQtc}
-                portYPct={portYPct}
-                portSpacingPct={portSpacingPct}
-                portLocation={portLocation}
-                useCustomPortLength={useCustomPortLength}
-                customPortLength={customPortLength}
-              />
-            </div>
+          {(workspaceView === 'split' || workspaceView === 'cabinet' || workspaceView === 'crossover') && (
+            <div 
+              className="results-diagrams-grid" 
+              style={{ 
+                display: 'grid', 
+                gridTemplateColumns: workspaceView === 'split' ? 'repeat(auto-fit, minmax(360px, 1fr))' : '1fr', 
+                gap: '0px', 
+                marginTop: '0px', 
+                alignItems: 'start' 
+              }}
+            >
+              {/* Panel Izquierdo: Cajón y Plano Técnico */}
+              {(workspaceView === 'split' || workspaceView === 'cabinet') && (
+                <div className="panel" style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '0', padding: '0px' }}>
+                  <div className="cad-dock-header">
+                    <div className="cad-dock-title">
+                      <span className="cad-dock-icon">≡</span>
+                      <span>{t("GABINETE 3D & LISTA DE CORTE")}</span>
+                    </div>
+                  </div>
+                  <CabinetTab 
+                    theme={theme}
+                    lang={lang}
+                    unitSystem={unitSystem}
+                    params={adjParams}
+                    sealedData={sealedData}
+                    portedData={portedData}
+                    bandpassData={bandpassData}
+                    woodMode={woodMode}
+                    setWoodMode={setWoodMode}
+                    woodShape={woodShape}
+                    setWoodShape={setWoodShape}
+                    woodConstraint={woodConstraint}
+                    setWoodConstraint={setWoodConstraint}
+                    woodSource={boxType}
+                    woodRatio={woodRatio}
+                    setWoodRatio={setWoodRatio}
+                    woodLockVal1={woodLockVal1}
+                    setWoodLockVal1={setWoodLockVal1}
+                    woodLockVal2={woodLockVal2}
+                    setWoodLockVal2={setWoodLockVal2}
+                    woodLockVal3={woodLockVal3}
+                    setWoodLockVal3={setWoodLockVal3}
+                    woodExtHeight={woodExtHeight}
+                    setWoodExtHeight={setWoodExtHeight}
+                    woodExtWidth={woodExtWidth}
+                    setWoodExtWidth={setWoodExtWidth}
+                    woodExtDepth={woodExtDepth}
+                    setWoodExtDepth={setWoodExtDepth}
+                    woodTrapExtHeight={woodTrapExtHeight}
+                    setWoodTrapExtHeight={setWoodTrapExtHeight}
+                    woodTrapExtWidth={woodTrapExtWidth}
+                    setWoodTrapExtWidth={setWoodTrapExtWidth}
+                    woodTrapExtDepthTop={woodTrapExtDepthTop}
+                    setWoodTrapExtDepthTop={setWoodTrapExtDepthTop}
+                    woodTrapExtDepthBot={woodTrapExtDepthBot}
+                    setWoodTrapExtDepthBot={setWoodTrapExtDepthBot}
+                    woodThickness={woodThickness}
+                    setWoodThickness={setWoodThickness}
+                    woodExtra={woodExtra}
+                    setWoodExtra={setWoodExtra}
+                    portCount={portCount}
+                    portDiameter={portDiameter}
+                    portShape={portShape}
+                    portWidth={portWidth}
+                    portHeight={portHeight}
+                    portArea={portArea}
+                    dampingFactor={dampingFactor}
+                    dampingType={dampingType}
+                    flaredEnds={flaredEnds}
+                    onCabinetDataChange={handleCabinetDataChange}
+                    readOnly={true}
+                    speakerYPct={speakerYPct}
+                    tweeterYPct={tweeterYPct}
+                    midrangeYPct={midrangeYPct}
+                    crossoverWays={crossoverWays}
+                    midSealed={midSealed}
+                    midCabinetDepth={midCabinetDepth}
+                    useCustomMidVol={useCustomMidVol}
+                    customMidVol={customMidVol}
+                    midVas={midVas}
+                    midQts={midQts}
+                    midTargetQtc={midTargetQtc}
+                    portYPct={portYPct}
+                    portSpacingPct={portSpacingPct}
+                    portLocation={portLocation}
+                    useCustomPortLength={useCustomPortLength}
+                    customPortLength={customPortLength}
+                  />
+                </div>
+              )}
 
-            {/* Panel Derecho: Crossover y Circuito */}
-            <div className="panel" style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '0', padding: '0px' }}>
-              <CrossoverTab 
-                theme={theme}
-                lang={lang} 
-                onRegisterExporter={handleRegisterCrossover}
-                readOnly={true}
-                crossoverWaysProp={crossoverWays === 2 ? '2way' : '3way'}
-                crossoverTypeProp={crossoverType}
-                fcProp={fc}
-                fcLowProp={fcLow}
-                fcHighProp={fcHigh}
-                zTweeterProp={zTweeter}
-                zMidrangeProp={zMidrange}
-                zWooferProp={zWoofer}
-                enableZobelProp={enableZobel}
-                reProp={zobelRe}
-                leProp={zobelLe}
-                enableLPadProp={enableLPad}
-                attenuationProp={lpadAttenuation}
-                zLoadProp={lpadZLoad}
-              />
+              {/* Panel Derecho: Crossover y Circuito */}
+              {(workspaceView === 'split' || workspaceView === 'crossover') && (
+                <div className="panel" style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '0', padding: '0px' }}>
+                  <div className="cad-dock-header">
+                    <div className="cad-dock-title">
+                      <span className="cad-dock-icon">≡</span>
+                      <span>{t("ESQUEMA CAD DEL DIVISOR (CROSSOVER)")}</span>
+                    </div>
+                  </div>
+                  <CrossoverTab 
+                    theme={theme}
+                    lang={lang} 
+                    onRegisterExporter={handleRegisterCrossover}
+                    readOnly={true}
+                    crossoverWaysProp={crossoverWays === 2 ? '2way' : '3way'}
+                    crossoverTypeProp={crossoverType}
+                    fcProp={fc}
+                    fcLowProp={fcLow}
+                    fcHighProp={fcHigh}
+                    zTweeterProp={zTweeter}
+                    zMidrangeProp={zMidrange}
+                    zWooferProp={zWoofer}
+                    enableZobelProp={enableZobel}
+                    reProp={zobelRe}
+                    leProp={zobelLe}
+                    enableLPadProp={enableLPad}
+                    attenuationProp={lpadAttenuation}
+                    zLoadProp={lpadZLoad}
+                  />
+                </div>
+              )}
             </div>
-          </div>
+          )}
         </main>
       </div>
+
+      {/* Barra de Estado Inferior de Ingeniería CAD */}
+      <StatusBar 
+        lang={lang}
+        unitSystem={unitSystem}
+        setUnitSystem={setUnitSystem}
+        boxType={boxType}
+        vb={activeVb}
+        fb={activeFb}
+        f3={activeF3}
+        qtc={activeQtc}
+        pe={deferredAdjParams.pe}
+        xmax={deferredAdjParams.xmax}
+        portVelocity={currentPortVelocity}
+        onExportReport={handleExportReport}
+      />
     </div>
   );
 }
