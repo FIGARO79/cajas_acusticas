@@ -130,8 +130,7 @@ export const Header: React.FC<HeaderProps> = ({
                   onClick={() => {
                     alert(
                       'AcousticLAB 3.0 Engineering CAD Suite\n\n' +
-                      'Simulador Electroacústico Thiele-Small, Redes de Cruce y Planos CAD de Fabricación.\n' +
-                      'Compatible con especificaciones VituixCAD 3 / BassBox 6 Pro.\n\n' +
+                      'Simulador Electroacústico Thiele-Small, Redes de Cruce y Planos CAD de Fabricación.\n\n' +
                       '© 2026 Fabio / AcousticLAB'
                     );
                     closeMenu();

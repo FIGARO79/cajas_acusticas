@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { type Lang, translate } from '../utils/translations';
 import { type UnitSystem } from '../utils/units';
-import type { WoodCabinetData } from '../types';
+import type { WoodCabinetData, WoodShape } from '../types';
 import { CabinetCad2D } from './CabinetCad2D';
 import { CabinetViewer3DModal } from './CabinetViewer3DModal';
 
 interface CabinetDiagramProps {
   lang: Lang;
   unitSystem: UnitSystem;
-  shape: 'rectangular' | 'trapezoidal';
+  shape: WoodShape;
   cabinetData: WoodCabinetData | null;
   boxType: 'sealed' | 'ported' | 'bandpass';
   portShape: 'round' | 'rectangular' | 'custom';

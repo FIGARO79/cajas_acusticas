@@ -67,6 +67,8 @@ export interface WoodCutPiece {
   dimensions: string;
 }
 
+export type WoodShape = 'rectangular' | 'trapezoidal';
+
 export interface WoodCabinetData {
   valid: boolean;
   vNeto: number;
@@ -77,11 +79,16 @@ export interface WoodCabinetData {
   dInt: number;
   dTrapTopInt?: number;
   dTrapBotInt?: number;
+  wFrontInt?: number;
+  wRearInt?: number;
   hExt: number;
   wExt: number;
   dExt: number;
   dTrapTopExt?: number;
   dTrapBotExt?: number;
+  wFrontExt?: number;
+  wRearExt?: number;
+  trapAngleDeg?: number;
   thickness: number;
   dMid?: number;
   hMid?: number;

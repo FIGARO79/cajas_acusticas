@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { type Lang, translate } from '../utils/translations';
-import type { CalculatedSealed, CalculatedPorted, CalculatedBandpass, SpeakerParams, WoodCabinetData, WoodCutPiece } from '../types';
+import type { CalculatedSealed, CalculatedPorted, CalculatedBandpass, SpeakerParams, WoodCabinetData, WoodCutPiece, WoodShape } from '../types';
 import { type UnitSystem, convertTo, convertFrom, getUnitLabel } from '../utils/units';
 import { CabinetDiagram } from './CabinetDiagram';
 import { calcPortLength } from '../utils/acousticMath';
@@ -16,8 +16,8 @@ interface CabinetTabProps {
   bandpassData: CalculatedBandpass;
   woodMode: 'calc' | 'input';
   setWoodMode: (mode: 'calc' | 'input') => void;
-  woodShape: 'rectangular' | 'trapezoidal';
-  setWoodShape: (shape: 'rectangular' | 'trapezoidal') => void;
+  woodShape: WoodShape;
+  setWoodShape: (shape: WoodShape) => void;
   woodConstraint: string;
   setWoodConstraint: (constraint: string) => void;
   woodSource: 'sealed' | 'ported' | 'bandpass';
@@ -46,6 +46,8 @@ interface CabinetTabProps {
   setWoodTrapExtDepthTop: (v: number | '') => void;
   woodTrapExtDepthBot: number | '';
   setWoodTrapExtDepthBot: (v: number | '') => void;
+  woodTrapExtRearWidth?: number | '';
+  setWoodTrapExtRearWidth?: (v: number | '') => void;
   // Espesor y volumen extra
   woodThickness: number | '';
   setWoodThickness: (v: number | '') => void;
@@ -119,6 +121,8 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
   setWoodTrapExtDepthTop,
   woodTrapExtDepthBot,
   setWoodTrapExtDepthBot,
+  woodTrapExtRearWidth = 30,
+  setWoodTrapExtRearWidth,
   woodThickness,
   setWoodThickness,
   woodExtra,
@@ -183,6 +187,7 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
     let hExt = 0, wExt = 0, dExt = 0;
     let dTrapTopInt = 0, dTrapBotInt = 0;
     let dTrapTopExt = 0, dTrapBotExt = 0;
+    let wFrontInt = 0, wRearInt = 0, wFrontExt = 0, wRearExt = 0, trapAngleDeg = 0;
     let netVol = 0;
     let totalVol = 0;
     let valid = false;
@@ -276,18 +281,22 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
             }
           }
         } else {
-          // Trapezoidal Auto
+          // Personalizada Auto (calcula D2 a partir de Alto, Ancho Frontal y Prof. Sup. D1)
           const valH = typeof woodLockVal1 === 'number' ? woodLockVal1 : 0;
           const valW = typeof woodLockVal2 === 'number' ? woodLockVal2 : 0;
           const valD1 = typeof woodLockVal3 === 'number' ? woodLockVal3 : 0;
 
           if (valH > 0 && valW > 0 && valD1 > 0) {
             hExt = valH;
+            wFrontExt = valW;
+            wRearExt = valW;
             wExt = valW;
             dTrapTopExt = valD1;
 
             hInt = hExt - (2 * thickness);
-            wInt = wExt - (2 * thickness);
+            wFrontInt = Math.max(0, wFrontExt - (2 * thickness));
+            wRearInt = wFrontInt;
+            wInt = wFrontInt;
             dTrapTopInt = Math.max(0, dTrapTopExt - (2 * thickness));
 
             if (hInt > 0 && wInt > 0 && dTrapTopInt > 0) {
@@ -342,21 +351,31 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
           }
         }
       } else {
-        // Trapezoidal manual
+        // Personalizada manual (caras a medida: Alto, Ancho Frontal/Trasero, Prof. Sup/Inf)
         hExt = typeof woodTrapExtHeight === 'number' ? woodTrapExtHeight : 0;
-        wExt = typeof woodTrapExtWidth === 'number' ? woodTrapExtWidth : 0;
+        wFrontExt = typeof woodTrapExtWidth === 'number' ? woodTrapExtWidth : 0;
+        wRearExt = typeof woodTrapExtRearWidth === 'number' && woodTrapExtRearWidth > 0
+          ? woodTrapExtRearWidth
+          : wFrontExt;
+        wExt = Math.max(wFrontExt, wRearExt);
         dTrapTopExt = typeof woodTrapExtDepthTop === 'number' ? woodTrapExtDepthTop : 0;
         dTrapBotExt = typeof woodTrapExtDepthBot === 'number' ? woodTrapExtDepthBot : 0;
+        dExt = Math.max(dTrapTopExt, dTrapBotExt);
 
-        if (hExt > 0 && wExt > 0 && dTrapTopExt > 0 && dTrapBotExt > 0) {
+        if (hExt > 0 && wFrontExt > 0 && wRearExt > 0 && dTrapTopExt > 0 && dTrapBotExt > 0) {
           hInt = hExt - (2 * thickness);
-          wInt = wExt - (2 * thickness);
+          wFrontInt = Math.max(0, wFrontExt - (2 * thickness));
+          wRearInt = Math.max(0, wRearExt - (2 * thickness));
+          wInt = Math.max(wFrontInt, wRearInt);
           dTrapTopInt = Math.max(0, dTrapTopExt - (2 * thickness));
           dTrapBotInt = Math.max(0, dTrapBotExt - (2 * thickness));
+          const dAvgExt = (dTrapTopExt + dTrapBotExt) / 2;
+          trapAngleDeg = Math.atan2(Math.abs(wFrontExt - wRearExt) / 2, Math.max(0.1, dAvgExt)) * (180 / Math.PI);
 
-          if (hInt > 0 && wInt > 0 && dTrapTopInt > 0 && dTrapBotInt > 0) {
+          if (hInt > 0 && wFrontInt > 0 && wRearInt > 0 && dTrapTopInt > 0 && dTrapBotInt > 0) {
+            const wAvgInt = (wFrontInt + wRearInt) / 2;
             const dAvgInt = (dTrapTopInt + dTrapBotInt) / 2;
-            const vBruto = (hInt * wInt * dAvgInt) / 1000;
+            const vBruto = (hInt * wAvgInt * dAvgInt) / 1000;
             totalVol = vBruto;
             const targetFb = portedData.valid && portedData.Fb > 0 ? portedData.Fb : 45;
             const pDia = portShape === 'round'
@@ -414,30 +433,41 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
         }
       } else {
         const hSlant = Math.sqrt(Math.pow(hInt, 2) + Math.pow(Math.abs(dTrapBotInt - dTrapTopInt), 2));
+        const avgDepthExt = (dTrapTopExt + dTrapBotExt) / 2;
+        const dSlant = Math.sqrt(Math.pow(avgDepthExt, 2) + Math.pow((wFrontExt - wRearExt) / 2, 2));
+        const hasSideTaper = Math.abs(wFrontExt - wRearExt) > 0.05;
         pieces.push({
-          name: t("Caras Laterales (Trapecios Inclinados)"),
+          name: hasSideTaper
+            ? `${t("Caras Laterales")} (±${trapAngleDeg.toFixed(1)}°)`
+            : t("Caras Laterales (Trapecios Inclinados)"),
           qty: 2,
-          dimensions: `${t("Alto")}: ${displayVal(hExt, 'length')} ${uLabel} | ${t("Sup")}: ${displayVal(dTrapTopExt, 'length')} / ${t("Inf")}: ${displayVal(dTrapBotExt, 'length')} ${uLabel}`
+          dimensions: hasSideTaper
+            ? `${t("Alto")}: ${displayVal(hExt, 'length')} ${uLabel} | ${t("Sup")}: ${displayVal(dTrapTopExt, 'length')} / ${t("Inf")}: ${displayVal(dTrapBotExt, 'length')} (${t("Largo")}: ${displayVal(dSlant, 'length')}) ${uLabel}`
+            : `${t("Alto")}: ${displayVal(hExt, 'length')} ${uLabel} | ${t("Sup")}: ${displayVal(dTrapTopExt, 'length')} / ${t("Inf")}: ${displayVal(dTrapBotExt, 'length')} ${uLabel}`
         });
         pieces.push({
           name: t("Tapa Superior"),
           qty: 1,
-          dimensions: `${displayVal(wInt, 'length')} x ${displayVal(dTrapTopExt, 'length')} ${uLabel}`
+          dimensions: hasSideTaper
+            ? `${displayVal(dTrapTopExt, 'length')} x (${t("Fr")}: ${displayVal(wFrontExt, 'length')} / ${t("Tr")}: ${displayVal(wRearExt, 'length')}) ${uLabel}`
+            : `${displayVal(wFrontInt, 'length')} x ${displayVal(dTrapTopExt, 'length')} ${uLabel}`
         });
         pieces.push({
           name: t("Tapa Inferior"),
           qty: 1,
-          dimensions: `${displayVal(wInt, 'length')} x ${displayVal(dTrapBotExt, 'length')} ${uLabel}`
+          dimensions: hasSideTaper
+            ? `${displayVal(dTrapBotExt, 'length')} x (${t("Fr")}: ${displayVal(wFrontExt, 'length')} / ${t("Tr")}: ${displayVal(wRearExt, 'length')}) ${uLabel}`
+            : `${displayVal(wFrontInt, 'length')} x ${displayVal(dTrapBotExt, 'length')} ${uLabel}`
         });
         pieces.push({
           name: t("Cara Trasera (Recta)"),
           qty: 1,
-          dimensions: `${displayVal(hInt, 'length')} x ${displayVal(wInt, 'length')} ${uLabel}`
+          dimensions: `${displayVal(hInt, 'length')} x ${displayVal(wRearInt, 'length')} ${uLabel}`
         });
         pieces.push({
-          name: t("Cara Frontal (Inclinada - Bafle)"),
+          name: Math.abs(dTrapBotInt - dTrapTopInt) > 0.05 ? t("Cara Frontal (Inclinada - Bafle)") : t("Cara Frontal (Bafle)"),
           qty: 1,
-          dimensions: `${displayVal(hSlant, 'length')} ${uLabel} (${t("inclinado")}) x ${displayVal(wInt, 'length')} ${uLabel}`
+          dimensions: `${displayVal(hSlant, 'length')} x ${displayVal(wFrontInt, 'length')} ${uLabel}`
         });
         if (woodSource === 'bandpass') {
           pieces.push({
@@ -501,8 +531,10 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
         vExtra: (woodExtra || 0) + portVol,
         hInt, wInt, dInt,
         dTrapTopInt, dTrapBotInt,
+        wFrontInt, wRearInt,
         hExt, wExt, dExt,
         dTrapTopExt, dTrapBotExt,
+        wFrontExt, wRearExt, trapAngleDeg,
         thickness: woodThickness || 0,
         dMid,
         hMid,
@@ -514,7 +546,8 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
   }, [
     unitSystem, sealedData, portedData, bandpassData, dampingFactor, flaredEnds, woodMode, woodShape, woodConstraint, woodSource, woodRatio,
     woodLockVal1, woodLockVal2, woodLockVal3, woodExtHeight, woodExtWidth, woodExtDepth,
-    woodTrapExtHeight, woodTrapExtWidth, woodTrapExtDepthTop, woodTrapExtDepthBot, woodThickness, woodExtra,
+    woodTrapExtHeight, woodTrapExtWidth, woodTrapExtRearWidth, woodTrapExtDepthTop, woodTrapExtDepthBot,
+    woodThickness, woodExtra,
     portCount, portDiameter, portShape, portWidth, portHeight, portArea,
     crossoverWays, midSealed, midCabinetDepth, useCustomMidVol, customMidVol, midVas, midQts, midTargetQtc,
     enableBracing, bracingCount,
@@ -724,7 +757,7 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
               {cabinetData?.valid ? (
                 woodShape === 'rectangular' 
                   ? `${convertTo(cabinetData.hInt, 'length', unitSystem).toFixed(1)}x${convertTo(cabinetData.wInt, 'length', unitSystem).toFixed(1)}x${convertTo(cabinetData.dInt, 'length', unitSystem).toFixed(1)}`
-                  : `${convertTo(cabinetData.hInt, 'length', unitSystem).toFixed(1)}x${convertTo(cabinetData.wInt, 'length', unitSystem).toFixed(1)}xd`
+                  : `${convertTo(cabinetData.hInt, 'length', unitSystem).toFixed(1)}x(${convertTo(cabinetData.wFrontInt ?? cabinetData.wInt, 'length', unitSystem).toFixed(1)}/${convertTo(cabinetData.wRearInt ?? cabinetData.wInt, 'length', unitSystem).toFixed(1)})x(${convertTo(cabinetData.dTrapTopInt ?? cabinetData.dInt, 'length', unitSystem).toFixed(1)}/${convertTo(cabinetData.dTrapBotInt ?? cabinetData.dInt, 'length', unitSystem).toFixed(1)})`
               ) : 'N/A'}
             </span>
           </div>
@@ -734,7 +767,7 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
               {cabinetData?.valid ? (
                 woodShape === 'rectangular'
                   ? `${convertTo(cabinetData.hExt, 'length', unitSystem).toFixed(1)}x${convertTo(cabinetData.wExt, 'length', unitSystem).toFixed(1)}x${convertTo(cabinetData.dExt, 'length', unitSystem).toFixed(1)}`
-                  : `${convertTo(cabinetData.hExt, 'length', unitSystem).toFixed(1)}x${convertTo(cabinetData.wExt, 'length', unitSystem).toFixed(1)}xd`
+                  : `${convertTo(cabinetData.hExt, 'length', unitSystem).toFixed(1)}x(${convertTo(cabinetData.wFrontExt ?? cabinetData.wExt, 'length', unitSystem).toFixed(1)}/${convertTo(cabinetData.wRearExt ?? cabinetData.wExt, 'length', unitSystem).toFixed(1)})x(${convertTo(cabinetData.dTrapTopExt ?? cabinetData.dExt, 'length', unitSystem).toFixed(1)}/${convertTo(cabinetData.dTrapBotExt ?? cabinetData.dExt, 'length', unitSystem).toFixed(1)})`
               ) : 'N/A'}
             </span>
           </div>
@@ -833,12 +866,12 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
             <label>{t("Forma de la Caja")}</label>
             <select 
               value={woodShape} 
-              onChange={(e) => setWoodShape(e.target.value as 'rectangular' | 'trapezoidal')} 
+              onChange={(e) => setWoodShape(e.target.value as WoodShape)} 
               className="input-select"
               style={{ width: '100%', height: '38px' }}
             >
               <option value="rectangular">{t("Prisma Rectangular (Estándar)")}</option>
-              <option value="trapezoidal">{t("Trapezoidal (Cuña para Coche)")}</option>
+              <option value="trapezoidal">{t("Personalizada (Caras a Medida)")}</option>
             </select>
           </div>
 
@@ -894,19 +927,23 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
                       type="number" 
                       value={displayVal(woodLockVal1, 'length')} 
                       onChange={(e) => handleInputChange(e.target.value, setWoodLockVal1, 'length')} 
-                      step="any" 
+                      step="0.1" 
                     />
                     <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                   </div>
                 </div>
                 <div className="input-group">
-                  <label>{woodShape === 'trapezoidal' ? t("Ancho Externo") : t("Dimensión 2")}</label>
+                  <label>
+                    {woodShape === 'trapezoidal'
+                      ? t("Ancho Externo")
+                      : t("Dimensión 2")}
+                  </label>
                   <div className="input-wrapper">
                     <input 
                       type="number" 
                       value={displayVal(woodLockVal2, 'length')} 
                       onChange={(e) => handleInputChange(e.target.value, setWoodLockVal2, 'length')} 
-                      step="any" 
+                      step="0.1" 
                     />
                     <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                   </div>
@@ -919,7 +956,7 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
                         type="number" 
                         value={displayVal(woodLockVal3, 'length')} 
                         onChange={(e) => handleInputChange(e.target.value, setWoodLockVal3, 'length')} 
-                        step="any" 
+                        step="0.1" 
                       />
                       <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                     </div>
@@ -953,7 +990,7 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
                       type="number" 
                       value={displayVal(woodExtHeight, 'length')} 
                       onChange={(e) => handleInputChange(e.target.value, setWoodExtHeight, 'length')} 
-                      step="any" 
+                      step="0.1" 
                     />
                     <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                   </div>
@@ -965,7 +1002,7 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
                       type="number" 
                       value={displayVal(woodExtWidth, 'length')} 
                       onChange={(e) => handleInputChange(e.target.value, setWoodExtWidth, 'length')} 
-                      step="any" 
+                      step="0.1" 
                     />
                     <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                   </div>
@@ -977,7 +1014,7 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
                       type="number" 
                       value={displayVal(woodExtDepth, 'length')} 
                       onChange={(e) => handleInputChange(e.target.value, setWoodExtDepth, 'length')} 
-                      step="any" 
+                      step="0.1" 
                     />
                     <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                   </div>
@@ -992,19 +1029,19 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
                       type="number" 
                       value={displayVal(woodTrapExtHeight, 'length')} 
                       onChange={(e) => handleInputChange(e.target.value, setWoodTrapExtHeight, 'length')} 
-                      step="any" 
+                      step="0.1" 
                     />
                     <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                   </div>
                 </div>
                 <div className="input-group">
-                  <label>{t("Ancho Externo")}</label>
+                  <label>{t("Ancho Frontal Externo")}</label>
                   <div className="input-wrapper">
                     <input 
                       type="number" 
                       value={displayVal(woodTrapExtWidth, 'length')} 
                       onChange={(e) => handleInputChange(e.target.value, setWoodTrapExtWidth, 'length')} 
-                      step="any" 
+                      step="0.1" 
                     />
                     <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                   </div>
@@ -1016,7 +1053,7 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
                       type="number" 
                       value={displayVal(woodTrapExtDepthTop, 'length')} 
                       onChange={(e) => handleInputChange(e.target.value, setWoodTrapExtDepthTop, 'length')} 
-                      step="any" 
+                      step="0.1" 
                     />
                     <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                   </div>
@@ -1028,7 +1065,19 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
                       type="number" 
                       value={displayVal(woodTrapExtDepthBot, 'length')} 
                       onChange={(e) => handleInputChange(e.target.value, setWoodTrapExtDepthBot, 'length')} 
-                      step="any" 
+                      step="0.1" 
+                    />
+                    <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
+                  </div>
+                </div>
+                <div className="input-group">
+                  <label>{t("Ancho Trasero Externo")}</label>
+                  <div className="input-wrapper">
+                    <input 
+                      type="number" 
+                      value={displayVal(woodTrapExtRearWidth, 'length')} 
+                      onChange={(e) => setWoodTrapExtRearWidth && handleInputChange(e.target.value, setWoodTrapExtRearWidth, 'length')} 
+                      step="0.1" 
                     />
                     <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                   </div>
@@ -1047,7 +1096,7 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
                 type="number" 
                 value={displayVal(woodThickness, 'length_small')} 
                 onChange={(e) => handleInputChange(e.target.value, setWoodThickness, 'length_small')} 
-                step="any" 
+                step="0.1" 
               />
               <span className="unit-badge">{getUnitLabel('length_small', unitSystem)}</span>
             </div>
@@ -1059,7 +1108,7 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
                 type="number" 
                 value={displayVal(woodExtra, 'volume')} 
                 onChange={(e) => handleInputChange(e.target.value, setWoodExtra, 'volume')} 
-                step="any" 
+                step="0.1" 
               />
               <span className="unit-badge">{getUnitLabel('volume', unitSystem)}</span>
             </div>

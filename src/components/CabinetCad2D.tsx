@@ -1,13 +1,13 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { type Lang, translate } from '../utils/translations';
 import { type UnitSystem, convertTo, getUnitLabel } from '../utils/units';
-import type { WoodCabinetData } from '../types';
+import type { WoodCabinetData, WoodShape } from '../types';
 import { calculatePortSpacing } from '../utils/acousticMath';
 
 interface CabinetCad2DProps {
   lang: Lang;
   unitSystem: UnitSystem;
-  shape: 'rectangular' | 'trapezoidal';
+  shape: WoodShape;
   cabinetData: WoodCabinetData | null;
   boxType: 'sealed' | 'ported' | 'bandpass';
   portShape: 'round' | 'rectangular' | 'custom';
@@ -79,6 +79,28 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
 
   const isLight = true;
   const [containerWidth, setContainerWidth] = useState<number>(0);
+  const [canvasHeight, setCanvasHeight] = useState<number>(440);
+
+  const handleVerticalResizeStart = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startH = canvasHeight;
+    document.body.style.cursor = 'ns-resize';
+
+    const onMouseMove = (ev: MouseEvent) => {
+      const nextH = Math.min(1200, Math.max(260, startH + (ev.clientY - startY)));
+      setCanvasHeight(nextH);
+    };
+
+    const onMouseUp = () => {
+      document.body.style.cursor = '';
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  };
 
   useEffect(() => {
     const el = containerRef.current;
@@ -108,11 +130,15 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
   const vLabel = getUnitLabel('volume', unitSystem);
 
   // Dimensions in cm
-  const wExt = cabinetData?.wExt || 35;
+  const wExt = shape === 'trapezoidal'
+    ? (cabinetData?.wFrontExt || cabinetData?.wExt || 35)
+    : (cabinetData?.wExt || 35);
+  const wRearExt = cabinetData?.wRearExt || wExt;
+  const trapAngleDeg = cabinetData?.trapAngleDeg ?? 0;
   const hExt = cabinetData?.hExt || 50;
-  const dExt = shape === 'rectangular' 
-    ? (cabinetData?.dExt || 30) 
-    : Math.max(cabinetData?.dTrapTopExt || 20, cabinetData?.dTrapBotExt || 35);
+  const dExt = shape === 'trapezoidal'
+    ? Math.max(cabinetData?.dTrapTopExt || 20, cabinetData?.dTrapBotExt || 35)
+    : (cabinetData?.dExt || 30);
   const dTrapTop = cabinetData?.dTrapTopExt || 20;
   const dTrapBot = cabinetData?.dTrapBotExt || 35;
   const thickness = (cabinetData?.thickness || 19) / 10; // mm to cm
@@ -199,7 +225,7 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
     if (!ctx) return;
 
     const width = containerWidth || containerRef.current.clientWidth || 800;
-    const height = 440;
+    const height = canvasHeight;
     const dpr = window.devicePixelRatio || 1;
 
     canvas.width = width * dpr;
@@ -392,6 +418,11 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
     ctx.lineWidth = 0.8 / zoom;
     ctx.setLineDash([1.5, 1]);
     ctx.strokeRect(fX + thickness, topY + thickness, fW - 2 * thickness, fH - 2 * thickness);
+    if (shape === 'trapezoidal' && wRearExt > 0 && Math.abs(fW - wRearExt) > 0.2) {
+      const rearX = fX + (fW - wRearExt) / 2;
+      ctx.strokeStyle = isLight ? 'rgba(100, 116, 139, 0.7)' : 'rgba(56, 189, 248, 0.45)';
+      ctx.strokeRect(rearX, topY, wRearExt, fH);
+    }
     ctx.setLineDash([]);
 
     // Woofer, Midrange & Tweeter on Front Baffle
@@ -773,9 +804,17 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
     ctx.fillText('VISTA FRONTAL (BAFLE)', fX + fW / 2, topY - 3.5);
 
     // Front View Dimension Lines
-    const wDisp = `${convertTo(wExt, 'length', unitSystem).toFixed(1)} ${uLabel}`;
+    const hasSideTaper = shape === 'trapezoidal' && wRearExt > 0 && Math.abs(wExt - wRearExt) > 0.2;
+    const wDisp = hasSideTaper
+      ? `Frente: ${convertTo(wExt, 'length', unitSystem).toFixed(1)} ${uLabel}`
+      : `${convertTo(wExt, 'length', unitSystem).toFixed(1)} ${uLabel}`;
     const hDisp = `${convertTo(hExt, 'length', unitSystem).toFixed(1)} ${uLabel}`;
     drawDimension(fX, botY, fX + fW, botY, wDisp, 3.5, true);
+    if (hasSideTaper) {
+      const rearX = fX + (fW - wRearExt) / 2;
+      const rearDisp = `Tras: ${convertTo(wRearExt, 'length', unitSystem).toFixed(1)} ${uLabel} (±${trapAngleDeg.toFixed(1)}°)`;
+      drawDimension(rearX, botY, rearX + wRearExt, botY, rearDisp, 6.2, true);
+    }
     drawDimension(fX, topY, fX, botY, hDisp, -3.5, false);
 
     // Driver Vertical Position Dimensions (from Top Edge)
@@ -807,31 +846,58 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
     // B. VISTA LATERAL (SECCIÓN DE CORTE A-A')
     // ----------------------------------------------------
     const sX = sideStartX;
-    const sWTop = shape === 'rectangular' ? dExt : dTrapTop;
-    const sWBot = shape === 'rectangular' ? dExt : dTrapBot;
+    const sWTop = shape === 'trapezoidal' ? dTrapTop : dExt;
+    const sWBot = shape === 'trapezoidal' ? dTrapBot : dExt;
     const sW = Math.max(sWTop, sWBot);
+    const frontOuterXAtY = (yPos: number) => {
+      const frac = Math.min(1, Math.max(0, (yPos - topY) / Math.max(1, fH)));
+      return sX + sWTop + (sWBot - sWTop) * frac;
+    };
+    const frontInnerXAtY = (yPos: number) => frontOuterXAtY(yPos) - thickness;
+    const baffleAngle = shape === 'trapezoidal' ? Math.atan2(sWTop - sWBot, fH) : 0;
 
     // Wood panels hatching and profiles
     ctx.fillStyle = isLight ? '#0369a1' : '#38bdf8';
     ctx.font = `bold ${Math.max(9 / zoom, 2.5)}px monospace`;
     ctx.textAlign = 'center';
-    ctx.fillText('SECCIÓN CORTE A-A\' (LATERAL)', sX + sW / 2, topY - 3.5);
+    ctx.fillText('SECCIÓN CORTE A-A\' (LATERAL)', sX + sW / 2, shape === 'trapezoidal' ? topY - 7.5 : topY - 3.5);
 
     // Panels (Top, Bottom, Front Baffle, Rear)
     ctx.strokeStyle = isLight ? '#0284c7' : '#38bdf8';
 
     // 1. Top Panel
-    ctx.strokeRect(sX, topY, sW, thickness);
-    hatchRect(sX, topY, sW, thickness);
+    ctx.strokeRect(sX, topY, sWTop, thickness);
+    hatchRect(sX, topY, sWTop, thickness);
 
     // 2. Bottom Panel
-    ctx.strokeRect(sX, botY - thickness, sW, thickness);
-    hatchRect(sX, botY - thickness, sW, thickness);
+    ctx.strokeRect(sX, botY - thickness, sWBot, thickness);
+    hatchRect(sX, botY - thickness, sWBot, thickness);
 
-    // 3. Front Baffle (Right side of profile)
-    const baffleX = sX + sW - thickness;
-    ctx.strokeRect(baffleX, topY + thickness, thickness, fH - 2 * thickness);
-    hatchRect(baffleX, topY + thickness, thickness, fH - 2 * thickness);
+    // 3. Front Baffle (Right side of profile - vertical or slanted for trapezoidal)
+    const baffleTopY = topY + thickness;
+    const baffleBotY = botY - thickness;
+    const bTopIn = frontInnerXAtY(baffleTopY);
+    const bTopOut = frontOuterXAtY(baffleTopY);
+    const bBotIn = frontInnerXAtY(baffleBotY);
+    const bBotOut = frontOuterXAtY(baffleBotY);
+    const baffleX = frontInnerXAtY(wooferCenterY);
+
+    if (shape === 'trapezoidal' && Math.abs(sWTop - sWBot) > 0.01) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(bTopIn, baffleTopY);
+      ctx.lineTo(bTopOut, baffleTopY);
+      ctx.lineTo(bBotOut, baffleBotY);
+      ctx.lineTo(bBotIn, baffleBotY);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.clip();
+      hatchRect(Math.min(bTopIn, bBotIn), baffleTopY, Math.max(bTopOut, bBotOut) - Math.min(bTopIn, bBotIn), baffleBotY - baffleTopY);
+      ctx.restore();
+    } else {
+      ctx.strokeRect(bTopIn, baffleTopY, thickness, fH - 2 * thickness);
+      hatchRect(bTopIn, baffleTopY, thickness, fH - 2 * thickness);
+    }
 
     // 4. Rear Panel (Left side of profile)
     ctx.strokeRect(sX, topY + thickness, thickness, fH - 2 * thickness);
@@ -876,32 +942,41 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
     // WooferCross-Section, Tweeter Cross-Section & Midrange Cross-Section (Mounted on Baffle extending inwards)
     if (crossoverWays >= 2 && !isBandpass) {
       const twDepth = Math.min(sW * 0.16, 4.8);
+      const twBaffleX = frontInnerXAtY(tweeterCenterY);
+      ctx.save();
+      ctx.translate(twBaffleX, tweeterCenterY);
+      ctx.rotate(baffleAngle);
       ctx.strokeStyle = isLight ? '#0369a1' : '#38bdf8';
       ctx.lineWidth = 1.0 / zoom;
 
       // Tweeter Rear Magnet Chamber inside Profile
       ctx.fillStyle = isLight ? '#cbd5e1' : '#1e3a5f';
-      ctx.fillRect(baffleX - twDepth, tweeterCenterY - tweeterRadius * 0.55, twDepth, tweeterRadius * 1.1);
-      ctx.strokeRect(baffleX - twDepth, tweeterCenterY - tweeterRadius * 0.55, twDepth, tweeterRadius * 1.1);
+      ctx.fillRect(-twDepth, -tweeterRadius * 0.55, twDepth, tweeterRadius * 1.1);
+      ctx.strokeRect(-twDepth, -tweeterRadius * 0.55, twDepth, tweeterRadius * 1.1);
 
       // Tweeter Dome protruding slightly at Baffle outer face
       ctx.beginPath();
-      ctx.arc(baffleX + thickness, tweeterCenterY, tweeterRadius * 0.36, -Math.PI / 2, Math.PI / 2);
+      ctx.arc(thickness, 0, tweeterRadius * 0.36, -Math.PI / 2, Math.PI / 2);
       ctx.fillStyle = isLight ? 'rgba(2, 132, 199, 0.25)' : 'rgba(56, 189, 248, 0.25)';
       ctx.fill();
       ctx.stroke();
+      ctx.restore();
     }
 
     if (crossoverWays === 3 && !isBandpass) {
       const midDepth = Math.min(sW * 0.28, 9.0);
+      const midBaffleX = frontInnerXAtY(midCenterY);
+      ctx.save();
+      ctx.translate(midBaffleX, midCenterY);
+      ctx.rotate(baffleAngle);
 
       // Internal Midrange Sub-Enclosure (Cámara de Medios Separada) if not sealed-back
       if (!midSealed) {
         const dMidVal = Math.min(cabinetData?.dMid ?? Math.min(sW * 0.45, 13), sW - 2 * thickness - 1.5);
         const hMidVal = Math.min(cabinetData?.hMid ?? Math.max(midDiameter + 3, 12), fH - 2 * thickness - 4);
-        const mBoxTop = midCenterY - hMidVal / 2;
-        const mBoxBot = midCenterY + hMidVal / 2;
-        const mBoxLeft = baffleX - dMidVal;
+        const mBoxTop = -hMidVal / 2;
+        const mBoxBot = hMidVal / 2;
+        const mBoxLeft = -dMidVal;
 
         ctx.strokeStyle = isLight ? '#0284c7' : '#38bdf8';
         ctx.lineWidth = 1.1 / zoom;
@@ -920,19 +995,20 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
       ctx.strokeStyle = isLight ? '#0369a1' : '#38bdf8';
       ctx.lineWidth = 1.05 / zoom;
       ctx.beginPath();
-      ctx.moveTo(baffleX, midCenterY - midRadius * 0.85);
-      ctx.lineTo(baffleX - midDepth * 0.6, midCenterY - midRadius * 0.38);
-      ctx.lineTo(baffleX - midDepth, midCenterY - midRadius * 0.38);
-      ctx.lineTo(baffleX - midDepth, midCenterY + midRadius * 0.38);
-      ctx.lineTo(baffleX - midDepth * 0.6, midCenterY + midRadius * 0.38);
-      ctx.lineTo(baffleX, midCenterY + midRadius * 0.85);
+      ctx.moveTo(0, -midRadius * 0.85);
+      ctx.lineTo(-midDepth * 0.6, -midRadius * 0.38);
+      ctx.lineTo(-midDepth, -midRadius * 0.38);
+      ctx.lineTo(-midDepth, midRadius * 0.38);
+      ctx.lineTo(-midDepth * 0.6, midRadius * 0.38);
+      ctx.lineTo(0, midRadius * 0.85);
       ctx.stroke();
 
       // Midrange Magnet Cylinder
       ctx.fillStyle = isLight ? '#cbd5e1' : '#1e3a5f';
-      ctx.fillRect(baffleX - midDepth, midCenterY - midRadius * 0.38, midDepth * 0.42, midRadius * 0.76);
+      ctx.fillRect(-midDepth, -midRadius * 0.38, midDepth * 0.42, midRadius * 0.76);
       ctx.strokeStyle = isLight ? '#64748b' : '#38bdf8';
-      ctx.strokeRect(baffleX - midDepth, midCenterY - midRadius * 0.38, midDepth * 0.42, midRadius * 0.76);
+      ctx.strokeRect(-midDepth, -midRadius * 0.38, midDepth * 0.42, midRadius * 0.76);
+      ctx.restore();
     }
 
     const spkDepth = driverDepth && driverDepth > 0
@@ -1188,8 +1264,12 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
     };
 
     if (!isBandpass) {
-      // Woofer en Bafle Frontal (Direct Radiator): Disparo a la derecha (+X)
-      drawRealisticWooferProfile(baffleX, wooferCenterY, wooferRadius, wooferCutoutRadius, spkDepth, 'right');
+      // Woofer en Bafle Frontal (Direct Radiator): Disparo perpendicular al bafle
+      ctx.save();
+      ctx.translate(baffleX, wooferCenterY);
+      ctx.rotate(baffleAngle);
+      drawRealisticWooferProfile(0, 0, wooferRadius, wooferCutoutRadius, spkDepth, 'right');
+      ctx.restore();
     } else {
       // CAJA PASO BANDA: El woofer está montado en el tabique divisor intermedio (divX)
       // 1. Delineación y tintado de las cámaras acústicas
@@ -1294,13 +1374,12 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
       const pTop = portCenterY - pR;
       const pBot = portCenterY + pR;
       const rearInnerX = sX + thickness;
+      const portBaffleX = frontInnerXAtY(portCenterY);
 
-      // Clear wood hatching inside the port wall cutout
-      ctx.fillStyle = isLight ? '#ffffff' : '#07101e';
+      // Clear wood hatching inside the port wall cutout (rear panel)
       if (isRearPort) {
+        ctx.fillStyle = isLight ? '#ffffff' : '#07101e';
         ctx.fillRect(sX, pTop, thickness, pBot - pTop);
-      } else {
-        ctx.fillRect(baffleX, pTop, thickness, pBot - pTop);
       }
 
       ctx.strokeStyle = isLight ? '#0284c7' : '#38bdf8';
@@ -1416,112 +1495,120 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
         const pLenDisp = `Lv: ${convertTo(effectivePortLen, 'length', unitSystem).toFixed(1)} ${uLabel}`;
         drawDimension(rearInnerX, pTop - 1, innerX, pTop - 1, pLenDisp, -1.8, true);
       } else {
-        // Port mounted on Front Baffle (right wall) extending leftwards into cavity
-        const outerX = baffleX + thickness;
-        const innerX = baffleX - effectivePortLen;
+        // Port mounted on Front Baffle (right wall) extending inwards perpendicular to baffle
+        ctx.save();
+        ctx.translate(portBaffleX, portCenterY);
+        ctx.rotate(baffleAngle);
+
+        // Clear wood hatching inside the port wall cutout
+        ctx.fillStyle = isLight ? '#ffffff' : '#07101e';
+        ctx.fillRect(-0.1, -pR, thickness + 0.2, pR * 2);
+
+        ctx.strokeStyle = isLight ? '#0284c7' : '#38bdf8';
+        ctx.lineWidth = 1.2 / zoom;
+        ctx.fillStyle = isLight ? 'rgba(2, 132, 199, 0.08)' : 'rgba(2, 132, 199, 0.12)';
+
+        const outerX = thickness;
+        const innerX = -effectivePortLen;
+        const pT = -pR;
+        const pB = pR;
 
         if (flaredEnds === 0) {
           // 0: Recto / Estándar (1 extremo a ras en el bafle, 1 extremo libre recto dentro de la caja)
-          ctx.fillRect(innerX, pTop, effectivePortLen + thickness, pBot - pTop);
+          ctx.fillRect(innerX, pT, effectivePortLen + thickness, pB - pT);
 
           ctx.beginPath();
-          ctx.moveTo(outerX, pTop);
-          ctx.lineTo(innerX, pTop);
-          ctx.moveTo(outerX, pBot);
-          ctx.lineTo(innerX, pBot);
-          // Straight vertical cut ticks at the free inner end
-          ctx.moveTo(innerX, pTop);
-          ctx.lineTo(innerX, pTop + Math.min(pR * 0.35, 0.6));
-          ctx.moveTo(innerX, pBot);
-          ctx.lineTo(innerX, pBot - Math.min(pR * 0.35, 0.6));
+          ctx.moveTo(outerX, pT);
+          ctx.lineTo(innerX, pT);
+          ctx.moveTo(outerX, pB);
+          ctx.lineTo(innerX, pB);
+          ctx.moveTo(innerX, pT);
+          ctx.lineTo(innerX, pT + Math.min(pR * 0.35, 0.6));
+          ctx.moveTo(innerX, pB);
+          ctx.lineTo(innerX, pB - Math.min(pR * 0.35, 0.6));
           ctx.stroke();
         } else if (flaredEnds === 1) {
           // 1: Dos a Ras (Ambos extremos adosados / con brida plana a 90°)
-          ctx.fillRect(innerX, pTop, effectivePortLen + thickness, pBot - pTop);
+          ctx.fillRect(innerX, pT, effectivePortLen + thickness, pB - pT);
 
           ctx.beginPath();
-          ctx.moveTo(outerX, pTop);
-          ctx.lineTo(innerX, pTop);
-          ctx.moveTo(outerX, pBot);
-          ctx.lineTo(innerX, pBot);
+          ctx.moveTo(outerX, pT);
+          ctx.lineTo(innerX, pT);
+          ctx.moveTo(outerX, pB);
+          ctx.lineTo(innerX, pB);
           ctx.stroke();
 
-          // Flat perpendicular flange lips (T-collar) at BOTH outer and inner ends
           const fThick = Math.min(0.35, thickness * 0.25);
           ctx.fillStyle = isLight ? 'rgba(2, 132, 199, 0.22)' : 'rgba(56, 189, 248, 0.25)';
-          // Outer flange (flush against front baffle exterior)
-          ctx.fillRect(outerX, pTop - flangeLip, fThick, flangeLip);
-          ctx.strokeRect(outerX, pTop - flangeLip, fThick, flangeLip);
-          ctx.fillRect(outerX, pBot, fThick, flangeLip);
-          ctx.strokeRect(outerX, pBot, fThick, flangeLip);
-          // Inner flange (flush baffle/plate at inner end)
-          ctx.fillRect(innerX, pTop - flangeLip, fThick, flangeLip);
-          ctx.strokeRect(innerX, pTop - flangeLip, fThick, flangeLip);
-          ctx.fillRect(innerX, pBot, fThick, flangeLip);
-          ctx.strokeRect(innerX, pBot, fThick, flangeLip);
+          ctx.fillRect(outerX, pT - flangeLip, fThick, flangeLip);
+          ctx.strokeRect(outerX, pT - flangeLip, fThick, flangeLip);
+          ctx.fillRect(outerX, pB, fThick, flangeLip);
+          ctx.strokeRect(outerX, pB, fThick, flangeLip);
+          ctx.fillRect(innerX, pT - flangeLip, fThick, flangeLip);
+          ctx.strokeRect(innerX, pT - flangeLip, fThick, flangeLip);
+          ctx.fillRect(innerX, pB, fThick, flangeLip);
+          ctx.strokeRect(innerX, pB, fThick, flangeLip);
         } else if (flaredEnds === 3) {
           // 3: Abocinado 1 Extremo — Trumpet curve ONLY on outer mouth, straight cut on inner end
           ctx.beginPath();
-          ctx.moveTo(outerX, pTop - flareR);
-          ctx.quadraticCurveTo(outerX, pTop, outerX - flareR, pTop);
-          ctx.lineTo(innerX, pTop);
-          ctx.lineTo(innerX, pBot);
-          ctx.lineTo(outerX - flareR, pBot);
-          ctx.quadraticCurveTo(outerX, pBot, outerX, pBot + flareR);
+          ctx.moveTo(outerX, pT - flareR);
+          ctx.quadraticCurveTo(outerX, pT, outerX - flareR, pT);
+          ctx.lineTo(innerX, pT);
+          ctx.lineTo(innerX, pB);
+          ctx.lineTo(outerX - flareR, pB);
+          ctx.quadraticCurveTo(outerX, pB, outerX, pB + flareR);
           ctx.closePath();
           ctx.fill();
 
-          // Top wall (flared outside, straight inside)
           ctx.beginPath();
-          ctx.moveTo(outerX, pTop - flareR);
-          ctx.quadraticCurveTo(outerX, pTop, outerX - flareR, pTop);
-          ctx.lineTo(innerX, pTop);
-          ctx.lineTo(innerX, pTop + Math.min(pR * 0.35, 0.6));
+          ctx.moveTo(outerX, pT - flareR);
+          ctx.quadraticCurveTo(outerX, pT, outerX - flareR, pT);
+          ctx.lineTo(innerX, pT);
+          ctx.lineTo(innerX, pT + Math.min(pR * 0.35, 0.6));
           ctx.stroke();
 
-          // Bottom wall (flared outside, straight inside)
           ctx.beginPath();
-          ctx.moveTo(outerX, pBot + flareR);
-          ctx.quadraticCurveTo(outerX, pBot, outerX - flareR, pBot);
-          ctx.lineTo(innerX, pBot);
-          ctx.lineTo(innerX, pBot - Math.min(pR * 0.35, 0.6));
+          ctx.moveTo(outerX, pB + flareR);
+          ctx.quadraticCurveTo(outerX, pB, outerX - flareR, pB);
+          ctx.lineTo(innerX, pB);
+          ctx.lineTo(innerX, pB - Math.min(pR * 0.35, 0.6));
           ctx.stroke();
         } else {
           // 2: Abocinado 2 Extremos (Aeroport / Flared) — Trumpet curves at BOTH outer and inner mouths
           ctx.beginPath();
-          ctx.moveTo(outerX, pTop - flareR);
-          ctx.quadraticCurveTo(outerX, pTop, outerX - flareR, pTop);
-          ctx.lineTo(innerX + flareR, pTop);
-          ctx.quadraticCurveTo(innerX, pTop, innerX, pTop - flareR);
-          ctx.lineTo(innerX, pBot + flareR);
-          ctx.quadraticCurveTo(innerX, pBot, innerX + flareR, pBot);
-          ctx.lineTo(outerX - flareR, pBot);
-          ctx.quadraticCurveTo(outerX, pBot, outerX, pBot + flareR);
+          ctx.moveTo(outerX, pT - flareR);
+          ctx.quadraticCurveTo(outerX, pT, outerX - flareR, pT);
+          ctx.lineTo(innerX + flareR, pT);
+          ctx.quadraticCurveTo(innerX, pT, innerX, pT - flareR);
+          ctx.lineTo(innerX, pB + flareR);
+          ctx.quadraticCurveTo(innerX, pB, innerX + flareR, pB);
+          ctx.lineTo(outerX - flareR, pB);
+          ctx.quadraticCurveTo(outerX, pB, outerX, pB + flareR);
           ctx.closePath();
           ctx.fill();
 
-          // Draw top flared wall
           ctx.beginPath();
-          ctx.moveTo(outerX, pTop - flareR);
-          ctx.quadraticCurveTo(outerX, pTop, outerX - flareR, pTop);
-          ctx.lineTo(innerX + flareR, pTop);
-          ctx.quadraticCurveTo(innerX, pTop, innerX, pTop - flareR);
+          ctx.moveTo(outerX, pT - flareR);
+          ctx.quadraticCurveTo(outerX, pT, outerX - flareR, pT);
+          ctx.lineTo(innerX + flareR, pT);
+          ctx.quadraticCurveTo(innerX, pT, innerX, pT - flareR);
           ctx.stroke();
 
-          // Draw bottom flared wall
           ctx.beginPath();
-          ctx.moveTo(outerX, pBot + flareR);
-          ctx.quadraticCurveTo(outerX, pBot, outerX - flareR, pBot);
-          ctx.lineTo(innerX + flareR, pBot);
-          ctx.quadraticCurveTo(innerX, pBot, innerX, pBot + flareR);
+          ctx.moveTo(outerX, pB + flareR);
+          ctx.quadraticCurveTo(outerX, pB, outerX - flareR, pB);
+          ctx.lineTo(innerX + flareR, pB);
+          ctx.quadraticCurveTo(innerX, pB, innerX, pB + flareR);
           ctx.stroke();
         }
+        ctx.restore();
 
         // Port Dimension
         const pLenDisp = (isBandpass && pLen > maxStraightDepth)
           ? `Lv: ${convertTo(pLen, 'length', unitSystem).toFixed(1)} ${uLabel} (Codo)`
           : `Lv: ${convertTo(effectivePortLen, 'length', unitSystem).toFixed(1)} ${uLabel}`;
-        drawDimension(innerX, pTop - 1, baffleX, pTop - 1, pLenDisp, -1.8, true);
+        const dimEndX = portBaffleX - effectivePortLen * Math.cos(baffleAngle);
+        drawDimension(Math.min(dimEndX, portBaffleX), pTop - 1, Math.max(dimEndX, portBaffleX), pTop - 1, pLenDisp, -1.8, true);
       }
     }
 
@@ -1535,19 +1622,20 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
       ctx.setLineDash([0.8 / zoom, 0.6 / zoom]);
 
       // Longitud del revestimiento superior e inferior (en paso banda recubre la cámara trasera Vr)
-      const liningLen = isBandpass ? depthRear : (sW - 2 * thickness);
+      const liningLenTop = isBandpass ? depthRear : Math.max(0, sWTop - 2 * thickness);
+      const liningLenBot = isBandpass ? depthRear : Math.max(0, sWBot - 2 * thickness);
 
       // 1. Revestimiento de pared trasera
       ctx.fillRect(sX + thickness, topY + thickness + dLining, dLining, fH - 2 * thickness - 2 * dLining);
       ctx.strokeRect(sX + thickness, topY + thickness + dLining, dLining, fH - 2 * thickness - 2 * dLining);
 
       // 2. Revestimiento de techo interior
-      ctx.fillRect(sX + thickness, topY + thickness, liningLen, dLining);
-      ctx.strokeRect(sX + thickness, topY + thickness, liningLen, dLining);
+      ctx.fillRect(sX + thickness, topY + thickness, liningLenTop, dLining);
+      ctx.strokeRect(sX + thickness, topY + thickness, liningLenTop, dLining);
 
       // 3. Revestimiento de piso interior
-      ctx.fillRect(sX + thickness, botY - thickness - dLining, liningLen, dLining);
-      ctx.strokeRect(sX + thickness, botY - thickness - dLining, liningLen, dLining);
+      ctx.fillRect(sX + thickness, botY - thickness - dLining, liningLenBot, dLining);
+      ctx.strokeRect(sX + thickness, botY - thickness - dLining, liningLenBot, dLining);
 
       ctx.restore();
     }
@@ -1575,7 +1663,7 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
     ctx.save();
     const tBadgeW = 5.2;
     const tBadgeH = Math.min(thickness * 0.85, 1.4);
-    const tCenterX = sX + sW / 2;
+    const tCenterX = sX + (shape === 'trapezoidal' ? sWTop : sW) / 2;
     const tCenterY = topY + thickness / 2;
     ctx.fillStyle = isLight ? 'rgba(255, 255, 255, 0.85)' : 'rgba(7, 16, 30, 0.85)';
     ctx.fillRect(tCenterX - tBadgeW / 2, tCenterY - tBadgeH / 2, tBadgeW, tBadgeH);
@@ -1586,7 +1674,7 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
     ctx.font = `bold ${Math.max(7.0 / zoom, 1.9)}px monospace`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(`Espesor: ${cabinetData?.thickness || 19} mm`, tCenterX, tCenterY);
+    ctx.fillText(`Espesor: ${convertTo(cabinetData?.thickness || 19, 'length_small', unitSystem).toFixed(unitSystem === 'imperial' ? 2 : 1)} ${getUnitLabel('length_small', unitSystem)}`, tCenterX, tCenterY);
     ctx.restore();
 
     // Magnet Clearance to Rear Wall (en cajas tradicionales direct-radiator)
@@ -1682,8 +1770,14 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
         } else if (hoveredPieceIndex === 4) {
           ctx.fillRect(fX + thickness, topY + thickness, fW - 2 * thickness, fH - 2 * thickness);
           ctx.strokeRect(fX + thickness, topY + thickness, fW - 2 * thickness, fH - 2 * thickness);
-          ctx.fillRect(baffleX, topY + thickness, thickness, fH - 2 * thickness);
-          ctx.strokeRect(baffleX, topY + thickness, thickness, fH - 2 * thickness);
+          ctx.beginPath();
+          ctx.moveTo(bTopIn, baffleTopY);
+          ctx.lineTo(bTopOut, baffleTopY);
+          ctx.lineTo(bBotOut, baffleBotY);
+          ctx.lineTo(bBotIn, baffleBotY);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
         } else if (hoveredPieceIndex === 5 && isBandpass) {
           ctx.fillRect(divX, topY + thickness, thickness, fH - 2 * thickness);
           ctx.strokeRect(divX, topY + thickness, thickness, fH - 2 * thickness);
@@ -1735,6 +1829,7 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
     dTrapTop,
     dTrapBot,
     containerWidth,
+    canvasHeight,
   ]);
 
   // Export CAD PNG
@@ -1935,7 +2030,7 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
       </div>
 
       {/* Interactive Canvas Area */}
-      <div style={{ position: 'relative', width: '100%', height: '440px', overflow: 'hidden' }}>
+      <div style={{ position: 'relative', width: '100%', height: `${canvasHeight}px`, overflow: 'hidden' }}>
         <canvas
           ref={canvasRef}
           onWheel={handleWheel}
@@ -1985,6 +2080,15 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
         >
           {t("Arrastra para mover | Rueda para zoom")}
         </div>
+      </div>
+
+      {/* Vertical Resize Handle */}
+      <div
+        className="cad-vertical-resizer"
+        onMouseDown={handleVerticalResizeStart}
+        title={t("Arrastra hacia abajo o arriba para redimensionar")}
+      >
+        <span />
       </div>
     </div>
   );

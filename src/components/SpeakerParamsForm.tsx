@@ -33,6 +33,51 @@ interface SpeakerParamsFormProps {
   panelStyle?: React.CSSProperties;
 }
 
+const RHO_C2 = 141343; // rho * c^2 (1.2 kg/m^3 * 343.2^2 m^2/s^2)
+
+function estimateMissingTS(p: SpeakerParams): Partial<SpeakerParams> {
+  const est: Partial<SpeakerParams> = {};
+  const qms = p.qms && p.qms > 0 ? p.qms : 0;
+  const qes = p.qes && p.qes > 0 ? p.qes : 0;
+  const qts = p.qts && p.qts > 0 ? p.qts : 0;
+
+  if (!qts && qms && qes) {
+    est.qts = Math.round(((qms * qes) / (qms + qes)) * 1000) / 1000;
+  } else if (!qms && qts && qes && qes > qts) {
+    est.qms = Math.round(((qts * qes) / (qes - qts)) * 100) / 100;
+  } else if (!qes && qts && qms && qms > qts) {
+    est.qes = Math.round(((qts * qms) / (qms - qts)) * 1000) / 1000;
+  }
+
+  let sd = p.sd && p.sd > 0 ? p.sd : 0;
+  let xmax = p.xmax && p.xmax > 0 ? p.xmax : 0;
+  const vd = p.vd && p.vd > 0 ? p.vd : 0;
+
+  if (!sd && vd && xmax) {
+    sd = Math.round((vd / (xmax / 10)) * 10) / 10;
+    est.sd = sd;
+  }
+  if (!xmax && vd && sd) {
+    xmax = Math.round(((vd / sd) * 10) * 100) / 100;
+    est.xmax = xmax;
+  }
+  if (!vd && sd && xmax) {
+    est.vd = Math.round(sd * (xmax / 10) * 10) / 10;
+  }
+
+  if ((!p.vas || p.vas <= 0) && p.cms && p.cms > 0 && sd > 0) {
+    const vasCalc = RHO_C2 * (p.cms / 1000) * Math.pow(sd / 10000, 2) * 1000;
+    est.vas = Math.round(vasCalc * 100) / 100;
+  }
+
+  if ((!p.fs || p.fs <= 0) && p.mms && p.mms > 0 && p.cms && p.cms > 0) {
+    const fsCalc = 1 / (2 * Math.PI * Math.sqrt((p.mms / 1000) * (p.cms / 1000)));
+    est.fs = Math.round(fsCalc * 10) / 10;
+  }
+
+  return est;
+}
+
 const UNIT_TYPES: Record<string, 'volume' | 'volume_small' | 'length' | 'length_small' | 'area'> = {
   vas: 'volume',
   sd: 'area',
@@ -467,18 +512,64 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
 
   // Derived calculations
   const [derived, setDerived] = useState<Awaited<ReturnType<typeof calcAutoParams>> | null>(null);
+  const estimatedTS = React.useMemo(() => estimateMissingTS(params), [params]);
 
   useEffect(() => {
     const fetchDerived = async () => {
-      if (params.fs && params.vas && params.qts) {
-        const results = await calcAutoParams(params);
+      const merged: SpeakerParams = {
+        ...params,
+        fs: params.fs || estimatedTS.fs || 0,
+        vas: params.vas || estimatedTS.vas || 0,
+        qts: params.qts || estimatedTS.qts || 0,
+        qes: params.qes || estimatedTS.qes || 0,
+        qms: params.qms || estimatedTS.qms || 0,
+        sd: params.sd || estimatedTS.sd || 0,
+        xmax: params.xmax || estimatedTS.xmax || 0,
+      };
+      if (merged.fs && merged.vas && merged.qts) {
+        const results = await calcAutoParams(merged);
         setDerived(results);
       } else {
         setDerived(null);
       }
     };
     fetchDerived();
-  }, [params]);
+  }, [params, estimatedTS]);
+
+  const hasAutoFillableParams = React.useMemo(() => {
+    if (Object.keys(estimatedTS).length > 0) return true;
+    if (!derived) return false;
+    return (
+      (!params.bl && derived.bl > 0) ||
+      (!params.mms && derived.mms > 0) ||
+      (!params.cms && derived.cms > 0) ||
+      (!params.vd && derived.vd > 0)
+    );
+  }, [estimatedTS, derived, params.bl, params.mms, params.cms, params.vd]);
+
+  const handleAutoFillMissing = () => {
+    const nextParams = { ...params };
+    if ((!nextParams.fs || nextParams.fs <= 0) && estimatedTS.fs) nextParams.fs = estimatedTS.fs;
+    if ((!nextParams.vas || nextParams.vas <= 0) && estimatedTS.vas) nextParams.vas = estimatedTS.vas;
+    if ((!nextParams.qts || nextParams.qts <= 0) && estimatedTS.qts) nextParams.qts = estimatedTS.qts;
+    if ((!nextParams.qms || nextParams.qms <= 0) && estimatedTS.qms) nextParams.qms = estimatedTS.qms;
+    if ((!nextParams.qes || nextParams.qes <= 0) && estimatedTS.qes) nextParams.qes = estimatedTS.qes;
+    if ((!nextParams.sd || nextParams.sd <= 0) && estimatedTS.sd) nextParams.sd = estimatedTS.sd;
+    if ((!nextParams.xmax || nextParams.xmax <= 0) && estimatedTS.xmax) nextParams.xmax = estimatedTS.xmax;
+    if ((!nextParams.vd || nextParams.vd <= 0) && (estimatedTS.vd || (derived && derived.vd > 0))) {
+      nextParams.vd = estimatedTS.vd || Math.round((derived?.vd || 0) * 10) / 10;
+    }
+    if ((!nextParams.bl || nextParams.bl <= 0) && derived && derived.bl > 0) {
+      nextParams.bl = Math.round(derived.bl * 100) / 100;
+    }
+    if ((!nextParams.mms || nextParams.mms <= 0) && derived && derived.mms > 0) {
+      nextParams.mms = Math.round(derived.mms * 10) / 10;
+    }
+    if ((!nextParams.cms || nextParams.cms <= 0) && derived && derived.cms > 0) {
+      nextParams.cms = Math.round(derived.cms * 1000) / 1000;
+    }
+    onParamsChange(nextParams);
+  };
 
   const displayValue = (field: keyof SpeakerParams) => {
     const val = params[field];
@@ -1082,7 +1173,19 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
 
         {/* BLOQUE 2: PARÁMETROS THIELE & SMALL */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.2rem', marginTop: '0.3rem', borderBottom: '1px solid rgba(255, 255, 255, 0.04)', paddingBottom: '0.35rem', marginBottom: '0.45rem' }}>
-          <div className="form-subsection-title" style={{ margin: 0, borderBottom: 'none', paddingBottom: 0 }}>{t("Parámetros Thiele & Small")}</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '0.4rem' }}>
+            <div className="form-subsection-title" style={{ margin: 0, borderBottom: 'none', paddingBottom: 0 }}>{t("Parámetros Thiele & Small")}</div>
+            {hasAutoFillableParams && (
+              <button
+                type="button"
+                className="cad-quad-tile-btn"
+                onClick={handleAutoFillMissing}
+                title={t("Calcular y rellenar automáticamente los parámetros Thiele-Small faltantes a partir de los ya ingresados")}
+              >
+                {t("Auto-completar")}
+              </button>
+            )}
+          </div>
           <label className="checkbox-container" style={{ fontWeight: 500, marginBottom: 0, cursor: 'pointer' }}>
             <input type="checkbox" checked={proMode} onChange={(e) => setProMode(e.target.checked)} />
             <div className="custom-checkbox" style={{ width: '13px', height: '13px' }}></div>
@@ -1092,13 +1195,13 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
 
         <div className="input-grid">
           <div className="input-group">
-            <label>Fs <span className="label-desc">({t("Resonancia")})</span></label>
+            <label title={t("Frecuencia de resonancia al aire libre (equivalente a Resonance)")}>Fs <span className="label-desc">({t("Resonancia")})</span></label>
             <div className="input-wrapper">
               <input 
                 type="number" 
                 value={params.fs ?? ''} 
                 onChange={(e) => handleInputChange('fs', e.target.value)}
-                placeholder="45" 
+                placeholder={estimatedTS.fs ? `${estimatedTS.fs} (auto)` : "45"} 
                 step="0.1" 
                 required
               />
@@ -1112,7 +1215,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
                 type="number" 
                 value={displayValue('vas')} 
                 onChange={(e) => handleInputChange('vas', e.target.value)}
-                placeholder={convertTo(60, 'volume', unitSystem).toFixed(1)} 
+                placeholder={estimatedTS.vas ? `${convertTo(estimatedTS.vas, 'volume', unitSystem).toFixed(1)} (auto)` : convertTo(60, 'volume', unitSystem).toFixed(1)} 
                 step="any" 
                 required
               />
@@ -1126,7 +1229,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
                 type="number" 
                 value={params.qms ?? ''} 
                 onChange={(e) => handleInputChange('qms', e.target.value)}
-                placeholder="4.5" 
+                placeholder={estimatedTS.qms ? `${estimatedTS.qms} (auto)` : "4.5"} 
                 step="any" 
               />
             </div>
@@ -1138,7 +1241,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
                 type="number" 
                 value={params.qes ?? ''} 
                 onChange={(e) => handleInputChange('qes', e.target.value)}
-                placeholder="0.45" 
+                placeholder={estimatedTS.qes ? `${estimatedTS.qes} (auto)` : "0.45"} 
                 step="any" 
               />
             </div>
@@ -1150,7 +1253,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
                 type="number" 
                 value={params.qts ?? ''} 
                 onChange={(e) => handleInputChange('qts', e.target.value)}
-                placeholder="0.41" 
+                placeholder={estimatedTS.qts ? `${estimatedTS.qts} (auto)` : "0.41"} 
                 step="any" 
               />
             </div>
@@ -1162,7 +1265,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
                 type="number" 
                 value={displayValue('sd')} 
                 onChange={(e) => handleInputChange('sd', e.target.value)}
-                placeholder={convertTo(350, 'area', unitSystem).toFixed(1)} 
+                placeholder={estimatedTS.sd ? `${convertTo(estimatedTS.sd, 'area', unitSystem).toFixed(1)} (auto)` : convertTo(350, 'area', unitSystem).toFixed(1)} 
                 step="any" 
               />
               <span className="unit-badge">{getUnitLabel('area', unitSystem)}</span>
@@ -1175,7 +1278,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
                 type="number" 
                 value={displayValue('xmax')} 
                 onChange={(e) => handleInputChange('xmax', e.target.value)}
-                placeholder={convertTo(6.5, 'length_small', unitSystem).toFixed(2)} 
+                placeholder={estimatedTS.xmax ? `${convertTo(estimatedTS.xmax, 'length_small', unitSystem).toFixed(2)} (auto)` : convertTo(6.5, 'length_small', unitSystem).toFixed(2)} 
                 step="any" 
               />
               <span className="unit-badge">{getUnitLabel('length_small', unitSystem)}</span>
@@ -1304,6 +1407,14 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
           <div className="pro-calc-row">
             <span className="pro-calc-label">{t("Impedancia Resonancia (Zmax):")}</span>
             <span className="pro-calc-value">{derived.zmax > 0 ? `${derived.zmax.toFixed(1)} Ω` : '-- Ω'}</span>
+          </div>
+          <div className="pro-calc-row">
+            <span className="pro-calc-label">{t("EBP (Fs / Qes):")}</span>
+            <span className="pro-calc-value">
+              {(params.fs || estimatedTS.fs) && (params.qes || estimatedTS.qes)
+                ? Math.round((params.fs || estimatedTS.fs || 0) / (params.qes || estimatedTS.qes || 1))
+                : '--'}
+            </span>
           </div>
           {(derived.autoCms || derived.autoMms || derived.autoBl || derived.autoVd) && (
             <div className="pro-calc-row" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>

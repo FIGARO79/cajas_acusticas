@@ -7,7 +7,7 @@ import { CabinetTab } from './components/CabinetTab';
 import { CrossoverTab } from './components/CrossoverTab';
 import { type Lang, translate } from './utils/translations';
 import { type UnitSystem, convertTo, getUnitLabel, nextUnitSystem } from './utils/units';
-import type { SpeakerParams, CalculatedSealed, CalculatedPorted, CalculatedBandpass, CustomDriver, WoodCabinetData, CrossoverExportData } from './types';
+import type { SpeakerParams, CalculatedSealed, CalculatedPorted, CalculatedBandpass, CustomDriver, WoodCabinetData, CrossoverExportData, WoodShape } from './types';
 import { estimateF3, calcPortLength, getKCorrection, calcOptimalPortForSpeaker, calcVentAirVelocity } from './utils/acousticMath';
 import { getWasm, calcRadiadorPasivo, calcVolumenNetoMadera } from './wasm/index.ts';
 import { generateReportHTML } from './utils/reportGenerator';
@@ -71,7 +71,7 @@ function App({ wasmError }: AppProps) {
   const [bandpassS, setBandpassS] = useState<number>(0.707);
   const [bandpassA, setBandpassA] = useState<number>(2.0);
 
-  // Sidebar layout (VS Code / FreeCAD Combo View collapsible & resizable sections)
+  // Sidebar layout (collapsible & resizable sections)
   const sidebarRef = useRef<HTMLDivElement>(null);
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
     const saved = Number(localStorage.getItem('aclab_sidebar_w'));
@@ -209,7 +209,7 @@ function App({ wasmError }: AppProps) {
 
   // Woodworking parameters
   const [woodMode, setWoodMode] = useState<'calc' | 'input'>('calc');
-  const [woodShape, setWoodShape] = useState<'rectangular' | 'trapezoidal'>('rectangular');
+  const [woodShape, setWoodShape] = useState<WoodShape>('rectangular');
   const [woodConstraint, setWoodConstraint] = useState<string>('none');
   const [woodRatio, setWoodRatio] = useState<'golden' | 'classic' | 'cube'>('golden');
   const [dampingType, setDampingType] = useState<'none' | 'light' | 'moderate' | 'heavy'>('none');
@@ -236,6 +236,7 @@ function App({ wasmError }: AppProps) {
 
   const [woodTrapExtHeight, setWoodTrapExtHeight] = useState<number | ''>(40);
   const [woodTrapExtWidth, setWoodTrapExtWidth] = useState<number | ''>(45);
+  const [woodTrapExtRearWidth, setWoodTrapExtRearWidth] = useState<number | ''>(30);
   const [woodTrapExtDepthTop, setWoodTrapExtDepthTop] = useState<number | ''>(18);
   const [woodTrapExtDepthBot, setWoodTrapExtDepthBot] = useState<number | ''>(32);
 
@@ -422,16 +423,19 @@ function App({ wasmError }: AppProps) {
       }
     } else {
       const hExt = woodTrapExtHeight || 0;
-      const wExt = woodTrapExtWidth || 0;
+      const wFrontExt = woodTrapExtWidth || 0;
+      const wRearExt = woodTrapExtRearWidth || wFrontExt;
       const d1Ext = woodTrapExtDepthTop || 0;
       const d2Ext = woodTrapExtDepthBot || 0;
       const hInt = hExt - (2 * thickness);
-      const wInt = wExt - (2 * thickness);
+      const wFrontInt = Math.max(0, wFrontExt - (2 * thickness));
+      const wRearInt = Math.max(0, wRearExt - (2 * thickness));
       const d1Int = Math.max(0, d1Ext - (2 * thickness));
       const d2Int = Math.max(0, d2Ext - (2 * thickness));
-      if (hInt > 0 && wInt > 0 && d1Int > 0 && d2Int > 0) {
+      if (hInt > 0 && wFrontInt > 0 && wRearInt > 0 && d1Int > 0 && d2Int > 0) {
+        const wAvg = (wFrontInt + wRearInt) / 2;
         dInt = (d1Int + d2Int) / 2;
-        bruto = (hInt * wInt * dInt) / 1000;
+        bruto = (hInt * wAvg * dInt) / 1000;
       }
     }
 
@@ -1222,6 +1226,8 @@ function App({ wasmError }: AppProps) {
           setWoodTrapExtHeight={setWoodTrapExtHeight}
           woodTrapExtWidth={woodTrapExtWidth}
           setWoodTrapExtWidth={setWoodTrapExtWidth}
+          woodTrapExtRearWidth={woodTrapExtRearWidth}
+          setWoodTrapExtRearWidth={setWoodTrapExtRearWidth}
           woodTrapExtDepthTop={woodTrapExtDepthTop}
           setWoodTrapExtDepthTop={setWoodTrapExtDepthTop}
           woodTrapExtDepthBot={woodTrapExtDepthBot}
@@ -1369,11 +1375,11 @@ function App({ wasmError }: AppProps) {
                   {workspaceView === 'cabinet' && (
                     <div className="cad-ribbon-group" style={{ padding: '0.35rem 0.65rem', borderBottom: '1px solid var(--card-border)' }}>
                       <span className="cad-ribbon-tag">{t("VISTA:")}</span>
-                      <div className="cad-ribbon-tools">
-                        <button type="button" className="cad-tool-btn" onClick={() => setWorkspaceView('split')}>{t("Estudio")}</button>
-                        <button type="button" className="cad-tool-btn" onClick={() => setWorkspaceView('simulation')}>{t("Simulación")}</button>
-                        <button type="button" className="cad-tool-btn active" onClick={() => setWorkspaceView('cabinet')}>{t("Gabinete 3D")}</button>
-                        <button type="button" className="cad-tool-btn" onClick={() => setWorkspaceView('crossover')}>{t("Crossover")}</button>
+                      <div className="segmented-control" style={{ display: 'inline-flex', width: 'auto', padding: '1px' }}>
+                        <button type="button" style={{ flex: '0 0 auto', padding: '0 0.5rem', fontSize: '0.68rem', height: '20px' }} onClick={() => setWorkspaceView('split')}>{t("Estudio")}</button>
+                        <button type="button" style={{ flex: '0 0 auto', padding: '0 0.5rem', fontSize: '0.68rem', height: '20px' }} onClick={() => setWorkspaceView('simulation')}>{t("Simulación")}</button>
+                        <button type="button" className="active" style={{ flex: '0 0 auto', padding: '0 0.5rem', fontSize: '0.68rem', height: '20px' }} onClick={() => setWorkspaceView('cabinet')}>{t("Gabinete 3D")}</button>
+                        <button type="button" style={{ flex: '0 0 auto', padding: '0 0.5rem', fontSize: '0.68rem', height: '20px' }} onClick={() => setWorkspaceView('crossover')}>{t("Crossover")}</button>
                       </div>
                     </div>
                   )}
@@ -1409,6 +1415,8 @@ function App({ wasmError }: AppProps) {
                     setWoodTrapExtHeight={setWoodTrapExtHeight}
                     woodTrapExtWidth={woodTrapExtWidth}
                     setWoodTrapExtWidth={setWoodTrapExtWidth}
+                    woodTrapExtRearWidth={woodTrapExtRearWidth}
+                    setWoodTrapExtRearWidth={setWoodTrapExtRearWidth}
                     woodTrapExtDepthTop={woodTrapExtDepthTop}
                     setWoodTrapExtDepthTop={setWoodTrapExtDepthTop}
                     woodTrapExtDepthBot={woodTrapExtDepthBot}
@@ -1462,11 +1470,11 @@ function App({ wasmError }: AppProps) {
                   {workspaceView === 'crossover' && (
                     <div className="cad-ribbon-group" style={{ padding: '0.35rem 0.65rem', borderBottom: '1px solid var(--card-border)' }}>
                       <span className="cad-ribbon-tag">{t("VISTA:")}</span>
-                      <div className="cad-ribbon-tools">
-                        <button type="button" className="cad-tool-btn" onClick={() => setWorkspaceView('split')}>{t("Estudio")}</button>
-                        <button type="button" className="cad-tool-btn" onClick={() => setWorkspaceView('simulation')}>{t("Simulación")}</button>
-                        <button type="button" className="cad-tool-btn" onClick={() => setWorkspaceView('cabinet')}>{t("Gabinete 3D")}</button>
-                        <button type="button" className="cad-tool-btn active" onClick={() => setWorkspaceView('crossover')}>{t("Crossover")}</button>
+                      <div className="segmented-control" style={{ display: 'inline-flex', width: 'auto', padding: '1px' }}>
+                        <button type="button" style={{ flex: '0 0 auto', padding: '0 0.5rem', fontSize: '0.68rem', height: '20px' }} onClick={() => setWorkspaceView('split')}>{t("Estudio")}</button>
+                        <button type="button" style={{ flex: '0 0 auto', padding: '0 0.5rem', fontSize: '0.68rem', height: '20px' }} onClick={() => setWorkspaceView('simulation')}>{t("Simulación")}</button>
+                        <button type="button" style={{ flex: '0 0 auto', padding: '0 0.5rem', fontSize: '0.68rem', height: '20px' }} onClick={() => setWorkspaceView('cabinet')}>{t("Gabinete 3D")}</button>
+                        <button type="button" className="active" style={{ flex: '0 0 auto', padding: '0 0.5rem', fontSize: '0.68rem', height: '20px' }} onClick={() => setWorkspaceView('crossover')}>{t("Crossover")}</button>
                       </div>
                     </div>
                   )}

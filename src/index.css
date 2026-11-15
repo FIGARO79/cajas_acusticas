@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 :root {
-  /* FreeCAD / Qt Fusion Dark Workstation Palette */
+  /* CAD Dark Workstation Palette */
   --cad-titlebar-bg: #2f2f2f;
   --cad-menubar-bg: #363636;
   --cad-toolstrip-bg: #3b3b3b;
@@ -1610,7 +1610,7 @@ html textarea:focus {
   border-color: var(--input-focus);
 }
 /* ==========================================================================
-   DESKTOP CAD SUITE WORKSTATION STYLES (SOLIDWORKS / CAD WORKSTATION)
+   DESKTOP CAD SUITE WORKSTATION STYLES
    ========================================================================== */
 
 .cad-desktop-header {
@@ -1628,7 +1628,7 @@ html textarea:focus {
   overflow: visible !important;
 }
 
-/* SOLIDWORKS-STYLE TWO-ROW CAD HEADER (MENUBAR + VIEWS TOOLBAR) */
+/* TWO-ROW CAD HEADER (MENUBAR + VIEWS TOOLBAR) */
 .cad-single-bar {
   height: auto;
   overflow: visible !important;
@@ -1669,7 +1669,7 @@ html textarea:focus {
   flex-shrink: 0;
 }
 
-/* TIER 1: WINDOW TITLEBAR CHROME & INLINE MENUBAR (SOLIDWORKS STYLE) */
+/* TIER 1: WINDOW TITLEBAR CHROME & INLINE MENUBAR */
 .cad-window-titlebar {
   height: 28px;
   background: var(--cad-titlebar-bg);
@@ -2000,7 +2000,7 @@ html textarea:focus {
   color: #ffffff;
 }
 
-/* TIER 2: SOLIDWORKS CAD COMMANDMANAGER / RIBBON (34px) */
+/* TIER 2: CAD COMMAND RIBBON (34px) */
 .cad-command-ribbon {
   height: 34px;
   background: var(--cad-toolstrip-bg);
@@ -2356,15 +2356,64 @@ html .cad-menu-option:hover {
   min-height: 600px;
 }
 
-/* CAD 2x2 Synchronized Oscilloscope Grid */
+/* CAD Synchronized Oscilloscope Grid (1..6 panels) */
 .cad-quad-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-rows: repeat(2, minmax(210px, 1fr));
+  grid-auto-rows: minmax(210px, 1fr);
   gap: 4px;
   flex: 1;
   min-height: 480px;
   height: 100%;
+}
+
+.cad-quad-grid.cols-1 {
+  grid-template-columns: 1fr;
+}
+
+.cad-quad-grid.cols-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.cad-quad-grid.cols-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 1100px) {
+  .cad-quad-grid.cols-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.cad-vertical-resizer {
+  height: 8px;
+  width: 100%;
+  cursor: ns-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--cad-panel-header-bg, #f1f5f9);
+  border-top: 1px solid var(--card-border);
+  border-bottom: 1px solid var(--card-border);
+  user-select: none;
+  transition: background 0.12s ease;
+}
+
+.cad-vertical-resizer span {
+  width: 36px;
+  height: 2px;
+  border-radius: 1px;
+  background: #94a3b8;
+  transition: background 0.12s ease, width 0.12s ease;
+}
+
+.cad-vertical-resizer:hover {
+  background: rgba(2, 132, 199, 0.08);
+}
+
+.cad-vertical-resizer:hover span {
+  background: var(--accent, #0284c7);
+  width: 52px;
 }
 
 .cad-quad-tile {
@@ -2378,15 +2427,15 @@ html .cad-menu-option:hover {
 }
 
 .cad-quad-tile-header {
-  height: 22px;
-  min-height: 22px;
+  height: 24px;
+  min-height: 24px;
   background: var(--cad-panel-header-bg);
   border-bottom: 1px solid var(--card-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 6px;
-  font-size: 0.65rem;
+  padding: 0 8px;
+  font-size: 0.72rem;
   font-weight: 700;
   color: var(--text-secondary);
   user-select: none;
@@ -2406,8 +2455,9 @@ html .cad-menu-option:hover {
   background: transparent;
   border: 1px solid var(--card-border);
   color: var(--text-muted);
-  font-size: 0.62rem;
-  padding: 1px 5px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 2px 6px;
   border-radius: 2px;
   cursor: pointer;
   display: inline-flex;
@@ -2458,7 +2508,7 @@ html .cad-quad-tile-btn:hover {
   border-top: 1px solid var(--card-border) !important;
 }
 
-/* Light Theme Support for CAD Suite (FreeCAD Qt Fusion Light) */
+/* Light Theme Support for CAD Suite */
 :root {
   --cad-titlebar-bg: #dce0e6;
   --cad-menubar-bg: #e4e7ec;
@@ -2867,19 +2917,19 @@ button,
    ESTILO DE CONTROLES SEGMENTADOS COMO DESLIZADORES INDUSTRIALES (FADERS)
    ========================================================================== */
 
-/* Contenedor de control segmentado (Estilo Qt Fusion / FreeCAD) */
+/* Contenedor de control segmentado */
 .segmented-control {
   position: relative !important;
   display: flex !important;
   background: #e4e7ec !important;
   border: 1px solid #c5cbd4 !important;
   border-radius: 2px !important;
-  padding: 2px !important;
-  gap: 2px !important;
+  padding: 0.5px !important;
+  gap: 0.5px !important;
   box-shadow: none !important;
   align-items: center !important;
   overflow: hidden !important;
-  min-height: 26px !important;
+  min-height: 23px !important;
   height: auto !important;
   box-sizing: border-box !important;
 }
@@ -2923,7 +2973,7 @@ button,
   background: rgba(56, 116, 180, 0.08) !important;
 }
 
-/* Botón Activo (Qt Fusion / FreeCAD Steel Blue) */
+/* Botón Activo (Steel Blue) */
 .segmented-control button.active {
   position: relative !important;
   z-index: 2 !important;

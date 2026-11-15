@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { type Lang, translate } from '../utils/translations';
 import { type UnitSystem, convertTo, getUnitLabel } from '../utils/units';
-import type { WoodCabinetData } from '../types';
+import type { WoodCabinetData, WoodShape } from '../types';
 import { calculatePortSpacing } from '../utils/acousticMath';
 
 interface CabinetViewer3DModalProps {
@@ -12,7 +12,7 @@ interface CabinetViewer3DModalProps {
   onClose: () => void;
   lang: Lang;
   unitSystem: UnitSystem;
-  shape: 'rectangular' | 'trapezoidal';
+  shape: WoodShape;
   cabinetData: WoodCabinetData | null;
   boxType: 'sealed' | 'ported' | 'bandpass';
   portShape: 'round' | 'rectangular' | 'custom';
@@ -128,13 +128,18 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
   }, [isOpen, onClose]);
 
   // Dimension helpers in centimeters
-  const wExt = cabinetData?.wExt || 35;
+  const wExt = shape === 'trapezoidal'
+    ? (cabinetData?.wFrontExt || cabinetData?.wExt || 35)
+    : (cabinetData?.wExt || 35);
+  const wRearExt = cabinetData?.wRearExt || wExt;
   const hExt = cabinetData?.hExt || 50;
-  const dExt = shape === 'rectangular' 
-    ? (cabinetData?.dExt || 30) 
-    : Math.max(cabinetData?.dTrapTopExt || 20, cabinetData?.dTrapBotExt || 35);
+  const dExt = shape === 'trapezoidal'
+    ? Math.max(cabinetData?.dTrapTopExt || 20, cabinetData?.dTrapBotExt || 35)
+    : (cabinetData?.dExt || 30);
   const dTrapTop = cabinetData?.dTrapTopExt || 20;
   const dTrapBot = cabinetData?.dTrapBotExt || 35;
+  const dTop3D = shape === 'trapezoidal' ? dTrapTop : dExt;
+  const dBot3D = shape === 'trapezoidal' ? dTrapBot : dExt;
   const thickness = (cabinetData?.thickness || 19) / 10; // mm to cm
 
   // Camera presets
@@ -167,18 +172,24 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
     const maxDim = Math.max(wExt, hExt, dExt);
     const offset = (explodedPct / 100) * (maxDim * 0.45);
 
+    const sideBaseX = shape === 'trapezoidal'
+      ? (wExt + wRearExt) / 4 - thickness / 2
+      : (wExt - thickness) / 2;
+    const frontBaseZ = shape === 'trapezoidal'
+      ? -dExt / 2 + (dTop3D + dBot3D) / 2 - thickness / 2
+      : (dExt - thickness) / 2;
     if (meshes.top) meshes.top.position.y = (hExt - thickness) / 2 + offset;
     if (meshes.bottom) meshes.bottom.position.y = -(hExt - thickness) / 2 - offset;
-    if (meshes.left) meshes.left.position.x = -(wExt - thickness) / 2 - offset;
-    if (meshes.right) meshes.right.position.x = (wExt - thickness) / 2 + offset;
+    if (meshes.left) meshes.left.position.x = -sideBaseX - offset;
+    if (meshes.right) meshes.right.position.x = sideBaseX + offset;
     if (meshes.rear) meshes.rear.position.z = -(dExt - thickness) / 2 - offset;
-    if (meshes.front) meshes.front.position.z = (dExt - thickness) / 2 + offset;
+    if (meshes.front) meshes.front.position.z = frontBaseZ + offset;
     if (meshes.divider) meshes.divider.position.z = dividerBaseZRef.current + offset * 0.22;
     if (gridHelperRef.current) gridHelperRef.current.position.y = -hExt / 2 - offset - 2;
 
     if (chambersRef.current.vr) chambersRef.current.vr.visible = explodedPct < 15;
     if (chambersRef.current.vf) chambersRef.current.vf.visible = explodedPct < 15;
-  }, [explodedPct, wExt, hExt, dExt, thickness]);
+  }, [explodedPct, shape, wExt, wRearExt, hExt, dExt, dTop3D, dBot3D, thickness]);
 
   // Main Three.js Scene Setup & Rebuild
   useEffect(() => {
@@ -424,10 +435,32 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
       }
     }
 
+    const createCapGeo = (capDepth: number) => {
+      if (shape !== 'trapezoidal' || Math.abs(wExt - wRearExt) < 0.05) {
+        return new THREE.BoxGeometry(wExt, thickness, capDepth);
+      }
+      const capShape = new THREE.Shape();
+      const hwF = wExt / 2;
+      const hwR = wRearExt / 2;
+      const hd = capDepth / 2;
+      capShape.moveTo(-hwF, -hd);
+      capShape.lineTo(hwF, -hd);
+      capShape.lineTo(hwR, hd);
+      capShape.lineTo(-hwR, hd);
+      capShape.closePath();
+      const geo = new THREE.ExtrudeGeometry(capShape, {
+        depth: thickness,
+        bevelEnabled: false,
+      });
+      geo.rotateX(-Math.PI / 2);
+      geo.translate(0, -thickness / 2, 0);
+      return geo;
+    };
+
     // --- TAPA SUPERIOR ---
-    const topGeo = new THREE.BoxGeometry(wExt, thickness, dExt);
+    const topGeo = createCapGeo(dTop3D);
     const topMesh = new THREE.Mesh(topGeo, getWoodMaterial());
-    topMesh.position.set(0, (hExt - thickness) / 2, 0);
+    topMesh.position.set(0, (hExt - thickness) / 2, -(dExt - dTop3D) / 2);
     topMesh.castShadow = true;
     topMesh.receiveShadow = true;
     addEdgeLines(topMesh);
@@ -435,19 +468,50 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
     panelMeshesRef.current.top = topMesh;
 
     // --- TAPA INFERIOR ---
-    const botGeo = new THREE.BoxGeometry(wExt, thickness, dExt);
+    const botGeo = createCapGeo(dBot3D);
     const botMesh = new THREE.Mesh(botGeo, getWoodMaterial());
-    botMesh.position.set(0, -(hExt - thickness) / 2, 0);
+    botMesh.position.set(0, -(hExt - thickness) / 2, -(dExt - dBot3D) / 2);
     botMesh.castShadow = true;
     botMesh.receiveShadow = true;
     addEdgeLines(botMesh);
     panelsGroup.add(botMesh);
     panelMeshesRef.current.bottom = botMesh;
 
+    const dxSide = shape === 'trapezoidal' ? (wExt - wRearExt) / 2 : 0;
+    const avgDepth = (dTop3D + dBot3D) / 2;
+    const sideAngle = shape === 'trapezoidal' ? Math.atan2(dxSide, Math.max(0.1, avgDepth)) : 0;
+    const sideCos = Math.cos(sideAngle) || 1;
+    const sideCenterX = shape === 'trapezoidal'
+      ? (wExt + wRearExt) / 4 - thickness / 2
+      : (wExt - thickness) / 2;
+
+    const createSideGeo = () => {
+      if (shape !== 'trapezoidal' || Math.abs(dTop3D - dBot3D) < 0.05) {
+        return new THREE.BoxGeometry(thickness, innerH, Math.hypot(dxSide, avgDepth));
+      }
+      const sideShape = new THREE.Shape();
+      const zRear = -dExt / 2;
+      const zTopFront = (zRear + dTop3D) / sideCos - (dExt / 2) * (1 / sideCos - 1);
+      const zBotFront = (zRear + dBot3D) / sideCos - (dExt / 2) * (1 / sideCos - 1);
+      sideShape.moveTo(zRear, -innerH / 2);
+      sideShape.lineTo(zBotFront, -innerH / 2);
+      sideShape.lineTo(zTopFront, innerH / 2);
+      sideShape.lineTo(zRear, innerH / 2);
+      sideShape.closePath();
+      const geo = new THREE.ExtrudeGeometry(sideShape, {
+        depth: thickness,
+        bevelEnabled: false,
+      });
+      geo.rotateY(-Math.PI / 2);
+      geo.translate(thickness / 2, 0, 0);
+      return geo;
+    };
+
     // --- LATERAL IZQUIERDO ---
-    const leftGeo = new THREE.BoxGeometry(thickness, innerH, dExt);
+    const leftGeo = createSideGeo();
     const leftMesh = new THREE.Mesh(leftGeo, getWoodMaterial());
-    leftMesh.position.set(-(wExt - thickness) / 2, 0, 0);
+    leftMesh.position.set(-sideCenterX, 0, 0);
+    leftMesh.rotation.y = -sideAngle;
     leftMesh.castShadow = true;
     leftMesh.receiveShadow = true;
     addEdgeLines(leftMesh);
@@ -455,9 +519,10 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
     panelMeshesRef.current.left = leftMesh;
 
     // --- LATERAL DERECHO ---
-    const rightGeo = new THREE.BoxGeometry(thickness, innerH, dExt);
+    const rightGeo = createSideGeo();
     const rightMesh = new THREE.Mesh(rightGeo, getWoodMaterial());
-    rightMesh.position.set((wExt - thickness) / 2, 0, 0);
+    rightMesh.position.set(sideCenterX, 0, 0);
+    rightMesh.rotation.y = sideAngle;
     rightMesh.castShadow = true;
     rightMesh.receiveShadow = true;
     addEdgeLines(rightMesh);
@@ -468,7 +533,10 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
     const rearGroup = new THREE.Group();
     rearGroup.position.set(0, 0, -(dExt - thickness) / 2);
 
-    const rearGeo = createPerforatedPanelGeo(innerW, innerH, thickness, rearHoleCircles, rearHoleRects);
+    const innerWRear = shape === 'trapezoidal'
+      ? Math.max(2, wRearExt - 2 * thickness)
+      : innerW;
+    const rearGeo = createPerforatedPanelGeo(innerWRear, innerH, thickness, rearHoleCircles, rearHoleRects);
     const rearMesh = new THREE.Mesh(rearGeo, getWoodMaterial());
     rearMesh.castShadow = true;
     rearMesh.receiveShadow = true;
@@ -479,9 +547,15 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
 
     // --- BAFLE FRONTAL + COMPONENTES ---
     const frontGroup = new THREE.Group();
-    frontGroup.position.set(0, 0, (dExt - thickness) / 2);
+    const frontCenterZ = shape === 'trapezoidal'
+      ? -dExt / 2 + (dTop3D + dBot3D) / 2 - thickness / 2
+      : (dExt - thickness) / 2;
+    const frontTiltX = shape === 'trapezoidal' ? Math.atan2(dTop3D - dBot3D, hExt) : 0;
+    const frontSlantH = shape === 'trapezoidal' ? Math.hypot(innerH, dTop3D - dBot3D) : innerH;
+    frontGroup.position.set(0, 0, frontCenterZ);
+    frontGroup.rotation.x = frontTiltX;
 
-    const frontGeo = createPerforatedPanelGeo(innerW, innerH, thickness, frontHoleCircles, frontHoleRects);
+    const frontGeo = createPerforatedPanelGeo(innerW, frontSlantH, thickness, frontHoleCircles, frontHoleRects);
     const frontMesh = new THREE.Mesh(frontGeo, getWoodMaterial());
     frontMesh.castShadow = true;
     frontMesh.receiveShadow = true;
@@ -1257,8 +1331,11 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
     isOpen,
     isLight,
     wExt,
+    wRearExt,
     hExt,
     dExt,
+    dTop3D,
+    dBot3D,
     thickness,
     renderMode,
     showWireEdges,
@@ -1416,12 +1493,12 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
               }}
             >
               {shape === 'trapezoidal' ? (
-                <span>{convertTo(wExt, 'length', unitSystem).toFixed(1)} x {convertTo(hExt, 'length', unitSystem).toFixed(1)} x [Sup:{convertTo(dTrapTop, 'length', unitSystem).toFixed(1)} / Inf:{convertTo(dTrapBot, 'length', unitSystem).toFixed(1)}] {uLabel}</span>
+                <span>[F:{convertTo(wExt, 'length', unitSystem).toFixed(1)} / T:{convertTo(wRearExt, 'length', unitSystem).toFixed(1)}] x {convertTo(hExt, 'length', unitSystem).toFixed(1)} x [Sup:{convertTo(dTrapTop, 'length', unitSystem).toFixed(1)} / Inf:{convertTo(dTrapBot, 'length', unitSystem).toFixed(1)}] {uLabel}</span>
               ) : (
                 <span>{convertTo(wExt, 'length', unitSystem).toFixed(1)} x {convertTo(hExt, 'length', unitSystem).toFixed(1)} x {convertTo(dExt, 'length', unitSystem).toFixed(1)} {uLabel}</span>
               )}
               <span style={{ color: '#0284c7' }}>|</span>
-              <span>ESP: {cabinetData?.thickness || 19} mm</span>
+              <span>ESP: {convertTo(cabinetData?.thickness || 19, 'length_small', unitSystem).toFixed(unitSystem === 'imperial' ? 2 : 1)} {getUnitLabel('length_small', unitSystem)}</span>
             </div>
 
             {/* Close Button */}

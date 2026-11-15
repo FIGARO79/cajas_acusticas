@@ -29,6 +29,28 @@ export const CrossoverCad2D: React.FC<CrossoverCad2DProps> = ({
 
   const isLight = true;
   const [containerWidth, setContainerWidth] = useState<number>(0);
+  const [canvasHeight, setCanvasHeight] = useState<number>(crossoverWays === '3way' ? 520 : 440);
+
+  const handleVerticalResizeStart = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startH = canvasHeight;
+    document.body.style.cursor = 'ns-resize';
+
+    const onMouseMove = (ev: MouseEvent) => {
+      const nextH = Math.min(1200, Math.max(260, startH + (ev.clientY - startY)));
+      setCanvasHeight(nextH);
+    };
+
+    const onMouseUp = () => {
+      document.body.style.cursor = '';
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  };
 
   useEffect(() => {
     const el = containerRef.current;
@@ -146,7 +168,7 @@ export const CrossoverCad2D: React.FC<CrossoverCad2DProps> = ({
     if (!ctx) return;
 
     const width = containerWidth || containerRef.current.clientWidth || 800;
-    const height = crossoverWays === '3way' ? 520 : 440;
+    const height = canvasHeight;
     const dpr = window.devicePixelRatio || 1;
 
     canvas.width = width * dpr;
@@ -795,6 +817,7 @@ export const CrossoverCad2D: React.FC<CrossoverCad2DProps> = ({
     lpadResults,
     t,
     containerWidth,
+    canvasHeight,
   ]);
 
   return (
@@ -952,7 +975,7 @@ export const CrossoverCad2D: React.FC<CrossoverCad2DProps> = ({
         style={{
           position: 'relative',
           width: '100%',
-          height: crossoverWays === '3way' ? '520px' : '440px',
+          height: `${canvasHeight}px`,
           overflow: 'hidden',
         }}
       >
@@ -1007,6 +1030,15 @@ export const CrossoverCad2D: React.FC<CrossoverCad2DProps> = ({
         >
           {t("Arrastra para mover | Rueda para zoom")}
         </div>
+      </div>
+
+      {/* Vertical Resize Handle */}
+      <div
+        className="cad-vertical-resizer"
+        onMouseDown={handleVerticalResizeStart}
+        title={t("Arrastra hacia abajo o arriba para redimensionar")}
+      >
+        <span />
       </div>
 
       {/* Legend Footer */}

@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { type Lang, translate } from '../utils/translations';
 import { type UnitSystem, convertTo, convertFrom, getUnitLabel } from '../utils/units';
-import type { CalculatedPorted, CalculatedSealed, CalculatedBandpass, SpeakerParams, PortSuggestions, WoodCabinetData } from '../types';
+import type { CalculatedPorted, CalculatedSealed, CalculatedBandpass, SpeakerParams, PortSuggestions, WoodCabinetData, WoodShape } from '../types';
 import { suggestPortConfig, calcOptimalPortForSpeaker, calculatePortSpacing } from '../utils/acousticMath';
 import { getWasm, optimizeCrossoverLowpass } from '../wasm';
 
@@ -77,8 +77,8 @@ interface BoxParamsFormProps {
   // Ebanistería (Woodworking)
   woodMode: 'calc' | 'input';
   setWoodMode: (mode: 'calc' | 'input') => void;
-  woodShape: 'rectangular' | 'trapezoidal';
-  setWoodShape: (shape: 'rectangular' | 'trapezoidal') => void;
+  woodShape: WoodShape;
+  setWoodShape: (shape: WoodShape) => void;
   woodConstraint: string;
   setWoodConstraint: (constraint: string) => void;
   woodRatio: 'golden' | 'classic' | 'cube';
@@ -115,6 +115,8 @@ interface BoxParamsFormProps {
   setWoodTrapExtDepthTop: (v: number | '') => void;
   woodTrapExtDepthBot: number | '';
   setWoodTrapExtDepthBot: (v: number | '') => void;
+  woodTrapExtRearWidth?: number | '';
+  setWoodTrapExtRearWidth?: (v: number | '') => void;
 
   // Damping
   dampingType: 'none' | 'light' | 'moderate' | 'heavy';
@@ -285,6 +287,8 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
   setWoodTrapExtDepthTop,
   woodTrapExtDepthBot,
   setWoodTrapExtDepthBot,
+  woodTrapExtRearWidth = 30,
+  setWoodTrapExtRearWidth,
 
   dampingType,
   setDampingType,
@@ -1030,7 +1034,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                   onClick={() => setWoodShape('trapezoidal')}
                   style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', borderRadius: '0px' }}
                 >
-                  {t("Trapezoidal")}
+                  {t("Personalizada")}
                 </button>
               </div>
             </div>
@@ -1082,7 +1086,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                           type="number"
                           value={displayVal(woodLockVal1, 'length')}
                           onChange={(e) => handleInputChange(e.target.value, setWoodLockVal1, 'length')}
-                          step="any"
+                          step="0.1"
                         />
                         <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                       </div>
@@ -1094,7 +1098,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                           type="number"
                           value={displayVal(woodLockVal2, 'length')}
                           onChange={(e) => handleInputChange(e.target.value, setWoodLockVal2, 'length')}
-                          step="any"
+                          step="0.1"
                         />
                         <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                       </div>
@@ -1107,7 +1111,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                             type="number"
                             value={displayVal(woodLockVal3, 'length')}
                             onChange={(e) => handleInputChange(e.target.value, setWoodLockVal3, 'length')}
-                            step="any"
+                            step="0.1"
                           />
                           <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                         </div>
@@ -1141,7 +1145,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                           type="number"
                           value={displayVal(woodExtHeight, 'length')}
                           onChange={(e) => handleInputChange(e.target.value, setWoodExtHeight, 'length')}
-                          step="any"
+                          step="0.1"
                         />
                         <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                       </div>
@@ -1153,7 +1157,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                           type="number"
                           value={displayVal(woodExtWidth, 'length')}
                           onChange={(e) => handleInputChange(e.target.value, setWoodExtWidth, 'length')}
-                          step="any"
+                          step="0.1"
                         />
                         <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                       </div>
@@ -1165,62 +1169,92 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                           type="number"
                           value={displayVal(woodExtDepth, 'length')}
                           onChange={(e) => handleInputChange(e.target.value, setWoodExtDepth, 'length')}
-                          step="any"
+                          step="0.1"
                         />
                         <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <div className="input-grid">
-                    <div className="input-group">
-                      <label>{t("Alto Externo")}</label>
-                      <div className="input-wrapper">
-                        <input
-                          type="number"
-                          value={displayVal(woodTrapExtHeight, 'length')}
-                          onChange={(e) => handleInputChange(e.target.value, setWoodTrapExtHeight, 'length')}
-                          step="any"
-                        />
-                        <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
+                  <div>
+                    <div className="input-grid">
+                      <div className="input-group">
+                        <label>{t("Alto Externo")}</label>
+                        <div className="input-wrapper">
+                          <input
+                            type="number"
+                            value={displayVal(woodTrapExtHeight, 'length')}
+                            onChange={(e) => handleInputChange(e.target.value, setWoodTrapExtHeight, 'length')}
+                            step="0.1"
+                          />
+                          <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
+                        </div>
+                      </div>
+                      <div className="input-group">
+                        <label>{t("Ancho Frontal")}</label>
+                        <div className="input-wrapper">
+                          <input
+                            type="number"
+                            value={displayVal(woodTrapExtWidth, 'length')}
+                            onChange={(e) => handleInputChange(e.target.value, setWoodTrapExtWidth, 'length')}
+                            step="0.1"
+                          />
+                          <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
+                        </div>
+                      </div>
+                      <div className="input-group">
+                        <label>{t("Ancho Trasero")}</label>
+                        <div className="input-wrapper">
+                          <input
+                            type="number"
+                            value={displayVal(woodTrapExtRearWidth, 'length')}
+                            onChange={(e) => setWoodTrapExtRearWidth && handleInputChange(e.target.value, setWoodTrapExtRearWidth, 'length')}
+                            step="0.1"
+                          />
+                          <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
+                        </div>
+                      </div>
+                      <div className="input-group">
+                        <label>{t("Prof. Sup. (D1)")}</label>
+                        <div className="input-wrapper">
+                          <input
+                            type="number"
+                            value={displayVal(woodTrapExtDepthTop, 'length')}
+                            onChange={(e) => handleInputChange(e.target.value, setWoodTrapExtDepthTop, 'length')}
+                            step="0.1"
+                          />
+                          <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
+                        </div>
+                      </div>
+                      <div className="input-group">
+                        <label>{t("Prof. Inf. (D2)")}</label>
+                        <div className="input-wrapper">
+                          <input
+                            type="number"
+                            value={displayVal(woodTrapExtDepthBot, 'length')}
+                            onChange={(e) => handleInputChange(e.target.value, setWoodTrapExtDepthBot, 'length')}
+                            step="0.1"
+                          />
+                          <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
+                        </div>
                       </div>
                     </div>
-                    <div className="input-group">
-                      <label>{t("Ancho Externo")}</label>
-                      <div className="input-wrapper">
-                        <input
-                          type="number"
-                          value={displayVal(woodTrapExtWidth, 'length')}
-                          onChange={(e) => handleInputChange(e.target.value, setWoodTrapExtWidth, 'length')}
-                          step="any"
-                        />
-                        <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
+                    {typeof woodTrapExtWidth === 'number' && typeof woodTrapExtRearWidth === 'number' && typeof woodTrapExtDepthTop === 'number' && typeof woodTrapExtDepthBot === 'number' && typeof woodTrapExtHeight === 'number' && woodTrapExtHeight > 0 && (
+                      <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.35rem', display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
+                        <span>
+                          {t("Ángulo lateral:")}{' '}
+                          <strong>
+                            ±{(Math.atan(Math.abs(woodTrapExtWidth - woodTrapExtRearWidth) / Math.max(0.1, woodTrapExtDepthTop + woodTrapExtDepthBot)) * (180 / Math.PI)).toFixed(1)}°
+                          </strong>
+                        </span>
+                        <span>
+                          {t("Inclinación frontal:")}{' '}
+                          <strong>
+                            {(Math.atan(Math.abs(woodTrapExtDepthBot - woodTrapExtDepthTop) / Math.max(0.1, woodTrapExtHeight)) * (180 / Math.PI)).toFixed(1)}°
+                          </strong>
+                        </span>
                       </div>
-                    </div>
-                    <div className="input-group">
-                      <label>{t("Prof. Sup. (D1)")}</label>
-                      <div className="input-wrapper">
-                        <input
-                          type="number"
-                          value={displayVal(woodTrapExtDepthTop, 'length')}
-                          onChange={(e) => handleInputChange(e.target.value, setWoodTrapExtDepthTop, 'length')}
-                          step="any"
-                        />
-                        <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
-                      </div>
-                    </div>
-                    <div className="input-group">
-                      <label>{t("Prof. Inf. (D2)")}</label>
-                      <div className="input-wrapper">
-                        <input
-                          type="number"
-                          value={displayVal(woodTrapExtDepthBot, 'length')}
-                          onChange={(e) => handleInputChange(e.target.value, setWoodTrapExtDepthBot, 'length')}
-                          step="any"
-                        />
-                        <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1237,7 +1271,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       type="number"
                       value={displayVal(woodThickness, 'length_small')}
                       onChange={(e) => handleInputChange(e.target.value, setWoodThickness, 'length_small')}
-                      step="any"
+                      step="0.1"
                       style={{ height: '30px', padding: '0.2rem 2rem 0.2rem 0.55rem', fontSize: '0.78rem' }}
                     />
                     <span className="unit-badge">{getUnitLabel('length_small', unitSystem)}</span>
@@ -1250,7 +1284,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       type="number"
                       value={displayVal(woodExtra, 'volume')}
                       onChange={(e) => handleInputChange(e.target.value, setWoodExtra, 'volume')}
-                      step="any"
+                      step="0.1"
                       style={{ height: '30px', padding: '0.2rem 2rem 0.2rem 0.55rem', fontSize: '0.78rem' }}
                     />
                     <span className="unit-badge">{getUnitLabel('volume', unitSystem)}</span>
@@ -1424,19 +1458,17 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       </div>
                     ) : (
                       <div className="input-group" style={{ marginBottom: '0.5rem' }}>
-                        <label>{t("Volumen del Recinto de Medios")} (L)</label>
+                        <label>{t("Volumen del Recinto de Medios")}</label>
                         <div className="input-wrapper">
                           <input
                             type="number"
-                            value={customMidVol}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setCustomMidVol(val === '' ? '' : parseFloat(val) || 0);
-                            }}
-                            placeholder="3.0"
+                            value={displayVal(customMidVol, 'volume')}
+                            onChange={(e) => handleInputChange(e.target.value, setCustomMidVol, 'volume')}
+                            placeholder={convertTo(3.0, 'volume', unitSystem).toFixed(2)}
                             step="0.1"
-                            style={{ height: '30px', padding: '0.2rem 0.55rem', fontSize: '0.78rem' }}
+                            style={{ height: '30px', padding: '0.2rem 2.2rem 0.2rem 0.55rem', fontSize: '0.78rem' }}
                           />
+                          <span className="unit-badge">{getUnitLabel('volume', unitSystem)}</span>
                         </div>
                       </div>
                     )}
@@ -1544,7 +1576,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                           setCustomPorted(true);
                         }}
                         disabled={isLinkedToCabinet}
-                        step="any"
+                        step="0.1"
                       />
                       <span className="unit-badge">{getUnitLabel('volume', unitSystem)}</span>
                     </div>
@@ -1938,10 +1970,10 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                             <div className="input-wrapper">
                               <input
                                 type="number"
-                                value={portDiameter}
-                                onChange={(e) => setPortDiameter(e.target.value === '' ? '' : Math.max(0.1, parseFloat(e.target.value) || 0))}
+                                value={displayVal(portDiameter, 'length')}
+                                onChange={(e) => handleInputChange(e.target.value, setPortDiameter, 'length')}
                                 step="0.1"
-                                min={1}
+                                min={0.01}
                               />
                               <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                             </div>
@@ -1973,10 +2005,10 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                             <div className="input-wrapper">
                               <input
                                   type="number"
-                                  value={portWidth}
-                                  onChange={(e) => setPortWidth(e.target.value === '' ? '' : Math.max(0.1, parseFloat(e.target.value) || 0))}
+                                  value={displayVal(portWidth, 'length')}
+                                  onChange={(e) => handleInputChange(e.target.value, setPortWidth, 'length')}
                                   step="0.1"
-                                  min={1}
+                                  min={0.01}
                               />
                               <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                             </div>
@@ -1986,10 +2018,10 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                             <div className="input-wrapper">
                               <input
                                   type="number"
-                                  value={portHeight}
-                                  onChange={(e) => setPortHeight(e.target.value === '' ? '' : Math.max(0.1, parseFloat(e.target.value) || 0))}
+                                  value={displayVal(portHeight, 'length')}
+                                  onChange={(e) => handleInputChange(e.target.value, setPortHeight, 'length')}
                                   step="0.1"
-                                  min={1}
+                                  min={0.01}
                               />
                               <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                             </div>
@@ -2283,15 +2315,25 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       <div className="input-group">
                         <label>{t("Diámetro PR")}</label>
                         <div className="input-wrapper">
-                          <input type="number" value={prDia} onChange={(e) => setPrDia(parseFloat(e.target.value) || 0)} step="any" />
+                          <input
+                            type="number"
+                            value={displayVal(prDia, 'length')}
+                            onChange={(e) => handleInputChange(e.target.value, (v) => setPrDia(typeof v === 'number' ? v : 0), 'length')}
+                            step="0.1"
+                          />
                           <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                         </div>
                       </div>
                       <div className="input-group">
                         <label>{t("Vas PR")}</label>
                         <div className="input-wrapper">
-                          <input type="number" value={prVas} onChange={(e) => setPrVas(parseFloat(e.target.value) || 0)} step="0.1" />
-                          <span className="unit-badge">L</span>
+                          <input
+                            type="number"
+                            value={displayVal(prVas, 'volume')}
+                            onChange={(e) => handleInputChange(e.target.value, (v) => setPrVas(typeof v === 'number' ? v : 0), 'volume')}
+                            step="0.1"
+                          />
+                          <span className="unit-badge">{getUnitLabel('volume', unitSystem)}</span>
                         </div>
                       </div>
                     </div>
@@ -2306,7 +2348,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       <div className="input-group">
                         <label>{t("Mms PR (g)")}</label>
                         <div className="input-wrapper">
-                          <input type="number" value={prMms} onChange={(e) => setPrMms(parseFloat(e.target.value) || 0)} step="any" />
+                          <input type="number" value={prMms} onChange={(e) => setPrMms(parseFloat(e.target.value) || 0)} step="0.1" />
                         </div>
                       </div>
                     </div>
