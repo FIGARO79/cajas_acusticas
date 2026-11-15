@@ -12,6 +12,7 @@ import { estimateF3, calcPortLength, getKCorrection, calcOptimalPortForSpeaker, 
 import { getWasm, calcRadiadorPasivo, calcVolumenNetoMadera } from './wasm/index.ts';
 import { generateReportHTML } from './utils/reportGenerator';
 import { StatusBar } from './components/StatusBar';
+import { DriverDatabaseModal } from './components/DriverDatabaseModal';
 
 interface AppProps {
   wasmError?: string | null;
@@ -70,16 +71,20 @@ function App({ wasmError }: AppProps) {
   const [bandpassS, setBandpassS] = useState<number>(0.707);
   const [bandpassA, setBandpassA] = useState<number>(2.0);
 
-  // Panel widths (resizable splitters)
-  const [speakerPanelWidth, setSpeakerPanelWidth] = useState<number>(() => {
-    const saved = Number(localStorage.getItem('aclab_speaker_panel_w'));
-    return Number.isFinite(saved) && saved >= 280 && saved <= 540 ? saved : 360;
+  // Sidebar layout (VS Code / FreeCAD Combo View collapsible & resizable sections)
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    const saved = Number(localStorage.getItem('aclab_sidebar_w'));
+    return Number.isFinite(saved) && saved >= 300 && saved <= 620 ? saved : 380;
   });
-  const [boxPanelWidth, setBoxPanelWidth] = useState<number>(() => {
-    const saved = Number(localStorage.getItem('aclab_box_panel_w'));
-    return Number.isFinite(saved) && saved >= 280 && saved <= 540 ? saved : 360;
+  const [speakerCollapsed, setSpeakerCollapsed] = useState<boolean>(false);
+  const [boxCollapsed, setBoxCollapsed] = useState<boolean>(false);
+  const [speakerSplitRatio, setSpeakerSplitRatio] = useState<number>(() => {
+    const saved = Number(localStorage.getItem('aclab_sidebar_split'));
+    return Number.isFinite(saved) && saved >= 0.2 && saved <= 0.8 ? saved : 0.48;
   });
-  const [activeResizer, setActiveResizer] = useState<'speaker' | 'box' | null>(null);
+  const [activeResizer, setActiveResizer] = useState<'sidebar' | 'split' | null>(null);
+  const [isDriverDbOpen, setIsDriverDbOpen] = useState<boolean>(false);
 
   // Altavoces personalizados guardados en localStorage (con Eminence Alpha-10A completo por defecto)
   const [customDrivers, setCustomDrivers] = useState<CustomDriver[]>(() => {
@@ -971,22 +976,18 @@ function App({ wasmError }: AppProps) {
     e.preventDefault();
   };
 
-  const startPanelResize = (panel: 'speaker' | 'box', e: React.MouseEvent<HTMLDivElement>) => {
+  const startSidebarResize = (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
     const startX = e.clientX;
-    const startWidth = panel === 'speaker' ? speakerPanelWidth : boxPanelWidth;
+    const startWidth = sidebarWidth;
     let latestWidth = startWidth;
-    setActiveResizer(panel);
+    setActiveResizer('sidebar');
     document.body.style.cursor = 'col-resize';
 
     const onMouseMove = (moveEvent: MouseEvent) => {
-      const next = Math.min(540, Math.max(280, Math.round(startWidth + (moveEvent.clientX - startX))));
+      const next = Math.min(620, Math.max(300, Math.round(startWidth + (moveEvent.clientX - startX))));
       latestWidth = next;
-      if (panel === 'speaker') {
-        setSpeakerPanelWidth(next);
-      } else {
-        setBoxPanelWidth(next);
-      }
+      setSidebarWidth(next);
     };
 
     const onMouseUp = () => {
@@ -994,25 +995,65 @@ function App({ wasmError }: AppProps) {
       window.removeEventListener('mouseup', onMouseUp);
       document.body.style.cursor = '';
       setActiveResizer(null);
-      localStorage.setItem(
-        panel === 'speaker' ? 'aclab_speaker_panel_w' : 'aclab_box_panel_w',
-        String(latestWidth)
-      );
+      localStorage.setItem('aclab_sidebar_w', String(latestWidth));
     };
 
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', onMouseUp);
   };
 
-  const resetPanelWidth = (panel: 'speaker' | 'box') => {
-    if (panel === 'speaker') {
-      setSpeakerPanelWidth(360);
-      localStorage.setItem('aclab_speaker_panel_w', '360');
-    } else {
-      setBoxPanelWidth(360);
-      localStorage.setItem('aclab_box_panel_w', '360');
-    }
+  const resetSidebarWidth = () => {
+    setSidebarWidth(380);
+    localStorage.setItem('aclab_sidebar_w', '380');
   };
+
+  const startSectionSplitResize = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const container = sidebarRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const usableHeight = Math.max(100, rect.height - 54);
+    const startY = e.clientY;
+    const startRatio = speakerSplitRatio;
+    let latestRatio = startRatio;
+    setActiveResizer('split');
+    document.body.style.cursor = 'row-resize';
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const deltaRatio = (moveEvent.clientY - startY) / usableHeight;
+      const next = Math.min(0.8, Math.max(0.2, Number((startRatio + deltaRatio).toFixed(3))));
+      latestRatio = next;
+      setSpeakerSplitRatio(next);
+    };
+
+    const onMouseUp = () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+      setActiveResizer(null);
+      localStorage.setItem('aclab_sidebar_split', String(latestRatio));
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  };
+
+  const resetSectionSplit = () => {
+    setSpeakerSplitRatio(0.48);
+    localStorage.setItem('aclab_sidebar_split', '0.48');
+  };
+
+  const speakerPanelStyle: React.CSSProperties | undefined = speakerCollapsed
+    ? undefined
+    : boxCollapsed
+      ? { flex: '1 1 0' }
+      : { flex: `${speakerSplitRatio} 1 0` };
+
+  const boxPanelStyle: React.CSSProperties | undefined = boxCollapsed
+    ? undefined
+    : speakerCollapsed
+      ? { flex: '1 1 0' }
+      : { flex: `${1 - speakerSplitRatio} 1 0` };
 
   return (
     <div className="container" onClick={handleContainerClick} onContextMenu={handleContainerContextMenu}>
@@ -1033,16 +1074,17 @@ function App({ wasmError }: AppProps) {
         onSaveProject={handleSaveProject}
         onLoadProject={handleLoadProject}
         onNewProject={handleNewProject}
+        onOpenDriverDatabase={() => setIsDriverDbOpen(true)}
       />
 
       <div
         className="dashboard-grid"
         style={{
-          '--speaker-col-w': `${speakerPanelWidth}px`,
-          '--box-col-w': `${boxPanelWidth}px`,
+          '--sidebar-col-w': `${sidebarWidth}px`,
         } as React.CSSProperties}
       >
-        {/* PARÁMETROS IZQUIERDA */}
+        <div className="cad-left-sidebar" ref={sidebarRef}>
+        {/* SECCIÓN SUPERIOR: PARÁMETROS DEL DRIVER */}
         <SpeakerParamsForm 
           lang={lang}
           unitSystem={unitSystem}
@@ -1065,18 +1107,23 @@ function App({ wasmError }: AppProps) {
           setMidQts={setMidQts}
           midTargetQtc={midTargetQtc}
           setMidTargetQtc={setMidTargetQtc}
+          isCollapsed={speakerCollapsed}
+          onToggleCollapse={() => setSpeakerCollapsed((prev) => !prev)}
+          panelStyle={speakerPanelStyle}
         />
 
-        <div
-          className={`panel-resizer${activeResizer === 'speaker' ? ' active' : ''}`}
-          onMouseDown={(e) => startPanelResize('speaker', e)}
-          onDoubleClick={() => resetPanelWidth('speaker')}
-          title={lang === 'es' ? 'Arrastra para redimensionar (doble clic para restablecer 360px)' : 'Drag to resize (double-click to reset 360px)'}
-          role="separator"
-          aria-orientation="vertical"
-        />
+        {!speakerCollapsed && !boxCollapsed && (
+          <div
+            className={`sidebar-section-resizer${activeResizer === 'split' ? ' active' : ''}`}
+            onMouseDown={startSectionSplitResize}
+            onDoubleClick={resetSectionSplit}
+            title={lang === 'es' ? 'Arrastra para ajustar altura (doble clic para restablecer)' : 'Drag to resize height (double-click to reset)'}
+            role="separator"
+            aria-orientation="horizontal"
+          />
+        )}
 
-        {/* PARÁMETROS CENTRO: CAJA DE DISEÑO */}
+        {/* SECCIÓN INFERIOR: CAJA DE DISEÑO */}
         <BoxParamsForm
           lang={lang}
           unitSystem={unitSystem}
@@ -1241,13 +1288,17 @@ function App({ wasmError }: AppProps) {
           setMidCabinetDepth={setMidCabinetDepth}
           midSealed={midSealed}
           setMidSealed={setMidSealed}
+          isCollapsed={boxCollapsed}
+          onToggleCollapse={() => setBoxCollapsed((prev) => !prev)}
+          panelStyle={boxPanelStyle}
         />
+        </div>
 
         <div
-          className={`panel-resizer${activeResizer === 'box' ? ' active' : ''}`}
-          onMouseDown={(e) => startPanelResize('box', e)}
-          onDoubleClick={() => resetPanelWidth('box')}
-          title={lang === 'es' ? 'Arrastra para redimensionar (doble clic para restablecer 360px)' : 'Drag to resize (double-click to reset 360px)'}
+          className={`panel-resizer${activeResizer === 'sidebar' ? ' active' : ''}`}
+          onMouseDown={startSidebarResize}
+          onDoubleClick={resetSidebarWidth}
+          title={lang === 'es' ? 'Arrastra para redimensionar panel lateral (doble clic para restablecer 380px)' : 'Drag to resize sidebar (double-click to reset 380px)'}
           role="separator"
           aria-orientation="vertical"
         />
@@ -1459,6 +1510,17 @@ function App({ wasmError }: AppProps) {
         xmax={deferredAdjParams.xmax}
         portVelocity={currentPortVelocity}
         onExportReport={handleExportReport}
+      />
+
+      <DriverDatabaseModal
+        isOpen={isDriverDbOpen}
+        onClose={() => setIsDriverDbOpen(false)}
+        lang={lang}
+        customDrivers={customDrivers}
+        onCustomDriversChange={handleCustomDriversChange}
+        activePresetId={preset}
+        currentParams={params}
+        onLoadDriver={(id, nextParams) => handlePresetChange(id, nextParams)}
       />
     </div>
   );

@@ -1,51 +1,51 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 :root {
-  /* Engineering Matte CAD Palette */
-  --cad-titlebar-bg: #14161a;
-  --cad-menubar-bg: #1a1d23;
-  --cad-toolstrip-bg: #1e2229;
-  --cad-panel-header-bg: #222630;
+  /* FreeCAD / Qt Fusion Dark Workstation Palette */
+  --cad-titlebar-bg: #2f2f2f;
+  --cad-menubar-bg: #363636;
+  --cad-toolstrip-bg: #3b3b3b;
+  --cad-panel-header-bg: #404040;
 
-  --bg-main: #121418;
-  --bg-secondary: #181b22;
-  --bg-tertiary: #20242d;
-  --card-bg: #181b22;
-  --card-border: #282d37;
-  --card-border-hover: #3d4452;
-  --card-border-active: #0ea5e9;
+  --bg-main: #2b2b2b;
+  --bg-secondary: #333333;
+  --bg-tertiary: #3c3c3c;
+  --card-bg: #333333;
+  --card-border: #232323;
+  --card-border-hover: #4e4e4e;
+  --card-border-active: #528bc5;
 
-  --text-main: #e2e6ed;
-  --text-muted: #738094;
-  --text-secondary: #9da8b9;
+  --text-main: #e6e6e6;
+  --text-muted: #9e9e9e;
+  --text-secondary: #cccccc;
 
-  --primary: #0284c7;
-  --primary-gradient: linear-gradient(135deg, #0284c7, #38bdf8);
+  --primary: #3874b4;
+  --primary-gradient: linear-gradient(to bottom, #4886c8, #356ca8);
   --primary-glow: transparent;
-  --accent: #f59e0b;
+  --accent: #528bc5;
 
-  --sealed-color: #0284c7;
-  --sealed-glow: rgba(2, 132, 199, 0.1);
-  --ported-color: #10b981;
-  --ported-glow: rgba(16, 185, 129, 0.1);
+  --sealed-color: #4b8bbe;
+  --sealed-glow: rgba(75, 139, 190, 0.12);
+  --ported-color: #3da67a;
+  --ported-glow: rgba(61, 166, 122, 0.12);
 
-  --danger: #ef4444;
-  --danger-bg: rgba(239, 68, 68, 0.12);
-  --warning: #f59e0b;
-  --warning-bg: rgba(245, 158, 11, 0.12);
-  --success: #10b981;
-  --success-bg: rgba(16, 185, 129, 0.12);
+  --danger: #d9534f;
+  --danger-bg: rgba(217, 83, 79, 0.12);
+  --warning: #d99b26;
+  --warning-bg: rgba(217, 155, 38, 0.12);
+  --success: #3da67a;
+  --success-bg: rgba(61, 166, 122, 0.12);
 
-  --input-bg: #101216;
-  --input-border: #2c323e;
-  --input-focus: #0ea5e9;
+  --input-bg: #232323;
+  --input-border: #4a4a4a;
+  --input-focus: #528bc5;
 
-  --font-display: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  --font-display: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', 'Consolas', 'Menlo', 'Monaco', monospace;
 
-  --scrollbar-thumb: #2d3340;
-  --scrollbar-thumb-hover: #434c5e;
+  --scrollbar-thumb: #525252;
+  --scrollbar-thumb-hover: #6a6a6a;
 }
 
 /* RESET & BASE STYLES */
@@ -233,7 +233,7 @@ select.preset-select:focus {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: var(--speaker-col-w, 360px) 4px var(--box-col-w, 360px) 4px minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-col-w, 380px) 4px minmax(0, 1fr);
   grid-template-rows: 1fr;
   flex: 1;
   min-height: 0;
@@ -241,6 +241,93 @@ select.preset-select:focus {
   overflow: hidden;
   gap: 0;
   background: var(--bg-main);
+}
+
+.cad-left-sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg-secondary);
+  --text-main: #000000;
+  --text-muted: #000000;
+  --text-secondary: #000000;
+  color: #000000;
+}
+
+.cad-left-sidebar label,
+.cad-left-sidebar .label-desc,
+.cad-left-sidebar .form-subsection-title,
+.cad-left-sidebar .unit-badge,
+.cad-left-sidebar .cad-dock-title,
+.cad-left-sidebar .cad-dock-tag,
+.cad-left-sidebar .cad-dock-icon,
+.cad-left-sidebar .cad-dock-chevron,
+.cad-left-sidebar .ebp-meter-title,
+.cad-left-sidebar .ebp-meter-val,
+.cad-left-sidebar .ebp-meter-chip,
+.cad-left-sidebar .ebp-meter-labels,
+.cad-left-sidebar .ebp-meter-footer,
+.cad-left-sidebar .chuffing-badge,
+.cad-left-sidebar .segmented-control button:not(.active),
+.cad-left-sidebar input,
+.cad-left-sidebar select,
+.cad-left-sidebar textarea {
+  color: #000000 !important;
+  opacity: 1 !important;
+}
+
+.cad-left-sidebar input::placeholder {
+  color: #404040 !important;
+  opacity: 1 !important;
+}
+
+.cad-left-sidebar label,
+.cad-left-sidebar .label-desc,
+.cad-left-sidebar .unit-badge,
+.cad-left-sidebar .cad-dock-tag,
+.cad-left-sidebar .ebp-meter-chip,
+.cad-left-sidebar .segmented-control button:not(.active),
+.cad-left-sidebar input,
+.cad-left-sidebar select,
+.cad-left-sidebar textarea {
+  font-weight: 400 !important;
+}
+
+.cad-left-sidebar .form-subsection-title,
+.cad-left-sidebar .cad-dock-title,
+.cad-left-sidebar .ebp-meter-title,
+.cad-left-sidebar .ebp-meter-val,
+.cad-left-sidebar .segmented-control button.active,
+.cad-left-sidebar strong {
+  font-weight: 500 !important;
+}
+
+.sidebar-section-resizer {
+  height: 4px;
+  flex: 0 0 4px;
+  cursor: row-resize;
+  background: var(--card-border);
+  position: relative;
+  z-index: 15;
+  transition: background-color 0.15s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.sidebar-section-resizer::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -2px;
+  bottom: -2px;
+}
+
+.sidebar-section-resizer:hover,
+.sidebar-section-resizer.active {
+  background: #3874b4;
 }
 
 .panel-resizer {
@@ -265,7 +352,7 @@ select.preset-select:focus {
 
 .panel-resizer:hover,
 .panel-resizer.active {
-  background: var(--accent-blue, #38bdf8);
+  background: #528bc5;
 }
 
 @media (max-width: 1023px) {
@@ -447,13 +534,23 @@ select.input-select {
   background: var(--input-bg);
   border: 1px solid var(--input-border);
   color: var(--text-main);
-  padding: 0.3rem 2rem 0.3rem 0.55rem;
+  padding: 0.3rem 0.6rem;
   border-radius: 0;
   font-family: var(--font-mono);
   font-size: 0.8rem;
   outline: none;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: none;
+}
+
+input[type="number"] {
+  padding-right: 1.8rem;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  opacity: 1;
+  cursor: pointer;
 }
 
 select.input-select {
@@ -491,6 +588,46 @@ select.input-select:focus {
 
 .unit-badge:hover {
   color: var(--primary);
+}
+
+.input-wrapper:has(> input[type="number"]),
+.input-wrapper:has(> input[type="text"]) {
+  display: flex;
+  align-items: stretch;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  transition: border-color 0.15s ease;
+}
+
+.input-wrapper:has(> input[type="number"]):focus-within,
+.input-wrapper:has(> input[type="text"]):focus-within {
+  border-color: var(--input-focus);
+}
+
+.input-wrapper:has(> input[type="number"]) > input[type="number"],
+.input-wrapper:has(> input[type="text"]) > input[type="text"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none !important;
+  background: transparent !important;
+  padding: 0.28rem 0.25rem 0.28rem 0.5rem !important;
+  box-shadow: none !important;
+}
+
+.input-wrapper:has(> input[type="number"]) > .unit-badge,
+.input-wrapper:has(> input[type="text"]) > .unit-badge {
+  position: static !important;
+  order: -1;
+  flex: 0 0 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-tertiary);
+  border-right: 1px solid var(--input-border);
+  color: var(--text-muted);
+  font-size: 0.68rem !important;
+  padding: 0 4px;
+  white-space: nowrap;
 }
 
 /* Error/Warnings Area */
@@ -1657,10 +1794,10 @@ html textarea:focus {
   top: 100%;
   left: 0;
   min-width: 240px;
-  background: #1a1d24;
-  border: 1px solid #333a47;
+  background: #363636;
+  border: 1px solid #4e4e4e;
   border-radius: 2px;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.85);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
   z-index: 9999999 !important;
   padding: 3px 0;
 }
@@ -1683,7 +1820,7 @@ html textarea:focus {
 }
 
 .cad-menu-option:hover {
-  background: #0284c7;
+  background: #3874b4;
   color: #ffffff;
 }
 
@@ -1691,7 +1828,7 @@ html textarea:focus {
   position: absolute;
   left: 7px;
   font-size: 0.7rem;
-  color: #38bdf8;
+  color: #7ab3ef;
   font-weight: bold;
 }
 
@@ -2029,10 +2166,10 @@ html .cad-menu-option:hover {
   position: sticky;
   top: 0;
   z-index: 20;
-  height: 27px;
-  min-height: 27px;
-  background: var(--cad-panel-header-bg);
-  border-bottom: 1px solid var(--card-border);
+  height: 25px;
+  min-height: 25px;
+  background: linear-gradient(to bottom, #e6e9ef, #d9dee6);
+  border-bottom: 1px solid #c5cbd4;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2042,20 +2179,38 @@ html .cad-menu-option:hover {
   margin-bottom: 0.4rem;
 }
 
+.cad-dock-header.collapsible {
+  cursor: pointer;
+}
+
+.cad-dock-header.collapsible:hover {
+  background: linear-gradient(to bottom, #dce1ea, #cfd6e1);
+}
+
+.cad-dock-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  font-size: 0.72rem;
+  color: #334155;
+  transition: transform 0.12s ease;
+}
+
 .cad-dock-title {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0.05em;
-  color: var(--text-main);
+  letter-spacing: 0.04em;
+  color: #1e293b;
   text-transform: uppercase;
   font-family: var(--font-sans);
 }
 
 .cad-dock-icon {
-  color: #38bdf8;
+  color: #475569;
   font-size: 0.78rem;
   font-weight: bold;
 }
@@ -2087,8 +2242,6 @@ html .cad-menu-option:hover {
 .speaker-panel,
 .box-design-panel,
 .dashboard-grid > aside.panel {
-  height: 100% !important;
-  max-height: 100% !important;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -2096,9 +2249,23 @@ html .cad-menu-option:hover {
   padding: 0 !important;
   background: var(--bg-secondary) !important;
   border: none !important;
-  border-right: 1px solid var(--card-border) !important;
   border-radius: 0 !important;
   box-shadow: none !important;
+}
+
+.speaker-panel.is-collapsed,
+.box-design-panel.is-collapsed {
+  flex: 0 0 auto !important;
+  height: auto !important;
+}
+
+.speaker-panel.is-collapsed > .panel-scroll-body,
+.box-design-panel.is-collapsed > .panel-scroll-body {
+  display: none;
+}
+
+.cad-left-sidebar > .box-design-panel > .cad-dock-header {
+  border-top: 1px solid #c5cbd4;
 }
 
 .panel-scroll-body {
@@ -2145,7 +2312,7 @@ html .cad-menu-option:hover {
 }
 
 .box-design-panel {
-  background: #14171d !important;
+  background: var(--bg-secondary) !important;
 }
 
 .dashboard-main {
@@ -2169,7 +2336,7 @@ html .cad-menu-option:hover {
   flex-shrink: 0;
   height: auto;
   padding: 0 0.65rem 0.4rem 0.65rem !important;
-  background: #0f1115 !important;
+  background: #282828 !important;
   border-bottom: 1px solid var(--card-border) !important;
 }
 
@@ -2291,24 +2458,26 @@ html .cad-quad-tile-btn:hover {
   border-top: 1px solid var(--card-border) !important;
 }
 
-/* Light Theme Support for CAD Suite */
+/* Light Theme Support for CAD Suite (FreeCAD Qt Fusion Light) */
 :root {
-  --cad-titlebar-bg: #e2e5eb;
-  --cad-menubar-bg: #edeff3;
-  --cad-toolstrip-bg: #f4f5f8;
-  --cad-panel-header-bg: #e5e8ee;
-  --bg-main: #f0f2f6;
+  --cad-titlebar-bg: #dce0e6;
+  --cad-menubar-bg: #e4e7ec;
+  --cad-toolstrip-bg: #eef0f4;
+  --cad-panel-header-bg: #dfe3ea;
+  --bg-main: #eef0f4;
   --bg-secondary: #ffffff;
-  --bg-tertiary: #e8ecf2;
+  --bg-tertiary: #e4e7ec;
   --card-bg: #ffffff;
-  --card-border: #d0d5dd;
+  --card-border: #c9cfd8;
   --card-border-hover: #98a2b3;
-  --text-main: #101828;
-  --text-muted: #667085;
-  --text-secondary: #475467;
+  --text-main: #1e293b;
+  --text-muted: #5b6676;
+  --text-secondary: #334155;
+  --primary: #3874b4;
+  --accent: #3874b4;
   --input-bg: #ffffff;
-  --input-border: #d0d5dd;
-  --input-focus: #0284c7;
+  --input-border: #c5cbd4;
+  --input-focus: #3874b4;
 }
 
 html .cad-window-titlebar {
@@ -2698,18 +2867,16 @@ button,
    ESTILO DE CONTROLES SEGMENTADOS COMO DESLIZADORES INDUSTRIALES (FADERS)
    ========================================================================== */
 
-/* Contenedor de control segmentado (Pista/Canal del Fader) */
+/* Contenedor de control segmentado (Estilo Qt Fusion / FreeCAD) */
 .segmented-control {
   position: relative !important;
   display: flex !important;
-  background: linear-gradient(to bottom, #090b0e, #14171f) !important;
-  border: 1px solid #2a313e !important;
-  border-radius: 4px !important;
+  background: #e4e7ec !important;
+  border: 1px solid #c5cbd4 !important;
+  border-radius: 2px !important;
   padding: 2px !important;
-  gap: 3px !important;
-  box-shadow: 
-    inset 0 2px 4px rgba(0, 0, 0, 0.85), 
-    0 1px 0 rgba(255, 255, 255, 0.05) !important;
+  gap: 2px !important;
+  box-shadow: none !important;
   align-items: center !important;
   overflow: hidden !important;
   min-height: 26px !important;
@@ -2722,7 +2889,7 @@ button,
   display: none !important;
 }
 
-/* Opciones/Botones inactivos (Serigrafiados en el panel) */
+/* Opciones/Botones inactivos */
 .segmented-control button:not(.active) {
   position: relative !important;
   z-index: 1 !important;
@@ -2731,15 +2898,15 @@ button,
   margin: 0 !important;
   background: transparent !important;
   border: 1px solid transparent !important;
-  color: #94a3b8 !important;
-  font-family: var(--font-sans), sans-serif !important;
-  font-size: 0.7rem !important;
-  font-weight: 700 !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.04em !important;
+  color: #334155 !important;
+  font-family: var(--font-sans) !important;
+  font-size: 0.72rem !important;
+  font-weight: 500 !important;
+  text-transform: none !important;
+  letter-spacing: 0.01em !important;
   box-shadow: none !important;
-  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.6) !important;
-  transition: color 0.15s ease, background 0.15s ease !important;
+  text-shadow: none !important;
+  transition: color 0.12s ease, background 0.12s ease !important;
   cursor: pointer !important;
   display: inline-flex !important;
   align-items: center !important;
@@ -2751,32 +2918,29 @@ button,
 }
 
 .segmented-control button:not(.active):hover {
-  color: #f1f5f9 !important;
-  text-shadow: 0 0 3px rgba(255, 255, 255, 0.25) !important;
-  background: rgba(255, 255, 255, 0.04) !important;
+  color: #0f172a !important;
+  text-shadow: none !important;
+  background: rgba(56, 116, 180, 0.08) !important;
 }
 
-/* Perilla Deslizante Activa (Fader Cap) */
+/* Botón Activo (Qt Fusion / FreeCAD Steel Blue) */
 .segmented-control button.active {
   position: relative !important;
   z-index: 2 !important;
   flex: 1 1 auto !important;
   height: 20px !important;
   margin: 0 !important;
-  background: linear-gradient(to bottom, #ffffff 0%, #eef2f6 45%, #cbd5e1 55%, #f8fafc 100%) !important;
-  color: #0f172a !important; /* Texto oscuro nítido sobre la perilla de metal */
-  font-family: var(--font-sans), sans-serif !important;
-  font-size: 0.7rem !important;
-  font-weight: 800 !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.04em !important;
-  border: 1px solid #5a5f69 !important;
-  border-radius: 3px !important;
-  box-shadow: 
-    0 1px 2px rgba(0, 0, 0, 0.3), 
-    inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.2) !important;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.85) !important;
+  background: #3874b4 !important;
+  color: #ffffff !important;
+  font-family: var(--font-sans) !important;
+  font-size: 0.72rem !important;
+  font-weight: 600 !important;
+  text-transform: none !important;
+  letter-spacing: 0.01em !important;
+  border: 1px solid #2d5f96 !important;
+  border-radius: 2px !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+  text-shadow: none !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;

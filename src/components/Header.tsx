@@ -19,6 +19,7 @@ interface HeaderProps {
   onSaveProject?: () => void;
   onLoadProject?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onNewProject?: () => void;
+  onOpenDriverDatabase?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -38,6 +39,7 @@ export const Header: React.FC<HeaderProps> = ({
   onSaveProject,
   onLoadProject,
   onNewProject,
+  onOpenDriverDatabase,
 }) => {
   const t = (text: string) => translate(text, lang);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
@@ -158,6 +160,18 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
             {openMenu === 'edicion' && (
               <div className="cad-menu-dropdown" role="menu">
+                <button
+                  className="cad-menu-option"
+                  onClick={() => {
+                    onOpenDriverDatabase?.();
+                    closeMenu();
+                  }}
+                  type="button"
+                  role="menuitem"
+                >
+                  <span>{t("Base de Datos de Altavoces...")}</span>
+                </button>
+                <div className="cad-menu-separator" role="separator" />
                 <button
                   className="cad-menu-option"
                   onClick={() => {

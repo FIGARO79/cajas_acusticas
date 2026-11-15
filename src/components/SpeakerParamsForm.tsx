@@ -27,6 +27,10 @@ interface SpeakerParamsFormProps {
   setMidQts: (val: number) => void;
   midTargetQtc: number;
   setMidTargetQtc: (val: number) => void;
+
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
+  panelStyle?: React.CSSProperties;
 }
 
 const UNIT_TYPES: Record<string, 'volume' | 'volume_small' | 'length' | 'length_small' | 'area'> = {
@@ -65,6 +69,9 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
   setMidQts,
   midTargetQtc,
   setMidTargetQtc,
+  isCollapsed = false,
+  onToggleCollapse,
+  panelStyle,
 }) => {
   const t = (text: string) => translate(text, lang);
   const [proMode, setProMode] = useState(false);
@@ -514,10 +521,16 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
   };
 
   return (
-    <aside className="panel speaker-panel">
+    <aside className={`panel speaker-panel${isCollapsed ? ' is-collapsed' : ''}`} style={panelStyle}>
       {/* CAD Dock Header */}
-      <div className="cad-dock-header">
+      <div
+        className={`cad-dock-header${onToggleCollapse ? ' collapsible' : ''}`}
+        onClick={onToggleCollapse}
+        role={onToggleCollapse ? 'button' : undefined}
+        aria-expanded={!isCollapsed}
+      >
         <div className="cad-dock-title">
+          {onToggleCollapse && <span className="cad-dock-chevron">{isCollapsed ? '▸' : '▾'}</span>}
           <span className="cad-dock-icon">≡</span>
           <span>{t("TRANSDUCTOR THIELE-SMALL")}</span>
         </div>

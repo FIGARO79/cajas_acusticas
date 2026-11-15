@@ -180,6 +180,10 @@ interface BoxParamsFormProps {
   setMidCabinetDepth: (val: number | '') => void;
   midSealed?: boolean;
   setMidSealed?: (val: boolean) => void;
+
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
+  panelStyle?: React.CSSProperties;
 }
 
 export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
@@ -342,6 +346,9 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
   setMidCabinetDepth,
   midSealed = false,
   setMidSealed = () => {},
+  isCollapsed = false,
+  onToggleCollapse,
+  panelStyle,
 }) => {
   const t = (text: string) => translate(text, lang);
 
@@ -714,10 +721,16 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
   const ebpStatus = ebpValue === null ? 'none' : ebpValue < 50 ? 'sealed' : ebpValue > 90 ? 'ported' : 'hybrid';
 
   return (
-    <aside className="panel box-design-panel" style={{ borderLeft: 'none' }}>
+    <aside className={`panel box-design-panel${isCollapsed ? ' is-collapsed' : ''}`} style={{ borderLeft: 'none', ...panelStyle }}>
       {/* CAD Dock Header */}
-      <div className="cad-dock-header">
+      <div
+        className={`cad-dock-header${onToggleCollapse ? ' collapsible' : ''}`}
+        onClick={onToggleCollapse}
+        role={onToggleCollapse ? 'button' : undefined}
+        aria-expanded={!isCollapsed}
+      >
         <div className="cad-dock-title">
+          {onToggleCollapse && <span className="cad-dock-chevron">{isCollapsed ? '▸' : '▾'}</span>}
           <span className="cad-dock-icon">≡</span>
           <span>{t("CONFIGURACIÓN DE CAJA & FILTRO")}</span>
         </div>
