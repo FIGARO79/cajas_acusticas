@@ -1,6 +1,6 @@
 import React from 'react';
 import { type Lang, translate } from '../utils/translations';
-import { type UnitSystem } from '../utils/units';
+import { type UnitSystem, nextUnitSystem } from '../utils/units';
 
 interface StatusBarProps {
   lang: Lang;
@@ -126,7 +126,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
         <button
           type="button"
-          onClick={() => setUnitSystem(unitSystem === 'metric' ? 'imperial' : 'metric')}
+          onClick={() => setUnitSystem(nextUnitSystem(unitSystem))}
           style={{
             background: 'rgba(255, 255, 255, 0.04)',
             border: '1px solid var(--card-border)',
@@ -138,9 +138,9 @@ export const StatusBar: React.FC<StatusBarProps> = ({
             fontFamily: 'inherit',
             fontWeight: 500
           }}
-          title={t("Cambiar sistema de unidades métrico / imperial")}
+          title={t("Cambiar unidades: CM / MM / INCH")}
         >
-          {unitSystem === 'metric' ? 'MÉTRICO' : 'IMPERIAL'}
+          {unitSystem === 'metric' ? 'CM' : unitSystem === 'metric_mm' ? 'MM' : 'INCH'}
         </button>
 
         {onExportReport && (

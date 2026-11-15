@@ -1,4 +1,10 @@
-export type UnitSystem = 'metric' | 'imperial';
+export type UnitSystem = 'metric' | 'metric_mm' | 'imperial';
+
+export function nextUnitSystem(current: UnitSystem): UnitSystem {
+  if (current === 'metric') return 'metric_mm';
+  if (current === 'metric_mm') return 'imperial';
+  return 'metric';
+}
 
 // Conversion constants
 const LITERS_PER_FT3 = 28.3168466;
@@ -12,6 +18,9 @@ const CC_PER_CUIN = 16.387064;
  */
 export function convertTo(val: number, type: 'volume' | 'volume_small' | 'length' | 'length_small' | 'area', system: UnitSystem): number {
   if (system === 'metric') return val;
+  if (system === 'metric_mm') {
+    return type === 'length' ? val * 10 : val;
+  }
   switch (type) {
     case 'volume':
       return val / LITERS_PER_FT3;
@@ -33,6 +42,9 @@ export function convertTo(val: number, type: 'volume' | 'volume_small' | 'length
  */
 export function convertFrom(val: number, type: 'volume' | 'volume_small' | 'length' | 'length_small' | 'area', system: UnitSystem): number {
   if (system === 'metric') return val;
+  if (system === 'metric_mm') {
+    return type === 'length' ? val / 10 : val;
+  }
   switch (type) {
     case 'volume':
       return val * LITERS_PER_FT3;
@@ -58,6 +70,14 @@ export function getUnitLabel(type: 'volume' | 'volume_small' | 'length' | 'lengt
       case 'volume': return 'L';
       case 'volume_small': return 'cc';
       case 'length': return 'cm';
+      case 'length_small': return 'mm';
+      case 'area': return 'cm²';
+    }
+  } else if (system === 'metric_mm') {
+    switch (type) {
+      case 'volume': return 'L';
+      case 'volume_small': return 'cc';
+      case 'length': return 'mm';
       case 'length_small': return 'mm';
       case 'area': return 'cm²';
     }

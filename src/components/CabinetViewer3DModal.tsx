@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { type Lang, translate } from '../utils/translations';
@@ -7,7 +8,6 @@ import type { WoodCabinetData } from '../types';
 import { calculatePortSpacing } from '../utils/acousticMath';
 
 interface CabinetViewer3DModalProps {
-  theme?: 'dark' | 'light';
   isOpen: boolean;
   onClose: () => void;
   lang: Lang;
@@ -38,10 +38,11 @@ interface CabinetViewer3DModalProps {
   bandpassVf?: number;
   bandpassVr?: number;
   dampingType?: 'none' | 'light' | 'moderate' | 'heavy';
+  enableBracing?: boolean;
+  bracingCount?: number;
 }
 
 export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
-  theme = 'dark',
   isOpen,
   onClose,
   lang,
@@ -72,6 +73,8 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
   bandpassVf,
   bandpassVr,
   dampingType = 'none',
+  enableBracing = false,
+  bracingCount = 2,
 }) => {
   const t = (text: string) => translate(text, lang);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -81,29 +84,11 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
   const controlsRef = useRef<OrbitControls | null>(null);
   const animFrameIdRef = useRef<number | null>(null);
 
-  // Active theme detection
-  const [effectiveTheme, setEffectiveTheme] = useState<'dark' | 'light'>(theme);
-
-  useEffect(() => {
-    setEffectiveTheme(theme);
-  }, [theme]);
-
-  useEffect(() => {
-    const checkDomTheme = () => {
-      const domTheme = document.documentElement.getAttribute('data-theme') as 'dark' | 'light' | null;
-      if (domTheme) setEffectiveTheme(domTheme);
-    };
-    checkDomTheme();
-
-    const observer = new MutationObserver(checkDomTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-    return () => observer.disconnect();
-  }, []);
-
-  const isLight = effectiveTheme === 'light';
+  const isLight = true;
 
   // Group references for interactive explosion
   const panelsGroupRef = useRef<THREE.Group | null>(null);
+  const gridHelperRef = useRef<THREE.GridHelper | null>(null);
   const panelMeshesRef = useRef<{
     top?: THREE.Mesh;
     bottom?: THREE.Mesh;
@@ -189,6 +174,7 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
     if (meshes.rear) meshes.rear.position.z = -(dExt - thickness) / 2 - offset;
     if (meshes.front) meshes.front.position.z = (dExt - thickness) / 2 + offset;
     if (meshes.divider) meshes.divider.position.z = dividerBaseZRef.current + offset * 0.22;
+    if (gridHelperRef.current) gridHelperRef.current.position.y = -hExt / 2 - offset - 2;
 
     if (chambersRef.current.vr) chambersRef.current.vr.visible = explodedPct < 15;
     if (chambersRef.current.vf) chambersRef.current.vf.visible = explodedPct < 15;
@@ -263,7 +249,8 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
       isLight ? 0x0284c7 : 0x0284c7,
       isLight ? 0xcbd5e1 : 0x0f2a4a
     );
-    gridHelper.position.y = -hExt / 2 - 2;
+    gridHelper.position.y = -hExt / 2 - (explodedPct / 100) * (Math.max(wExt, hExt, dExt) * 0.45) - 2;
+    gridHelperRef.current = gridHelper;
     scene.add(gridHelper);
 
     // 7. Cabinet Geometry & Materials
@@ -1145,6 +1132,45 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
       }
     }
 
+    // Refuerzos Internos 3D (Window-Frame Bracing)
+    if (enableBracing && bracingCount > 0) {
+      const braceMat = getWoodMaterial();
+      const braceRim = Math.min(Math.max(thickness * 2.5, 4), Math.min(innerW, innerD) * 0.22);
+      for (let i = 0; i < bracingCount; i++) {
+        const frac = (i + 1) / (bracingCount + 1);
+        const braceY = innerH / 2 - innerH * frac;
+        const braceGroup = new THREE.Group();
+        braceGroup.position.set(0, braceY, 0);
+
+        // Front & Rear crossbars
+        const fbGeo = new THREE.BoxGeometry(innerW, thickness, braceRim);
+        const frontBar = new THREE.Mesh(fbGeo, braceMat);
+        frontBar.position.set(0, 0, innerD / 2 - braceRim / 2);
+        addEdgeLines(frontBar);
+        braceGroup.add(frontBar);
+
+        const rearBar = new THREE.Mesh(fbGeo, braceMat);
+        rearBar.position.set(0, 0, -innerD / 2 + braceRim / 2);
+        addEdgeLines(rearBar);
+        braceGroup.add(rearBar);
+
+        // Left & Right sidebars
+        const sideLen = Math.max(innerD - 2 * braceRim, 0.5);
+        const sbGeo = new THREE.BoxGeometry(braceRim, thickness, sideLen);
+        const leftBar = new THREE.Mesh(sbGeo, braceMat);
+        leftBar.position.set(-innerW / 2 + braceRim / 2, 0, 0);
+        addEdgeLines(leftBar);
+        braceGroup.add(leftBar);
+
+        const rightBar = new THREE.Mesh(sbGeo, braceMat);
+        rightBar.position.set(innerW / 2 - braceRim / 2, 0, 0);
+        addEdgeLines(rightBar);
+        braceGroup.add(rightBar);
+
+        panelsGroup.add(braceGroup);
+      }
+    }
+
     // Material de Amortiguamiento Acústico 3D (Damping) para Cajas Selladas y Ventiladas
     if (!isBandpass && dampingType !== 'none') {
       const liningThick = dampingType === 'light' ? 1.4 : dampingType === 'moderate' ? 2.2 : 3.0;
@@ -1261,6 +1287,8 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
     bandpassVf,
     bandpassVr,
     dampingType,
+    enableBracing,
+    bracingCount,
   ]);
 
   // Export Screenshot
@@ -1291,14 +1319,14 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
     ? Math.max(0, depthFrontVal - driverDepthCmVal)
     : Math.max(0, depthRearVal - driverDepthCmVal);
 
-  return (
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 9999,
+        zIndex: 10000000,
         background: isLight ? 'rgba(15, 23, 42, 0.65)' : 'rgba(2, 6, 17, 0.88)',
         backdropFilter: 'blur(10px)',
         display: 'flex',
@@ -1660,6 +1688,7 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

@@ -7,8 +7,6 @@ interface HeaderProps {
   setLang: (lang: Lang) => void;
   unitSystem: UnitSystem;
   setUnitSystem: (system: UnitSystem) => void;
-  theme: 'dark' | 'light';
-  toggleTheme: () => void;
   onExportReport?: () => void;
   workspaceView?: 'split' | 'simulation' | 'cabinet' | 'crossover';
   setWorkspaceView?: (view: 'split' | 'simulation' | 'cabinet' | 'crossover') => void;
@@ -28,8 +26,6 @@ export const Header: React.FC<HeaderProps> = ({
   setLang,
   unitSystem,
   setUnitSystem,
-  theme,
-  toggleTheme,
   onExportReport,
   workspaceView = 'split',
   setWorkspaceView,
@@ -74,7 +70,6 @@ export const Header: React.FC<HeaderProps> = ({
     if (window.confirm(t("¿Restablecer toda la configuración a los valores predeterminados?"))) {
       localStorage.removeItem('lang');
       localStorage.removeItem('unitSystem');
-      localStorage.removeItem('theme');
       window.location.reload();
     }
     closeMenu();
@@ -91,24 +86,9 @@ export const Header: React.FC<HeaderProps> = ({
         style={{ display: 'none' }}
       />
 
-      {/* BARRA ÚNICA CONSOLIDADA (34px) */}
+      {/* FILA 1: MENÚ DE OPCIONES ALINEADO A LA IZQUIERDA */}
       <div className="cad-bar-row">
-        {/* 1. Brand Logo */}
-        <div className="cad-brand-block">
-          <img
-            src="/app-icon.png"
-            alt=""
-            className="cad-app-icon"
-            width={16}
-            height={16}
-          />
-          <span className="cad-app-brand">AcousticLAB</span>
-          <span className="cad-app-sub">CAD</span>
-        </div>
-
-        <div className="cad-header-vdiv" />
-
-        {/* 2. Menús desplegables estándar */}
+        {/* 1. Menús desplegables estándar alineados a la izquierda */}
         <div className="cad-menubar-inline" ref={menuBarRef} role="menubar">
           {/* ARCHIVO */}
           <div className="cad-menu-item" role="none">
@@ -249,27 +229,6 @@ export const Header: React.FC<HeaderProps> = ({
                 >
                   {workspaceView === 'crossover' && <span className="cad-menu-check">✓</span>}
                   <span>{t("Crossover CAD Circuital")}</span>
-                </button>
-
-                <div className="cad-menu-separator" role="separator" />
-                <div className="cad-menu-section-label">{t("Apariencia")}</div>
-                <button
-                  className={`cad-menu-option ${theme === 'dark' ? 'checked' : ''}`}
-                  onClick={() => { if (theme !== 'dark') toggleTheme(); closeMenu(); }}
-                  type="button"
-                  role="menuitem"
-                >
-                  {theme === 'dark' && <span className="cad-menu-check">✓</span>}
-                  <span>{t("Modo Oscuro")}</span>
-                </button>
-                <button
-                  className={`cad-menu-option ${theme === 'light' ? 'checked' : ''}`}
-                  onClick={() => { if (theme !== 'light') toggleTheme(); closeMenu(); }}
-                  type="button"
-                  role="menuitem"
-                >
-                  {theme === 'light' && <span className="cad-menu-check">✓</span>}
-                  <span>{t("Modo Claro")}</span>
                 </button>
               </div>
             )}
@@ -427,7 +386,16 @@ export const Header: React.FC<HeaderProps> = ({
                   role="menuitem"
                 >
                   {unitSystem === 'metric' && <span className="cad-menu-check">✓</span>}
-                  <span>{t("Métrico (Litros, mm, cm)")}</span>
+                  <span>{t("Métrico (cm, mm, Litros)")}</span>
+                </button>
+                <button
+                  className={`cad-menu-option ${unitSystem === 'metric_mm' ? 'checked' : ''}`}
+                  onClick={() => { setUnitSystem('metric_mm'); closeMenu(); }}
+                  type="button"
+                  role="menuitem"
+                >
+                  {unitSystem === 'metric_mm' && <span className="cad-menu-check">✓</span>}
+                  <span>{t("Métrico (mm, Litros)")}</span>
                 </button>
                 <button
                   className={`cad-menu-option ${unitSystem === 'imperial' ? 'checked' : ''}`}
@@ -436,7 +404,7 @@ export const Header: React.FC<HeaderProps> = ({
                   role="menuitem"
                 >
                   {unitSystem === 'imperial' && <span className="cad-menu-check">✓</span>}
-                  <span>{t("Imperial (ft³, in)")}</span>
+                  <span>{t("Imperial (in, ft³)")}</span>
                 </button>
 
                 <div className="cad-menu-separator" role="separator" />
@@ -527,111 +495,18 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        <div className="cad-header-vdiv" />
-
-        {/* 3. Grupo Vistas CAD */}
-        <div className="cad-ribbon-group">
-          <span className="cad-ribbon-tag">{t("VISTA:")}</span>
-          <div className="cad-ribbon-tools">
-            <button
-              type="button"
-              className={`cad-tool-btn ${workspaceView === 'split' ? 'active' : ''}`}
-              onClick={() => setWorkspaceView?.('split')}
-              title={t("Estudio Completo Multi-Panel")}
-            >
-              {t("Estudio")}
-            </button>
-            <button
-              type="button"
-              className={`cad-tool-btn ${workspaceView === 'simulation' ? 'active' : ''}`}
-              onClick={() => setWorkspaceView?.('simulation')}
-              title={t("Simulación SPL/Z")}
-            >
-              {t("Simulación")}
-            </button>
-            <button
-              type="button"
-              className={`cad-tool-btn ${workspaceView === 'cabinet' ? 'active' : ''}`}
-              onClick={() => setWorkspaceView?.('cabinet')}
-              title={t("Gabinete 3D y Lista de Corte")}
-            >
-              {t("Gabinete 3D")}
-            </button>
-            <button
-              type="button"
-              className={`cad-tool-btn ${workspaceView === 'crossover' ? 'active' : ''}`}
-              onClick={() => setWorkspaceView?.('crossover')}
-              title={t("Crossover CAD Circuital")}
-            >
-              {t("Crossover")}
-            </button>
-          </div>
-        </div>
-
-        <div className="cad-header-vdiv" />
-
-        {/* 4. Acciones rápidas (Reporte / Guardar) */}
-        <div className="cad-ribbon-group">
-          <button
-            type="button"
-            className="cad-tool-btn cad-btn-action"
-            onClick={() => onExportReport?.()}
-            title={t("Generar y Exportar Reporte Técnico de Ingeniería (PDF)")}
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-              <line x1="16" y1="13" x2="8" y2="13" />
-              <line x1="16" y1="17" x2="8" y2="17" />
-            </svg>
-            <span>{t("PDF")}</span>
-          </button>
-          <button
-            type="button"
-            className="cad-tool-btn cad-btn-action"
-            onClick={() => onSaveProject?.()}
-            title={t("Guardar Proyecto .aclab (Ctrl+S)")}
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-              <polyline points="17 21 17 13 7 13 7 21" />
-              <polyline points="7 3 7 8 15 8" />
-            </svg>
-            <span>{t("Guardar")}</span>
-          </button>
-        </div>
-
-        {/* 5. Lado Derecho: Controles de Ventana únicamente */}
+        {/* Lado Derecho: Marca */}
         <div className="cad-bar-right" style={{ marginLeft: 'auto' }}>
-          {/* Botones de control de ventana */}
-          <div className="cad-win-controls">
-            <button type="button" className="cad-win-btn win-min" title={t("Minimizar")} onClick={() => {}}>─</button>
-            <button
-              type="button"
-              className="cad-win-btn win-max"
-              title={t("Pantalla Completa")}
-              onClick={() => {
-                if (!document.fullscreenElement) {
-                  document.documentElement.requestFullscreen().catch(() => {});
-                } else {
-                  document.exitFullscreen().catch(() => {});
-                }
-              }}
-            >
-              □
-            </button>
-            <button
-              type="button"
-              className="cad-win-btn win-close"
-              title={t("Cerrar")}
-              onClick={() => {
-                if (window.confirm(t("¿Deseas cerrar AcousticLAB?"))) {
-                  window.close();
-                }
-              }}
-            >
-              ✕
-            </button>
+          <div className="cad-brand-block">
+            <img
+              src="/app-icon.png"
+              alt=""
+              className="cad-app-icon"
+              width={16}
+              height={16}
+            />
+            <span className="cad-app-brand">AcousticLAB</span>
+            <span className="cad-app-sub">CAD</span>
           </div>
         </div>
       </div>

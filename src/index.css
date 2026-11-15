@@ -224,7 +224,7 @@ select.preset-select:focus {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 320px 360px minmax(0, 1fr);
+  grid-template-columns: 360px 360px minmax(0, 1fr);
   grid-template-rows: 1fr;
   flex: 1;
   min-height: 0;
@@ -445,11 +445,18 @@ select.input-select:focus {
   right: 0.55rem;
   font-size: 0.65rem;
   color: #64748b;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
+  user-select: none;
   font-weight: 600;
   background: transparent;
   padding: 0;
   border: none;
+  transition: color 0.15s ease;
+}
+
+.unit-badge:hover {
+  color: var(--primary);
 }
 
 /* Error/Warnings Area */
@@ -1084,7 +1091,8 @@ input[type="range"]::-moz-range-thumb:hover {
 }
 
 /* LIGHT THEME DEFINITIONS */
-html[data-theme="light"] {
+:root {
+  color-scheme: light;
   --bg-gradient: radial-gradient(circle at top, #f8fafc 0%, #e2e8f0 100%);
   --card-bg: rgba(255, 255, 255, 0.75);
   --card-border: rgba(0, 0, 0, 0.18);
@@ -1104,178 +1112,170 @@ html[data-theme="light"] {
   background: #f1f5f9;
 }
 
-/* Theme toggle icon state changes */
-html[data-theme="light"] .sun-icon {
-  display: none;
-}
-html[data-theme="dark"] .moon-icon {
-  display: none;
-}
-
-html[data-theme="light"] input[type="number"]:focus,
-html[data-theme="light"] input[type="text"]:focus,
-html[data-theme="light"] select.input-select:focus {
+html input[type="number"]:focus,
+html input[type="text"]:focus,
+html select.input-select:focus {
   background-color: #ffffff;
   color: #0f172a;
 }
 
-html[data-theme="light"] .input-group:focus-within label {
+html .input-group:focus-within label {
   color: var(--primary);
 }
 
-html[data-theme="light"] .form-subsection-title {
+html .form-subsection-title {
   color: var(--primary);
 }
 
-html[data-theme="light"] .custom-checkbox {
+html .custom-checkbox {
   border-color: rgba(0, 0, 0, 0.25);
   background-color: #ffffff;
 }
 
-html[data-theme="light"] .checkbox-container:hover .custom-checkbox {
+html .checkbox-container:hover .custom-checkbox {
   border-color: var(--primary);
 }
 
-html[data-theme="light"] .unit-badge {
+html .unit-badge {
   color: #334155;
 }
 
 /* High contrast light alerts */
-html[data-theme="light"] .alert-box.info {
+html .alert-box.info {
   background: rgba(14, 165, 233, 0.1);
   border: 1px solid rgba(14, 165, 233, 0.35);
   color: #0369a1;
 }
 
-html[data-theme="light"] .alert-box.warn {
+html .alert-box.warn {
   background: rgba(245, 158, 11, 0.08);
   border: 1px solid rgba(245, 158, 11, 0.35);
   color: #854d0e;
 }
 
-html[data-theme="light"] .alert-box.danger {
+html .alert-box.danger {
   background: rgba(239, 68, 68, 0.08);
   border: 1px solid rgba(239, 68, 68, 0.35);
   color: #991b1b;
 }
 
-html[data-theme="light"] .alert-box.success {
+html .alert-box.success {
   background: rgba(16, 185, 129, 0.08);
   border: 1px solid rgba(16, 185, 129, 0.35);
   color: #065f46;
 }
 
 /* High contrast light EBP */
-html[data-theme="light"] .ebp-normal {
+html .ebp-normal {
   background: rgba(59, 130, 246, 0.12);
   border: 1px solid rgba(59, 130, 246, 0.35);
   color: #3730a3;
 }
 
-html[data-theme="light"] .ebp-sealed {
+html .ebp-sealed {
   background: rgba(14, 165, 233, 0.12);
   border: 1px solid rgba(14, 165, 233, 0.35);
   color: #0369a1;
 }
 
-html[data-theme="light"] .ebp-ported {
+html .ebp-ported {
   background: rgba(16, 185, 129, 0.12);
   border: 1px solid rgba(16, 185, 129, 0.35);
   color: #065f46;
 }
 
-html[data-theme="light"] h1 {
+html h1 {
   background: linear-gradient(to right, #0f172a 30%, #2563eb 100%);
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
-html[data-theme="light"] .top-bar-controls {
+html .top-bar-controls {
   background: rgba(255, 255, 255, 0.7);
   border: 1px solid rgba(0, 0, 0, 0.08);
   box-shadow: none;
 }
 
-html[data-theme="light"] .control-divider {
+html .control-divider {
   background: rgba(0, 0, 0, 0.1);
 }
 
-html[data-theme="light"] .theme-toggle-btn:hover {
+html .theme-toggle-btn:hover {
   background: rgba(0, 0, 0, 0.05);
 }
 
-html[data-theme="light"] .lang-btn:hover {
+html .lang-btn:hover {
   background: rgba(0, 0, 0, 0.03);
 }
 
-html[data-theme="light"] .wood-mode-selector-container {
+html .wood-mode-selector-container {
   background: rgba(255, 255, 255, 0.8);
   border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
-html[data-theme="light"] .wood-grid-controls {
+html .wood-grid-controls {
   background: rgba(255, 255, 255, 0.5);
   border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
-html[data-theme="light"] .preset-container {
+html .preset-container {
   background: rgba(255, 255, 255, 0.8);
   border: 1px solid rgba(0, 0, 0, 0.06);
   box-shadow: none;
 }
 
-html[data-theme="light"] select.preset-select {
+html select.preset-select {
   background: #ffffff;
   border: 1px solid rgba(0, 0, 0, 0.12);
   color: #0f172a;
 }
 
-html[data-theme="light"] .wood-table {
+html .wood-table {
   background: rgba(255, 255, 255, 0.5);
   border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
-html[data-theme="light"] .wood-table th {
+html .wood-table th {
   background: rgba(226, 232, 240, 0.8);
   color: #0f172a;
   border-bottom: 2px solid rgba(0, 0, 0, 0.08);
 }
 
-html[data-theme="light"] .wood-table td {
+html .wood-table td {
   border-top: 1px solid rgba(0, 0, 0, 0.05);
   color: #0f172a;
 }
 
-html[data-theme="light"] .info-footer {
+html .info-footer {
   background: rgba(255, 255, 255, 0.5);
   border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
-html[data-theme="light"] .tabs-header {
+html .tabs-header {
   border-bottom-color: rgba(0, 0, 0, 0.08);
 }
 
-html[data-theme="light"] .result-tile {
+html .result-tile {
   background: rgba(255, 255, 255, 0.5);
   border-color: rgba(0, 0, 0, 0.06);
   box-shadow: none;
 }
 
-html[data-theme="light"] .result-tile:hover {
+html .result-tile:hover {
   border-color: rgba(59, 130, 246, 0.3);
 }
 
-html[data-theme="light"] .control-group {
+html .control-group {
   background: rgba(255, 255, 255, 0.5);
   border-color: rgba(0, 0, 0, 0.06);
 }
 
-html[data-theme="light"] input[type="range"] {
+html input[type="range"] {
   background: #cbd5e1;
 }
 
-html[data-theme="light"] .tab-btn:hover {
+html .tab-btn:hover {
   background: rgba(0, 0, 0, 0.02);
 }
 
@@ -1332,20 +1332,20 @@ html[data-theme="light"] .tab-btn:hover {
   gap: 0;
 }
 
-html[data-theme="light"] .search-dropdown {
+html .search-dropdown {
   background-color: #ffffff;
   border-color: #e2e8f0;
   box-shadow: none;
   border-radius: 0;
 }
 
-html[data-theme="light"] .search-item {
+html .search-item {
   color: #0f172a;
   border-bottom-color: rgba(0, 0, 0, 0.05);
 }
 
-html[data-theme="light"] .search-item:hover,
-html[data-theme="light"] .search-item.active {
+html .search-item:hover,
+html .search-item.active {
   background-color: #1d4ed8;
   color: #ffffff;
 }
@@ -1408,46 +1408,30 @@ html[data-theme="light"] .search-item.active {
 
 /* Tema Claro */
 /* --- Light Theme --- */
-html[data-theme="light"] :root {
-  --bg-main: #ffffff;
-  --bg-secondary: #f5f5f5;
-  --bg-tertiary: #eeeeee;
-  --card-bg: #ffffff;
-  --card-border: #d0d0d0;
-  --card-border-hover: #b0b0b0;
-
-  --text-main: #333333;
-  --text-muted: #666666;
-  --text-secondary: #777777;
-
-  --scrollbar-thumb: rgba(174, 200, 219, 0.34);
-  --scrollbar-thumb-hover: rgba(66, 121, 163, 0.502);
-}
-
-html[data-theme="light"] body {
+html body {
   background: #f5f5f5;
 }
 
-html[data-theme="light"] .top-navbar {
+html .top-navbar {
   background: #f5f5f5;
   border-bottom-color: #d0d0d0;
 }
 
-html[data-theme="light"] .panel {
+html .panel {
   border-color: #d0d0d0;
 }
 
-html[data-theme="light"] input,
-html[data-theme="light"] select,
-html[data-theme="light"] textarea {
+html input,
+html select,
+html textarea {
   background: #f9f9f9;
   border-color: #d0d0d0;
   color: #333333;
 }
 
-html[data-theme="light"] input:focus,
-html[data-theme="light"] select:focus,
-html[data-theme="light"] textarea:focus {
+html input:focus,
+html select:focus,
+html textarea:focus {
   border-color: var(--input-focus);
 }
 /* ==========================================================================
@@ -1459,6 +1443,8 @@ html[data-theme="light"] textarea:focus {
   z-index: 99999 !important;
   display: flex;
   flex-direction: column;
+  align-items: stretch;
+  text-align: left;
   width: 100%;
   flex-shrink: 0;
   user-select: none;
@@ -1467,23 +1453,37 @@ html[data-theme="light"] textarea:focus {
   overflow: visible !important;
 }
 
-/* SOLIDWORKS-STYLE SINGLE CONSOLIDATED COMPACT CAD BAR (34px) */
+/* SOLIDWORKS-STYLE TWO-ROW CAD HEADER (MENUBAR + VIEWS TOOLBAR) */
 .cad-single-bar {
-  height: 34px;
-  min-height: 34px;
-  max-height: 34px;
+  height: auto;
   overflow: visible !important;
   position: relative;
   z-index: 99999;
 }
 
 .cad-bar-row {
-  height: 34px;
+  width: 100%;
+  box-sizing: border-box;
+  height: 30px;
   display: flex;
   align-items: center;
   padding: 0 0.5rem;
   gap: 5px;
   overflow: visible !important;
+}
+
+.cad-toolbar-row {
+  width: 100%;
+  box-sizing: border-box;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  padding: 0 0.5rem;
+  gap: 6px;
+  background: var(--cad-toolstrip-bg);
+  border-top: 1px solid var(--card-border);
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .cad-bar-right {
@@ -1914,75 +1914,75 @@ html[data-theme="light"] textarea:focus {
 }
 
 /* Light Theme Overrides */
-[data-theme="light"] .cad-desktop-header.cad-single-bar {
+html .cad-desktop-header.cad-single-bar {
   background: #f8fafc;
   border-bottom: 1px solid #cbd5e1;
 }
 
-[data-theme="light"] .cad-window-titlebar {
+html .cad-window-titlebar {
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 }
 
-[data-theme="light"] .cad-header-vdiv,
-[data-theme="light"] .cad-ribbon-vsep {
+html .cad-header-vdiv,
+html .cad-ribbon-vsep {
   background: rgba(0, 0, 0, 0.12);
 }
 
-[data-theme="light"] .cad-qat-btn:hover {
+html .cad-qat-btn:hover {
   background: rgba(0, 0, 0, 0.06);
   border-color: rgba(0, 0, 0, 0.12);
 }
 
-[data-theme="light"] .cad-menu-trigger:hover,
-[data-theme="light"] .cad-menu-trigger.active {
+html .cad-menu-trigger:hover,
+html .cad-menu-trigger.active {
   background: rgba(0, 0, 0, 0.06);
 }
 
-[data-theme="light"] .cad-doc-badge {
+html .cad-doc-badge {
   background: rgba(0, 0, 0, 0.04);
   border-color: rgba(0, 0, 0, 0.1);
   color: #475569;
 }
 
-[data-theme="light"] .cad-quick-pill-group {
+html .cad-quick-pill-group {
   background: #e2e8f0;
   border-color: #cbd5e1;
 }
 
-[data-theme="light"] .cad-quick-pill {
+html .cad-quick-pill {
   color: #64748b;
 }
 
-[data-theme="light"] .cad-tool-btn {
+html .cad-tool-btn {
   background: #ffffff;
   border-color: #cbd5e1;
   color: #334155;
 }
 
-[data-theme="light"] .cad-tool-btn:hover {
+html .cad-tool-btn:hover {
   background: #f1f5f9;
   border-color: #94a3b8;
   color: #0f172a;
 }
 
-[data-theme="light"] .cad-tool-btn.active {
+html .cad-tool-btn.active {
   background: #0284c7;
   color: #ffffff;
   border-color: #0284c7;
 }
 
-[data-theme="light"] .cad-menu-dropdown {
+html .cad-menu-dropdown {
   background: #ffffff;
   border-color: #cbd5e1;
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.22);
   z-index: 9999999 !important;
 }
 
-[data-theme="light"] .cad-menu-option {
+html .cad-menu-option {
   color: #1e293b;
 }
 
-[data-theme="light"] .cad-menu-option:hover {
+html .cad-menu-option:hover {
   background: #f1f5f9;
 }
 
@@ -2050,12 +2050,21 @@ html[data-theme="light"] textarea:focus {
   min-height: 0;
   overflow-y: auto !important;
   overflow-x: hidden !important;
-  scrollbar-gutter: stable;
   padding: 0.45rem 0.65rem 3.5rem 0.65rem !important;
   background: var(--bg-secondary) !important;
+  border: none !important;
   border-right: 1px solid var(--card-border) !important;
   border-radius: 0 !important;
   box-shadow: none !important;
+}
+
+.speaker-panel > .cad-dock-header,
+.box-design-panel > .cad-dock-header {
+  margin: -0.45rem -0.65rem 0.5rem -0.65rem;
+}
+
+.chart-card > .cad-dock-header {
+  margin: -0.4rem -0.65rem 0.45rem -0.65rem;
 }
 
 .box-design-panel {
@@ -2080,6 +2089,8 @@ html[data-theme="light"] textarea:focus {
 }
 
 .dashboard-main .panel.chart-card {
+  flex-shrink: 0;
+  height: auto;
   padding: 0.4rem 0.65rem !important;
   background: #0f1115 !important;
   border-bottom: 1px solid var(--card-border) !important;
@@ -2176,22 +2187,22 @@ html[data-theme="light"] textarea:focus {
   height: calc(100% - 22px);
 }
 
-html[data-theme="light"] .cad-quad-tile {
+html .cad-quad-tile {
   background: #ffffff;
   border-color: #cbd5e1;
 }
 
-html[data-theme="light"] .cad-quad-tile-header {
+html .cad-quad-tile-header {
   background: #f1f5f9;
   border-bottom-color: #cbd5e1;
 }
 
-html[data-theme="light"] .cad-quad-tile-btn {
+html .cad-quad-tile-btn {
   border-color: #cbd5e1;
   color: #475467;
 }
 
-html[data-theme="light"] .cad-quad-tile-btn:hover {
+html .cad-quad-tile-btn:hover {
   background: #e2e8f0;
   color: #0f172a;
 }
@@ -2204,7 +2215,7 @@ html[data-theme="light"] .cad-quad-tile-btn:hover {
 }
 
 /* Light Theme Support for CAD Suite */
-html[data-theme="light"] {
+:root {
   --cad-titlebar-bg: #e2e5eb;
   --cad-menubar-bg: #edeff3;
   --cad-toolstrip-bg: #f4f5f8;
@@ -2223,93 +2234,93 @@ html[data-theme="light"] {
   --input-focus: #0284c7;
 }
 
-html[data-theme="light"] .cad-window-titlebar {
+html .cad-window-titlebar {
   border-bottom-color: rgba(0, 0, 0, 0.08);
 }
 
-html[data-theme="light"] .cad-app-title {
+html .cad-app-title {
   color: #101828;
 }
 
-html[data-theme="light"] .cad-tool-btn {
+html .cad-tool-btn {
   background: #ffffff;
   border-color: #d0d5dd;
   color: #344054;
 }
 
-html[data-theme="light"] .cad-tool-btn:hover {
+html .cad-tool-btn:hover {
   background: #f2f4f7;
   color: #101828;
 }
 
-html[data-theme="light"] .cad-tool-btn.active {
+html .cad-tool-btn.active {
   background: #0284c7;
   color: #ffffff;
 }
 
-html[data-theme="light"] .cad-menu-dropdown {
+html .cad-menu-dropdown {
   background: #ffffff;
   border-color: #cbd5e1;
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.22);
   z-index: 9999999 !important;
 }
 
-html[data-theme="light"] .cad-menu-option {
+html .cad-menu-option {
   color: #1e293b;
 }
 
-html[data-theme="light"] .cad-menu-option:hover {
+html .cad-menu-option:hover {
   background: #0284c7;
   color: #ffffff;
 }
 
-html[data-theme="light"] .cad-menu-separator {
+html .cad-menu-separator {
   background: #e2e8f0;
 }
 
-html[data-theme="light"] .box-design-panel {
-  background: #f8fafc !important;
-}
-
-html[data-theme="light"] .dashboard-main .panel.chart-card {
+html .box-design-panel {
   background: #ffffff !important;
 }
 
-html[data-theme="light"] .engineering-status-bar {
+html .dashboard-main .panel.chart-card {
+  background: #ffffff !important;
+}
+
+html .engineering-status-bar {
   background: #eaecf0 !important;
   color: #475467 !important;
 }
 
-html[data-theme="light"] .nav-subtitle {
+html .nav-subtitle {
   border-left-color: #cbd5e1;
 }
 
 /* Scrollbars claros para evitar líneas negras en modo claro */
-html[data-theme="light"] ::-webkit-scrollbar-track {
+html ::-webkit-scrollbar-track {
   background: transparent;
 }
 
 
 /* Modo Claro Desktop - Fondos uniformes */
 @media (min-width: 1024px) {
-  html[data-theme="light"] body {
+  html body {
     background: #f8fafc;
     background-image: none;
   }
 
-  html[data-theme="light"] .top-navbar {
+  html .top-navbar {
     background: #ffffff;
     border-bottom: 1px solid #e2e8f0;
   }
 
-  html[data-theme="light"] .speaker-panel,
-  html[data-theme="light"] .box-design-panel,
-  html[data-theme="light"] .dashboard-grid > aside.panel {
+  html .speaker-panel,
+  html .box-design-panel,
+  html .dashboard-grid > aside.panel {
     background: #ffffff;
     border-right: 1px solid #e2e8f0;
   }
 
-  html[data-theme="light"] .dashboard-main {
+  html .dashboard-main {
     background: #f8fafc;
   }
 }
@@ -2361,22 +2372,22 @@ html[data-theme="light"] ::-webkit-scrollbar-track {
 }
 
 /* Light theme support */
-html[data-theme="light"] .segmented-control {
+html .segmented-control {
   background: rgba(241, 245, 249, 0.85);
   border-color: rgba(0, 0, 0, 0.06);
   box-shadow: none;
 }
 
-html[data-theme="light"] .segmented-control button {
+html .segmented-control button {
   color: #64748b;
 }
 
-html[data-theme="light"] .segmented-control button:hover {
+html .segmented-control button:hover {
   color: #0f172a;
   background: rgba(0, 0, 0, 0.02);
 }
 
-html[data-theme="light"] .segmented-control button.active {
+html .segmented-control button.active {
   background: linear-gradient(135deg, #3b82f6, #2563eb);
   color: #ffffff;
   box-shadow: none;
@@ -2421,7 +2432,7 @@ html[data-theme="light"] .segmented-control button.active {
   color: var(--text-main);
 }
 
-html[data-theme="light"] .sub-tabs-header {
+html .sub-tabs-header {
   background: rgba(241, 245, 249, 0.6);
   border-color: rgba(0, 0, 0, 0.04);
 }
@@ -2467,19 +2478,19 @@ html[data-theme="light"] .sub-tabs-header {
   text-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
 }
 
-html[data-theme="light"] .ebp-badge-card {
+html .ebp-badge-card {
   background: rgba(248, 250, 252, 0.85);
   border-color: rgba(0, 0, 0, 0.06);
 }
-html[data-theme="light"] .ebp-badge-card.ebp-sealed {
+html .ebp-badge-card.ebp-sealed {
   background: rgba(224, 242, 254, 0.45);
   border-color: rgba(14, 165, 233, 0.2);
 }
-html[data-theme="light"] .ebp-badge-card.ebp-ported {
+html .ebp-badge-card.ebp-ported {
   background: rgba(209, 250, 229, 0.45);
   border-color: rgba(16, 185, 129, 0.2);
 }
-html[data-theme="light"] .ebp-badge-card.ebp-normal {
+html .ebp-badge-card.ebp-normal {
   background: rgba(254, 243, 199, 0.45);
   border-color: rgba(245, 158, 11, 0.2);
 }
@@ -2500,12 +2511,12 @@ html[data-theme="light"] .ebp-badge-card.ebp-normal {
   background: transparent;
 }
 
-html[data-theme="light"] .premium-form-card {
+html .premium-form-card {
   background: transparent;
   border: none;
   box-shadow: none;
 }
-html[data-theme="light"] .premium-form-card:hover {
+html .premium-form-card:hover {
   background: transparent;
   border: none;
 }
@@ -2541,17 +2552,17 @@ html[data-theme="light"] .premium-form-card:hover {
   box-shadow: none;
 }
 
-html[data-theme="light"] .premium-panel-btn {
+html .premium-panel-btn {
   background: #f1f5f9;
   border-color: #e2e8f0;
   color: #0f172a;
 }
-html[data-theme="light"] .premium-panel-btn:hover {
+html .premium-panel-btn:hover {
   background: var(--primary-gradient);
   color: #ffffff;
   border-color: transparent;
 }
-html[data-theme="light"] .premium-panel-btn.active-primary {
+html .premium-panel-btn.active-primary {
   background: var(--primary-gradient);
   color: #ffffff;
   border-color: transparent;
@@ -2875,6 +2886,16 @@ input[type="checkbox"]:checked::before,
 }
 
 
+input[type="checkbox"]:not(.native-checkbox):focus-visible {
+  outline: 2px solid var(--primary) !important;
+  outline-offset: 2px !important;
+}
+
+input[type="checkbox"]:not(.native-checkbox):disabled {
+  cursor: not-allowed !important;
+  opacity: 0.5 !important;
+}
+
 /* ==========================================================================
    ESTILO DE BOTONES PREMIUM CON INDICADOR LED (PANEL SELECTIONS)
    ========================================================================== */
@@ -2951,8 +2972,8 @@ input[type="checkbox"]:checked::before,
    SOPORTE DE TEMA CLARO PARA LOS CONTROLES INDUSTRIALES
    ========================================================================== */
 
-html[data-theme="light"] .segmented-control,
-html[data-theme="light"] .sub-tabs-header {
+html .segmented-control,
+html .sub-tabs-header {
   background: linear-gradient(to bottom, #cbd5e1, #e2e8f0) !important;
   border-color: #94a3b8 !important;
   box-shadow: 
@@ -2961,25 +2982,25 @@ html[data-theme="light"] .sub-tabs-header {
 }
 
 /* Ranuras en tema claro (QUITADAS) */
-html[data-theme="light"] .segmented-control::before,
-html[data-theme="light"] .sub-tabs-header::before {
+html .segmented-control::before,
+html .sub-tabs-header::before {
   display: none !important;
 }
 
-html[data-theme="light"] .segmented-control button:not(.active),
-html[data-theme="light"] .sub-tabs-header button:not(.active) {
+html .segmented-control button:not(.active),
+html .sub-tabs-header button:not(.active) {
   color: #334155 !important;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.75) !important;
 }
 
-html[data-theme="light"] .segmented-control button:not(.active):hover,
-html[data-theme="light"] .sub-tabs-header button:not(.active):hover {
+html .segmented-control button:not(.active):hover,
+html .sub-tabs-header button:not(.active):hover {
   color: #0f172a !important;
   background: rgba(255, 255, 255, 0.45) !important;
 }
 
-html[data-theme="light"] .segmented-control button.active,
-html[data-theme="light"] .sub-tabs-header button.active {
+html .segmented-control button.active,
+html .sub-tabs-header button.active {
   background: linear-gradient(to bottom, #ffffff 0%, #f1f5f9 45%, #e2e8f0 55%, #ffffff 100%) !important;
   border-color: #64748b !important;
   color: #0f172a !important;
@@ -2991,15 +3012,15 @@ html[data-theme="light"] .sub-tabs-header button.active {
 }
 
 /* Checkboxes tema claro */
-html[data-theme="light"] input[type="checkbox"]:not(.native-checkbox),
-html[data-theme="light"] .custom-checkbox {
+html input[type="checkbox"]:not(.native-checkbox),
+html .custom-checkbox {
   background: #e2e8f0 !important;
   border-color: #cbd5e1 !important;
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.15) !important;
 }
 
-html[data-theme="light"] input[type="checkbox"]:not(.native-checkbox)::before,
-html[data-theme="light"] .custom-checkbox::before {
+html input[type="checkbox"]:not(.native-checkbox)::before,
+html .custom-checkbox::before {
   background: linear-gradient(180deg, #ffffff 0%, #e2e8f0 100%) !important;
   border-color: #cbd5e1 !important;
   box-shadow: 
@@ -3007,20 +3028,20 @@ html[data-theme="light"] .custom-checkbox::before {
     inset 0 1px 0 rgba(255,255,255,0.9) !important;
 }
 
-html[data-theme="light"] input[type="checkbox"]:checked,
-html[data-theme="light"] .checkbox-container input:checked + .custom-checkbox {
+html input[type="checkbox"]:checked,
+html .checkbox-container input:checked + .custom-checkbox {
   background: #d1fae5 !important;
   border-color: #a7f3d0 !important;
 }
 
-html[data-theme="light"] input[type="checkbox"]:checked::before,
-html[data-theme="light"] .checkbox-container input:checked + .custom-checkbox::before {
+html input[type="checkbox"]:checked::before,
+html .checkbox-container input:checked + .custom-checkbox::before {
   background: linear-gradient(180deg, #34d399 0%, #10b981 100%) !important;
   border-color: #059669 !important;
 }
 
 /* Botones Premium tema claro */
-html[data-theme="light"] .premium-panel-btn {
+html .premium-panel-btn {
   background: linear-gradient(to bottom, #f8fafc, #e2e8f0) !important;
   border-color: #cbd5e1 !important;
   border-top-color: #ffffff !important;
@@ -3031,19 +3052,19 @@ html[data-theme="light"] .premium-panel-btn {
     inset 0 1px 0 rgba(255,255,255,0.8) !important;
 }
 
-html[data-theme="light"] .premium-panel-btn:hover {
+html .premium-panel-btn:hover {
   background: linear-gradient(to bottom, #ffffff, #f1f5f9) !important;
   color: #0f172a !important;
 }
 
-html[data-theme="light"] .premium-panel-btn::before {
+html .premium-panel-btn::before {
   background: #e2e8f0 !important;
   border-color: #cbd5e1 !important;
   box-shadow: inset 0 1px 1px rgba(0,0,0,0.1) !important;
 }
 
-html[data-theme="light"] .premium-panel-btn.active-primary,
-html[data-theme="light"] .premium-panel-btn.active {
+html .premium-panel-btn.active-primary,
+html .premium-panel-btn.active {
   background: linear-gradient(to bottom, #f1f5f9, #e2e8f0) !important;
   border-color: #cbd5e1 !important;
   color: #0f172a !important;
@@ -3053,8 +3074,8 @@ html[data-theme="light"] .premium-panel-btn.active {
   transform: translateY(1px) !important;
 }
 
-html[data-theme="light"] .premium-panel-btn.active-primary::before,
-html[data-theme="light"] .premium-panel-btn.active::before {
+html .premium-panel-btn.active-primary::before,
+html .premium-panel-btn.active::before {
   background: #3b82f6 !important;
   border-color: #93c5fd !important;
   box-shadow: 
@@ -3268,14 +3289,14 @@ input[type="range"].slider-mini::-moz-range-thumb {
 .crossover-table tr:hover {
   background: rgba(255, 255, 255, 0.01);
 }
-html[data-theme="light"] .crossover-table {
+html .crossover-table {
   border-color: rgba(0, 0, 0, 0.06);
 }
-html[data-theme="light"] .crossover-table th {
+html .crossover-table th {
   background: rgba(0, 0, 0, 0.02);
   border-bottom-color: rgba(0, 0, 0, 0.08);
 }
-html[data-theme="light"] .crossover-table td {
+html .crossover-table td {
   border-top-color: rgba(0, 0, 0, 0.04);
 }
 
@@ -3293,7 +3314,7 @@ html[data-theme="light"] .crossover-table td {
   backdrop-filter: blur(8px);
   transition: all 0.25s ease;
 }
-html[data-theme="light"] .ebp-meter-card {
+html .ebp-meter-card {
   background: rgba(248, 250, 252, 0.85);
   border-color: rgba(0, 0, 0, 0.08);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
@@ -3536,12 +3557,12 @@ html[data-theme="light"] .ebp-meter-card {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
-html[data-theme="light"] .sub-tabs-header {
+html .sub-tabs-header {
   background: rgba(0, 0, 0, 0.04);
   border-color: rgba(0, 0, 0, 0.06);
 }
 
-html[data-theme="light"] .sub-tabs-header button.active {
+html .sub-tabs-header button.active {
   background: #ffffff;
   color: #0284c7;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);

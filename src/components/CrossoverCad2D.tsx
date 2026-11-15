@@ -3,7 +3,6 @@ import { type Lang, translate } from '../utils/translations';
 import type { CrossoverResult } from '../types';
 
 interface CrossoverCad2DProps {
-  theme?: 'dark' | 'light';
   lang: Lang;
   crossoverWays: '2way' | '3way';
   crossoverType: '1st_order' | '2nd_butter' | '2nd_lr' | '4th_lr';
@@ -15,7 +14,6 @@ interface CrossoverCad2DProps {
 }
 
 export const CrossoverCad2D: React.FC<CrossoverCad2DProps> = ({
-  theme = 'dark',
   lang,
   crossoverWays,
   crossoverType,
@@ -29,26 +27,21 @@ export const CrossoverCad2D: React.FC<CrossoverCad2DProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Active theme detection
-  const [effectiveTheme, setEffectiveTheme] = useState<'dark' | 'light'>(theme);
+  const isLight = true;
+  const [containerWidth, setContainerWidth] = useState<number>(0);
 
   useEffect(() => {
-    setEffectiveTheme(theme);
-  }, [theme]);
-
-  useEffect(() => {
-    const checkDomTheme = () => {
-      const domTheme = document.documentElement.getAttribute('data-theme') as 'dark' | 'light' | null;
-      if (domTheme) setEffectiveTheme(domTheme);
+    const el = containerRef.current;
+    if (!el) return;
+    const updateWidth = () => {
+      const w = el.clientWidth;
+      if (w > 0) setContainerWidth(prev => (prev !== w ? w : prev));
     };
-    checkDomTheme();
-
-    const observer = new MutationObserver(checkDomTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-    return () => observer.disconnect();
+    updateWidth();
+    const ro = new ResizeObserver(updateWidth);
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
-
-  const isLight = effectiveTheme === 'light';
 
   // CAD Navigation State (Pan & Zoom)
   const [zoom, setZoom] = useState<number>(1);
@@ -152,7 +145,7 @@ export const CrossoverCad2D: React.FC<CrossoverCad2DProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const width = containerRef.current.clientWidth || 800;
+    const width = containerWidth || containerRef.current.clientWidth || 800;
     const height = crossoverWays === '3way' ? 520 : 440;
     const dpr = window.devicePixelRatio || 1;
 
@@ -801,6 +794,7 @@ export const CrossoverCad2D: React.FC<CrossoverCad2DProps> = ({
     enableLPad,
     lpadResults,
     t,
+    containerWidth,
   ]);
 
   return (

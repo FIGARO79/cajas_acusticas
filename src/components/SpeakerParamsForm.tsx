@@ -150,6 +150,27 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
   // Estados para guardar/editar driver personalizado
   const [saveBrand, setSaveBrand] = useState('');
   const [saveModel, setSaveModel] = useState('');
+  const [showBrandDropdown, setShowBrandDropdown] = useState(false);
+  const [brandActiveIndex, setBrandActiveIndex] = useState(-1);
+  const brandSearchRef = React.useRef<HTMLDivElement>(null);
+
+  const filteredBrands = React.useMemo(() => {
+    const q = saveBrand.trim().toLowerCase();
+    if (!q) return brandsList.slice(0, 50);
+    return brandsList
+      .filter(b => b.toLowerCase().includes(q))
+      .slice(0, 50);
+  }, [brandsList, saveBrand]);
+
+  useEffect(() => {
+    const handleClickOutsideBrand = (event: MouseEvent) => {
+      if (brandSearchRef.current && !brandSearchRef.current.contains(event.target as Node)) {
+        setShowBrandDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutsideBrand);
+    return () => document.removeEventListener('mousedown', handleClickOutsideBrand);
+  }, []);
 
   // Identificar si el driver actual es personalizado
   const currentCustomDriver = React.useMemo(() => {
@@ -211,6 +232,12 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
   // Actualizar parámetros del altavoz personalizado seleccionado
   const handleUpdateCustomDriver = () => {
     if (!currentCustomDriver) return;
+    const newBrand = saveBrand.trim();
+    const newModel = saveModel.trim();
+    if (!newBrand || !newModel) {
+      alert(t("Por favor introduce Marca y Modelo."));
+      return;
+    }
     
     // Calcular Qts si falta pero existen Qms y Qes
     let finalQts = params.qts || 0;
@@ -220,12 +247,19 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
 
     const updatedList = customDrivers.map(d => 
       d.id === currentCustomDriver.id 
-        ? { ...d, params: { ...params, qts: finalQts || d.params.qts } } 
+        ? {
+            ...d,
+            brand: newBrand,
+            model: newModel,
+            params: { ...params, qts: finalQts || d.params.qts },
+          } 
         : d
     );
 
     onCustomDriversChange(updatedList);
-    alert(t("Parámetros actualizados correctamente para el altavoz " + currentCustomDriver.brand + " " + currentCustomDriver.model + "."));
+    setSelectedBrand(newBrand);
+    setSearchQuery(newModel);
+    alert(t("Parámetros actualizados correctamente para el altavoz " + newBrand + " " + newModel + "."));
   };
 
   // Eliminar altavoz personalizado seleccionado
@@ -617,16 +651,56 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
       {/* PESTAÑA 2: AGREGAR / EDITAR */}
       {driverTab === 'edit' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', marginBottom: '0.5rem', padding: '0.4rem', borderRadius: '4px', background: 'rgba(255,255,255,0.01)' }}>
-          <div className="input-group input-group-full" style={{ marginBottom: 0 }}>
+          <div className="input-group input-group-full" style={{ marginBottom: 0 }} ref={brandSearchRef}>
             <label>{t("Marca / Fabricante:")}</label>
-            <input 
-              type="text"
-              value={saveBrand}
-              onChange={(e) => setSaveBrand(e.target.value)}
-              placeholder={t("Ej. Pioneer, Eminence...")}
-              className="input-text"
-              style={{ width: '100%', height: '34px' }}
-            />
+            <div className="search-container">
+              <input 
+                type="text"
+                value={saveBrand}
+                onChange={(e) => {
+                  setSaveBrand(e.target.value);
+                  setBrandActiveIndex(-1);
+                  setShowBrandDropdown(true);
+                }}
+                onFocus={() => setShowBrandDropdown(true)}
+                onKeyDown={(e) => {
+                  if (!showBrandDropdown || filteredBrands.length === 0) return;
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    setBrandActiveIndex(prev => (prev + 1 < filteredBrands.length ? prev + 1 : 0));
+                  } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setBrandActiveIndex(prev => (prev - 1 >= 0 ? prev - 1 : filteredBrands.length - 1));
+                  } else if (e.key === 'Enter' && brandActiveIndex >= 0 && brandActiveIndex < filteredBrands.length) {
+                    e.preventDefault();
+                    setSaveBrand(filteredBrands[brandActiveIndex]);
+                    setShowBrandDropdown(false);
+                  } else if (e.key === 'Escape') {
+                    setShowBrandDropdown(false);
+                  }
+                }}
+                placeholder={t("Ej. Pioneer, Eminence...")}
+                className="input-text"
+                style={{ width: '100%', height: '34px' }}
+              />
+              {showBrandDropdown && filteredBrands.length > 0 && (
+                <ul className="search-dropdown">
+                  {filteredBrands.map((brand, index) => (
+                    <li
+                      key={brand}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setSaveBrand(brand);
+                        setShowBrandDropdown(false);
+                      }}
+                      className={`search-item ${index === brandActiveIndex ? 'active' : ''}`}
+                    >
+                      {brand}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
 
           <div className="input-group input-group-full" style={{ marginBottom: 0 }}>

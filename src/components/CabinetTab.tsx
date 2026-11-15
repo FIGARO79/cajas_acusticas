@@ -8,7 +8,6 @@ import { calcVolumenNetoMadera } from '../wasm/index.ts';
 
 
 interface CabinetTabProps {
-  theme?: 'dark' | 'light';
   lang: Lang;
   unitSystem: UnitSystem;
   params: SpeakerParams;
@@ -80,10 +79,11 @@ interface CabinetTabProps {
   portLocation?: 'front' | 'rear';
   useCustomPortLength?: boolean;
   customPortLength?: number | '';
+  enableBracing?: boolean;
+  bracingCount?: number;
 }
 
 const CabinetTabComponent: React.FC<CabinetTabProps> = ({
-  theme = 'dark',
   lang,
   unitSystem,
   params,
@@ -150,6 +150,8 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
   portLocation = 'front',
   useCustomPortLength = false,
   customPortLength = '',
+  enableBracing = false,
+  bracingCount = 2,
 }) => {
   const t = React.useCallback((text: string) => translate(text, lang), [lang]);
   const [hoveredPieceIndex, setHoveredPieceIndex] = useState<number | null>(null);
@@ -468,6 +470,30 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
         });
       }
 
+      if (enableBracing && bracingCount > 0) {
+        const refDepthBracing = woodShape === 'rectangular' ? dInt : Math.min(dTrapTopInt, dTrapBotInt);
+        const braceRim = Math.min(Math.max(thickness * 2.5, 4), Math.min(wInt, refDepthBracing) * 0.22);
+        if (woodShape === 'rectangular') {
+          pieces.push({
+            name: t("Refuerzos Internos (Marcos Bracing)"),
+            qty: bracingCount,
+            dimensions: `${displayVal(wInt, 'length')} x ${displayVal(dInt, 'length')} (${t("Marco")} ${displayVal(braceRim, 'length')}, e=${displayVal(thickness, 'length')}) ${uLabel}`
+          });
+        } else {
+          for (let i = 0; i < bracingCount; i++) {
+            const frac = (i + 1) / (bracingCount + 1);
+            const braceD = dTrapTopInt + (dTrapBotInt - dTrapTopInt) * frac;
+            pieces.push({
+              name: bracingCount === 1
+                ? t("Refuerzo Interno (Marco Bracing)")
+                : `${t("Refuerzo Interno (Marco Bracing)")} #${i + 1}`,
+              qty: 1,
+              dimensions: `${displayVal(wInt, 'length')} x ${displayVal(braceD, 'length')} (${t("Marco")} ${displayVal(braceRim, 'length')}, e=${displayVal(thickness, 'length')}) ${uLabel}`
+            });
+          }
+        }
+      }
+
       return {
         valid: true,
         vNeto: netVol,
@@ -491,6 +517,7 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
     woodTrapExtHeight, woodTrapExtWidth, woodTrapExtDepthTop, woodTrapExtDepthBot, woodThickness, woodExtra,
     portCount, portDiameter, portShape, portWidth, portHeight, portArea,
     crossoverWays, midSealed, midCabinetDepth, useCustomMidVol, customMidVol, midVas, midQts, midTargetQtc,
+    enableBracing, bracingCount,
     t, displayVal
   ]);
 
@@ -648,7 +675,6 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%', boxSizing: 'border-box' }}>
         {/* Diagrama dinámico Corte A-A (Alineado arriba bajo la gráfica) */}
         <CabinetDiagram
-          theme={theme}
           lang={lang}
           unitSystem={unitSystem}
           shape={woodShape}
@@ -678,6 +704,8 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
           bandpassVf={bandpassData?.Vf}
           bandpassVr={bandpassData?.Vr}
           dampingType={dampingType}
+          enableBracing={enableBracing}
+          bracingCount={bracingCount}
         />
 
         {/* Resultados de Ebanistería */}

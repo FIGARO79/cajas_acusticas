@@ -5,7 +5,6 @@ import type { CrossoverResult, CrossoverExportData } from '../types';
 import { CrossoverCad2D } from './CrossoverCad2D';
 
 interface CrossoverTabProps {
-  theme?: 'dark' | 'light';
   lang: Lang;
   onRegisterExporter?: (exporter: () => CrossoverExportData) => void;
   readOnly?: boolean;
@@ -26,7 +25,6 @@ interface CrossoverTabProps {
 }
 
 const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
-  theme = 'dark',
   lang,
   onRegisterExporter,
   readOnly = false,
@@ -46,25 +44,6 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
   zLoadProp
 }) => {
   const t = (text: string) => translate(text, lang);
-
-  // Active theme detection
-  const [effectiveTheme, setEffectiveTheme] = useState<'dark' | 'light'>(theme);
-
-  useEffect(() => {
-    setEffectiveTheme(theme);
-  }, [theme]);
-
-  useEffect(() => {
-    const checkDomTheme = () => {
-      const domTheme = document.documentElement.getAttribute('data-theme') as 'dark' | 'light' | null;
-      if (domTheme) setEffectiveTheme(domTheme);
-    };
-    checkDomTheme();
-
-    const observer = new MutationObserver(checkDomTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-    return () => observer.disconnect();
-  }, []);
 
   // 1. Crossover Way Mode
   const [crossoverWaysLocal, setCrossoverWays] = useState<'2way' | '3way'>('2way');
@@ -899,7 +878,6 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
         {/* Esquema de conexión CAD Canvas 2D */}
         <div style={{ width: '100%', marginTop: '0px' }}>
           <CrossoverCad2D
-            theme={effectiveTheme}
             lang={lang}
             crossoverWays={crossoverWays}
             crossoverType={crossoverType}
@@ -1204,7 +1182,6 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
         {/* DIAGRAMA CAD EN CANVAS 2D DE ANCHO COMPLETO */}
         <div style={{ width: '100%' }}>
           <CrossoverCad2D
-            theme={effectiveTheme}
             lang={lang}
             crossoverWays={crossoverWays}
             crossoverType={crossoverType}

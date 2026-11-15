@@ -5,7 +5,6 @@ import type { WoodCabinetData } from '../types';
 import { calculatePortSpacing } from '../utils/acousticMath';
 
 interface CabinetCad2DProps {
-  theme?: 'dark' | 'light';
   lang: Lang;
   unitSystem: UnitSystem;
   shape: 'rectangular' | 'trapezoidal';
@@ -35,11 +34,12 @@ interface CabinetCad2DProps {
   bandpassVf?: number;
   bandpassVr?: number;
   dampingType?: 'none' | 'light' | 'moderate' | 'heavy';
+  enableBracing?: boolean;
+  bracingCount?: number;
   onOpen3DModal: () => void;
 }
 
 export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
-  theme = 'dark',
   lang,
   unitSystem,
   shape,
@@ -69,32 +69,29 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
   bandpassVf,
   bandpassVr,
   dampingType = 'none',
+  enableBracing = false,
+  bracingCount = 2,
   onOpen3DModal,
 }) => {
   const t = (text: string) => translate(text, lang);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Active theme detection (reacts to prop and documentElement attribute)
-  const [effectiveTheme, setEffectiveTheme] = useState<'dark' | 'light'>(theme);
+  const isLight = true;
+  const [containerWidth, setContainerWidth] = useState<number>(0);
 
   useEffect(() => {
-    setEffectiveTheme(theme);
-  }, [theme]);
-
-  useEffect(() => {
-    const checkDomTheme = () => {
-      const domTheme = document.documentElement.getAttribute('data-theme') as 'dark' | 'light' | null;
-      if (domTheme) setEffectiveTheme(domTheme);
+    const el = containerRef.current;
+    if (!el) return;
+    const updateWidth = () => {
+      const w = el.clientWidth;
+      if (w > 0) setContainerWidth(prev => (prev !== w ? w : prev));
     };
-    checkDomTheme();
-
-    const observer = new MutationObserver(checkDomTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-    return () => observer.disconnect();
+    updateWidth();
+    const ro = new ResizeObserver(updateWidth);
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
-
-  const isLight = effectiveTheme === 'light';
 
   // CAD Navigation State
   const [zoom, setZoom] = useState<number>(1);
@@ -201,7 +198,7 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const width = containerRef.current.clientWidth || 800;
+    const width = containerWidth || containerRef.current.clientWidth || 800;
     const height = 440;
     const dpr = window.devicePixelRatio || 1;
 
@@ -755,6 +752,20 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
       }
     }
 
+    // Front View Internal Bracing (Hidden dashed lines behind baffle)
+    if (enableBracing && bracingCount > 0) {
+      ctx.save();
+      ctx.strokeStyle = isLight ? 'rgba(217, 119, 6, 0.75)' : 'rgba(251, 191, 36, 0.75)';
+      ctx.lineWidth = 1.0 / zoom;
+      ctx.setLineDash([4 / zoom, 3 / zoom]);
+      for (let i = 0; i < bracingCount; i++) {
+        const frac = (i + 1) / (bracingCount + 1);
+        const braceY = topY + thickness + (fH - 2 * thickness) * frac;
+        ctx.strokeRect(fX + thickness, braceY - thickness / 2, fW - 2 * thickness, thickness);
+      }
+      ctx.restore();
+    }
+
     // Front View Label Header
     ctx.fillStyle = isLight ? '#0369a1' : '#38bdf8';
     ctx.font = `bold ${Math.max(9 / zoom, 2.5)}px monospace`;
@@ -825,6 +836,42 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
     // 4. Rear Panel (Left side of profile)
     ctx.strokeRect(sX, topY + thickness, thickness, fH - 2 * thickness);
     hatchRect(sX, topY + thickness, thickness, fH - 2 * thickness);
+
+    // 5. Internal Bracing Cross-Section (Sección de Refuerzos Internos)
+    if (enableBracing && bracingCount > 0) {
+      const innerLeft = sX + thickness;
+      const innerRight = baffleX;
+      const braceD = Math.max(innerRight - innerLeft, 2);
+      const braceRim = Math.min(Math.max(thickness * 2.5, 4), Math.min(fW - 2 * thickness, braceD) * 0.22);
+
+      for (let i = 0; i < bracingCount; i++) {
+        const frac = (i + 1) / (bracingCount + 1);
+        const braceY = topY + thickness + (fH - 2 * thickness) * frac;
+        const bTop = braceY - thickness / 2;
+
+        // Rear & Front hatched rim cross-sections
+        ctx.save();
+        ctx.strokeStyle = isLight ? '#d97706' : '#fbbf24';
+        ctx.lineWidth = 1.1 / zoom;
+        ctx.strokeRect(innerLeft, bTop, braceRim, thickness);
+        hatchRect(innerLeft, bTop, braceRim, thickness);
+        ctx.strokeRect(innerRight - braceRim, bTop, braceRim, thickness);
+        hatchRect(innerRight - braceRim, bTop, braceRim, thickness);
+
+        // Dashed span across the open window cutout
+        if (braceD > braceRim * 2 + 1) {
+          ctx.setLineDash([3 / zoom, 2.5 / zoom]);
+          ctx.beginPath();
+          ctx.moveTo(innerLeft + braceRim, bTop);
+          ctx.lineTo(innerRight - braceRim, bTop);
+          ctx.moveTo(innerLeft + braceRim, bTop + thickness);
+          ctx.lineTo(innerRight - braceRim, bTop + thickness);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+        ctx.restore();
+      }
+    }
 
     // WooferCross-Section, Tweeter Cross-Section & Midrange Cross-Section (Mounted on Baffle extending inwards)
     if (crossoverWays >= 2 && !isBandpass) {
@@ -1679,12 +1726,15 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
     portLocation,
     bandpassRatio,
     dampingType,
+    enableBracing,
+    bracingCount,
     hoveredPieceIndex,
     cabinetData,
     unitSystem,
     uLabel,
     dTrapTop,
     dTrapBot,
+    containerWidth,
   ]);
 
   // Export CAD PNG

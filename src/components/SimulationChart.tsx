@@ -129,7 +129,7 @@ const cadBlueprintPlugin = {
     const { ctx, chartArea } = chart;
     if (!chartArea) return;
     const { left, top, right, bottom, width, height } = chartArea;
-    const isLight = ((chart.options.plugins as any)?.cadBlueprint?.theme === 'light');
+    const isLight = true;
 
     ctx.save();
     // Fondo de plano CAD Blueprint de alta fidelidad
@@ -183,7 +183,7 @@ const cadBlueprintPlugin = {
     const { ctx, chartArea, scales: { x, y } } = chart;
     if (!chartArea) return;
     const { left, top, right, bottom } = chartArea;
-    const isLight = ((chart.options.plugins as any)?.cadBlueprint?.theme === 'light');
+    const isLight = true;
 
     ctx.save();
     // Cruces de mira técnica en las intersecciones de ticks principales (+)
@@ -266,7 +266,6 @@ export type SimulationChartMode = 'spl' | 'excursion' | 'velocity' | 'impedance'
 
 interface SimulationChartProps {
   lang: Lang;
-  theme: 'dark' | 'light';
   sealedData: CalculatedSealed | null;
   portedData: CalculatedPorted | null;
   bandpassData: CalculatedBandpass | null;
@@ -281,11 +280,11 @@ interface SimulationChartProps {
   baffleWidth?: number;
   baffleHeight?: number;
   workspaceView?: 'split' | 'simulation' | 'cabinet' | 'crossover';
+  setWorkspaceView?: (view: 'split' | 'simulation' | 'cabinet' | 'crossover') => void;
 }
 
 const SimulationChartComponent: React.FC<SimulationChartProps> = ({
   lang,
-  theme,
   sealedData,
   portedData,
   bandpassData,
@@ -299,6 +298,7 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
   baffleWidth = 32,
   baffleHeight = 45,
   workspaceView = 'split',
+  setWorkspaceView,
 }) => {
   const t = useCallback((text: string) => translate(text, lang), [lang]);
 
@@ -1052,7 +1052,7 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
   }, [chartMode, params.xmax, params.re, dynamicMin, dynamicMax, t]);
 
   const cadFontFamily = "'JetBrains Mono', 'Fira Code', 'Consolas', monospace";
-  const isLight = theme === 'light';
+  const isLight = true;
 
   const createChartOptions = useCallback((
     yMin: number,
@@ -1142,13 +1142,10 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
         },
         lineAnnotation: {
           annotations: annList
-        },
-        cadBlueprint: {
-          theme
         }
       },
     };
-  }, [chartMode, rangeMode, isLight, t, cadFontFamily, theme]);
+  }, [chartMode, rangeMode, isLight, t, cadFontFamily]);
 
   const splOptionsQuad = useMemo(() => 
     createChartOptions(dynamicMin, dynamicMax, 3, t('Ganancia (dB)'), 'dB', true, annotations),
@@ -1219,8 +1216,48 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
         </div>
       </div>
 
-      {/* Barra de Controles Globales (Potencia, Baffle Step, Extended Z, Rango) */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+      {/* Selector de Vista + Controles de Simulación (Potencia, Baffle Step, Extended Z, Líneas Ref.) */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.35rem', paddingBottom: '0.35rem', borderBottom: '1px solid var(--card-border)' }}>
+        {setWorkspaceView && (
+          <div className="cad-ribbon-group">
+            <span className="cad-ribbon-tag">{t("VISTA:")}</span>
+            <div className="cad-ribbon-tools">
+              <button
+                type="button"
+                className={`cad-tool-btn ${workspaceView === 'split' ? 'active' : ''}`}
+                onClick={() => setWorkspaceView('split')}
+                title={t("Estudio Completo Multi-Panel")}
+              >
+                {t("Estudio")}
+              </button>
+              <button
+                type="button"
+                className={`cad-tool-btn ${workspaceView === 'simulation' ? 'active' : ''}`}
+                onClick={() => setWorkspaceView('simulation')}
+                title={t("Simulación SPL/Z")}
+              >
+                {t("Simulación")}
+              </button>
+              <button
+                type="button"
+                className={`cad-tool-btn ${workspaceView === 'cabinet' ? 'active' : ''}`}
+                onClick={() => setWorkspaceView('cabinet')}
+                title={t("Gabinete 3D y Lista de Corte")}
+              >
+                {t("Gabinete 3D")}
+              </button>
+              <button
+                type="button"
+                className={`cad-tool-btn ${workspaceView === 'crossover' ? 'active' : ''}`}
+                onClick={() => setWorkspaceView('crossover')}
+                title={t("Crossover CAD Circuital")}
+              >
+                {t("Crossover")}
+              </button>
+            </div>
+          </div>
+        )}
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
           {/* Ajuste de Potencia Eléctrica */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'rgba(255,255,255,0.04)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--card-border)' }}>
@@ -1231,7 +1268,7 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
               max="5000"
               value={simPower}
               onChange={(e) => setSimPower(Math.max(1, parseFloat(e.target.value) || 1))}
-              style={{ width: '50px', height: '20px', fontSize: '0.72rem', background: 'transparent', border: '1px solid var(--card-border)', color: 'var(--accent)', borderRadius: '2px', textAlign: 'center', fontWeight: 600 }}
+              style={{ width: '72px', height: '22px', padding: '0 4px', fontSize: '0.72rem', background: 'transparent', border: '1px solid var(--card-border)', color: 'var(--accent)', borderRadius: '2px', textAlign: 'center', fontWeight: 600 }}
             />
             <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>W</span>
           </div>
@@ -1269,9 +1306,11 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
             <span>{t("Líneas Ref.")}</span>
           </label>
         </div>
+      </div>
 
-        {/* Controles exclusivos de Vista Única */}
-        {effectiveDisplayLayout === 'single' && (
+      {/* Controles exclusivos de Vista Única */}
+      {effectiveDisplayLayout === 'single' && (
+        <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
             {/* Segmented range selector solo en modo SPL */}
             {chartMode === 'spl' && (
@@ -1347,8 +1386,8 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
               </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* RENDER CONDICIONAL: CUADRÍCULA 2×2 vs VISTA ÚNICA */}
       {effectiveDisplayLayout === 'quad' ? (
@@ -1435,7 +1474,7 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
         </div>
       ) : (
         /* VISTA ÚNICA DETALLADA */
-        <div className="chart-container" style={{ flex: 1, minHeight: '300px' }}>
+        <div className="chart-container" style={{ flex: 1, minHeight: '330px', marginBottom: '0.5rem' }}>
           {activeDatasets.length > 0 ? (
             <Line data={{ datasets: activeDatasets as any }} options={optionsSingle as any} plugins={[cadBlueprintPlugin, lineAnnotationPlugin]} />
           ) : (

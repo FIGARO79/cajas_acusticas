@@ -6,7 +6,7 @@ import { SimulationChart } from './components/SimulationChart';
 import { CabinetTab } from './components/CabinetTab';
 import { CrossoverTab } from './components/CrossoverTab';
 import { type Lang, translate } from './utils/translations';
-import { type UnitSystem, convertTo, getUnitLabel } from './utils/units';
+import { type UnitSystem, convertTo, getUnitLabel, nextUnitSystem } from './utils/units';
 import type { SpeakerParams, CalculatedSealed, CalculatedPorted, CalculatedBandpass, CustomDriver, WoodCabinetData, CrossoverExportData } from './types';
 import { estimateF3, calcPortLength, getKCorrection, calcOptimalPortForSpeaker, calcVentAirVelocity } from './utils/acousticMath';
 import { getWasm, calcRadiadorPasivo, calcVolumenNetoMadera } from './wasm/index.ts';
@@ -18,10 +18,9 @@ interface AppProps {
 }
 
 function App({ wasmError }: AppProps) {
-  // Theme & Language
+  // Language & Units
   const [lang, setLang] = useState<Lang>(() => (localStorage.getItem('lang') as Lang) || 'es');
   const [unitSystem, setUnitSystem] = useState<UnitSystem>(() => (localStorage.getItem('unitSystem') as UnitSystem) || 'metric');
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => (localStorage.getItem('theme') as 'dark' | 'light') || 'dark');
   const [activeTab, setActiveTab] = useState<'wood' | 'port' | 'damping' | 'crossover'>('wood');
   const [workspaceView, setWorkspaceView] = useState<'split' | 'simulation' | 'cabinet' | 'crossover'>('split');
   const [boxType, setBoxType] = useState<'sealed' | 'ported' | 'bandpass'>('sealed');
@@ -226,6 +225,8 @@ function App({ wasmError }: AppProps) {
 
   const [woodThickness, setWoodThickness] = useState<number | ''>(15);
   const [woodExtra, setWoodExtra] = useState<number | ''>(3.5);
+  const [enableBracing, setEnableBracing] = useState<boolean>(false);
+  const [bracingCount, setBracingCount] = useState<number>(2);
 
   const [speakerYPct, setSpeakerYPct] = useState<number>(50);
   const [portYPct, setPortYPct] = useState<number>(85);
@@ -256,12 +257,6 @@ function App({ wasmError }: AppProps) {
     crossoverRef.current = exp;
   }, []);
 
-  // Sync theme to document element
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('theme', theme);
-  }, [theme]);
-
   // Sync lang to document element and storage
   useEffect(() => {
     document.documentElement.lang = lang;
@@ -272,10 +267,6 @@ function App({ wasmError }: AppProps) {
   useEffect(() => {
     localStorage.setItem('unitSystem', unitSystem);
   }, [unitSystem]);
-
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
-  };
 
   const handlePresetChange = (presetId: string, newParams: SpeakerParams | null) => {
     setPreset(presetId);
@@ -948,15 +939,26 @@ function App({ wasmError }: AppProps) {
     }
   };
 
+  const CONVERTIBLE_UNIT_LABELS = new Set(['cm', 'mm', 'in', 'L', 'ft³', 'cc', 'cu in', 'cm²', 'in²']);
+  const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement | null;
+    const badge = target?.closest('.unit-badge');
+    if (!badge) return;
+    const label = badge.textContent?.trim() || '';
+    if (CONVERTIBLE_UNIT_LABELS.has(label)) {
+      e.preventDefault();
+      e.stopPropagation();
+      setUnitSystem(prev => nextUnitSystem(prev));
+    }
+  };
+
   return (
-    <div className="container">
+    <div className="container" onClick={handleContainerClick}>
       <Header 
         lang={lang} 
         setLang={setLang} 
         unitSystem={unitSystem}
         setUnitSystem={setUnitSystem}
-        theme={theme} 
-        toggleTheme={toggleTheme}
         onExportReport={handleExportReport}
         workspaceView={workspaceView}
         setWorkspaceView={setWorkspaceView}
@@ -1045,6 +1047,10 @@ function App({ wasmError }: AppProps) {
           setUseCustomPortLength={setUseCustomPortLength}
           customPortLength={customPortLength}
           setCustomPortLength={setCustomPortLength}
+          enableBracing={enableBracing}
+          onEnableBracingChange={setEnableBracing}
+          bracingCount={bracingCount}
+          onBracingCountChange={setBracingCount}
 
           prTuning={prTuning}
           setPrTuning={setPrTuning}
@@ -1166,8 +1172,8 @@ function App({ wasmError }: AppProps) {
           {(workspaceView === 'split' || workspaceView === 'simulation') && (
             <SimulationChart 
               lang={lang}
-              theme={theme}
               workspaceView={workspaceView}
+              setWorkspaceView={setWorkspaceView}
               sealedData={boxType === 'sealed' && sealedData.valid ? deferredSealedData : null}
               portedData={boxType === 'ported' && portedData.valid ? deferredPortedData : null}
               bandpassData={boxType === 'bandpass' && bandpassData.valid ? deferredBandpassData : null}
@@ -1207,15 +1213,34 @@ function App({ wasmError }: AppProps) {
             >
               {/* Panel Izquierdo: Cajón y Plano Técnico */}
               {(workspaceView === 'split' || workspaceView === 'cabinet') && (
-                <div className="panel" style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '0', padding: '0px' }}>
+                <div
+                  className="panel"
+                  style={{
+                    background: 'var(--card-bg)',
+                    border: 'none',
+                    borderRight: workspaceView === 'split' ? '1px solid var(--card-border)' : 'none',
+                    borderRadius: '0',
+                    padding: '0px',
+                  }}
+                >
                   <div className="cad-dock-header">
                     <div className="cad-dock-title">
                       <span className="cad-dock-icon">≡</span>
                       <span>{t("GABINETE 3D & LISTA DE CORTE")}</span>
                     </div>
                   </div>
+                  {workspaceView === 'cabinet' && (
+                    <div className="cad-ribbon-group" style={{ padding: '0.35rem 0.65rem', borderBottom: '1px solid var(--card-border)' }}>
+                      <span className="cad-ribbon-tag">{t("VISTA:")}</span>
+                      <div className="cad-ribbon-tools">
+                        <button type="button" className="cad-tool-btn" onClick={() => setWorkspaceView('split')}>{t("Estudio")}</button>
+                        <button type="button" className="cad-tool-btn" onClick={() => setWorkspaceView('simulation')}>{t("Simulación")}</button>
+                        <button type="button" className="cad-tool-btn active" onClick={() => setWorkspaceView('cabinet')}>{t("Gabinete 3D")}</button>
+                        <button type="button" className="cad-tool-btn" onClick={() => setWorkspaceView('crossover')}>{t("Crossover")}</button>
+                      </div>
+                    </div>
+                  )}
                   <CabinetTab 
-                    theme={theme}
                     lang={lang}
                     unitSystem={unitSystem}
                     params={adjParams}
@@ -1282,6 +1307,8 @@ function App({ wasmError }: AppProps) {
                     portLocation={portLocation}
                     useCustomPortLength={useCustomPortLength}
                     customPortLength={customPortLength}
+                    enableBracing={enableBracing}
+                    bracingCount={bracingCount}
                   />
                 </div>
               )}
@@ -1295,8 +1322,18 @@ function App({ wasmError }: AppProps) {
                       <span>{t("ESQUEMA CAD DEL DIVISOR (CROSSOVER)")}</span>
                     </div>
                   </div>
+                  {workspaceView === 'crossover' && (
+                    <div className="cad-ribbon-group" style={{ padding: '0.35rem 0.65rem', borderBottom: '1px solid var(--card-border)' }}>
+                      <span className="cad-ribbon-tag">{t("VISTA:")}</span>
+                      <div className="cad-ribbon-tools">
+                        <button type="button" className="cad-tool-btn" onClick={() => setWorkspaceView('split')}>{t("Estudio")}</button>
+                        <button type="button" className="cad-tool-btn" onClick={() => setWorkspaceView('simulation')}>{t("Simulación")}</button>
+                        <button type="button" className="cad-tool-btn" onClick={() => setWorkspaceView('cabinet')}>{t("Gabinete 3D")}</button>
+                        <button type="button" className="cad-tool-btn active" onClick={() => setWorkspaceView('crossover')}>{t("Crossover")}</button>
+                      </div>
+                    </div>
+                  )}
                   <CrossoverTab 
-                    theme={theme}
                     lang={lang} 
                     onRegisterExporter={handleRegisterCrossover}
                     readOnly={true}

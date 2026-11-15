@@ -848,17 +848,17 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
         )}
 
         {boxType === 'sealed' && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem' }}>
-            <span style={{ fontSize: '0.67rem', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            <span style={{ fontSize: '0.67rem', color: 'var(--text-muted)', fontWeight: 600 }}>
               {t("Alineación (Qtc):")}
             </span>
-            <div className="segmented-control" style={{ display: 'inline-flex', width: 'auto', margin: 0, padding: '1px', flex: 1 }}>
+            <div className="segmented-control" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', width: '100%', margin: 0, padding: '1px' }}>
               <button
                 type="button"
                 className={Math.abs(targetQtc - 0.577) < 0.05 ? 'active' : ''}
                 onClick={() => setTargetQtc(0.577)}
                 title={t("Bessel (Qtc 0.577): Óptima respuesta transitoria")}
-                style={{ padding: '0.15rem 0.35rem', fontSize: '0.66rem', height: '22px' }}
+                style={{ padding: '0.15rem 0.25rem', fontSize: '0.64rem', height: '22px', minWidth: 0 }}
               >
                 0.577 (Bessel)
               </button>
@@ -867,7 +867,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 className={Math.abs(targetQtc - 0.707) < 0.05 ? 'active' : ''}
                 onClick={() => setTargetQtc(0.707)}
                 title={t("Butterworth (Qtc 0.707): Máxima planicidad")}
-                style={{ padding: '0.15rem 0.35rem', fontSize: '0.66rem', height: '22px' }}
+                style={{ padding: '0.15rem 0.25rem', fontSize: '0.64rem', height: '22px', minWidth: 0 }}
               >
                 0.707 (B4)
               </button>
@@ -876,7 +876,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 className={Math.abs(targetQtc - 1.0) < 0.05 ? 'active' : ''}
                 onClick={() => setTargetQtc(1.0)}
                 title={t("Chebyshev (Qtc 1.0): Compacta con realce")}
-                style={{ padding: '0.15rem 0.35rem', fontSize: '0.66rem', height: '22px' }}
+                style={{ padding: '0.15rem 0.25rem', fontSize: '0.64rem', height: '22px', minWidth: 0 }}
               >
                 1.0 (Boost)
               </button>

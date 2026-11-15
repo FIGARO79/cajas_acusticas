@@ -6,7 +6,6 @@ import { CabinetCad2D } from './CabinetCad2D';
 import { CabinetViewer3DModal } from './CabinetViewer3DModal';
 
 interface CabinetDiagramProps {
-  theme?: 'dark' | 'light';
   lang: Lang;
   unitSystem: UnitSystem;
   shape: 'rectangular' | 'trapezoidal';
@@ -36,10 +35,11 @@ interface CabinetDiagramProps {
   bandpassVf?: number;
   bandpassVr?: number;
   dampingType?: 'none' | 'light' | 'moderate' | 'heavy';
+  enableBracing?: boolean;
+  bracingCount?: number;
 }
 
 export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
-  theme = 'dark',
   lang,
   unitSystem,
   shape,
@@ -69,6 +69,8 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
   bandpassVf,
   bandpassVr,
   dampingType = 'none',
+  enableBracing = false,
+  bracingCount = 2,
 }) => {
   const t = (text: string) => translate(text, lang);
   const [is3DModalOpen, setIs3DModalOpen] = useState<boolean>(false);
@@ -98,7 +100,6 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
     <div style={{ width: '100%', position: 'relative' }}>
       {/* 2D CAD Canvas Viewport */}
       <CabinetCad2D
-        theme={theme}
         lang={lang}
         unitSystem={unitSystem}
         shape={shape}
@@ -128,12 +129,13 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
         bandpassVf={bandpassVf}
         bandpassVr={bandpassVr}
         dampingType={dampingType}
+        enableBracing={enableBracing}
+        bracingCount={bracingCount}
         onOpen3DModal={() => setIs3DModalOpen(true)}
       />
 
       {/* 3D WebGL Inspection Modal (Three.js) */}
       <CabinetViewer3DModal
-        theme={theme}
         isOpen={is3DModalOpen}
         onClose={() => setIs3DModalOpen(false)}
         lang={lang}
@@ -164,6 +166,8 @@ export const CabinetDiagram: React.FC<CabinetDiagramProps> = ({
         bandpassVf={bandpassVf}
         bandpassVr={bandpassVr}
         dampingType={dampingType}
+        enableBracing={enableBracing}
+        bracingCount={bracingCount}
       />
     </div>
   );
