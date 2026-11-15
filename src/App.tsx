@@ -70,6 +70,17 @@ function App({ wasmError }: AppProps) {
   const [bandpassS, setBandpassS] = useState<number>(0.707);
   const [bandpassA, setBandpassA] = useState<number>(2.0);
 
+  // Panel widths (resizable splitters)
+  const [speakerPanelWidth, setSpeakerPanelWidth] = useState<number>(() => {
+    const saved = Number(localStorage.getItem('aclab_speaker_panel_w'));
+    return Number.isFinite(saved) && saved >= 280 && saved <= 540 ? saved : 360;
+  });
+  const [boxPanelWidth, setBoxPanelWidth] = useState<number>(() => {
+    const saved = Number(localStorage.getItem('aclab_box_panel_w'));
+    return Number.isFinite(saved) && saved >= 280 && saved <= 540 ? saved : 360;
+  });
+  const [activeResizer, setActiveResizer] = useState<'speaker' | 'box' | null>(null);
+
   // Altavoces personalizados guardados en localStorage (con Eminence Alpha-10A completo por defecto)
   const [customDrivers, setCustomDrivers] = useState<CustomDriver[]>(() => {
     const defaultAlpha10A: CustomDriver = {
@@ -952,8 +963,59 @@ function App({ wasmError }: AppProps) {
     }
   };
 
+  const handleContainerContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement | null;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+      return;
+    }
+    e.preventDefault();
+  };
+
+  const startPanelResize = (panel: 'speaker' | 'box', e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = panel === 'speaker' ? speakerPanelWidth : boxPanelWidth;
+    let latestWidth = startWidth;
+    setActiveResizer(panel);
+    document.body.style.cursor = 'col-resize';
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const next = Math.min(540, Math.max(280, Math.round(startWidth + (moveEvent.clientX - startX))));
+      latestWidth = next;
+      if (panel === 'speaker') {
+        setSpeakerPanelWidth(next);
+      } else {
+        setBoxPanelWidth(next);
+      }
+    };
+
+    const onMouseUp = () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+      setActiveResizer(null);
+      localStorage.setItem(
+        panel === 'speaker' ? 'aclab_speaker_panel_w' : 'aclab_box_panel_w',
+        String(latestWidth)
+      );
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  };
+
+  const resetPanelWidth = (panel: 'speaker' | 'box') => {
+    if (panel === 'speaker') {
+      setSpeakerPanelWidth(360);
+      localStorage.setItem('aclab_speaker_panel_w', '360');
+    } else {
+      setBoxPanelWidth(360);
+      localStorage.setItem('aclab_box_panel_w', '360');
+    }
+  };
+
   return (
-    <div className="container" onClick={handleContainerClick}>
+    <div className="container" onClick={handleContainerClick} onContextMenu={handleContainerContextMenu}>
       <Header 
         lang={lang} 
         setLang={setLang} 
@@ -973,7 +1035,13 @@ function App({ wasmError }: AppProps) {
         onNewProject={handleNewProject}
       />
 
-      <div className="dashboard-grid">
+      <div
+        className="dashboard-grid"
+        style={{
+          '--speaker-col-w': `${speakerPanelWidth}px`,
+          '--box-col-w': `${boxPanelWidth}px`,
+        } as React.CSSProperties}
+      >
         {/* PARÁMETROS IZQUIERDA */}
         <SpeakerParamsForm 
           lang={lang}
@@ -997,6 +1065,15 @@ function App({ wasmError }: AppProps) {
           setMidQts={setMidQts}
           midTargetQtc={midTargetQtc}
           setMidTargetQtc={setMidTargetQtc}
+        />
+
+        <div
+          className={`panel-resizer${activeResizer === 'speaker' ? ' active' : ''}`}
+          onMouseDown={(e) => startPanelResize('speaker', e)}
+          onDoubleClick={() => resetPanelWidth('speaker')}
+          title={lang === 'es' ? 'Arrastra para redimensionar (doble clic para restablecer 360px)' : 'Drag to resize (double-click to reset 360px)'}
+          role="separator"
+          aria-orientation="vertical"
         />
 
         {/* PARÁMETROS CENTRO: CAJA DE DISEÑO */}
@@ -1164,6 +1241,15 @@ function App({ wasmError }: AppProps) {
           setMidCabinetDepth={setMidCabinetDepth}
           midSealed={midSealed}
           setMidSealed={setMidSealed}
+        />
+
+        <div
+          className={`panel-resizer${activeResizer === 'box' ? ' active' : ''}`}
+          onMouseDown={(e) => startPanelResize('box', e)}
+          onDoubleClick={() => resetPanelWidth('box')}
+          title={lang === 'es' ? 'Arrastra para redimensionar (doble clic para restablecer 360px)' : 'Drag to resize (double-click to reset 360px)'}
+          role="separator"
+          aria-orientation="vertical"
         />
 
         {/* CONTENIDOS DERECHA */}

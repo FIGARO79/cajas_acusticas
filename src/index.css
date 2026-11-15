@@ -70,7 +70,16 @@ body {
   line-height: 1.4;
   overflow: hidden;
   position: relative;
-  user-select: auto;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+input,
+textarea,
+select,
+[contenteditable="true"] {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 #root {
@@ -224,7 +233,7 @@ select.preset-select:focus {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 360px 360px minmax(0, 1fr);
+  grid-template-columns: var(--speaker-col-w, 360px) 4px var(--box-col-w, 360px) 4px minmax(0, 1fr);
   grid-template-rows: 1fr;
   flex: 1;
   min-height: 0;
@@ -234,11 +243,40 @@ select.preset-select:focus {
   background: var(--bg-main);
 }
 
+.panel-resizer {
+  width: 4px;
+  cursor: col-resize;
+  background: var(--card-border);
+  position: relative;
+  z-index: 10;
+  transition: background-color 0.15s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.panel-resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -2px;
+  right: -2px;
+}
+
+.panel-resizer:hover,
+.panel-resizer.active {
+  background: var(--accent-blue, #38bdf8);
+}
+
 @media (max-width: 1023px) {
   .dashboard-grid {
     grid-template-columns: 1fr;
     height: auto;
     overflow-y: auto;
+  }
+
+  .panel-resizer {
+    display: none;
   }
 }
 
@@ -262,10 +300,6 @@ select.preset-select:focus {
 .speaker-panel,
 .box-design-panel,
 aside.panel {
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  scrollbar-gutter: stable;
-  scrollbar-width: thin;
   background: var(--bg-secondary) !important;
 }
 
@@ -293,7 +327,7 @@ aside.panel {
 }
 
 .form-subsection-title {
-  color: var(--accent);
+  color: var(--text-main);
   letter-spacing: 0.05em;
   font-size: 0.85rem;
   text-transform: uppercase;
@@ -329,11 +363,11 @@ input, select, textarea {
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--primary);
+  color: var(--text-main);
   font-weight: 700;
   margin-top: 0.15rem;
   margin-bottom: 0.15rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid var(--card-border);
   padding-bottom: 0.15rem;
   line-height: 1.1;
 }
@@ -865,27 +899,31 @@ input[type="range"]::-moz-range-thumb:hover {
 }
 
 .alert-box.info {
-  background: rgba(14, 165, 233, 0.06);
-  border: none;
-  color: #7dd3fc;
+  background: var(--bg-main);
+  border: 1px solid var(--card-border);
+  border-left: 3px solid #0ea5e9;
+  color: var(--text-main);
 }
 
 .alert-box.success {
-  background: rgba(16, 185, 129, 0.06);
-  border: none;
-  color: #6ee7b7;
+  background: var(--bg-main);
+  border: 1px solid var(--card-border);
+  border-left: 3px solid #10b981;
+  color: var(--text-main);
 }
 
 .alert-box.warn {
-  background: rgba(245, 158, 11, 0.06);
-  border: none;
-  color: #fef08a;
+  background: var(--bg-main);
+  border: 1px solid var(--card-border);
+  border-left: 3px solid #f59e0b;
+  color: var(--text-main);
 }
 
 .alert-box.danger {
-  background: rgba(239, 68, 68, 0.06);
-  border: none;
-  color: #fca5a5;
+  background: var(--bg-main);
+  border: 1px solid var(--card-border);
+  border-left: 3px solid #ef4444;
+  color: var(--text-main);
 }
 
 /* Wood cut layout */
@@ -1598,13 +1636,13 @@ html textarea:focus {
   background: none;
   border: none;
   color: var(--text-secondary);
-  font-family: var(--font-sans);
-  font-size: 0.71rem;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 0.75rem;
   font-weight: 500;
-  padding: 2px 6px;
-  cursor: pointer;
-  border-radius: 2px;
-  transition: all 0.1s ease;
+  padding: 3px 8px;
+  cursor: default;
+  border-radius: 3px;
+  transition: background-color 0.1s ease, color 0.1s ease;
   outline: none;
 }
 
@@ -1988,6 +2026,9 @@ html .cad-menu-option:hover {
 
 /* CAD DOCK HEADERS FOR PANELS */
 .cad-dock-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   height: 27px;
   min-height: 27px;
   background: var(--cad-panel-header-bg);
@@ -2026,19 +2067,20 @@ html .cad-menu-option:hover {
 }
 
 .cad-dock-tag {
-  font-size: 0.62rem;
+  font-size: 0.64rem;
   font-family: var(--font-mono);
-  padding: 1px 6px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 2px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 0;
+  background: transparent;
+  border: none;
   color: var(--text-muted);
 }
 
 .cad-dock-tag.tag-primary {
-  background: rgba(14, 165, 233, 0.15);
-  border-color: rgba(14, 165, 233, 0.3);
-  color: #38bdf8;
+  background: transparent;
+  border: none;
+  color: var(--text-main);
 }
 
 /* DOCK LAYOUT ADJUSTMENTS FOR ASIDE AND MAIN */
@@ -2048,9 +2090,10 @@ html .cad-menu-option:hover {
   height: 100% !important;
   max-height: 100% !important;
   min-height: 0;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  padding: 0.45rem 0.65rem 3.5rem 0.65rem !important;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden !important;
+  padding: 0 !important;
   background: var(--bg-secondary) !important;
   border: none !important;
   border-right: 1px solid var(--card-border) !important;
@@ -2058,13 +2101,47 @@ html .cad-menu-option:hover {
   box-shadow: none !important;
 }
 
+.panel-scroll-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.35) transparent;
+  padding: 0.45rem 0.65rem 3.5rem 0.65rem;
+}
+
+.panel-scroll-body::-webkit-scrollbar,
+.speaker-panel::-webkit-scrollbar,
+.box-design-panel::-webkit-scrollbar,
+.dashboard-main::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.panel-scroll-body::-webkit-scrollbar-thumb,
+.speaker-panel::-webkit-scrollbar-thumb,
+.box-design-panel::-webkit-scrollbar-thumb,
+.dashboard-main::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.32);
+  border-radius: 3px;
+}
+
+.panel-scroll-body::-webkit-scrollbar-thumb:hover,
+.speaker-panel::-webkit-scrollbar-thumb:hover,
+.box-design-panel::-webkit-scrollbar-thumb:hover,
+.dashboard-main::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.55);
+}
+
 .speaker-panel > .cad-dock-header,
 .box-design-panel > .cad-dock-header {
-  margin: -0.45rem -0.65rem 0.5rem -0.65rem;
+  margin: 0;
 }
 
 .chart-card > .cad-dock-header {
-  margin: -0.4rem -0.65rem 0.45rem -0.65rem;
+  margin: 0 -0.65rem 0.45rem -0.65rem;
 }
 
 .box-design-panel {
@@ -2091,7 +2168,7 @@ html .cad-menu-option:hover {
 .dashboard-main .panel.chart-card {
   flex-shrink: 0;
   height: auto;
-  padding: 0.4rem 0.65rem !important;
+  padding: 0 0.65rem 0.4rem 0.65rem !important;
   background: #0f1115 !important;
   border-bottom: 1px solid var(--card-border) !important;
 }
@@ -3306,18 +3383,17 @@ html .crossover-table td {
 
 /* EBP Visual Gauge */
 .ebp-meter-card {
-  background: rgba(15, 23, 42, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: var(--bg-main);
+  border: 1px solid var(--card-border);
   border-radius: 0;
-  padding: 0.55rem 0.75rem 0.65rem;
-  margin-bottom: 0.65rem;
-  backdrop-filter: blur(8px);
-  transition: all 0.25s ease;
+  padding: 0.5rem 0.65rem 0.6rem;
+  margin-bottom: 0.6rem;
+  backdrop-filter: none;
 }
 html .ebp-meter-card {
-  background: rgba(248, 250, 252, 0.85);
-  border-color: rgba(0, 0, 0, 0.08);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  box-shadow: none;
 }
 
 .ebp-meter-header {
@@ -3349,32 +3425,37 @@ html .ebp-meter-card {
 }
 
 .ebp-meter-chip {
-  font-size: 0.68rem;
-  font-weight: 700;
-  padding: 0.15rem 0.45rem;
-  border-radius: 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-main);
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  letter-spacing: 0.2px;
+  gap: 0.35rem;
+  letter-spacing: 0.01em;
 }
 
-.ebp-meter-chip.chip-sealed {
-  background: rgba(14, 165, 233, 0.15);
-  color: #38bdf8;
-  border: 1px solid rgba(14, 165, 233, 0.35);
+.ebp-meter-chip::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 1px;
+  background: var(--text-muted);
+  flex-shrink: 0;
 }
 
-.ebp-meter-chip.chip-hybrid {
-  background: rgba(245, 158, 11, 0.15);
-  color: #fbbf24;
-  border: 1px solid rgba(245, 158, 11, 0.35);
+.ebp-meter-chip.chip-sealed::before {
+  background: #0ea5e9;
 }
 
-.ebp-meter-chip.chip-ported {
-  background: rgba(16, 185, 129, 0.15);
-  color: #34d399;
-  border: 1px solid rgba(16, 185, 129, 0.35);
+.ebp-meter-chip.chip-hybrid::before {
+  background: #f59e0b;
+}
+
+.ebp-meter-chip.chip-ported::before {
+  background: #10b981;
 }
 
 /* Track and Zones */
@@ -3491,30 +3572,31 @@ html .ebp-meter-card {
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  padding: 0.45rem 0.65rem;
+  padding: 0.4rem 0.6rem;
   border-radius: 0;
+  background: var(--bg-main);
+  border: 1px solid var(--card-border);
+  border-left-width: 3px;
+  color: var(--text-main);
   font-size: 0.72rem;
   margin-top: 0.5rem;
   line-height: 1.25;
-  transition: all 0.2s ease;
+}
+
+html .chuffing-badge {
+  background: #f8fafc;
 }
 
 .chuffing-badge.quiet {
-  background: rgba(16, 185, 129, 0.08);
-  border: 1px solid rgba(16, 185, 129, 0.25);
-  color: #34d399;
+  border-left-color: #10b981;
 }
 
 .chuffing-badge.moderate {
-  background: rgba(245, 158, 11, 0.08);
-  border: 1px solid rgba(245, 158, 11, 0.25);
-  color: #fbbf24;
+  border-left-color: #f59e0b;
 }
 
 .chuffing-badge.critical {
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  color: #f87171;
+  border-left-color: #ef4444;
 }
 
 /* Refined sub-tabs header for 4 tabs */

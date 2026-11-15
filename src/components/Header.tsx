@@ -495,20 +495,6 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Lado Derecho: Marca */}
-        <div className="cad-bar-right" style={{ marginLeft: 'auto' }}>
-          <div className="cad-brand-block">
-            <img
-              src="/app-icon.png"
-              alt=""
-              className="cad-app-icon"
-              width={16}
-              height={16}
-            />
-            <span className="cad-app-brand">AcousticLAB</span>
-            <span className="cad-app-sub">CAD</span>
-          </div>
-        </div>
       </div>
     </header>
   );

@@ -726,6 +726,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
         </div>
       </div>
 
+      <div className="panel-scroll-body">
       {/* Medidor Visual de EBP (Thiele-Small) */}
       <div className="ebp-meter-card">
         <div className="ebp-meter-header">
@@ -758,8 +759,8 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
         {/* Marcas de escala */}
         <div className="ebp-meter-labels">
           <span>0</span>
-          <span style={{ color: '#38bdf8' }}>50 (Sellada)</span>
-          <span style={{ color: '#34d399' }}>90 (Ventilada)</span>
+          <span>50 (Sellada)</span>
+          <span>90 (Ventilada)</span>
           <span>160+</span>
         </div>
 
@@ -1320,7 +1321,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       <summary style={{
                         cursor: 'pointer',
                         fontWeight: 600,
-                        color: 'var(--accent)',
+                        color: 'var(--text-main)',
                         outline: 'none',
                         userSelect: 'none'
                       }}>
@@ -1446,7 +1447,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
 
                     {/* Resultados del Recinto debajo de los inputs */}
                     <div style={{ borderTop: '1px solid var(--card-border)', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
-                      <label style={{ color: 'var(--accent)', fontWeight: 650, fontSize: '0.72rem', display: 'block', marginBottom: '0.15rem' }}>
+                      <label style={{ color: 'var(--text-main)', fontWeight: 650, fontSize: '0.72rem', display: 'block', marginBottom: '0.15rem' }}>
                         {t("Resultados del Recinto:")}
                       </label>
                       {cabinetData?.valid ? (
@@ -1505,7 +1506,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       style={{
                         background: 'none',
                         border: 'none',
-                        color: 'var(--accent)',
+                        color: 'var(--text-main)',
                         fontSize: '0.7rem',
                         fontWeight: 600,
                         cursor: 'pointer',
@@ -1558,7 +1559,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
               <div className="input-group" style={{ marginBottom: '0.5rem' }}>
                 <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem' }}>
                   <span>{t("Posición Vertical Woofer")}</span>
-                  <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{speakerYPct}%</span>
+                  <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{speakerYPct}%</span>
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <input
@@ -1576,7 +1577,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 <div className="input-group" style={{ marginBottom: '0.5rem' }}>
                   <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem' }}>
                     <span>{t("Posición Vertical Tweeter")}</span>
-                    <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{tweeterYPct}%</span>
+                    <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{tweeterYPct}%</span>
                   </label>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <input
@@ -1595,7 +1596,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 <div className="input-group" style={{ marginBottom: '0.5rem' }}>
                   <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem' }}>
                     <span>{t("Posición Vertical Medio")}</span>
-                    <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{midrangeYPct}%</span>
+                    <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{midrangeYPct}%</span>
                   </label>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <input
@@ -1627,7 +1628,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     style={{
                       background: 'none',
                       border: 'none',
-                      color: 'var(--accent)',
+                      color: 'var(--text-main)',
                       fontSize: '0.7rem',
                       fontWeight: 600,
                       cursor: 'pointer',
@@ -1646,7 +1647,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
                       {t("Alineación Acústica")}
                     </label>
-                    <span style={{ fontSize: '0.68rem', color: 'var(--accent)', fontWeight: 600 }}>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-main)', fontWeight: 600 }}>
                       {ventedAlignment === 'QB3' ? 'High Output (QB3)' : ventedAlignment === 'B4' ? 'High Fidelity (B4)' : 'Extended Bass (SBB4)'}
                     </span>
                   </div>
@@ -1694,11 +1695,11 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                   {params.fs && params.qts && (
                     <div style={{ fontSize: '0.64rem', color: 'var(--text-muted)', marginTop: '0.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span>
-                        {t("Sugerida")}: <strong style={{ color: 'var(--accent)' }}>{recommendedAlignment === 'B4' ? 'Hi-Fi (B4)' : recommendedAlignment === 'QB3' ? 'High Output (QB3)' : 'Ext. Bass (SBB4)'}</strong> (Qts: {params.qts.toFixed(2)})
+                        {t("Sugerida")}: <strong style={{ color: 'var(--text-main)' }}>{recommendedAlignment === 'B4' ? 'Hi-Fi (B4)' : recommendedAlignment === 'QB3' ? 'High Output (QB3)' : 'Ext. Bass (SBB4)'}</strong> (Qts: {params.qts.toFixed(2)})
                       </span>
                       {recommendedFbForDriver > 0 && (
                         <span>
-                          Fb óptima: <strong style={{ color: 'var(--accent)' }}>{recommendedFbForDriver.toFixed(1)} Hz</strong>
+                          Fb óptima: <strong style={{ color: 'var(--text-main)' }}>{recommendedFbForDriver.toFixed(1)} Hz</strong>
                         </span>
                       )}
                     </div>
@@ -1762,7 +1763,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     style={{
                       background: 'rgba(255, 255, 255, 0.05)',
                       border: '1px solid var(--card-border)',
-                      color: 'var(--accent)',
+                      color: 'var(--text-main)',
                       borderRadius: '3px',
                       padding: '0.15rem 0.45rem',
                       fontSize: '0.64rem',
@@ -1890,13 +1891,13 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       </div>
                     </div>
 
-                    <div style={{ fontSize: '0.67rem', marginBottom: '0.45rem', padding: '0.25rem 0.45rem', borderRadius: '4px', background: !useCustomPortLength ? 'rgba(52, 211, 153, 0.08)' : 'rgba(251, 191, 36, 0.08)', border: `1px solid ${!useCustomPortLength ? 'rgba(52, 211, 153, 0.25)' : 'rgba(251, 191, 36, 0.25)'}` }}>
+                    <div style={{ fontSize: '0.67rem', marginBottom: '0.45rem', padding: '0.3rem 0.5rem', borderRadius: '0px', background: 'var(--bg-main)', border: '1px solid var(--card-border)', borderLeft: `3px solid ${!useCustomPortLength ? '#10b981' : '#f59e0b'}` }}>
                       {!useCustomPortLength ? (
-                        <span style={{ color: '#34d399', fontWeight: 600 }}>
+                        <span style={{ color: 'var(--text-main)', fontWeight: 500 }}>
                           {t("Sintonía bloqueada en")} {(portedData.valid ? portedData.Fb : customFb).toFixed(1)} Hz — {t("La longitud se recalcula al modificar decimales de diámetro o cantidad.")}
                         </span>
                       ) : (
-                        <span style={{ color: '#fbbf24', fontWeight: 600 }}>
+                        <span style={{ color: 'var(--text-main)', fontWeight: 500 }}>
                           {t("Longitud personalizada activa — La sintonía (Fb) cambia según la medida del tubo.")}
                         </span>
                       )}
@@ -2027,7 +2028,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                         >
                           <div className="port-end-opt-title">
                             <span>{t("Recto / Estándar")}</span>
-                            <span style={{ fontSize: '0.62rem', color: 'var(--accent)' }}>k = 0.732</span>
+                            <span style={{ fontSize: '0.62rem', color: 'var(--text-main)' }}>k = 0.732</span>
                           </div>
                           <span className="port-end-opt-desc">{t("1 extremo a ras")}</span>
                         </button>
@@ -2038,7 +2039,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                         >
                           <div className="port-end-opt-title">
                             <span>{t("Dos a Ras")}</span>
-                            <span style={{ fontSize: '0.62rem', color: 'var(--accent)' }}>k = 0.850</span>
+                            <span style={{ fontSize: '0.62rem', color: 'var(--text-main)' }}>k = 0.850</span>
                           </div>
                           <span className="port-end-opt-desc">{t("Ambos adosados")}</span>
                         </button>
@@ -2055,7 +2056,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                         >
                           <div className="port-end-opt-title">
                             <span>{t("Abocinado (Aeroport / Flared)")}</span>
-                            <span style={{ fontSize: '0.62rem', color: 'var(--accent)' }}>
+                            <span style={{ fontSize: '0.62rem', color: 'var(--text-main)' }}>
                               {flaredEnds === 3 ? 'k = 0.850' : flaredEnds === 2 ? 'k = 0.968' : 'k = 0.850 / 0.968'}
                             </span>
                           </div>
@@ -2151,7 +2152,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                           <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)' }}>
                             {t("SUGERENCIAS DE PUERTOS (ANTI-SOPLIDO)")}:
                           </span>
-                          <span style={{ fontSize: '0.64rem', color: 'var(--accent)', fontWeight: 600 }}>
+                          <span style={{ fontSize: '0.64rem', color: 'var(--text-main)', fontWeight: 600 }}>
                             Fb: {targetOptimalFb.toFixed(1)} Hz
                           </span>
                         </div>
@@ -2174,12 +2175,12 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                                     </span>
                                   )}
                                   {s.areaRatio !== undefined && (
-                                    <span style={{ marginLeft: '0.25rem', fontSize: '0.62rem', color: s.areaRatio >= 14 ? '#34d399' : '#94a3b8' }}>
+                                    <span style={{ marginLeft: '0.25rem', fontSize: '0.62rem', color: 'var(--text-muted)' }}>
                                       ({s.areaRatio}% Sd)
                                     </span>
                                   )}
                                   {!fitsDepth && (
-                                    <span style={{ marginLeft: '0.3rem', fontSize: '0.62rem', color: '#f87171' }}>
+                                    <span style={{ marginLeft: '0.3rem', fontSize: '0.62rem', color: 'var(--text-muted)' }}>
                                       ({t("Excede prof.")})
                                     </span>
                                   )}
@@ -2224,7 +2225,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       <div className="input-group" style={{ marginBottom: '0.75rem', paddingBottom: '0.35rem' }}>
                         <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem' }}>
                           <span>{t("Posición Vertical Puerto(s)")}</span>
-                          <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{portYPct}%</span>
+                          <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{portYPct}%</span>
                         </label>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
                           <input
@@ -2243,7 +2244,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                         <div className="input-group" style={{ marginBottom: '0.75rem', paddingBottom: '0.35rem' }}>
                           <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem' }}>
                             <span>{t("Separación entre Puertos")}</span>
-                            <span style={{ fontWeight: 600, color: 'var(--accent)' }}>
+                            <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>
                               {portSpacingPct}% {computedPortSpacingCm ? `(${convertTo(computedPortSpacingCm, 'length', unitSystem).toFixed(1)} ${getUnitLabel('length', unitSystem)})` : ''}
                             </span>
                           </label>
@@ -2767,7 +2768,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', fontSize: '0.72rem' }}>
                     <div>
                       <span style={{ color: 'var(--text-muted)' }}>{t("Inductancia:")}</span>{' '}
-                      <strong style={{ color: 'var(--ported-color)' }}>{whCalculations.inductance.toFixed(3)} mH</strong>
+                      <strong style={{ color: 'var(--text-main)' }}>{whCalculations.inductance.toFixed(3)} mH</strong>
                     </div>
                     <div>
                       <span style={{ color: 'var(--text-muted)' }}>{t("Espiras (vueltas):")}</span>{' '}
@@ -2795,6 +2796,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
             </div>
           </div>
         )}
+      </div>
       </div>
     </aside>
   );

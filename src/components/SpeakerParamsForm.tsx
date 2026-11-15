@@ -526,6 +526,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
         </div>
       </div>
 
+      <div className="panel-scroll-body">
       {/* Selector de Pestañas de Altavoz (Menú de Texto Plano) */}
       <div className="driver-menu-links" style={{ display: 'flex', gap: '1rem', marginBottom: '0.85rem', borderBottom: '1px solid var(--card-border)', paddingBottom: '0.4rem' }}>
         <button 
@@ -814,7 +815,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
 
         {crossoverWays === 3 && (
           <div style={{ marginTop: '0.5rem', marginBottom: '0.75rem', padding: '0.75rem', background: 'rgba(234,179,8,0.03)', border: '1px solid rgba(234,179,8,0.1)', borderRadius: '8px' }}>
-            <div className="form-subsection-title" style={{ color: '#eab308', borderBottomColor: 'rgba(234,179,8,0.1)', marginTop: 0 }}>
+            <div className="form-subsection-title" style={{ marginTop: 0 }}>
               {t("Parámetros de Medios (Midrange T/S)")}
             </div>
             <div className="input-grid">
@@ -1305,6 +1306,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
           <span>{validationError}</span>
         </div>
       )}
+      </div>
     </aside>
   );
 };
