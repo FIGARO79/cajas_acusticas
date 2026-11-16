@@ -92,21 +92,41 @@ pub fn calc_f3_ventilada(fs: f64, qts: f64, vb: f64, fb: f64, vas: f64) -> f64 {
     let a1 = h * h / qts + h / ql;
     let a0 = h * h;
 
-    let mut low = 10.0_f64;
-    let mut high = 500.0_f64;
-    for _ in 0..24 {
-        let mid = (low + high) / 2.0;
-        let y = mid / fs;
+    let eval_mag = |freq: f64| -> f64 {
+        let y = freq / fs;
         let real = y.powi(4) - a2 * y * y + a0;
         let imag = a1 * y - a3 * y.powi(3);
-        let mag = y.powi(4) / (real * real + imag * imag + 1e-20).sqrt();
-        if mag < std::f64::consts::FRAC_1_SQRT_2 {
-            low = mid;
-        } else {
-            high = mid;
-        }
+        y.powi(4) / (real * real + imag * imag + 1e-20).sqrt()
+    };
+
+    // Seguimiento descendente desde la banda de paso hasta el primer cruce absoluto a -3 dB
+    let start_f = (fs * 8.0).max(500.0);
+    let min_f = 5.0_f64;
+    let mut prev_f = start_f;
+    if eval_mag(prev_f) < std::f64::consts::FRAC_1_SQRT_2 {
+        return prev_f;
     }
-    (low + high) / 2.0
+
+    let mut curr_f = prev_f * 0.99;
+    while curr_f >= min_f {
+        if eval_mag(curr_f) < std::f64::consts::FRAC_1_SQRT_2 {
+            let mut low = curr_f;
+            let mut high = prev_f;
+            for _ in 0..20 {
+                let mid = (low + high) / 2.0;
+                if eval_mag(mid) < std::f64::consts::FRAC_1_SQRT_2 {
+                    low = mid;
+                } else {
+                    high = mid;
+                }
+            }
+            return (low + high) / 2.0;
+        }
+        prev_f = curr_f;
+        curr_f *= 0.99;
+    }
+
+    min_f
 }
 
 #[wasm_bindgen]
@@ -306,36 +326,35 @@ pub fn calc_alineacion_ventilada(fs: f64, vas: f64, qts: f64, tipo: &str) -> Ven
     let fs_val = if fs <= 0.0 { 0.0 } else { fs };
     let vas_val = if vas <= 0.0 { 0.0 } else { vas };
 
-    let (mut vb, mut fb, mut f3) = match tipo {
-        "SBB4" => (
-            11.0 * qts_val.powf(2.87) * vas_val,
-            0.38 * qts_val.powf(-0.95) * fs_val,
-            0.38 * qts_val.powf(-0.95) * fs_val,
-        ),
-        "B4" => (
-            0.25 * qts_val.powf(-2.0) * vas_val,
-            fs_val,
-            fs_val,
-        ),
-        _ => (
-            6.27 * qts_val.powf(1.44) * vas_val,
-            0.94 * qts_val.powf(-0.9) * fs_val,
-            1.2 * qts_val.powf(-0.9) * fs_val,
-        ),
+    if fs_val <= 0.0 || vas_val <= 0.0 {
+        return VentedAlignment { vb: 0.0, fb: 0.0, f3: 0.0 };
+    }
+
+    // Referencia de alta fidelidad (máximamente plana): transiciona naturalmente entre QB3, B4 y C4 según Qts
+    let vb_flat = (15.0 * qts_val.powf(2.87) * vas_val)
+        .max(vas_val * 0.25)
+        .min(vas_val * 2.0);
+    let fb_flat = ((vas_val / vb_flat.max(1e-6)).powf(0.31) * fs_val)
+        .clamp(fs_val * 0.86, fs_val * 1.30);
+
+    let (vb, fb) = match tipo {
+        "SBB4" => {
+            // Extensión de graves: incrementa Vb según Qts (~2.0x para Qts<=0.30 hasta ~1.4x para Qts>=0.50) y baja ligeramente Fb
+            let ext_factor = (2.0 - (qts_val - 0.30) * 3.0).clamp(1.35, 2.0);
+            let vb_ext = (vb_flat * ext_factor).min(vas_val * 3.0);
+            let fb_ext = (fb_flat * 0.90).max(fs_val * 0.68);
+            (vb_ext, fb_ext)
+        }
+        "B4" => (vb_flat, fb_flat),
+        _ => {
+            // Alto rendimiento: caja más compacta y sintonía algo más alta para mayor salida y control de excursión
+            let vb_out = (vb_flat * 0.65).max(vas_val * 0.22);
+            let fb_out = (fb_flat * 1.08).clamp(fs_val * 0.90, fs_val * 1.35);
+            (vb_out, fb_out)
+        }
     };
 
-    // Para altavoces con Qts moderado a alto (Qts >= 0.40):
-    // La fórmula teórica de alineaciones como QB3 proyecta un Fb excesivo (hasta 2x Fs) y un Vb gigante
-    // generando un pico resonante ("joroba") en la respuesta de graves y tubos de sintonía inviables.
-    // Acotamos acústicamente Fb y Vb para mantener una respuesta controlada y factible.
-    if qts_val >= 0.45 {
-        fb = fb.min(fs_val * 1.05).max(fs_val * 0.85);
-        vb = vb.min(vas_val * 1.5).max(vas_val * 0.35);
-        f3 = f3.min(fs_val * 1.25);
-    } else if qts_val >= 0.40 {
-        fb = fb.min(fs_val * 1.18);
-        vb = vb.min(vas_val * 2.0);
-    }
+    let f3 = calc_f3_ventilada(fs_val, qts_val, vb, fb, vas_val);
 
     VentedAlignment { vb, fb, f3 }
 }

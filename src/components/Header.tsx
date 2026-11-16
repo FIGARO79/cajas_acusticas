@@ -286,7 +286,7 @@ export const Header: React.FC<HeaderProps> = ({
                   role="menuitem"
                 >
                   {boxType === 'ported' && ventedAlignment === 'QB3' && <span className="cad-menu-check">✓</span>}
-                  <span>{t("Ventilada QB3 (Quasi-Butterworth 3)")}</span>
+                  <span>{t("Potencia / High Output (QB3)")}</span>
                 </button>
                 <button
                   className={`cad-menu-option ${boxType === 'ported' && ventedAlignment === 'B4' ? 'checked' : ''}`}
@@ -299,7 +299,7 @@ export const Header: React.FC<HeaderProps> = ({
                   role="menuitem"
                 >
                   {boxType === 'ported' && ventedAlignment === 'B4' && <span className="cad-menu-check">✓</span>}
-                  <span>{t("Ventilada B4 (Butterworth 4to Orden)")}</span>
+                  <span>{t("Hi-Fi / Respuesta Plana (B4)")}</span>
                 </button>
                 <button
                   className={`cad-menu-option ${boxType === 'ported' && ventedAlignment === 'SBB4' ? 'checked' : ''}`}
@@ -312,7 +312,7 @@ export const Header: React.FC<HeaderProps> = ({
                   role="menuitem"
                 >
                   {boxType === 'ported' && ventedAlignment === 'SBB4' && <span className="cad-menu-check">✓</span>}
-                  <span>{t("Ventilada SBB4 (Super Boom-Box 4)")}</span>
+                  <span>{t("Deep Bass / Graves Profundos (SBB4)")}</span>
                 </button>
 
                 <div className="cad-menu-separator" role="separator" />

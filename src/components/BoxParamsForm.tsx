@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { type Lang, translate } from '../utils/translations';
 import { type UnitSystem, convertTo, convertFrom, getUnitLabel } from '../utils/units';
 import type { CalculatedPorted, CalculatedSealed, CalculatedBandpass, SpeakerParams, PortSuggestions, WoodCabinetData, WoodShape } from '../types';
-import { suggestPortConfig, calcOptimalPortForSpeaker, calculatePortSpacing } from '../utils/acousticMath';
+import { suggestPortConfig, calcOptimalPortForSpeaker, calculatePortSpacing, calcPortLength, getKCorrection } from '../utils/acousticMath';
 import { getWasm, optimizeCrossoverLowpass } from '../wasm';
 
 interface BoxParamsFormProps {
@@ -533,13 +533,10 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
     return params.fs || 50;
   }, [useCustomPortLength, customPorted, customFb, recommendedFbForDriver, portedData.valid, portedData.Fb, params.fs]);
 
-  // Alineación sugerida óptima según el Qts del altavoz
+  // Alineación sugerida óptima (Alta Fidelidad: transición continua QB3/B4/C4 según Qts)
   const recommendedAlignment = useMemo<'QB3' | 'B4' | 'SBB4'>(() => {
-    if (!params.qts || params.qts <= 0) return 'B4';
-    if (params.qts < 0.38) return 'QB3';
-    if (params.qts <= 0.45) return 'B4';
-    return 'B4'; // Para Qts >= 0.45, B4 (Fb=Fs) es la ideal para evitar jorobas
-  }, [params.qts]);
+    return 'B4';
+  }, []);
 
   const handleApplyOptimalFb = () => {
     if (recommendedFbForDriver <= 0) return;
@@ -581,6 +578,42 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
     return null;
   }, [portCount, portDiameter, portShape, portWidth, portHeight, portedData, params]);
 
+  const silentAirLimit = flaredEnds >= 2 ? 12.0 : 10.0;
+
+  const portPhysicalDiagnostics = useMemo(() => {
+    const pCount = typeof portCount === 'number' && portCount > 0 ? portCount : 1;
+    const pDia = portShape === 'round'
+      ? (Number(portDiameter) || 0)
+      : (2 * Math.sqrt(((Number(portWidth) || 0) * (Number(portHeight) || 0)) / Math.PI));
+
+    if (pDia <= 0) return null;
+
+    const lvCm = useCustomPortLength && Number(customPortLength) > 0
+      ? Number(customPortLength)
+      : (portedData.valid && portedData.Vb > 0 && portedData.Fb > 0
+          ? calcPortLength(portedData.Vb, portedData.Fb, pDia, flaredEnds, pCount)
+          : 0);
+
+    if (lvCm <= 0) return null;
+
+    const kCorr = getKCorrection(flaredEnds);
+    const pipeResonanceHz = 34400 / (2 * (lvCm + kCorr * pDia));
+    const minClearanceCm = Math.max(pDia, 2.5);
+    const clearanceCm = cabinetData?.valid && cabinetData.dInt > 0
+      ? cabinetData.dInt - lvCm
+      : null;
+
+    return {
+      pDia,
+      lvCm,
+      pipeResonanceHz,
+      minClearanceCm,
+      clearanceCm,
+      hasPipeWarning: pipeResonanceHz < 400,
+      hasClearanceWarning: clearanceCm !== null && clearanceCm < minClearanceCm,
+    };
+  }, [portCount, portShape, portDiameter, portWidth, portHeight, useCustomPortLength, customPortLength, portedData.valid, portedData.Vb, portedData.Fb, flaredEnds, cabinetData]);
+
   const computedPortSpacingCm = useMemo(() => {
     const pCount = typeof portCount === 'number' ? portCount : 1;
     if (pCount < 2) return null;
@@ -621,8 +654,9 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
     if (targetVb <= 0 || targetFb <= 0) return;
 
     const minLen = Math.max((Number(woodThickness) || 15) / 10, 2.0);
+    const estDia = portShape === 'round' && typeof portDiameter === 'number' && portDiameter > 0 ? portDiameter : 7.5;
     const maxLen = cabinetData?.valid && cabinetData.dInt > 6
-      ? Math.max(cabinetData.dInt - 3.5, minLen + 2)
+      ? Math.max(cabinetData.dInt - Math.max(estDia, 3.5), minLen + 2)
       : 42.0;
 
     const opt = calcOptimalPortForSpeaker(targetVb, targetFb, params, flaredEnds, minLen, maxLen);
@@ -838,28 +872,31 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 type="button"
                 className={ventedAlignment === 'QB3' ? 'active' : ''}
                 onClick={() => setVentedAlignment('QB3')}
-                title={t("Quasi-Butterworth 3: Salida SPL alta, caja compacta")}
-                style={{ padding: '0.15rem 0.35rem', fontSize: '0.67rem', height: '22px' }}
+                title={t("Alta salida SPL y caja compacta (QB3)")}
+                style={{ padding: '0.18rem 0.25rem', fontSize: '0.62rem', lineHeight: 1.1, height: 'auto', minHeight: '26px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
               >
-                QB3
+                <span>{t("Potencia")}</span>
+                <span style={{ fontSize: '0.55rem', opacity: 0.8 }}>QB3</span>
               </button>
               <button
                 type="button"
                 className={ventedAlignment === 'B4' ? 'active' : ''}
                 onClick={() => setVentedAlignment('B4')}
-                title={t("Butterworth 4to Orden: Máxima fidelidad y respuesta plana")}
-                style={{ padding: '0.15rem 0.35rem', fontSize: '0.67rem', height: '22px' }}
+                title={t("Máxima fidelidad y respuesta plana (B4)")}
+                style={{ padding: '0.18rem 0.25rem', fontSize: '0.62rem', lineHeight: 1.1, height: 'auto', minHeight: '26px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
               >
-                B4
+                <span>Hi-Fi</span>
+                <span style={{ fontSize: '0.55rem', opacity: 0.8 }}>B4</span>
               </button>
               <button
                 type="button"
                 className={ventedAlignment === 'SBB4' ? 'active' : ''}
                 onClick={() => setVentedAlignment('SBB4')}
-                title={t("Super Boom Box 4: Extensión profunda de graves")}
-                style={{ padding: '0.15rem 0.35rem', fontSize: '0.67rem', height: '22px' }}
+                title={t("Graves profundos y mayor extensión (SBB4)")}
+                style={{ padding: '0.18rem 0.25rem', fontSize: '0.62rem', lineHeight: 1.1, height: 'auto', minHeight: '26px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
               >
-                SBB4
+                <span>Deep Bass</span>
+                <span style={{ fontSize: '0.55rem', opacity: 0.8 }}>SBB4</span>
               </button>
             </div>
           </div>
@@ -1734,7 +1771,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       style={{ padding: '0.28rem 0.2rem', fontSize: '0.68rem', textAlign: 'center' }}
                       title="Super Boom Box 4: Máxima extensión de subgraves profundos"
                     >
-                      Ext. Bass (SBB4)
+                      Deep Bass (SBB4)
                     </button>
                   </div>
                   {params.fs && params.qts && (
@@ -2133,14 +2170,14 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     </div>
 
                     {/* Alerta de Velocidad y Chuffing */}
-                    <div className={`chuffing-badge ${vPeak !== null ? (vPeak < 10 ? 'quiet' : vPeak <= 17 ? 'moderate' : 'critical') : 'quiet'}`}>
+                    <div className={`chuffing-badge ${vPeak !== null ? (vPeak < silentAirLimit ? 'quiet' : vPeak <= 17 ? 'moderate' : 'critical') : 'quiet'}`}>
                       <span
                         style={{
                           width: '7px',
                           height: '7px',
                           borderRadius: '50%',
-                          background: vPeak !== null ? (vPeak < 10 ? '#34d399' : vPeak <= 17 ? '#fbbf24' : '#f87171') : 'var(--text-muted)',
-                          boxShadow: vPeak !== null ? `0 0 6px ${vPeak < 10 ? '#34d399' : vPeak <= 17 ? '#fbbf24' : '#f87171'}` : 'none',
+                          background: vPeak !== null ? (vPeak < silentAirLimit ? '#34d399' : vPeak <= 17 ? '#fbbf24' : '#f87171') : 'var(--text-muted)',
+                          boxShadow: vPeak !== null ? `0 0 6px ${vPeak < silentAirLimit ? '#34d399' : vPeak <= 17 ? '#fbbf24' : '#f87171'}` : 'none',
                           display: 'inline-block',
                           flexShrink: 0
                         }}
@@ -2149,7 +2186,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.4rem' }}>
                           <span style={{ fontWeight: 700, letterSpacing: '0.02em' }}>
                             {vPeak !== null 
-                              ? (vPeak < 10 
+                              ? (vPeak < silentAirLimit 
                                   ? `${t("Flujo silencioso")}: ${vPeak.toFixed(1)} m/s` 
                                   : vPeak <= 17 
                                     ? `${t("Velocidad moderada")}: ${vPeak.toFixed(1)} m/s` 
@@ -2157,7 +2194,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                               : t("Ingresa Sd y Xmax para calcular velocidad")
                             }
                           </span>
-                          {vPeak !== null && vPeak >= 10 && (
+                          {vPeak !== null && vPeak >= silentAirLimit && (
                             <button
                               type="button"
                               onClick={handleApplyOptimalPort}
@@ -2179,7 +2216,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                         </div>
                         <div style={{ fontSize: '0.64rem', opacity: 0.85 }}>
                           {vPeak !== null 
-                            ? (vPeak < 10 
+                            ? (vPeak < silentAirLimit 
                                 ? t("Sin soplidos ni ruidos de aire audibles.") 
                                 : vPeak <= 17 
                                   ? t("Aceptable. Se recomienda usar extremos abocinados.") 
@@ -2189,6 +2226,42 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                         </div>
                       </div>
                     </div>
+
+                    {portPhysicalDiagnostics && (
+                      <div
+                        style={{
+                          marginTop: '0.4rem',
+                          padding: '0.35rem 0.5rem',
+                          background: 'rgba(255,255,255,0.02)',
+                          border: `1px solid ${portPhysicalDiagnostics.hasClearanceWarning ? 'rgba(248, 113, 113, 0.45)' : portPhysicalDiagnostics.hasPipeWarning ? 'rgba(251, 191, 36, 0.45)' : 'var(--card-border)'}`,
+                          borderRadius: '4px',
+                          fontSize: '0.64rem',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.18rem',
+                          color: 'var(--text-muted)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.4rem' }}>
+                          <span>{t("Resonancia de tubo")}:</span>
+                          <strong style={{ color: portPhysicalDiagnostics.hasPipeWarning ? '#fbbf24' : 'var(--text-main)' }}>
+                            ~{Math.round(portPhysicalDiagnostics.pipeResonanceHz)} Hz
+                            {portPhysicalDiagnostics.hasPipeWarning ? ` (${t("Baja: riesgo en medios-bajos")})` : ''}
+                          </strong>
+                        </div>
+                        {portPhysicalDiagnostics.clearanceCm !== null && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.4rem' }}>
+                            <span>{t("Despeje pared trasera")} (min 1×Dv):</span>
+                            <strong style={{ color: portPhysicalDiagnostics.hasClearanceWarning ? '#f87171' : '#34d399' }}>
+                              {convertTo(portPhysicalDiagnostics.clearanceCm, 'length', unitSystem).toFixed(1)} {getUnitLabel('length', unitSystem)}
+                              {portPhysicalDiagnostics.hasClearanceWarning
+                                ? ` (< ${convertTo(portPhysicalDiagnostics.minClearanceCm, 'length', unitSystem).toFixed(1)} ${getUnitLabel('length', unitSystem)})`
+                                : ' (OK)'}
+                            </strong>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Sugerencias Comerciales de Puerto */}
                     {suggestions && 'options' in suggestions && suggestions.options && suggestions.options.length > 0 && (
@@ -2209,7 +2282,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                             const optVel = s.vPeak ?? ((params.sd && params.xmax && portedData.Fb > 0)
                               ? (0.008 * portedData.Fb * params.sd * params.xmax) / (s.numPorts * s.diameter * s.diameter)
                               : null);
-                            const fitsDepth = !cabinetData?.valid || s.length <= (cabinetData.dInt - 2.5);
+                            const fitsDepth = !cabinetData?.valid || s.length <= (cabinetData.dInt - Math.max(s.diameter, 2.5));
                             return (
                               <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', gap: '0.35rem' }}>
                                 <span>

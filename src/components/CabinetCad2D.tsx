@@ -1362,10 +1362,10 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
 
     // Port Tube Side Profile (extending into cavity from Front Baffle or Rear Panel)
     if (boxType === 'ported' || boxType === 'bandpass') {
-      const pLen = Math.max(portLength || 15, 3);
+      const pLen = Math.max(portLength || 15, thickness + 1);
       const maxStraightDepth = isBandpass 
-        ? Math.max(depthFront - 1.2, 2.0)
-        : (sW - 2 * thickness - 2);
+        ? Math.max(depthFront + thickness - 1.2, thickness + 2.0)
+        : (sW - thickness - 2);
       const effectivePortLen = Math.min(pLen, maxStraightDepth);
       const pR = (portShape === 'round' || portShape === 'custom')
         ? Math.max((portDiameter || 7.5) / 2, 1.2)
@@ -1373,7 +1373,6 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
 
       const pTop = portCenterY - pR;
       const pBot = portCenterY + pR;
-      const rearInnerX = sX + thickness;
       const portBaffleX = frontInnerXAtY(portCenterY);
 
       // Clear wood hatching inside the port wall cutout (rear panel)
@@ -1390,13 +1389,13 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
       const flareR = Math.min(Math.max(pR * 0.48, 0.85), Math.min(1.65, effectivePortLen * 0.28));
 
       if (isRearPort) {
-        // Port mounted on Rear Panel (left wall) extending rightwards into cavity
+        // Port mounted on Rear Panel (left wall) extending rightwards into cavity (total length from outer face)
         const outerX = sX;
-        const innerX = rearInnerX + effectivePortLen;
+        const innerX = outerX + effectivePortLen;
 
         if (flaredEnds === 0) {
           // 0: Recto / Estándar (1 extremo a ras en el bafle, 1 extremo libre recto dentro de la caja)
-          ctx.fillRect(outerX, pTop, thickness + effectivePortLen, pBot - pTop);
+          ctx.fillRect(outerX, pTop, effectivePortLen, pBot - pTop);
 
           ctx.beginPath();
           ctx.moveTo(outerX, pTop);
@@ -1411,7 +1410,7 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
           ctx.stroke();
         } else if (flaredEnds === 1) {
           // 1: Dos a Ras (Ambos extremos adosados / con brida plana a 90°)
-          ctx.fillRect(outerX, pTop, thickness + effectivePortLen, pBot - pTop);
+          ctx.fillRect(outerX, pTop, effectivePortLen, pBot - pTop);
 
           ctx.beginPath();
           ctx.moveTo(outerX, pTop);
@@ -1491,11 +1490,11 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
           ctx.stroke();
         }
 
-        // Port Dimension
+        // Port Dimension (total length from outer face)
         const pLenDisp = `Lv: ${convertTo(effectivePortLen, 'length', unitSystem).toFixed(1)} ${uLabel}`;
-        drawDimension(rearInnerX, pTop - 1, innerX, pTop - 1, pLenDisp, -1.8, true);
+        drawDimension(outerX, pTop - 1, innerX, pTop - 1, pLenDisp, -1.8, true);
       } else {
-        // Port mounted on Front Baffle (right wall) extending inwards perpendicular to baffle
+        // Port mounted on Front Baffle (right wall) extending inwards perpendicular to baffle (total length from outer face)
         ctx.save();
         ctx.translate(portBaffleX, portCenterY);
         ctx.rotate(baffleAngle);
@@ -1509,13 +1508,13 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
         ctx.fillStyle = isLight ? 'rgba(2, 132, 199, 0.08)' : 'rgba(2, 132, 199, 0.12)';
 
         const outerX = thickness;
-        const innerX = -effectivePortLen;
+        const innerX = outerX - effectivePortLen;
         const pT = -pR;
         const pB = pR;
 
         if (flaredEnds === 0) {
           // 0: Recto / Estándar (1 extremo a ras en el bafle, 1 extremo libre recto dentro de la caja)
-          ctx.fillRect(innerX, pT, effectivePortLen + thickness, pB - pT);
+          ctx.fillRect(innerX, pT, effectivePortLen, pB - pT);
 
           ctx.beginPath();
           ctx.moveTo(outerX, pT);
@@ -1529,7 +1528,7 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
           ctx.stroke();
         } else if (flaredEnds === 1) {
           // 1: Dos a Ras (Ambos extremos adosados / con brida plana a 90°)
-          ctx.fillRect(innerX, pT, effectivePortLen + thickness, pB - pT);
+          ctx.fillRect(innerX, pT, effectivePortLen, pB - pT);
 
           ctx.beginPath();
           ctx.moveTo(outerX, pT);
@@ -1603,12 +1602,13 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
         }
         ctx.restore();
 
-        // Port Dimension
+        // Port Dimension (total length from outer face)
         const pLenDisp = (isBandpass && pLen > maxStraightDepth)
           ? `Lv: ${convertTo(pLen, 'length', unitSystem).toFixed(1)} ${uLabel} (Codo)`
           : `Lv: ${convertTo(effectivePortLen, 'length', unitSystem).toFixed(1)} ${uLabel}`;
-        const dimEndX = portBaffleX - effectivePortLen * Math.cos(baffleAngle);
-        drawDimension(Math.min(dimEndX, portBaffleX), pTop - 1, Math.max(dimEndX, portBaffleX), pTop - 1, pLenDisp, -1.8, true);
+        const dimStartX = portBaffleX + thickness * Math.cos(baffleAngle);
+        const dimEndX = portBaffleX - (effectivePortLen - thickness) * Math.cos(baffleAngle);
+        drawDimension(Math.min(dimEndX, dimStartX), pTop - 1, Math.max(dimEndX, dimStartX), pTop - 1, pLenDisp, -1.8, true);
       }
     }
 

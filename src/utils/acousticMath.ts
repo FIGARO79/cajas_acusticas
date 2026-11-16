@@ -39,6 +39,7 @@ export function estimateF3(fs: number, qts: number, Vb: number, Fb: number, vas:
   if (wasm) {
     return wasm.calc_f3_ventilada(fs, qts, Vb, Fb, vas);
   }
+  if (fs <= 0 || qts <= 0 || Vb <= 0 || Fb <= 0 || vas <= 0) return 0;
   const h = Fb / fs;
   const alpha = vas / Vb;
   const Ql = QL_LOSSES;
@@ -48,22 +49,37 @@ export function estimateF3(fs: number, qts: number, Vb: number, Fb: number, vas:
   const a1 = (h * h) / qts + h / Ql;
   const a0 = h * h;
 
-  let low = 10;
-  let high = 500;
-  for (let iter = 0; iter < 20; iter++) {
-    const mid = (low + high) / 2;
-    const y = mid / fs;
+  const evalMag = (freq: number) => {
+    const y = freq / fs;
     const real = Math.pow(y, 4) - a2 * y * y + a0;
     const imag = a1 * y - a3 * Math.pow(y, 3);
-    const mag = Math.pow(y, 4) / Math.sqrt(real * real + imag * imag + 1e-20);
+    return Math.pow(y, 4) / Math.sqrt(real * real + imag * imag + 1e-20);
+  };
 
-    if (mag < 0.707) {
-      low = mid;
-    } else {
-      high = mid;
+  const startF = Math.max(fs * 8, 500);
+  const minF = 5;
+  let prevF = startF;
+  if (evalMag(prevF) < Math.SQRT1_2) return prevF;
+
+  let currF = prevF * 0.99;
+  while (currF >= minF) {
+    if (evalMag(currF) < Math.SQRT1_2) {
+      let low = currF;
+      let high = prevF;
+      for (let iter = 0; iter < 20; iter++) {
+        const mid = (low + high) / 2;
+        if (evalMag(mid) < Math.SQRT1_2) {
+          low = mid;
+        } else {
+          high = mid;
+        }
+      }
+      return (low + high) / 2;
     }
+    prevF = currF;
+    currF *= 0.99;
   }
-  return (low + high) / 2;
+  return minF;
 }
 
 export interface OptimalPortResult {

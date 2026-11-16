@@ -10,7 +10,7 @@ import { type UnitSystem, convertTo, getUnitLabel, nextUnitSystem } from './util
 import type { SpeakerParams, CalculatedSealed, CalculatedPorted, CalculatedBandpass, CustomDriver, WoodCabinetData, CrossoverExportData, WoodShape } from './types';
 import { estimateF3, calcPortLength, getKCorrection, calcOptimalPortForSpeaker, calcVentAirVelocity } from './utils/acousticMath';
 import { getWasm, calcRadiadorPasivo, calcVolumenNetoMadera } from './wasm/index.ts';
-import { generateReportHTML } from './utils/reportGenerator';
+import { generateReportHTML, printReportHtml } from './utils/reportGenerator';
 import { StatusBar } from './components/StatusBar';
 import { DriverDatabaseModal } from './components/DriverDatabaseModal';
 
@@ -298,16 +298,9 @@ function App({ wasmError }: AppProps) {
       }
       setParams(updatedParams);
 
-      // Seleccionar alineación acústica óptima según el Qts del altavoz (Small / Keele)
+      // Seleccionar alineación acústica de alta fidelidad (transición continua QB3/B4/C4 según Qts)
       let optAlign: 'QB3' | 'B4' | 'SBB4' = 'B4';
       if (updatedParams.qts && updatedParams.qts > 0) {
-        if (updatedParams.qts < 0.38) {
-          optAlign = 'QB3'; // Para motores potentes con Qts bajo
-        } else if (updatedParams.qts <= 0.45) {
-          optAlign = 'B4';  // Alineación plana estándar (Fb = Fs)
-        } else {
-          optAlign = 'B4';  // Para Qts alto (> 0.45), B4 (Fb = Fs) evita la joroba de QB3
-        }
         setVentedAlignment(optAlign);
       }
 
@@ -330,9 +323,11 @@ function App({ wasmError }: AppProps) {
           setPortDiameter(optPort.diameter);
           if (optPort.length > 0) {
             setCustomPortLength(Number(optPort.length.toFixed(1)));
-            setUseCustomPortLength(true);
           }
-          setCustomFbState(Number(targetFb.toFixed(1)));
+          setUseCustomPortLength(false);
+          setCustomPorted(false);
+          setCustomVbState(null);
+          setCustomFbState(null);
         } catch {
           // Mantiene configuración actual si el motor WASM aún no está listo
         }
@@ -720,34 +715,25 @@ function App({ wasmError }: AppProps) {
         xoverData = crossoverRef.current();
       }
 
-      // Longitud del puerto, diámetro equivalente, velocidad del aire
+      // Longitud del puerto, diámetro equivalente, velocidad del aire (misma referencia que la UI)
       let pLen = 'N/A';
-      let vp: number | null = null;
+      let vp: number | null = currentPortVelocity > 0 ? currentPortVelocity : null;
       const pCount = Number(portCount) || 0;
-      if (pCount > 0 && portedData.valid && portedData.Vb > 0) {
+      if (useCustomPortLength && Number(customPortLength) > 0) {
+        pLen = `${Number(customPortLength).toFixed(1)} cm`;
+      } else if (pCount > 0 && portedData.valid && portedData.Vb > 0) {
         const pDia = portShape === 'round'
           ? (Number(portDiameter) || 0)
           : portShape === 'custom'
             ? (2 * Math.sqrt((portArea || 0) / Math.PI))
             : (2 * Math.sqrt(((portWidth || 0) * (portHeight || 0)) / Math.PI));
-        
+
         if (pDia > 0) {
-          const targetVb = cabinetRef.current?.vNeto || portedData.Vb;
-          const Lv = calcPortLength(targetVb, portedData.Fb, pDia, flaredEnds, pCount);
+          const Lv = calcPortLength(portedData.Vb, portedData.Fb, pDia, flaredEnds, pCount);
           if (Lv <= 0) {
             pLen = t("Excesivamente corto");
           } else {
             pLen = `${Lv.toFixed(1)} cm`;
-          }
-
-          // Velocidad del aire
-          if (params.sd && params.xmax) {
-            const vd = (params.sd * params.xmax) / 10000;
-            const peakV = 2 * Math.PI * portedData.Fb * vd * 0.001; // m3/s aprox
-            const totalArea = pCount * Math.PI * Math.pow(pDia / 2, 2) * 0.0001; // m2
-            if (totalArea > 0) {
-              vp = peakV / totalArea;
-            }
           }
         }
       }
@@ -790,14 +776,7 @@ function App({ wasmError }: AppProps) {
         vp
       );
 
-      const reportWindow = window.open('', '_blank');
-      if (reportWindow) {
-        reportWindow.document.write(htmlContent);
-        reportWindow.document.close();
-        console.log("handleExportReport: opened successfully");
-      } else {
-        alert(t("El navegador bloqueó la ventana emergente. Por favor, permite las ventanas emergentes para este sitio web para descargar el PDF."));
-      }
+      printReportHtml(htmlContent);
     } catch (e: unknown) {
       console.error("handleExportReport: error", e);
       const errMsg = e instanceof Error ? e.message : String(e);
@@ -854,6 +833,14 @@ function App({ wasmError }: AppProps) {
         ? (2 * Math.sqrt((Number(portArea) || 0) / Math.PI))
         : (2 * Math.sqrt(((Number(portWidth) || 0) * (Number(portHeight) || 0)) / Math.PI));
     const pCount = Number(portCount) || 1;
+    if (pDia > 0 && deferredAdjParams.sd && deferredAdjParams.xmax) {
+      try {
+        const wasm = getWasm();
+        return wasm.calc_velocidad_puerto(portedData.Fb, deferredAdjParams.sd, deferredAdjParams.xmax, pCount, pDia);
+      } catch {
+        return (0.008 * portedData.Fb * deferredAdjParams.sd * deferredAdjParams.xmax) / (pCount * pDia * pDia);
+      }
+    }
     const areaM2 = pDia > 0 ? pCount * Math.PI * Math.pow(pDia / 200, 2) : 0.0044;
     return calcVentAirVelocity(portedData.Fb, deferredAdjParams, portedData.Vb, portedData.Fb, areaM2, deferredAdjParams.pe || 100);
   }, [boxType, portedData, portShape, portDiameter, portArea, portWidth, portHeight, portCount, deferredAdjParams]);

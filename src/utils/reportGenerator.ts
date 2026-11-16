@@ -527,3 +527,74 @@ export function generateReportHTML(
     </html>
   `;
 }
+
+/**
+ * Imprime o exporta a PDF un reporte HTML mediante un iframe oculto,
+ * evitando bloqueos de ventanas emergentes del navegador.
+ */
+export function printReportHtml(htmlContent: string): void {
+  const frameId = 'acoustic-report-print-frame';
+  const previousFrame = document.getElementById(frameId);
+  if (previousFrame) {
+    previousFrame.remove();
+  }
+
+  const iframe = document.createElement('iframe');
+  iframe.id = frameId;
+  iframe.setAttribute('aria-hidden', 'true');
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  iframe.style.visibility = 'hidden';
+
+  document.body.appendChild(iframe);
+
+  const frameDoc = iframe.contentDocument || iframe.contentWindow?.document;
+  if (!frameDoc || !iframe.contentWindow) {
+    iframe.remove();
+    throw new Error('No se pudo inicializar el marco de impresión.');
+  }
+
+  let printed = false;
+  const triggerPrint = () => {
+    if (printed) return;
+    printed = true;
+
+    const win = iframe.contentWindow;
+    if (!win) {
+      iframe.remove();
+      return;
+    }
+
+    const cleanup = () => {
+      setTimeout(() => {
+        iframe.remove();
+      }, 500);
+    };
+
+    win.addEventListener('afterprint', cleanup, { once: true });
+    win.focus();
+    win.print();
+
+    // Respaldo si el navegador no emite afterprint
+    setTimeout(() => {
+      if (document.body.contains(iframe)) {
+        iframe.remove();
+      }
+    }, 60000);
+  };
+
+  iframe.onload = () => {
+    setTimeout(triggerPrint, 100);
+  };
+
+  frameDoc.open();
+  frameDoc.write(htmlContent);
+  frameDoc.close();
+
+  // Respaldo si document.write/close no dispara onload
+  setTimeout(triggerPrint, 250);
+}
