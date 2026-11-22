@@ -24,6 +24,8 @@ dist-ssr
 *.sw?
 SKILL_EN.md
 analisis.md
+analisis_bassbox_pro.md 
+
 
 # Rust build target
 backend/target/

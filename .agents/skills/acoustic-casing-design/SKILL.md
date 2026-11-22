@@ -46,14 +46,24 @@ Cuando la hoja de datos del fabricante omite parámetros electromecánicos secun
 
 ## 2. Topologías y Modelos de Alineación de Recintos (`cajas.rs` / `radiador.rs` / `isobaric.rs`)
 
+### 2.0 Selección Recomendada por EBP y $Q_{ts}$ (Criterio BassBox 6 Pro)
+* **Producto Eficiencia-Ancho de Banda:** $\text{EBP} = \frac{F_s}{Q_{es}}$
+  * $\text{EBP} < 60$: **Sellada** (umbral real compilado en `BassBox 6.exe`, frente al `50` divulgativo).
+  * $60 \le \text{EBP} \le 90$: zona neutra (**Sellada, Ventilada o Radiador Pasivo**).
+  * $\text{EBP} > 90$: **Ventilada o Radiador Pasivo**.
+* **Paso Banda (4.º Orden):** recomendado adicionalmente cuando $0.3 \le Q_{ts} \le 0.5$ (cerca de `0.3` = paso de banda más ancho; cerca de `0.5` = más estrecho).
+* **Modelo de Relleno (`classicalModel`):** en modo **BassBox** (`false`) se aplica `dampingFactor` al volumen efectivo (`1.00 / 1.05 / 1.12 / 1.20`); en modo **Clásico** (`true`) se fuerza `1.0`.
+
 ### 2.1 Cajas Selladas (Closed / Sealed)
 * **Relación de elasticidad ($\alpha$):** $\alpha = \frac{V_{as}}{V_b}$
 * **Factor de calidad del sistema ($Q_{tc}$):** $Q_{tc} = Q_{ts} \cdot \sqrt{\alpha + 1}$
 * **Frecuencia de resonancia en caja ($F_c$):** $F_c = F_s \cdot \sqrt{\alpha + 1}$
 * **Volumen neto óptimo ($V_b$) para un $Q_{tc}$ objetivo** (con restricción $Q_{tc} > Q_{ts}$):
   $$V_b = \frac{V_{as}}{\left(\frac{Q_{tc}}{Q_{ts}}\right)^2 - 1}$$
+  * **Prioridades $Q_{tc}$:** `0.577` (Bessel), `0.707` (High Fidelity / Butterworth), `1.0` (Boost), `1.5` (High Output BassBox).
 * **Frecuencia de corte a $-3\text{ dB}$ ($F_3$):**
   $$F_3 = F_c \cdot \sqrt{\frac{\left(\frac{1}{Q_{tc}^2} - 2\right) + \sqrt{\left(\frac{1}{Q_{tc}^2} - 2\right)^2 + 4}}{2}}$$
+* **Solver Desired $F_3$ (`calc_sealed_for_f3`):** $F_3(Q_{tc})$ no es monótona en todo $[Q_{ts}+0.02, 2.5]$ (desciende hasta un mínimo cerca de $Q_{tc} \approx 0.7\text{–}1.0$ y luego vuelve a subir). Siempre localizar primero el mínimo antes de biseccionar (prefiriendo la rama Hi-Fi si alcanza el objetivo).
 
 ### 2.2 Cajas Ventiladas (Bass-Reflex / Ported) y Geometría de Puertos
 * **Longitud de puerto cilíndrico ($L_v$ en $\text{cm}$) para $N_{ports}$ ductos y factor de campana $k$:**
@@ -64,25 +74,29 @@ Cuando la hoja de datos del fabricante omite parámetros electromecánicos secun
     * $2$ extremos acampanados: $k = 0.968$
 * **Diámetro mínimo anti-turbulencia (sin ruido de viento, $D_{min}$ en $\text{cm}$):**
   $$D_{min} = \sqrt{\frac{0.1 \cdot S_d \cdot X_{max}}{\sqrt{F_b}}}$$
-* **Alineaciones clásicas óptimas (Small / Bullock en `calc_alineacion_ventilada`):**
-  * **SBB4 ($Q_{ts} < 0.35$):** $V_b = 11 \cdot Q_{ts}^{2.87} \cdot V_{as}$, $F_b = 0.38 \cdot Q_{ts}^{-0.95} \cdot F_s$, $F_3 = F_b$.
-  * **B4 ($Q_{ts} \approx 0.38 - 0.40$):** $V_b = 0.25 \cdot Q_{ts}^{-2} \cdot V_{as}$, $F_b = F_s$, $F_3 = F_s$.
-  * **QB3 ($Q_{ts} > 0.40$):** $V_b = 6.27 \cdot Q_{ts}^{1.44} \cdot V_{as}$, $F_b = 0.94 \cdot Q_{ts}^{-0.9} \cdot F_s$, $F_3 = 1.2 \cdot Q_{ts}^{-0.9} \cdot F_s$.
+* **Alineaciones BassBox / Keele (`calc_alineacion_ventilada_ex` y `calc_suggest_fb`):**
+  * **`B4` (High Fidelity):** tabla continua por tramos en $Q_{ts}$ ($V_b = K_v V_{as} Q_{ts}^{P_v}$, $F_b = K_f F_s Q_{ts}^{-P_f}$). Para un $V_b$ arbitrario/manual: $F_b = K_f F_s \left(\frac{C_{vas} V_{as}}{V_b}\right)^{P_f / P_v}$.
+  * **`SBB4` (Extended Bass / EBS):** $V_b = 12.3 \cdot V_{as} \cdot Q_{ts}^{2.4}$ y $F_b$ mediante `calc_suggest_fb`.
+  * **`QB3` (High Output):** $Q_{tc,\text{target}} = 0.8$ (rampa creciente si $Q_{ts} > 0.75$), $V_b = V_{as} / ((Q_{tc,\text{eff}}/Q_{ts})^2 - 1)$ y `calc_suggest_fb`.
+  * **`B6` (6.º Orden con HP Activo):** $V_b = 4.1 \cdot V_{as} \cdot Q_{ts}^2$, $F_b = \text{clamp}((0.30/Q_{ts})F_s, 0.45 F_s, 1.4 F_s)$ + filtro paso-alto de 2.º orden ($F_x = 1.07 F_b$, $Q_x = 1.93$) en `calc_f3_ventilada_b6` y `calc_ported_b6_response_at`.
+  * **`COMPACT`:** heurística práctica para drivers de $Q_{ts} > 0.45$ ($V_b \le 1.25 V_{as}$).
+  * **Clamp a volumen mínimo físico ($V_{b,\text{min}}$):** si $V_b < V_{b,\text{min}}$, fijar $V_b = V_{b,\text{min}}$ y compensar $F_b \leftarrow F_b (V_{b,\text{opt}}/V_{b,\text{min}})^{0.125}$.
+  * **Solver Desired $F_3$ (`calc_vented_for_f3`):** muestrear $F_3(V_b)$ en escala logarítmica para localizar el mínimo (antes de que un $V_b$ excesivo forme un valle $>3\text{ dB}$ sobre $F_b$) y biseccionar en el tramo práctico.
+  * Tablas exactas de coeficientes por tramos en [references/bassbox-pro-alignments.md](./references/bassbox-pro-alignments.md).
 
 ### 2.3 Cajas de Paso de Banda (Bandpass 4.º y 6.º Orden)
-* **4.º Orden (`calc_bandpass_4`, factor plano $S > Q_{ts}$, usualmente $S = 0.707$):**
-  * Cámara trasera sellada: $V_f = \frac{V_{as}}{(S / Q_{ts})^2 - 1}$
-  * Cámara delantera ventilada: $V_r = 2 \cdot S^2 \cdot Q_{ts}^2 \cdot V_{as}$
-  * Sintonía y ancho de banda: $F_b = F_0 = F_s \cdot \frac{S}{Q_{ts}}$, $\Delta f = \frac{F_s}{Q_{ts}} \cdot S$
-* **6.º Orden Paralelo / Clase B (`calc_bandpass_6`, factor $a \approx 2$):**
-  * Sintonías: $F_H = F_s \cdot \sqrt{\frac{1 + a}{2}}$, $F_L = F_s \cdot \sqrt{\frac{1}{2(1 + a)}}$
-  * Volúmenes simétricos: $V_f = V_r = V_{as} \cdot Q_{ts} \cdot \sqrt{2a}$
+* **4.º Orden BassBox (`calc_bandpass_4_bassbox`, con `DF = 0.65` y $Q'_t = \max(0.8, Q_{ts} + 0.1)$):**
+  * Cámara trasera sellada: $V_r = \frac{V_{as}}{(Q'_t / Q_{ts})^2 - 1}$
+  * Cámara delantera ventilada: $V_f = (2 \cdot \text{DF} \cdot Q_{ts})^2 \cdot V_{as}$
+  * Sintonía y ancho de banda: $F_b = F_0 = F_s \cdot \frac{Q'_t}{Q_{ts}}$, $\Delta f = \frac{F_s}{Q_{ts}} \cdot \text{DF}$ (se conserva `calc_bandpass_4` legacy).
+* **6.º Orden BassBox (`calc_bandpass_6_bassbox`):** soporta topologías **`parallel`** (ratios `LF-to-HF Vb` y `HF-to-LF Fb`) y **`series`** (factores por tramos de $Q_{ts}$ sobre la base Keele). Ver tablas completas en [references/bassbox-pro-alignments.md](./references/bassbox-pro-alignments.md). (Se conserva `calc_bandpass_6` simétrica legacy).
 
 ### 2.4 Cajas con Radiador Pasivo (`calc_radiador_pasivo`)
 * **Compliancias acústicas** ($\text{factor} = \rho \cdot c^2 \cdot S_{d(pr)}^2$):
   $$C_{ab} = \frac{V_b}{\rho \cdot c^2 \cdot S_{d(pr)}^2}, \quad C_{ap} = \frac{V_{as(pr)}}{\rho \cdot c^2 \cdot S_{d(pr)}^2}$$
 * **Frecuencia de sintonía ($F_b$) y masa añadida requerida ($M_{ad}$):**
   $$F_b = \frac{1}{2\pi \sqrt{M_p \cdot (C_{ap} + C_{ab})}}, \quad M_{ad} = \max\left(0, \frac{V_{as(pr)}}{V_b \cdot 4\pi^2 \cdot F_b^2 \cdot C_{ap}} - M_p\right)$$
+* **Sugerencia automática (`suggest_passive_radiator`):** selecciona el menor diámetro comercial de la escalera BassBox (`6"–48"`) que cumpla desplazamiento $\ge 2\times V_d$ ($d_{\text{req}} = d_{\text{drv}}\sqrt{2}$), calcula $V_{as(pr)} = \max(1.5\,V_b, 10)$, $F_{s(pr)} = \max(0.55\,F_b, 12)$, $M_{ms(pr)}$ y la masa añadida requerida.
 
 ### 2.5 Múltiples Altavoces y Configuraciones Isobáricas (`calc_isobari_multiple`)
 
