@@ -318,45 +318,478 @@ pub struct VentedAlignment {
     pub vb: f64,
     pub fb: f64,
     pub f3: f64,
+    pub active_hp: bool,
+    pub hp_fx: f64,
+    pub hp_qx: f64,
+    pub clamped_to_min_vol: bool,
+}
+
+/// Coeficientes continuos por tramos de BassBox 6 Pro (Keele): (kv, pv, kf, pf, c_vas)
+fn bassbox_vented_coeffs(qts: f64) -> (f64, f64, f64, f64, f64) {
+    let (kv, pv) = if qts > 0.49 {
+        (6.427, 1.943)
+    } else if qts > 0.313 {
+        (18.029, 3.365)
+    } else {
+        (6.096, 2.432)
+    };
+
+    let (kf, pf) = if qts > 0.49 {
+        (0.457, 0.766)
+    } else if qts > 0.383 {
+        (0.397, 0.963)
+    } else if qts > 0.259 {
+        (0.428, 0.883)
+    } else {
+        (0.3985, 0.940)
+    };
+
+    let c_vas = if qts > 0.75 {
+        12.0 + ((qts - 0.75) / 0.05) * 1.6
+    } else if qts > 0.49 {
+        6.5 + ((qts - 0.49) / 0.05) * 1.1
+    } else if qts > 0.313 {
+        18.029
+    } else {
+        6.096
+    };
+
+    (kv, pv, kf, pf, c_vas)
+}
+
+#[wasm_bindgen]
+pub fn calc_suggest_fb(fs: f64, vas: f64, qts: f64, vb: f64) -> f64 {
+    if fs <= 0.0 || vas <= 0.0 || qts <= 0.0 || vb <= 0.0 {
+        return 0.0;
+    }
+    let (_, pv, kf, pf, c_vas) = bassbox_vented_coeffs(qts);
+    kf * fs * ((c_vas * vas) / vb).powf(pf / pv)
+}
+
+#[wasm_bindgen]
+pub fn calc_f3_ventilada_b6(
+    fs: f64,
+    qts: f64,
+    vb: f64,
+    fb: f64,
+    vas: f64,
+    fx: f64,
+    qx: f64,
+) -> f64 {
+    if fs <= 0.0 || qts <= 0.0 || vb <= 0.0 || fb <= 0.0 || vas <= 0.0 || fx <= 0.0 || qx <= 0.0 {
+        return 0.0;
+    }
+    let h = fb / fs;
+    let alpha = vas / vb;
+    let ql = 7.0_f64;
+
+    let a3 = 1.0 / qts + h / ql;
+    let a2 = 1.0 + h * h * (1.0 + alpha) + h / (qts * ql);
+    let a1 = h * h / qts + h / ql;
+    let a0 = h * h;
+
+    let eval_mag = |freq: f64| -> f64 {
+        let y = freq / fs;
+        let real = y.powi(4) - a2 * y * y + a0;
+        let imag = a1 * y - a3 * y.powi(3);
+        let vented_mag = y.powi(4) / (real * real + imag * imag + 1e-20).sqrt();
+
+        let r = freq / fx;
+        let hp = (r * r) / ((1.0 - r * r).powi(2) + (r / qx).powi(2) + 1e-20).sqrt();
+        vented_mag * hp
+    };
+
+    let start_f = (fs * 8.0).max(500.0);
+    let min_f = 5.0_f64;
+    let mut prev_f = start_f;
+    if eval_mag(prev_f) < std::f64::consts::FRAC_1_SQRT_2 {
+        return prev_f;
+    }
+
+    let mut curr_f = prev_f * 0.99;
+    while curr_f >= min_f {
+        if eval_mag(curr_f) < std::f64::consts::FRAC_1_SQRT_2 {
+            let mut low = curr_f;
+            let mut high = prev_f;
+            for _ in 0..20 {
+                let mid = (low + high) / 2.0;
+                if eval_mag(mid) < std::f64::consts::FRAC_1_SQRT_2 {
+                    low = mid;
+                } else {
+                    high = mid;
+                }
+            }
+            return (low + high) / 2.0;
+        }
+        prev_f = curr_f;
+        curr_f *= 0.99;
+    }
+
+    min_f
 }
 
 #[wasm_bindgen]
 pub fn calc_alineacion_ventilada(fs: f64, vas: f64, qts: f64, tipo: &str) -> VentedAlignment {
+    calc_alineacion_ventilada_ex(fs, vas, qts, tipo, 0.0)
+}
+
+#[wasm_bindgen]
+pub fn calc_alineacion_ventilada_ex(
+    fs: f64,
+    vas: f64,
+    qts: f64,
+    tipo: &str,
+    vb_min: f64,
+) -> VentedAlignment {
     let qts_val = if qts <= 0.0 { 0.001 } else { qts };
     let fs_val = if fs <= 0.0 { 0.0 } else { fs };
     let vas_val = if vas <= 0.0 { 0.0 } else { vas };
 
     if fs_val <= 0.0 || vas_val <= 0.0 {
-        return VentedAlignment { vb: 0.0, fb: 0.0, f3: 0.0 };
+        return VentedAlignment {
+            vb: 0.0,
+            fb: 0.0,
+            f3: 0.0,
+            active_hp: false,
+            hp_fx: 0.0,
+            hp_qx: 0.0,
+            clamped_to_min_vol: false,
+        };
     }
 
-    // Referencia de alta fidelidad (máximamente plana): transiciona naturalmente entre QB3, B4 y C4 según Qts
-    let vb_flat = (15.0 * qts_val.powf(2.87) * vas_val)
-        .max(vas_val * 0.25)
-        .min(vas_val * 2.0);
-    let fb_flat = ((vas_val / vb_flat.max(1e-6)).powf(0.31) * fs_val)
-        .clamp(fs_val * 0.86, fs_val * 1.30);
+    let (kv, pv, kf, pf, _) = bassbox_vented_coeffs(qts_val);
+    let mut active_hp = false;
+    let mut hp_fx = 0.0;
+    let mut hp_qx = 0.0;
 
-    let (vb, fb) = match tipo {
+    let (mut vb, mut fb) = match tipo {
+        "B4" => {
+            let vb_hifi = kv * vas_val * qts_val.powf(pv);
+            let fb_hifi = kf * fs_val * qts_val.powf(-pf);
+            (vb_hifi, fb_hifi)
+        }
         "SBB4" => {
-            // Extensión de graves: incrementa Vb según Qts (~2.0x para Qts<=0.30 hasta ~1.4x para Qts>=0.50) y baja ligeramente Fb
-            let ext_factor = (2.0 - (qts_val - 0.30) * 3.0).clamp(1.35, 2.0);
-            let vb_ext = (vb_flat * ext_factor).min(vas_val * 3.0);
-            let fb_ext = (fb_flat * 0.90).max(fs_val * 0.68);
+            let vb_ext = 12.3 * vas_val * qts_val.powf(2.4);
+            let fb_ext = calc_suggest_fb(fs_val, vas_val, qts_val, vb_ext);
             (vb_ext, fb_ext)
         }
-        "B4" => (vb_flat, fb_flat),
+        "B6" => {
+            let vb_b6 = 4.1 * vas_val * qts_val.powi(2);
+            let fb_b6 = ((0.30 / qts_val) * fs_val).clamp(fs_val * 0.45, fs_val * 1.4);
+            active_hp = true;
+            hp_fx = 1.07 * fb_b6;
+            hp_qx = 1.93;
+            (vb_b6, fb_b6)
+        }
+        "COMPACT" => {
+            if qts_val <= 0.45 {
+                let vb_c = (15.0 * qts_val.powf(2.87) * vas_val)
+                    .clamp(vas_val * 0.25, vas_val * 1.5);
+                let fb_c = ((vas_val / vb_c.max(1e-6)).powf(0.31) * fs_val)
+                    .clamp(fs_val * 0.86, fs_val * 1.30);
+                (vb_c, fb_c)
+            } else {
+                let vb_c = (vas_val * (1.20 - (qts_val - 0.45) * 2.5))
+                    .clamp(vas_val * 0.55, vas_val * 1.25);
+                let fb_c = ((vas_val / vb_c.max(1e-6)).powf(0.31) * fs_val)
+                    .clamp(fs_val * 0.92, fs_val * 1.30);
+                (vb_c, fb_c)
+            }
+        }
         _ => {
-            // Alto rendimiento: caja más compacta y sintonía algo más alta para mayor salida y control de excursión
-            let vb_out = (vb_flat * 0.65).max(vas_val * 0.22);
-            let fb_out = (fb_flat * 1.08).clamp(fs_val * 0.90, fs_val * 1.35);
+            // High Output (QB3 BassBox): Qtc objetivo -> alpha -> Vb = Vas / alpha
+            let qtc_target = if qts_val > 0.75 {
+                0.8 + ((qts_val - 0.75) / 0.35) * 0.3
+            } else {
+                0.8
+            };
+            let qtc_eff = qtc_target.max(qts_val + 0.01);
+            let alpha = (qtc_eff / qts_val).powi(2) - 1.0;
+            let vb_out = (vas_val / alpha.max(1e-6)).max(vas_val * 0.12);
+            let fb_out = calc_suggest_fb(fs_val, vas_val, qts_val, vb_out);
             (vb_out, fb_out)
         }
     };
 
-    let f3 = calc_f3_ventilada(fs_val, qts_val, vb, fb, vas_val);
+    let mut clamped_to_min_vol = false;
+    if vb_min > 0.0 && vb < vb_min {
+        let vb_opt = vb;
+        vb = vb_min;
+        fb *= (vb_opt / vb_min).powf(0.125);
+        clamped_to_min_vol = true;
+        if active_hp {
+            hp_fx = 1.07 * fb;
+        }
+    }
 
-    VentedAlignment { vb, fb, f3 }
+    let f3 = if active_hp {
+        calc_f3_ventilada_b6(fs_val, qts_val, vb, fb, vas_val, hp_fx, hp_qx)
+    } else {
+        calc_f3_ventilada(fs_val, qts_val, vb, fb, vas_val)
+    };
+
+    VentedAlignment {
+        vb,
+        fb,
+        f3,
+        active_hp,
+        hp_fx,
+        hp_qx,
+        clamped_to_min_vol,
+    }
+}
+
+#[wasm_bindgen]
+pub struct DesiredF3Result {
+    pub valid: bool,
+    pub vb: f64,
+    pub fb_or_fc: f64,
+    pub qtc: f64,
+    pub f3: f64,
+    /// 0 = ok, 1 = too_low, 2 = too_high, 3 = invalid
+    pub status_code: u8,
+}
+
+#[wasm_bindgen]
+pub fn calc_sealed_for_f3(fs: f64, vas: f64, qts: f64, target_f3: f64) -> DesiredF3Result {
+    if fs <= 0.0 || vas <= 0.0 || qts <= 0.0 || target_f3 <= 0.0 {
+        return DesiredF3Result {
+            valid: false,
+            vb: 0.0,
+            fb_or_fc: 0.0,
+            qtc: 0.0,
+            f3: 0.0,
+            status_code: 3,
+        };
+    }
+
+    let eval_qtc = |qtc_val: f64| -> SealedResult {
+        let denom = (qtc_val / qts).powi(2) - 1.0;
+        let vb = if denom > 1e-9 { vas / denom } else { vas * 1e4 };
+        calc_caja_sellada(fs, vas, qts, vb, qtc_val)
+    };
+
+    let qtc_min = (qts + 0.02).max(0.2);
+    let qtc_max = 2.5_f64.max(qtc_min + 0.2);
+
+    // Buscar mínimo de F3(Qtc) escaneando [qtc_min, qtc_max] en pasos de 0.01
+    let mut best_qtc = qtc_min;
+    let mut best_res = eval_qtc(qtc_min);
+    let mut q = qtc_min + 0.01;
+    while q <= qtc_max + 1e-9 {
+        let r = eval_qtc(q);
+        if r.f3 < best_res.f3 {
+            best_res = r;
+            best_qtc = q;
+        }
+        q += 0.01;
+    }
+
+    if target_f3 < best_res.f3 - 0.1 {
+        return DesiredF3Result {
+            valid: false,
+            vb: 0.0,
+            fb_or_fc: 0.0,
+            qtc: 0.0,
+            f3: best_res.f3,
+            status_code: 1,
+        };
+    }
+
+    let res_at_min_qtc = eval_qtc(qtc_min);
+    let res_at_max_qtc = eval_qtc(qtc_max);
+
+    if target_f3 > res_at_max_qtc.f3.max(res_at_min_qtc.f3) + 0.1 {
+        return DesiredF3Result {
+            valid: false,
+            vb: 0.0,
+            fb_or_fc: 0.0,
+            qtc: 0.0,
+            f3: res_at_max_qtc.f3,
+            status_code: 2,
+        };
+    }
+
+    // Preferir rama Hi-Fi [qtc_min, best_qtc] si alcanza el F3 objetivo; si no, rama compacta [best_qtc, qtc_max]
+    let (mut lo, mut hi, decreasing) = if best_qtc > qtc_min + 0.005
+        && target_f3 <= res_at_min_qtc.f3 + 0.1
+        && target_f3 >= best_res.f3 - 0.1
+    {
+        (qtc_min, best_qtc, true)
+    } else {
+        (best_qtc, qtc_max, false)
+    };
+
+    for _ in 0..40 {
+        let mid = 0.5 * (lo + hi);
+        let r = eval_qtc(mid);
+        if decreasing {
+            if r.f3 > target_f3 {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        } else if r.f3 < target_f3 {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+
+    let qtc_sol = 0.5 * (lo + hi);
+    let final_res = eval_qtc(qtc_sol);
+
+    DesiredF3Result {
+        valid: true,
+        vb: final_res.vb_optimo,
+        fb_or_fc: final_res.fc,
+        qtc: final_res.qtc,
+        f3: final_res.f3,
+        status_code: 0,
+    }
+}
+
+#[wasm_bindgen]
+pub fn calc_vented_for_f3(fs: f64, vas: f64, qts: f64, target_f3: f64) -> DesiredF3Result {
+    if fs <= 0.0 || vas <= 0.0 || qts <= 0.0 || target_f3 <= 0.0 {
+        return DesiredF3Result {
+            valid: false,
+            vb: 0.0,
+            fb_or_fc: 0.0,
+            qtc: 0.0,
+            f3: 0.0,
+            status_code: 3,
+        };
+    }
+
+    let eval_vb = |vb: f64| -> (f64, f64) {
+        let fb = calc_suggest_fb(fs, vas, qts, vb);
+        let f3 = calc_f3_ventilada(fs, qts, vb, fb, vas);
+        (fb, f3)
+    };
+
+    let vb_low = (vas * 0.08).max(0.5);
+    let vb_high = (vas * 10.0).max(500.0);
+    let lo_ln_all = vb_low.ln();
+    let hi_ln_all = vb_high.ln();
+
+    // F3(Vb) desciende hasta un mínimo (antes de que un Vb gigante cree un valle > 3 dB sobre Fb).
+    // Muestrear en escala logarítmica para localizar el mínimo y el tramo monótono [vb_low, vb_at_min].
+    const SAMPLES: usize = 80;
+    let mut sample_ln = Vec::with_capacity(SAMPLES + 1);
+    let mut sample_f3 = Vec::with_capacity(SAMPLES + 1);
+    let mut min_idx = 0_usize;
+    let mut f3_min = f64::INFINITY;
+    let mut f3_max = 0.0_f64;
+
+    for i in 0..=SAMPLES {
+        let frac = (i as f64) / (SAMPLES as f64);
+        let ln_v = lo_ln_all + frac * (hi_ln_all - lo_ln_all);
+        let (_, f3_val) = eval_vb(ln_v.exp());
+        if f3_val < f3_min {
+            f3_min = f3_val;
+            min_idx = i;
+        }
+        if f3_val > f3_max {
+            f3_max = f3_val;
+        }
+        sample_ln.push(ln_v);
+        sample_f3.push(f3_val);
+    }
+
+    if target_f3 < f3_min - 0.2 {
+        return DesiredF3Result {
+            valid: false,
+            vb: 0.0,
+            fb_or_fc: 0.0,
+            qtc: 0.0,
+            f3: f3_min,
+            status_code: 1,
+        };
+    }
+
+    let f3_at_small = sample_f3[0];
+    if target_f3 > f3_at_small.max(f3_max) + 0.2 {
+        return DesiredF3Result {
+            valid: false,
+            vb: 0.0,
+            fb_or_fc: 0.0,
+            qtc: 0.0,
+            f3: f3_at_small,
+            status_code: 2,
+        };
+    }
+
+    // Buscar primer intervalo en [0..=min_idx] que cruce target_f3 (caja más práctica)
+    let mut lo_ln = sample_ln[0];
+    let mut hi_ln = sample_ln[min_idx];
+    let mut found_bracket = false;
+    for i in 0..min_idx {
+        let a = sample_f3[i] - target_f3;
+        let b = sample_f3[i + 1] - target_f3;
+        if (a >= 0.0 && b <= 0.0) || (a <= 0.0 && b >= 0.0) {
+            lo_ln = sample_ln[i];
+            hi_ln = sample_ln[i + 1];
+            found_bracket = true;
+            break;
+        }
+    }
+
+    if !found_bracket {
+        // Fallback al rango [min_idx..=SAMPLES] si el usuario pidió un F3 alto en la rama ascendente
+        for i in min_idx..SAMPLES {
+            let a = sample_f3[i] - target_f3;
+            let b = sample_f3[i + 1] - target_f3;
+            if (a >= 0.0 && b <= 0.0) || (a <= 0.0 && b >= 0.0) {
+                lo_ln = sample_ln[i];
+                hi_ln = sample_ln[i + 1];
+                found_bracket = true;
+                break;
+            }
+        }
+    }
+
+    if !found_bracket {
+        let vb_best = sample_ln[min_idx].exp();
+        let (fb_best, f3_best) = eval_vb(vb_best);
+        return DesiredF3Result {
+            valid: (f3_best - target_f3).abs() < 0.5,
+            vb: vb_best,
+            fb_or_fc: fb_best,
+            qtc: 0.0,
+            f3: f3_best,
+            status_code: if f3_best > target_f3 { 1 } else { 2 },
+        };
+    }
+
+    let increasing = eval_vb(hi_ln.exp()).1 > eval_vb(lo_ln.exp()).1;
+    for _ in 0..40 {
+        let mid_ln = 0.5 * (lo_ln + hi_ln);
+        let (_, f3_mid) = eval_vb(mid_ln.exp());
+        if increasing {
+            if f3_mid < target_f3 {
+                lo_ln = mid_ln;
+            } else {
+                hi_ln = mid_ln;
+            }
+        } else if f3_mid > target_f3 {
+            lo_ln = mid_ln;
+        } else {
+            hi_ln = mid_ln;
+        }
+    }
+
+    let vb_sol = (0.5 * (lo_ln + hi_ln)).exp();
+    let (fb_sol, f3_sol) = eval_vb(vb_sol);
+
+    DesiredF3Result {
+        valid: true,
+        vb: vb_sol,
+        fb_or_fc: fb_sol,
+        qtc: 0.0,
+        f3: f3_sol,
+        status_code: 0,
+    }
 }
 
 #[wasm_bindgen]
@@ -390,6 +823,52 @@ pub fn calc_bandpass_4(fs: f64, vas: f64, qts: f64, s: f64) -> Bandpass4Result {
 }
 
 #[wasm_bindgen]
+pub fn calc_bandpass_4_bassbox(
+    fs: f64,
+    vas: f64,
+    qts: f64,
+    df: f64,
+    qt_prime: f64,
+) -> Bandpass4Result {
+    let qts_val = if qts <= 0.0 { 0.001 } else { qts };
+    let fs_val = if fs <= 0.0 { 0.0 } else { fs };
+    let vas_val = if vas <= 0.0 { 0.0 } else { vas };
+
+    if fs_val <= 0.0 || vas_val <= 0.0 {
+        return Bandpass4Result {
+            vf: 0.0,
+            vr: 0.0,
+            fb: 0.0,
+            f0: 0.0,
+            delta_f: 0.0,
+        };
+    }
+
+    let df_val = if df > 0.0 { df } else { 0.65 };
+    let qt_base = if qt_prime > 0.0 {
+        qt_prime
+    } else {
+        (qts_val + 0.1).max(0.8)
+    };
+    let qt_val = qt_base.max(qts_val + 0.01);
+
+    let denom = (qt_val / qts_val).powi(2) - 1.0;
+    let vr = if denom <= 0.0 { 0.0 } else { vas_val / denom };
+    let vf = (2.0 * df_val * qts_val).powi(2) * vas_val;
+    let fb = fs_val * (qt_val / qts_val);
+    let f0 = fb;
+    let delta_f = (fs_val / qts_val) * df_val;
+
+    Bandpass4Result {
+        vf,
+        vr,
+        fb,
+        f0,
+        delta_f,
+    }
+}
+
+#[wasm_bindgen]
 pub struct Bandpass6Result {
     pub vf: f64,
     pub vr: f64,
@@ -409,6 +888,82 @@ pub fn calc_bandpass_6(fs: f64, vas: f64, qts: f64, a: f64) -> Bandpass6Result {
     let vol = vas_val * qts_val * (2.0 * a_val).sqrt();
 
     Bandpass6Result { vf: vol, vr: vol, fh, fl }
+}
+
+#[wasm_bindgen]
+pub fn calc_bandpass_6_bassbox(
+    fs: f64,
+    vas: f64,
+    qts: f64,
+    topology: &str,
+) -> Bandpass6Result {
+    if fs <= 0.0 || vas <= 0.0 || qts <= 0.0 {
+        return Bandpass6Result {
+            vf: 0.0,
+            vr: 0.0,
+            fh: 0.0,
+            fl: 0.0,
+        };
+    }
+
+    let (kv, pv, kf, pf, _) = bassbox_vented_coeffs(qts);
+    let vb_base = kv * vas * qts.powf(pv);
+    let fb_base = kf * fs * qts.powf(-pf);
+
+    if topology == "series" {
+        let (m_fl, m_vf, m_vr) = if qts <= 0.2 {
+            let t = qts / 0.2;
+            (0.925 - t * 0.05, 1.17 - t * 0.34, 0.78 - t * 0.10)
+        } else if qts <= 0.3 {
+            let t = (qts - 0.2) / 0.1;
+            (0.875 - t * 0.025, 0.83 - t * 0.27, 0.68 + t * 0.11)
+        } else if qts <= 0.4 {
+            let t = (qts - 0.3) / 0.1;
+            (0.85 - t * 0.08, 0.56 - t * 0.25, 0.79 + t * 0.11)
+        } else if qts <= 0.5 {
+            let t = (qts - 0.4) / 0.1;
+            (0.77 - t * 0.07, 0.31 - t * 0.11, 0.90 + t * 0.12)
+        } else if qts <= 0.6 {
+            let t = (qts - 0.5) / 0.1;
+            (0.70 - t * 0.075, 0.20 - t * 0.03, 1.02 + t * 0.04)
+        } else if qts <= 0.7 {
+            let t = (qts - 0.6) / 0.1;
+            (0.625 - t * 0.075, 0.17 - t * 0.01, 1.06 + t * 0.05)
+        } else {
+            let t = ((qts - 0.7) / 0.1).min(3.0);
+            ((0.55 - t * 0.05).max(0.35), 0.16, 1.11)
+        };
+
+        let vr = (vb_base * m_vr).max(0.5);
+        let vf = (vb_base * m_vf).max(0.5);
+        let fl = (fb_base * m_fl).max(15.0);
+        let fh = (fl * 2.5).max(fl * 1.4);
+        Bandpass6Result { vf, vr, fh, fl }
+    } else {
+        let (vb_ratio, fb_ratio) = if qts <= 0.2 {
+            (1.3 + (qts / 0.3) * 0.15, 2.83 - (qts / 0.2) * 0.58)
+        } else if qts <= 0.3 {
+            (
+                1.3 + (qts / 0.3) * 0.15,
+                2.25 - ((qts - 0.2) / 0.1) * 0.15,
+            )
+        } else if qts <= 0.5 {
+            (
+                1.5 + ((qts - 0.3) / 0.2) * 1.0,
+                2.10 - ((qts - 0.3) / 0.2) * 0.25,
+            )
+        } else if qts <= 0.6 {
+            (2.5 + ((qts - 0.5) / 0.1) * 0.9, 1.85)
+        } else {
+            (3.4, 1.85)
+        };
+
+        let vr = vb_base.max(0.5);
+        let vf = (vr / vb_ratio).max(0.5);
+        let fl = fb_base.max(15.0);
+        let fh = fl * fb_ratio;
+        Bandpass6Result { vf, vr, fh, fl }
+    }
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
@@ -759,6 +1314,111 @@ mod tests {
         assert!(res.v_neto_fisico > 30.0 && res.v_neto_fisico <= 32.3);
         assert!(!res.exceeds_depth);
         assert!(res.port_length > 8.0 && res.port_length < 20.0);
+    }
+
+    #[test]
+    fn test_bassbox_vented_keele_alignments() {
+        let fs = 40.0;
+        let vas = 100.0;
+
+        // B4 Keele tabla por tramos
+        let b4_25 = calc_alineacion_ventilada(fs, vas, 0.25, "B4");
+        assert!((b4_25.vb - 6.096 * vas * 0.25_f64.powf(2.432)).abs() < 1e-4);
+        assert!((b4_25.fb - 0.3985 * fs * 0.25_f64.powf(-0.940)).abs() < 1e-4);
+
+        let b4_35 = calc_alineacion_ventilada(fs, vas, 0.35, "B4");
+        assert!((b4_35.vb - 18.029 * vas * 0.35_f64.powf(3.365)).abs() < 1e-4);
+        assert!((b4_35.fb - 0.428 * fs * 0.35_f64.powf(-0.883)).abs() < 1e-4);
+
+        let b4_40 = calc_alineacion_ventilada(fs, vas, 0.40, "B4");
+        assert!((b4_40.vb - 18.029 * vas * 0.40_f64.powf(3.365)).abs() < 1e-4);
+        assert!((b4_40.fb - 0.397 * fs * 0.40_f64.powf(-0.963)).abs() < 1e-4);
+
+        let b4_55 = calc_alineacion_ventilada(fs, vas, 0.55, "B4");
+        assert!((b4_55.vb - 6.427 * vas * 0.55_f64.powf(1.943)).abs() < 1e-4);
+        assert!((b4_55.fb - 0.457 * fs * 0.55_f64.powf(-0.766)).abs() < 1e-4);
+
+        // SBB4 Extended Bass: 12.3 * Vas * Qts^2.4
+        let sbb4 = calc_alineacion_ventilada(fs, vas, 0.38, "SBB4");
+        assert!((sbb4.vb - 12.3 * vas * 0.38_f64.powf(2.4)).abs() < 1e-4);
+        assert!(!sbb4.active_hp);
+
+        // QB3 High Output
+        let qb3 = calc_alineacion_ventilada(fs, vas, 0.38, "QB3");
+        assert!(qb3.vb > 0.0 && qb3.vb < b4_40.vb);
+        assert!(qb3.fb > b4_40.fb);
+
+        // B6 Active HP
+        let b6 = calc_alineacion_ventilada(fs, vas, 0.40, "B6");
+        assert!(b6.active_hp);
+        assert!((b6.vb - 4.1 * vas * 0.40_f64.powi(2)).abs() < 1e-4);
+        assert!((b6.hp_fx - 1.07 * b6.fb).abs() < 1e-4);
+        assert!((b6.hp_qx - 1.93).abs() < 1e-6);
+
+        // COMPACT
+        let compact = calc_alineacion_ventilada(fs, vas, 0.55, "COMPACT");
+        assert!(compact.vb <= vas * 1.25 && compact.vb >= vas * 0.55);
+
+        // Clamp a vb_min con exponente 0.125
+        let vb_min = 35.0;
+        let clamped = calc_alineacion_ventilada_ex(fs, vas, 0.25, "B4", vb_min);
+        assert!(clamped.clamped_to_min_vol);
+        assert!((clamped.vb - vb_min).abs() < 1e-6);
+        let expected_fb = b4_25.fb * (b4_25.vb / vb_min).powf(0.125);
+        assert!((clamped.fb - expected_fb).abs() < 1e-4);
+    }
+
+    #[test]
+    fn test_desired_f3_solvers() {
+        let fs = 40.0;
+        let vas = 80.0;
+        let qts = 0.38;
+
+        // Sellada alcanzable (para Fs=40, Qts=0.38 el F3 mínimo sellado es ~74.4 Hz)
+        let ok_s = calc_sealed_for_f3(fs, vas, qts, 85.0);
+        assert!(ok_s.valid && ok_s.status_code == 0);
+        assert!((ok_s.f3 - 85.0).abs() < 0.5);
+        assert!(ok_s.vb > 0.0);
+
+        // Sellada demasiado baja
+        let low_s = calc_sealed_for_f3(fs, vas, qts, 20.0);
+        assert!(!low_s.valid && low_s.status_code == 1);
+
+        // Sellada demasiado alta
+        let high_s = calc_sealed_for_f3(fs, vas, qts, 300.0);
+        assert!(!high_s.valid && high_s.status_code == 2);
+
+        // Ventilada alcanzable
+        let ok_v = calc_vented_for_f3(fs, vas, qts, 42.0);
+        assert!(ok_v.valid && ok_v.status_code == 0);
+        assert!((ok_v.f3 - 42.0).abs() < 0.5);
+        assert!(ok_v.vb > 0.0 && ok_v.fb_or_fc > 0.0);
+
+        // Ventilada demasiado baja
+        let low_v = calc_vented_for_f3(fs, vas, qts, 8.0);
+        assert!(!low_v.valid && low_v.status_code == 1);
+
+        // Ventilada demasiado alta
+        let high_v = calc_vented_for_f3(fs, vas, qts, 350.0);
+        assert!(!high_v.valid && high_v.status_code == 2);
+    }
+
+    #[test]
+    fn test_bassbox_bandpass_variants() {
+        let bp4 = calc_bandpass_4_bassbox(38.0, 70.0, 0.36, 0.0, 0.0);
+        assert!(bp4.vf > 0.0 && bp4.vr > 0.0 && bp4.fb > 0.0);
+
+        for &qts in &[0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80] {
+            let par = calc_bandpass_6_bassbox(38.0, 70.0, qts, "parallel");
+            assert!(par.vf.is_finite() && par.vf > 0.0);
+            assert!(par.vr.is_finite() && par.vr > 0.0);
+            assert!(par.fh > par.fl && par.fl > 0.0, "parallel invertida en qts={qts}");
+
+            let ser = calc_bandpass_6_bassbox(38.0, 70.0, qts, "series");
+            assert!(ser.vf.is_finite() && ser.vf > 0.0);
+            assert!(ser.vr.is_finite() && ser.vr > 0.0);
+            assert!(ser.fh > ser.fl && ser.fl > 0.0, "series invertida en qts={qts}");
+        }
     }
 }
 

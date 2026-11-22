@@ -7,9 +7,9 @@ import { CabinetTab } from './components/CabinetTab';
 import { CrossoverTab } from './components/CrossoverTab';
 import { type Lang, translate } from './utils/translations';
 import { type UnitSystem, convertTo, getUnitLabel, nextUnitSystem } from './utils/units';
-import type { SpeakerParams, CalculatedSealed, CalculatedPorted, CalculatedBandpass, CustomDriver, WoodCabinetData, CrossoverExportData, WoodShape } from './types';
+import type { SpeakerParams, CalculatedSealed, CalculatedPorted, CalculatedBandpass, CustomDriver, WoodCabinetData, CrossoverExportData, WoodShape, VentedAlignmentType, Bandpass6Topology } from './types';
 import { estimateF3, calcPortLength, getKCorrection, calcOptimalPortForSpeaker, calcVentAirVelocity } from './utils/acousticMath';
-import { getWasm, calcRadiadorPasivo, calcVolumenNetoMadera } from './wasm/index.ts';
+import { getWasm, calcRadiadorPasivo, calcVolumenNetoMadera, calcSuggestFb } from './wasm/index.ts';
 import { generateReportHTML, printReportHtml } from './utils/reportGenerator';
 import { StatusBar } from './components/StatusBar';
 import { DriverDatabaseModal } from './components/DriverDatabaseModal';
@@ -25,7 +25,8 @@ function App({ wasmError }: AppProps) {
   const [activeTab, setActiveTab] = useState<'wood' | 'port' | 'damping' | 'crossover'>('wood');
   const [workspaceView, setWorkspaceView] = useState<'split' | 'simulation' | 'cabinet' | 'crossover'>('split');
   const [boxType, setBoxType] = useState<'sealed' | 'ported' | 'bandpass'>('sealed');
-  const [ventedAlignment, setVentedAlignment] = useState<'QB3' | 'B4' | 'SBB4'>('QB3');
+  const [ventedAlignment, setVentedAlignment] = useState<VentedAlignmentType>('B4');
+  const [externalSubwoofer, setExternalSubwoofer] = useState<boolean>(false);
   const t = (text: string) => translate(text, lang);
 
   const handleBoxTypeChange = (newType: 'sealed' | 'ported' | 'bandpass') => {
@@ -70,6 +71,9 @@ function App({ wasmError }: AppProps) {
   const [bandpassOrder, setBandpassOrder] = useState<4 | 6>(4);
   const [bandpassS, setBandpassS] = useState<number>(0.707);
   const [bandpassA, setBandpassA] = useState<number>(2.0);
+  const [bandpassTopology, setBandpassTopology] = useState<Bandpass6Topology>('parallel');
+  const [bandpassDf, setBandpassDf] = useState<number>(0.65);
+  const [bandpassQtPrime, setBandpassQtPrime] = useState<number>(0);
 
   // Sidebar layout (collapsible & resizable sections)
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -213,6 +217,7 @@ function App({ wasmError }: AppProps) {
   const [woodConstraint, setWoodConstraint] = useState<string>('none');
   const [woodRatio, setWoodRatio] = useState<'golden' | 'classic' | 'cube'>('golden');
   const [dampingType, setDampingType] = useState<'none' | 'light' | 'moderate' | 'heavy'>('none');
+  const [classicalModel, setClassicalModel] = useState<boolean>(false);
 
   const getDampingFactor = () => {
     switch (dampingType) {
@@ -222,7 +227,7 @@ function App({ wasmError }: AppProps) {
       default: return 1.00;
     }
   };
-  const dampingFactor = getDampingFactor();
+  const dampingFactor = classicalModel ? 1.0 : getDampingFactor();
 
   // Lock sizes for Auto Wood
   const [woodLockVal1, setWoodLockVal1] = useState<number | ''>(40);
@@ -298,8 +303,8 @@ function App({ wasmError }: AppProps) {
       }
       setParams(updatedParams);
 
-      // Seleccionar alineación acústica de alta fidelidad (transición continua QB3/B4/C4 según Qts)
-      let optAlign: 'QB3' | 'B4' | 'SBB4' = 'B4';
+      // Seleccionar alineación recomendada según Qts (Keele B4 <= 0.49, Compacto práctico > 0.49)
+      const optAlign: VentedAlignmentType = (updatedParams.qts && updatedParams.qts > 0.49) ? 'COMPACT' : 'B4';
       if (updatedParams.qts && updatedParams.qts > 0) {
         setVentedAlignment(optAlign);
       }
@@ -308,7 +313,7 @@ function App({ wasmError }: AppProps) {
       if (updatedParams.fs > 0 && updatedParams.vas > 0 && updatedParams.qts > 0) {
         try {
           const wasm = getWasm();
-          const res = wasm.calc_alineacion_ventilada(updatedParams.fs, updatedParams.vas, updatedParams.qts, optAlign);
+          const res = wasm.calc_alineacion_ventilada_ex(updatedParams.fs, updatedParams.vas, updatedParams.qts, optAlign, 0);
           const targetVb = (woodMode === 'input' && cabinetData?.valid && cabinetData.vNeto > 0)
             ? cabinetData.vNeto
             : (res.vb > 0 ? res.vb : 40);
@@ -388,17 +393,57 @@ function App({ wasmError }: AppProps) {
 
 
 
+  const driverMinVb = useMemo<number>(() => {
+    if (adjParams.driverVolDisplaced && adjParams.driverVolDisplaced > 0) {
+      return adjParams.driverVolDisplaced * 2.5;
+    }
+    if (adjParams.overallDiameter && adjParams.overallDiameter > 0 && adjParams.driverDepth && adjParams.driverDepth > 0) {
+      const r = adjParams.overallDiameter / 2.0;
+      const cylLitres = (Math.PI * r * r * adjParams.driverDepth) / 1e6;
+      return cylLitres * 1.2;
+    }
+    return 0;
+  }, [adjParams.driverVolDisplaced, adjParams.overallDiameter, adjParams.driverDepth]);
+
+  const formatVentedAlignmentLabel = useCallback((align: VentedAlignmentType): string => {
+    switch (align) {
+      case 'QB3': return 'High Output (QB3)';
+      case 'B4': return 'High Fidelity (B4)';
+      case 'SBB4': return 'Extended Bass (SBB4)';
+      case 'B6': return '6.º Orden HP Activo (B6)';
+      case 'COMPACT': return 'Compacto (Práctico)';
+    }
+  }, []);
+
   // Frecuencia de sintonía óptima (Fb) según los parámetros Thiele-Small del altavoz y la alineación activa
+  // Si se refuerza con subwoofer externo, optimiza Fb como satélite/top (control de excursión en 60-100 Hz)
   const optimalDriverFb = useMemo<number>(() => {
     if (validationError || !adjParams.fs || !adjParams.vas || !adjParams.qts) return 38;
+    if (externalSubwoofer) {
+      return Math.min(95, Math.max(55, Math.round(adjParams.fs * 1.12 * 10) / 10));
+    }
     try {
       const wasm = getWasm();
-      const res = wasm.calc_alineacion_ventilada(adjParams.fs, adjParams.vas, adjParams.qts, ventedAlignment);
+      const res = wasm.calc_alineacion_ventilada_ex(adjParams.fs, adjParams.vas, adjParams.qts, ventedAlignment, driverMinVb);
       return res.fb > 0 ? Math.round(res.fb * 10) / 10 : 38;
     } catch {
       return 38;
     }
-  }, [validationError, adjParams.fs, adjParams.vas, adjParams.qts, ventedAlignment]);
+  }, [validationError, adjParams.fs, adjParams.vas, adjParams.qts, ventedAlignment, driverMinVb, externalSubwoofer]);
+
+  const handleExternalSubwooferChange = (enabled: boolean) => {
+    setExternalSubwoofer(enabled);
+    if (enabled && adjParams.fs > 0) {
+      const subFb = Math.min(95, Math.max(55, Math.round(adjParams.fs * 1.12 * 10) / 10));
+      setUseCustomPortLength(false);
+      if (customPorted || woodMode === 'input') {
+        setCustomFbState(subFb);
+      }
+    } else if (!enabled) {
+      setUseCustomPortLength(false);
+      setCustomFbState(null);
+    }
+  };
 
   // Manual wood volume calculation (needed for link overrides)
   const getManualWoodNetVolume = () => {
@@ -516,29 +561,54 @@ function App({ wasmError }: AppProps) {
     let FbPorted: number;
     let F3Ported: number;
     let alignmentActive: string;
+    let activeHpEnabled = false;
+    let hpFx = 0;
+    let hpQx = 0;
+    let clampedToMinVol = false;
 
     const wasm = getWasm();
 
     if (woodMode === 'input' && manualNetVol > 0) {
       VbPorted = manualNetVol * dampingFactor;
-      // Sintonizar a la Fb personalizada o a la Fb óptima calculada según el altavoz y alineación
-      FbPorted = customFbState ?? optimalDriverFb;
-      F3Ported = estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas);
+      // Sintonizar a la Fb personalizada o a SuggestFb de BassBox para ese Vb
+      const suggestedFbForVb = (!externalSubwoofer && VbPorted > 0)
+        ? calcSuggestFb(adjParams.fs, adjParams.vas, adjParams.qts, VbPorted)
+        : optimalDriverFb;
+      FbPorted = customFbState ?? (suggestedFbForVb > 0 ? suggestedFbForVb : optimalDriverFb);
+      if (ventedAlignment === 'B6' && !externalSubwoofer && customFbState === null) {
+        activeHpEnabled = true;
+        hpFx = 1.07 * FbPorted;
+        hpQx = 1.93;
+        F3Ported = wasm.calc_f3_ventilada_b6(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas, hpFx, hpQx);
+      } else {
+        F3Ported = estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas);
+      }
       alignmentActive = customFbState !== null
         ? 'Manual'
-        : `${ventedAlignment === 'QB3' ? 'High Output (QB3)' : ventedAlignment === 'B4' ? 'High Fidelity (B4)' : 'Extended Bass (SBB4)'}`;
+        : formatVentedAlignmentLabel(ventedAlignment);
     } else {
       if (customPorted) {
         VbPorted = customVbState ?? 45;
-        FbPorted = customFbState ?? optimalDriverFb;
+        const suggestedFbForVb = (!externalSubwoofer && VbPorted > 0)
+          ? calcSuggestFb(adjParams.fs, adjParams.vas, adjParams.qts, VbPorted)
+          : optimalDriverFb;
+        FbPorted = customFbState ?? (suggestedFbForVb > 0 ? suggestedFbForVb : optimalDriverFb);
         F3Ported = estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas);
         alignmentActive = 'Manual';
       } else {
-        const result = wasm.calc_alineacion_ventilada(adjParams.fs, adjParams.vas, adjParams.qts, ventedAlignment);
+        const result = wasm.calc_alineacion_ventilada_ex(adjParams.fs, adjParams.vas, adjParams.qts, ventedAlignment, driverMinVb);
         VbPorted = result.vb;
-        FbPorted = result.fb;
-        F3Ported = result.f3;
-        alignmentActive = `${ventedAlignment === 'QB3' ? 'High Output (QB3)' : ventedAlignment === 'B4' ? 'High Fidelity (B4)' : 'Extended Bass (SBB4)'}`;
+        FbPorted = externalSubwoofer ? optimalDriverFb : result.fb;
+        activeHpEnabled = !externalSubwoofer && result.active_hp;
+        hpFx = activeHpEnabled ? result.hp_fx : 0;
+        hpQx = activeHpEnabled ? result.hp_qx : 0;
+        clampedToMinVol = result.clamped_to_min_vol;
+        F3Ported = externalSubwoofer
+          ? estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas)
+          : result.f3;
+        alignmentActive = externalSubwoofer
+          ? 'Satélite + Subwoofer'
+          : formatVentedAlignmentLabel(ventedAlignment);
       }
     }
 
@@ -555,7 +625,9 @@ function App({ wasmError }: AppProps) {
         const fbCalc = Math.sqrt((23562.5 * Math.pow(pDia, 2) * pCount) / (VbPorted * (Lv_cm + kCorrection * pDia)));
         if (fbCalc > 0 && !isNaN(fbCalc) && isFinite(fbCalc)) {
           FbPorted = fbCalc;
-          F3Ported = estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas);
+          F3Ported = activeHpEnabled && hpFx > 0 && hpQx > 0
+            ? wasm.calc_f3_ventilada_b6(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas, hpFx, hpQx)
+            : estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas);
           alignmentActive = `${t("Personalizada")} (L: ${Lv_cm.toFixed(1)} cm)`;
         }
       }
@@ -569,9 +641,13 @@ function App({ wasmError }: AppProps) {
       Fs: adjParams.fs,
       Qts: adjParams.qts,
       Vas: adjParams.vas,
-      alignment: alignmentActive
+      alignment: alignmentActive,
+      activeHpEnabled,
+      hpFx,
+      hpQx,
+      clampedToMinVol,
     };
-  }, [validationError, adjParams.fs, adjParams.vas, adjParams.qts, woodMode, manualNetVol, dampingFactor, customPorted, customVbState, customFbState, optimalDriverFb, ventedAlignment, useCustomPortLength, customPortLength, portShape, portDiameter, portArea, portWidth, portHeight, portCount, flaredEnds, lang]);
+  }, [validationError, adjParams.fs, adjParams.vas, adjParams.qts, woodMode, manualNetVol, dampingFactor, customPorted, customVbState, customFbState, optimalDriverFb, ventedAlignment, driverMinVb, externalSubwoofer, formatVentedAlignmentLabel, useCustomPortLength, customPortLength, portShape, portDiameter, portArea, portWidth, portHeight, portCount, flaredEnds, lang]);
 
   const customVb = customPorted ? (customVbState ?? Math.round((portedData.Vb || 45) * 10) / 10) : Math.round((portedData.Vb || 45) * 10) / 10;
   const customFb = customPorted ? (customFbState ?? Math.round((portedData.Fb || 38) * 10) / 10) : Math.round((portedData.Fb || 38) * 10) / 10;
@@ -603,7 +679,8 @@ function App({ wasmError }: AppProps) {
 
     try {
       if (bandpassOrder === 4) {
-        const res = wasm.calc_bandpass_4(adjParams.fs, adjParams.vas, adjParams.qts, bandpassS);
+        const effectiveQt = bandpassQtPrime > 0 ? Math.max(bandpassQtPrime, adjParams.qts + 0.01) : Math.max(0.8, adjParams.qts + 0.1);
+        const res = wasm.calc_bandpass_4_bassbox(adjParams.fs, adjParams.vas, adjParams.qts, bandpassDf, bandpassQtPrime);
         return {
           valid: true,
           order: 4,
@@ -611,10 +688,12 @@ function App({ wasmError }: AppProps) {
           Vr: res.vr,
           Fb: res.fb,
           F0: res.f0,
-          delta_f: res.delta_f
+          delta_f: res.delta_f,
+          df: bandpassDf,
+          qtPrime: effectiveQt
         };
       } else {
-        const res = wasm.calc_bandpass_6(adjParams.fs, adjParams.vas, adjParams.qts, bandpassA);
+        const res = wasm.calc_bandpass_6_bassbox(adjParams.fs, adjParams.vas, adjParams.qts, bandpassTopology);
         return {
           valid: true,
           order: 6,
@@ -622,14 +701,15 @@ function App({ wasmError }: AppProps) {
           Vr: res.vr,
           Fb: 0,
           Fl: res.fl,
-          Fh: res.fh
+          Fh: res.fh,
+          topology: bandpassTopology
         };
       }
     } catch (e) {
       console.error("Bandpass calculation error:", e);
       return { valid: false, order: bandpassOrder, Vf: 0, Vr: 0, Fb: 0, F0: 0, delta_f: 0, Fl: 0, Fh: 0 };
     }
-  }, [validationError, adjParams.fs, adjParams.vas, adjParams.qts, bandpassOrder, bandpassS, bandpassA]);
+  }, [validationError, adjParams.fs, adjParams.vas, adjParams.qts, bandpassOrder, bandpassDf, bandpassQtPrime, bandpassTopology]);
 
   const deferredSealedData = useDeferredValue(sealedData);
   const deferredPortedData = useDeferredValue(portedData);
@@ -857,6 +937,7 @@ function App({ wasmError }: AppProps) {
       customFb,
       customPorted,
       ventedAlignment,
+      externalSubwoofer,
       portCount,
       portDiameter,
       portShape,
@@ -911,6 +992,7 @@ function App({ wasmError }: AppProps) {
         if (data.customFb !== undefined) setCustomFb(data.customFb);
         if (data.customPorted !== undefined) setCustomPorted(data.customPorted);
         if (data.ventedAlignment) setVentedAlignment(data.ventedAlignment);
+        if (data.externalSubwoofer !== undefined) setExternalSubwoofer(data.externalSubwoofer);
         if (data.crossoverWays !== undefined) setCrossoverWays(data.crossoverWays);
         if (data.crossoverType) setCrossoverType(data.crossoverType);
         if (data.fc !== undefined) setFc(data.fc);
@@ -1133,6 +1215,8 @@ function App({ wasmError }: AppProps) {
           cabinetData={cabinetData}
           ventedAlignment={ventedAlignment}
           setVentedAlignment={setVentedAlignment}
+          externalSubwoofer={externalSubwoofer}
+          setExternalSubwoofer={handleExternalSubwooferChange}
           isLinkedToCabinet={woodMode === 'input' && manualNetVol > 0}
           targetQtc={targetQtc}
           setTargetQtc={setTargetQtc}
@@ -1142,6 +1226,14 @@ function App({ wasmError }: AppProps) {
           setBandpassS={setBandpassS}
           bandpassA={bandpassA}
           setBandpassA={setBandpassA}
+          bandpassTopology={bandpassTopology}
+          setBandpassTopology={setBandpassTopology}
+          bandpassDf={bandpassDf}
+          setBandpassDf={setBandpassDf}
+          bandpassQtPrime={bandpassQtPrime}
+          setBandpassQtPrime={setBandpassQtPrime}
+          classicalModel={classicalModel}
+          setClassicalModel={setClassicalModel}
           
           portCount={portCount}
           setPortCount={setPortCount}

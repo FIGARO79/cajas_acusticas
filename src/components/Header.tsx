@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { type Lang, translate } from '../utils/translations';
 import { type UnitSystem } from '../utils/units';
+import type { VentedAlignmentType } from '../types';
 
 interface HeaderProps {
   lang: Lang;
@@ -12,8 +13,8 @@ interface HeaderProps {
   setWorkspaceView?: (view: 'split' | 'simulation' | 'cabinet' | 'crossover') => void;
   boxType?: 'sealed' | 'ported' | 'bandpass';
   setBoxType?: (type: 'sealed' | 'ported' | 'bandpass') => void;
-  ventedAlignment?: 'QB3' | 'B4' | 'SBB4';
-  setVentedAlignment?: (align: 'QB3' | 'B4' | 'SBB4') => void;
+  ventedAlignment?: VentedAlignmentType;
+  setVentedAlignment?: (align: VentedAlignmentType) => void;
   crossoverWays?: number;
   setCrossoverWays?: (ways: number) => void;
   onSaveProject?: () => void;
@@ -313,6 +314,32 @@ export const Header: React.FC<HeaderProps> = ({
                 >
                   {boxType === 'ported' && ventedAlignment === 'SBB4' && <span className="cad-menu-check">✓</span>}
                   <span>{t("Deep Bass / Graves Profundos (SBB4)")}</span>
+                </button>
+                <button
+                  className={`cad-menu-option ${boxType === 'ported' && ventedAlignment === 'B6' ? 'checked' : ''}`}
+                  onClick={() => {
+                    setBoxType?.('ported');
+                    setVentedAlignment?.('B6');
+                    closeMenu();
+                  }}
+                  type="button"
+                  role="menuitem"
+                >
+                  {boxType === 'ported' && ventedAlignment === 'B6' && <span className="cad-menu-check">✓</span>}
+                  <span>{t("6.º Orden HP Activo (B6)")}</span>
+                </button>
+                <button
+                  className={`cad-menu-option ${boxType === 'ported' && ventedAlignment === 'COMPACT' ? 'checked' : ''}`}
+                  onClick={() => {
+                    setBoxType?.('ported');
+                    setVentedAlignment?.('COMPACT');
+                    closeMenu();
+                  }}
+                  type="button"
+                  role="menuitem"
+                >
+                  {boxType === 'ported' && ventedAlignment === 'COMPACT' && <span className="cad-menu-check">✓</span>}
+                  <span>{t("Compacto / Práctico")}</span>
                 </button>
 
                 <div className="cad-menu-separator" role="separator" />

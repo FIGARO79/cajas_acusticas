@@ -1,5 +1,5 @@
 import init, * as wasm from "./pkg/backend.js";
-import type { CalculatedSealed, CalculatedPorted, SpeakerParams } from '../types';
+import type { CalculatedSealed, CalculatedPorted, SpeakerParams, VentedAlignmentType, Bandpass6Topology } from '../types';
 
 let wasmInstance: typeof wasm | null = null;
 
@@ -84,6 +84,83 @@ export async function calcRadiadorPasivo(vb: number, vas: number, fs: number, cd
   return { fb: res.fb, capAcustica: res.cap_acustica, masaAñadida: res.masa_añadida };
 }
 
+/** Sugerencia automática de radiador pasivo (escalera comercial BassBox Pro) */
+export async function suggestPassiveRadiator(
+  fs: number,
+  vas: number,
+  qts: number,
+  sdCm2: number,
+  xmaxMm: number,
+  vb: number,
+  fb: number
+) {
+  const w = await getWasm();
+  const res = w.suggest_passive_radiator(fs, vas, qts, sdCm2, xmaxMm, vb, fb);
+  return {
+    diaCm: res.dia_cm,
+    diaInches: res.dia_inches,
+    sdPrCm2: res.sd_pr_cm2,
+    vasPr: res.vas_pr,
+    fsPr: res.fs_pr,
+    mmsPr: res.mms_pr,
+    masaAnadidaG: res.masa_anadida_g,
+  };
+}
+
+/** Sugerencia de sintonía Fb óptima para un volumen Vb dado (tabla Keele BassBox) */
+export function calcSuggestFb(fs: number, vas: number, qts: number, vb: number): number {
+  const w = getWasm();
+  return w.calc_suggest_fb(fs, vas, qts, vb);
+}
+
+/** Solver Desired F3 para caja sellada */
+export function calcSealedForF3(fs: number, vas: number, qts: number, targetF3: number) {
+  const w = getWasm();
+  const res = w.calc_sealed_for_f3(fs, vas, qts, targetF3);
+  return {
+    valid: res.valid,
+    vb: res.vb,
+    fc: res.fb_or_fc,
+    qtc: res.qtc,
+    f3: res.f3,
+    statusCode: res.status_code,
+  };
+}
+
+/** Solver Desired F3 para caja ventilada */
+export function calcVentedForF3(fs: number, vas: number, qts: number, targetF3: number) {
+  const w = getWasm();
+  const res = w.calc_vented_for_f3(fs, vas, qts, targetF3);
+  return {
+    valid: res.valid,
+    vb: res.vb,
+    fb: res.fb_or_fc,
+    f3: res.f3,
+    statusCode: res.status_code,
+  };
+}
+
+/** Alineación ventilada extendida con soporte B6 (HP activo) y volumen mínimo del driver */
+export function calcVentedAlignmentEx(
+  fs: number,
+  vas: number,
+  qts: number,
+  tipo: VentedAlignmentType,
+  vbMin = 0
+) {
+  const w = getWasm();
+  const res = w.calc_alineacion_ventilada_ex(fs, vas, qts, tipo, vbMin);
+  return {
+    vb: res.vb,
+    fb: res.fb,
+    f3: res.f3,
+    activeHp: res.active_hp,
+    hpFx: res.hp_fx,
+    hpQx: res.hp_qx,
+    clampedToMinVol: res.clamped_to_min_vol,
+  };
+}
+
 /** Isobaric configuration calculations */
 export async function calcIsobariMultiple(fs: number, vas: number, qts: number, n: number, tipo: string) {
   const w = await getWasm();
@@ -107,14 +184,25 @@ export async function calcSealedCurve(sealed: CalculatedSealed, params: SpeakerP
 /** Ported box frequency response curve (10-500 Hz) */
 export async function calcPortedCurve(ported: CalculatedPorted, params: SpeakerParams): Promise<number[]> {
   const w = await getWasm();
-  const res = w.calc_ported_curve(
-    params.fs,
-    params.qts,
-    params.vas,
-    ported.Vb,
-    ported.Fb,
-    ported.valid
-  );
+  const res = (ported.activeHpEnabled && ported.hpFx && ported.hpQx)
+    ? w.calc_ported_b6_curve(
+        params.fs,
+        params.qts,
+        params.vas,
+        ported.Vb,
+        ported.Fb,
+        ported.hpFx,
+        ported.hpQx,
+        ported.valid
+      )
+    : w.calc_ported_curve(
+        params.fs,
+        params.qts,
+        params.vas,
+        ported.Vb,
+        ported.Fb,
+        ported.valid
+      );
   return Array.from(res);
 }
 
@@ -125,10 +213,24 @@ export async function calcBandpass4(fs: number, vas: number, qts: number, s: num
   return { vf: res.vf, vr: res.vr, fb: res.fb, f0: res.f0, delta_f: res.delta_f };
 }
 
+/** Bandpass 4th order BassBox (DF y Q't) */
+export function calcBandpass4Bassbox(fs: number, vas: number, qts: number, df = 0.65, qtPrime = 0) {
+  const w = getWasm();
+  const res = w.calc_bandpass_4_bassbox(fs, vas, qts, df, qtPrime);
+  return { vf: res.vf, vr: res.vr, fb: res.fb, f0: res.f0, delta_f: res.delta_f };
+}
+
 /** Bandpass 6th order calculations */
 export async function calcBandpass6(fs: number, vas: number, qts: number, a: number) {
   const w = await getWasm();
   const res = w.calc_bandpass_6(fs, vas, qts, a);
+  return { vf: res.vf, vr: res.vr, fh: res.fh, fl: res.fl };
+}
+
+/** Bandpass 6th order BassBox (Paralelo / Serie) */
+export function calcBandpass6Bassbox(fs: number, vas: number, qts: number, topology: Bandpass6Topology) {
+  const w = getWasm();
+  const res = w.calc_bandpass_6_bassbox(fs, vas, qts, topology);
   return { vf: res.vf, vr: res.vr, fh: res.fh, fl: res.fl };
 }
 
@@ -174,6 +276,22 @@ export function calcPortedCurveCustom(freqs: number[], fs: number, qts: number, 
   const w = getWasm();
   const floatArr = Float64Array.from(freqs);
   return Array.from(w.calc_ported_curve_custom(floatArr, fs, qts, vas, vb, fb, valid));
+}
+
+export function calcPortedB6CurveCustom(
+  freqs: number[],
+  fs: number,
+  qts: number,
+  vas: number,
+  vb: number,
+  fb: number,
+  fx: number,
+  qx: number,
+  valid = true
+): number[] {
+  const w = getWasm();
+  const floatArr = Float64Array.from(freqs);
+  return Array.from(w.calc_ported_b6_curve_custom(floatArr, fs, qts, vas, vb, fb, fx, qx, valid));
 }
 
 export function calcBandpass4CurveCustom(freqs: number[], fs: number, qts: number, vas: number, vf: number, vr: number, fb: number, valid = true): number[] {

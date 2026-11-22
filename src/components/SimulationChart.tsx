@@ -31,6 +31,7 @@ import {
   calcGroupDelayCurve,
   calculateSealedResponseAt,
   calculatePortedResponseAt,
+  calculatePortedB6ResponseAt,
   calculateBandpass4ResponseAt,
   calculateBandpass6ResponseAt,
   getFilterGain,
@@ -546,7 +547,12 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
     } else if (portedData && portedData.valid) {
       boxPoints = frequenciesFull.map(f => ({
         x: f,
-        y: Math.max(-45, calculatePortedResponseAt(f, fs, qts, vas, portedData.Vb, portedData.Fb))
+        y: Math.max(
+          -45,
+          portedData.activeHpEnabled && portedData.hpFx && portedData.hpQx
+            ? calculatePortedB6ResponseAt(f, fs, qts, vas, portedData.Vb, portedData.Fb, portedData.hpFx, portedData.hpQx)
+            : calculatePortedResponseAt(f, fs, qts, vas, portedData.Vb, portedData.Fb)
+        )
       }));
       label = `${t("Caja Ventilada")} (${t("Sin Filtro")})`;
       borderColor = '#10b981';

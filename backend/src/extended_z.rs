@@ -179,11 +179,12 @@ pub fn calc_extended_system_impedance(
             Complex::new(c_as, 0.0)
         };
 
-        // Impedancia acústica de la caja Cab // Rab // Ral
+        // Impedancia acústica de la caja: Ral en paralelo con (Rab + 1/(s*Cab))
         let omega_b = omega_s * (c_as / cab).sqrt();
         let r_ab = 1.0 / (omega_b * cab * qa);
-        let r_al = omega_b * cab * ql;
-        let y_box = Complex::new(1.0 / r_ab + 1.0 / r_al, 0.0) + (s * cab);
+        let r_al = ql / (omega_b * cab);
+        let z_ab = Complex::new(r_ab, 0.0) + (Complex::ONE / (s * cab));
+        let y_box = Complex::new(1.0 / r_al, 0.0) + (Complex::ONE / z_ab);
         let z_box = Complex::ONE / y_box;
 
         // Impedancia acústica motriz: Zas = Ras + s*Mas + 1/(s*Cas_eff) + Zbox
@@ -206,13 +207,15 @@ pub fn calc_extended_system_impedance(
 
         let r_ap = omega_b * map / qp;
         let r_ab = 1.0 / (omega_b * cab * qa);
-        let r_al = omega_b * cab * ql;
+        let r_al = ql / (omega_b * cab);
 
         // Rama del puerto: Zap = Rap + s*Map
         let z_ap = Complex::new(r_ap, 0.0) + (s * map);
-        
-        // Admitancia total de la cavidad: Ybox = 1/Zbox_losses + s*Cab + 1/Zap
-        let y_cavity = Complex::new(1.0 / r_ab + 1.0 / r_al, 0.0) + (s * cab) + (Complex::ONE / z_ap);
+        // Rama de compliancia + absorción de caja: Zab = Rab + 1/(s*Cab)
+        let z_ab = Complex::new(r_ab, 0.0) + (Complex::ONE / (s * cab));
+
+        // Admitancia total de la cavidad: Ybox = 1/Ral + 1/Zab + 1/Zap
+        let y_cavity = Complex::new(1.0 / r_al, 0.0) + (Complex::ONE / z_ab) + (Complex::ONE / z_ap);
         let z_cavity = Complex::ONE / y_cavity;
 
         // Compliancia del cono con Creep
@@ -304,5 +307,37 @@ mod tests {
         let z_10k = calc_z_voice_coil(10000.0, 5.6, 0.5, 0.8, 35.0);
         assert!(z_10k.re > 5.6); // Efecto de resistencia de pérdidas Rss
         assert!(z_10k.im > 10.0); // Efecto inductivo Leb + Ke
+    }
+
+    #[test]
+    fn test_extended_ported_impedance_has_two_peaks_and_valley_at_fb() {
+        // Eminence Alpha-10A en caja ventilada (Vb=31.93L, Fb=43Hz)
+        let z_low_peak = (10..42)
+            .map(|f| calc_extended_system_impedance(
+                f as f64, 50.0, 5.21, 0.66, 5.31, 82.2, 31.93, 43.0, true, 0.5, 0.8, 35.0, 0.015,
+            ))
+            .fold(0.0_f64, f64::max);
+        let z_fb = calc_extended_system_impedance(
+            43.0, 50.0, 5.21, 0.66, 5.31, 82.2, 31.93, 43.0, true, 0.5, 0.8, 35.0, 0.015,
+        );
+        let z_high_peak = (44..150)
+            .map(|f| calc_extended_system_impedance(
+                f as f64, 50.0, 5.21, 0.66, 5.31, 82.2, 31.93, 43.0, true, 0.5, 0.8, 35.0, 0.015,
+            ))
+            .fold(0.0_f64, f64::max);
+        assert!(z_low_peak > z_fb + 2.0, "Debe existir un pico inferior por debajo de Fb: z_low_peak={z_low_peak}, z_fb={z_fb}");
+        assert!(z_high_peak > z_fb + 5.0, "Debe existir un pico superior por encima de Fb: z_high_peak={z_high_peak}, z_fb={z_fb}");
+        assert!(z_fb < 7.5, "En Fb debe existir el valle de sintonía cercano a Re: z_fb={z_fb}");
+    }
+
+    #[test]
+    fn test_extended_sealed_impedance_shifts_resonance_above_fs() {
+        let z_at_fs = calc_extended_system_impedance(
+            50.0, 50.0, 5.21, 0.66, 5.31, 82.2, 31.93, 43.0, false, 0.5, 0.8, 35.0, 0.015,
+        );
+        let z_at_fc = calc_extended_system_impedance(
+            94.0, 50.0, 5.21, 0.66, 5.31, 82.2, 31.93, 43.0, false, 0.5, 0.8, 35.0, 0.015,
+        );
+        assert!(z_at_fc > z_at_fs, "En caja sellada el pico Fc debe desplazarse por encima de Fs: z_at_fc={z_at_fc}, z_at_fs={z_at_fs}");
     }
 }

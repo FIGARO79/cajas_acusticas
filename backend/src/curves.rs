@@ -113,6 +113,27 @@ pub fn calc_ported_response_at(f: f64, fs: f64, qts: f64, vas: f64, vb: f64, fb:
 }
 
 #[wasm_bindgen]
+pub fn calc_ported_b6_response_at(
+    f: f64,
+    fs: f64,
+    qts: f64,
+    vas: f64,
+    vb: f64,
+    fb: f64,
+    fx: f64,
+    qx: f64,
+) -> f64 {
+    if f <= 0.0 || vb <= 0.0 || fs <= 0.0 || qts <= 0.0 || fb <= 0.0 || fx <= 0.0 || qx <= 0.0 {
+        return -45.0;
+    }
+    let vented_db = calc_ported_response_at(f, fs, qts, vas, vb, fb);
+    let r = f / fx;
+    let hp_mag = (r * r) / ((1.0 - r * r).powi(2) + (r / qx).powi(2) + 1e-20).sqrt();
+    let hp_db = 20.0 * (hp_mag + 1e-10).log10();
+    vented_db + hp_db
+}
+
+#[wasm_bindgen]
 pub fn calc_bandpass4_response_at(f: f64, fs: f64, qts: f64, vas: f64, vf: f64, vr: f64, fb: f64) -> f64 {
     if f <= 0.0 || vf <= 0.0 || vr <= 0.0 || fb <= 0.0 || fs <= 0.0 || qts <= 0.0 {
         return -45.0;
@@ -186,6 +207,45 @@ pub fn calc_ported_curve_custom(freqs: &[f64], fs: f64, qts: f64, vas: f64, vb: 
     }
     for &f in freqs {
         let db = calc_ported_response_at(f, fs, qts, vas, vb, fb);
+        let val = (db * 100.0_f64).round() / 100.0_f64;
+        result.push(&JsValue::from_f64(val));
+    }
+    result
+}
+
+#[wasm_bindgen]
+pub fn calc_ported_b6_curve(
+    fs: f64,
+    qts: f64,
+    vas: f64,
+    vb: f64,
+    fb: f64,
+    fx: f64,
+    qx: f64,
+    valid: bool,
+) -> Array {
+    let freqs = default_chart_frequencies();
+    calc_ported_b6_curve_custom(&freqs, fs, qts, vas, vb, fb, fx, qx, valid)
+}
+
+#[wasm_bindgen]
+pub fn calc_ported_b6_curve_custom(
+    freqs: &[f64],
+    fs: f64,
+    qts: f64,
+    vas: f64,
+    vb: f64,
+    fb: f64,
+    fx: f64,
+    qx: f64,
+    valid: bool,
+) -> Array {
+    let result = Array::new();
+    if !valid || vb <= 0.0 || fx <= 0.0 || qx <= 0.0 {
+        return result;
+    }
+    for &f in freqs {
+        let db = calc_ported_b6_response_at(f, fs, qts, vas, vb, fb, fx, qx);
         let val = (db * 100.0_f64).round() / 100.0_f64;
         result.push(&JsValue::from_f64(val));
     }

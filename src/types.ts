@@ -29,6 +29,9 @@ export interface SpeakerParams {
   driverDepth?: number;        // mm (Mounting Depth)
 }
 
+export type VentedAlignmentType = 'QB3' | 'B4' | 'SBB4' | 'B6' | 'COMPACT';
+export type Bandpass6Topology = 'parallel' | 'series';
+
 export interface CalculatedSealed {
   valid: boolean;
   Vb: number;
@@ -46,6 +49,10 @@ export interface CalculatedPorted {
   Qts: number;
   Vas: number;
   alignment: string;
+  activeHpEnabled?: boolean;
+  hpFx?: number;
+  hpQx?: number;
+  clampedToMinVol?: boolean;
 }
 
 export interface CalculatedBandpass {
@@ -58,6 +65,9 @@ export interface CalculatedBandpass {
   delta_f?: number;
   Fl?: number;
   Fh?: number;
+  topology?: Bandpass6Topology;
+  df?: number;
+  qtPrime?: number;
 }
 
 

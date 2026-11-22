@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { type Lang, translate } from '../utils/translations';
 import { type UnitSystem, convertTo, convertFrom, getUnitLabel } from '../utils/units';
-import type { CalculatedPorted, CalculatedSealed, CalculatedBandpass, SpeakerParams, PortSuggestions, WoodCabinetData, WoodShape } from '../types';
+import type { CalculatedPorted, CalculatedSealed, CalculatedBandpass, SpeakerParams, PortSuggestions, WoodCabinetData, WoodShape, VentedAlignmentType, Bandpass6Topology } from '../types';
 import { suggestPortConfig, calcOptimalPortForSpeaker, calculatePortSpacing, calcPortLength, getKCorrection } from '../utils/acousticMath';
-import { getWasm, optimizeCrossoverLowpass } from '../wasm';
+import { getWasm, optimizeCrossoverLowpass, calcSuggestFb, calcSealedForF3, calcVentedForF3, suggestPassiveRadiator } from '../wasm';
 
 interface BoxParamsFormProps {
   lang: Lang;
@@ -26,14 +26,22 @@ interface BoxParamsFormProps {
   // Ajustes de alineación
   targetQtc: number;
   setTargetQtc: (val: number) => void;
-  ventedAlignment?: 'QB3' | 'B4' | 'SBB4';
-  setVentedAlignment?: (align: 'QB3' | 'B4' | 'SBB4') => void;
+  ventedAlignment?: VentedAlignmentType;
+  setVentedAlignment?: (align: VentedAlignmentType) => void;
+  externalSubwoofer?: boolean;
+  setExternalSubwoofer?: (val: boolean) => void;
   bandpassOrder: 4 | 6;
   setBandpassOrder: (val: 4 | 6) => void;
-  bandpassS: number;
-  setBandpassS: (val: number) => void;
-  bandpassA: number;
-  setBandpassA: (val: number) => void;
+  bandpassS?: number;
+  setBandpassS?: (val: number) => void;
+  bandpassA?: number;
+  setBandpassA?: (val: number) => void;
+  bandpassTopology?: Bandpass6Topology;
+  setBandpassTopology?: (val: Bandpass6Topology) => void;
+  bandpassDf?: number;
+  setBandpassDf?: (val: number) => void;
+  bandpassQtPrime?: number;
+  setBandpassQtPrime?: (val: number) => void;
 
   // Puerto de Aire
   portCount: number | '';
@@ -121,6 +129,8 @@ interface BoxParamsFormProps {
   // Damping
   dampingType: 'none' | 'light' | 'moderate' | 'heavy';
   setDampingType: (type: 'none' | 'light' | 'moderate' | 'heavy') => void;
+  classicalModel?: boolean;
+  setClassicalModel?: (val: boolean) => void;
 
   // Crossover
   crossoverWays: number;
@@ -207,14 +217,18 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
 
   targetQtc,
   setTargetQtc,
-  ventedAlignment = 'QB3',
+  ventedAlignment = 'B4',
   setVentedAlignment,
+  externalSubwoofer = false,
+  setExternalSubwoofer,
   bandpassOrder,
   setBandpassOrder,
-  bandpassS,
-  setBandpassS,
-  bandpassA,
-  setBandpassA,
+  bandpassTopology = 'parallel',
+  setBandpassTopology,
+  bandpassDf = 0.65,
+  setBandpassDf,
+  bandpassQtPrime = 0,
+  setBandpassQtPrime,
 
   portCount,
   setPortCount,
@@ -292,6 +306,8 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
 
   dampingType,
   setDampingType,
+  classicalModel = false,
+  setClassicalModel,
 
   crossoverWays,
   setCrossoverWays,
@@ -355,6 +371,77 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
   panelStyle,
 }) => {
   const t = (text: string) => translate(text, lang);
+
+  // Desired F3 (BassBox Pro) local state
+  const [desiredF3Sealed, setDesiredF3Sealed] = useState<string>('50');
+  const [desiredF3SealedMsg, setDesiredF3SealedMsg] = useState<string>('');
+  const [desiredF3Vented, setDesiredF3Vented] = useState<string>('40');
+  const [desiredF3VentedMsg, setDesiredF3VentedMsg] = useState<string>('');
+
+  const handleApplyDesiredF3Sealed = () => {
+    const f3Target = parseFloat(desiredF3Sealed);
+    if (!params.fs || !params.vas || !params.qts || !Number.isFinite(f3Target) || f3Target <= 0) {
+      setDesiredF3SealedMsg(t("Ingresa un F3 objetivo válido."));
+      return;
+    }
+    const res = calcSealedForF3(params.fs, params.vas, params.qts, f3Target);
+    if (res.valid) {
+      setTargetQtc(Number(res.qtc.toFixed(3)));
+      setCustomPorted(false);
+      setDesiredF3SealedMsg(`${t("Aplicado")}: Qtc ${res.qtc.toFixed(2)} (F3 ≈ ${res.f3.toFixed(1)} Hz)`);
+    } else if (res.statusCode === 1) {
+      setDesiredF3SealedMsg(`${t("F3 demasiado baja para este altavoz")} (mín ≈ ${res.f3.toFixed(1)} Hz)`);
+    } else if (res.statusCode === 2) {
+      setDesiredF3SealedMsg(`${t("F3 demasiado alta")} (máx ≈ ${res.f3.toFixed(1)} Hz)`);
+    } else {
+      setDesiredF3SealedMsg(t("No se pudo alcanzar el F3 deseado."));
+    }
+  };
+
+  const handleApplyDesiredF3Vented = () => {
+    const f3Target = parseFloat(desiredF3Vented);
+    if (!params.fs || !params.vas || !params.qts || !Number.isFinite(f3Target) || f3Target <= 0) {
+      setDesiredF3VentedMsg(t("Ingresa un F3 objetivo válido."));
+      return;
+    }
+    const res = calcVentedForF3(params.fs, params.vas, params.qts, f3Target);
+    if (res.valid) {
+      setCustomVb(Number(res.vb.toFixed(2)));
+      setCustomFb(Number(res.fb.toFixed(1)));
+      setCustomPorted(true);
+      setUseCustomPortLength(false);
+      setDesiredF3VentedMsg(`${t("Aplicado")}: Vb ${res.vb.toFixed(1)} L · Fb ${res.fb.toFixed(1)} Hz`);
+    } else if (res.statusCode === 1) {
+      setDesiredF3VentedMsg(`${t("F3 demasiado baja para este altavoz")} (mín ≈ ${res.f3.toFixed(1)} Hz)`);
+    } else if (res.statusCode === 2) {
+      setDesiredF3VentedMsg(`${t("F3 demasiado alta")} (máx ≈ ${res.f3.toFixed(1)} Hz)`);
+    } else {
+      setDesiredF3VentedMsg(t("No se pudo alcanzar el F3 deseado."));
+    }
+  };
+
+  const handleSuggestPassiveRadiator = async () => {
+    if (!params.fs || !params.vas || !params.qts) return;
+    try {
+      const vbRef = portedData.valid && portedData.Vb > 0 ? portedData.Vb : (customVb || 40);
+      const fbRef = portedData.valid && portedData.Fb > 0 ? portedData.Fb : (customFb || params.fs);
+      const res = await suggestPassiveRadiator(
+        params.fs,
+        params.vas,
+        params.qts,
+        params.sd || 215,
+        params.xmax || 5,
+        vbRef,
+        fbRef
+      );
+      setPrDia(Number(res.diaCm.toFixed(1)));
+      setPrVas(Number(res.vasPr.toFixed(1)));
+      setPrFs(Number(res.fsPr.toFixed(1)));
+      setPrMms(Number(res.mmsPr.toFixed(1)));
+    } catch (e) {
+      console.error("Error suggesting passive radiator:", e);
+    }
+  };
 
   // Air-Core Inductor Winding Calculator State
   const [whLTarget, setWhLTarget] = useState<number>(1.0); // mH
@@ -499,18 +586,32 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
     return list;
   }, [crossoverWays, crossoverType, fc, fcLow, fcHigh, zTweeter, zMidrange, zWoofer, t]);
 
-  // Sintonía Fb óptima sugerida según la alineación acústica activa (QB3, B4, SBB4) y los parámetros Thiele-Small
+  const targetOptimalVb = useMemo(() => {
+    if (cabinetData?.valid && cabinetData.vNeto > 0) {
+      return cabinetData.vNeto;
+    }
+    return portedData.valid && portedData.Vb > 0 ? portedData.Vb : (customVb || 35);
+  }, [cabinetData, portedData.valid, portedData.Vb, customVb]);
+
+  // Sintonía Fb óptima sugerida según la alineación acústica activa o SuggestFb cuando Vb es fijo/manual
   const recommendedFbForDriver = useMemo<number>(() => {
     if (!params.fs || params.fs <= 0) return 0;
+    if (externalSubwoofer) {
+      return Math.min(95, Math.max(55, Math.round(params.fs * 1.12 * 10) / 10));
+    }
     try {
       const wasm = getWasm();
       if (wasm && params.vas && params.qts) {
-        const res = wasm.calc_alineacion_ventilada(params.fs, params.vas, params.qts, ventedAlignment || 'B4');
+        if ((isLinkedToCabinet || customPorted) && targetOptimalVb > 0) {
+          const suggestFb = calcSuggestFb(params.fs, params.vas, params.qts, targetOptimalVb);
+          if (suggestFb > 0) return Math.round(suggestFb * 10) / 10;
+        }
+        const res = wasm.calc_alineacion_ventilada_ex(params.fs, params.vas, params.qts, ventedAlignment || 'B4', 0);
         if (res.fb > 0) return Math.round(res.fb * 10) / 10;
       }
     } catch {}
     return Math.round(params.fs * 10) / 10;
-  }, [params.fs, params.qts, params.vas, ventedAlignment]);
+  }, [params.fs, params.qts, params.vas, ventedAlignment, externalSubwoofer, isLinkedToCabinet, customPorted, targetOptimalVb]);
 
   // Determinar la sintonía (Fb) objetivo para el cálculo de puertos:
   // Si el usuario fijó una sintonía personalizada, la respeta; de lo contrario usa la Fb óptima de la alineación seleccionada
@@ -533,10 +634,12 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
     return params.fs || 50;
   }, [useCustomPortLength, customPorted, customFb, recommendedFbForDriver, portedData.valid, portedData.Fb, params.fs]);
 
-  // Alineación sugerida óptima (Alta Fidelidad: transición continua QB3/B4/C4 según Qts)
-  const recommendedAlignment = useMemo<'QB3' | 'B4' | 'SBB4'>(() => {
+  // Alineación sugerida óptima según Qts del driver (BassBox B4 <= 0.49, Compacto práctico > 0.49)
+  const recommendedAlignment = useMemo<VentedAlignmentType>(() => {
+    if (!params.qts) return 'B4';
+    if (params.qts > 0.49) return 'COMPACT';
     return 'B4';
-  }, []);
+  }, [params.qts]);
 
   const handleApplyOptimalFb = () => {
     if (recommendedFbForDriver <= 0) return;
@@ -544,13 +647,6 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
     setUseCustomPortLength(false);
     setCustomPorted(true);
   };
-
-  const targetOptimalVb = useMemo(() => {
-    if (cabinetData?.valid && cabinetData.vNeto > 0) {
-      return cabinetData.vNeto;
-    }
-    return portedData.valid && portedData.Vb > 0 ? portedData.Vb : (customVb || 35);
-  }, [cabinetData, portedData.valid, portedData.Vb, customVb]);
 
   const suggestions = useMemo<PortSuggestions | null>(() => {
     if (targetOptimalVb > 0 && targetOptimalFb > 0) {
@@ -749,14 +845,26 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
   const getEbpRecommendation = () => {
     const ebp = params.qes ? (params.fs / params.qes) : 0;
     if (ebp === 0) return '';
-    if (ebp < 50) return t("Sugerencia: Caja Sellada (Sealed).");
-    if (ebp > 90) return t("Sugerencia: Caja Ventilada (Ported).");
-    return t("Sugerencia: Apta para Sellada o Ventilada.");
+    let base: string;
+    if (ebp < 60) {
+      base = t("Sugerencia: Caja Sellada (Sealed).");
+    } else if (ebp > 90) {
+      base = t("Sugerencia: Caja Ventilada o Radiador Pasivo.");
+    } else {
+      base = t("Sugerencia: Sellada, Ventilada o Radiador Pasivo.");
+    }
+    if (params.qts >= 0.3 && params.qts <= 0.5) {
+      const bwNote = params.qts <= 0.38
+        ? t("Qts bajo (~0.3): paso banda más ancho.")
+        : t("Qts medio (~0.5): paso banda más estrecho.");
+      return `${base} ${t("Apto también para Paso Banda (4.º Orden).")} ${bwNote}`;
+    }
+    return base;
   };
 
   const ebpValue = params.qes ? (params.fs / params.qes) : null;
   const ebpPct = ebpValue !== null ? Math.min(100, Math.max(0, (ebpValue / 160) * 100)) : 50;
-  const ebpStatus = ebpValue === null ? 'none' : ebpValue < 50 ? 'sealed' : ebpValue > 90 ? 'ported' : 'hybrid';
+  const ebpStatus = ebpValue === null ? 'none' : ebpValue < 60 ? 'sealed' : ebpValue > 90 ? 'ported' : 'hybrid';
 
   return (
     <aside className={`panel box-design-panel${isCollapsed ? ' is-collapsed' : ''}`} style={{ borderLeft: 'none', ...panelStyle }}>
@@ -787,17 +895,17 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
           </div>
           <div className={`ebp-meter-chip chip-${ebpStatus}`}>
             {ebpStatus === 'sealed' && t("Sellada Óptima")}
-            {ebpStatus === 'hybrid' && t("Sellada / Ventilada")}
-            {ebpStatus === 'ported' && t("Ventilada Óptima")}
+            {ebpStatus === 'hybrid' && t("Sellada / Ventilada / PR")}
+            {ebpStatus === 'ported' && t("Ventilada / PR Óptima")}
             {ebpStatus === 'none' && t("Requiere Qes")}
           </div>
         </div>
 
         {/* Pista graduada con 3 zonas y puntero */}
         <div className="ebp-meter-track">
-          <div className="ebp-zone-sealed" title="0 - 50: Caja Sellada" />
-          <div className="ebp-zone-hybrid" title="50 - 90: Caja Sellada o Ventilada" />
-          <div className="ebp-zone-ported" title="> 90: Caja Ventilada" />
+          <div className="ebp-zone-sealed" title="0 - 60: Caja Sellada (BassBox)" />
+          <div className="ebp-zone-hybrid" title="60 - 90: Sellada, Ventilada o Radiador Pasivo" />
+          <div className="ebp-zone-ported" title="> 90: Caja Ventilada o Radiador Pasivo" />
           {ebpValue !== null && (
             <div
               className="ebp-meter-pin"
@@ -810,8 +918,8 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
         {/* Marcas de escala */}
         <div className="ebp-meter-labels">
           <span>0</span>
-          <span>50 (Sellada)</span>
-          <span>90 (Ventilada)</span>
+          <span>60 (Sellada)</span>
+          <span>90 (Ventilada/PR)</span>
           <span>160+</span>
         </div>
 
@@ -863,40 +971,60 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
       >
         {/* Fila 1: Alineación específica según tipo de caja */}
         {boxType === 'ported' && setVentedAlignment && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
             <span style={{ fontSize: '0.67rem', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>
               {t("Alineación:")}
             </span>
-            <div className="segmented-control" style={{ display: 'inline-flex', width: 'auto', margin: 0, padding: '1px', flex: 1 }}>
+            <div className="segmented-control" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', width: '100%', margin: 0, padding: '1px', gap: '1px' }}>
               <button
                 type="button"
                 className={ventedAlignment === 'QB3' ? 'active' : ''}
                 onClick={() => setVentedAlignment('QB3')}
-                title={t("Alta salida SPL y caja compacta (QB3)")}
-                style={{ padding: '0.18rem 0.25rem', fontSize: '0.62rem', lineHeight: 1.1, height: 'auto', minHeight: '26px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
+                title={t("High Output (BassBox): menor excursión y caja compacta (Qtc ~0.8)")}
+                style={{ padding: '0.18rem 0.12rem', fontSize: '0.58rem', lineHeight: 1.05, height: 'auto', minHeight: '26px', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
               >
                 <span>{t("Potencia")}</span>
-                <span style={{ fontSize: '0.55rem', opacity: 0.8 }}>QB3</span>
+                <span style={{ fontSize: '0.52rem', opacity: 0.8 }}>QB3</span>
               </button>
               <button
                 type="button"
                 className={ventedAlignment === 'B4' ? 'active' : ''}
                 onClick={() => setVentedAlignment('B4')}
-                title={t("Máxima fidelidad y respuesta plana (B4)")}
-                style={{ padding: '0.18rem 0.25rem', fontSize: '0.62rem', lineHeight: 1.1, height: 'auto', minHeight: '26px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
+                title={t("High Fidelity (Keele/BassBox): respuesta máximamente plana")}
+                style={{ padding: '0.18rem 0.12rem', fontSize: '0.58rem', lineHeight: 1.05, height: 'auto', minHeight: '26px', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
               >
                 <span>Hi-Fi</span>
-                <span style={{ fontSize: '0.55rem', opacity: 0.8 }}>B4</span>
+                <span style={{ fontSize: '0.52rem', opacity: 0.8 }}>B4</span>
               </button>
               <button
                 type="button"
                 className={ventedAlignment === 'SBB4' ? 'active' : ''}
                 onClick={() => setVentedAlignment('SBB4')}
-                title={t("Graves profundos y mayor extensión (SBB4)")}
-                style={{ padding: '0.18rem 0.25rem', fontSize: '0.62rem', lineHeight: 1.1, height: 'auto', minHeight: '26px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
+                title={t("Extended Bass (EBS BassBox): 12.3·Vas·Qts^2.4")}
+                style={{ padding: '0.18rem 0.12rem', fontSize: '0.58rem', lineHeight: 1.05, height: 'auto', minHeight: '26px', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
               >
-                <span>Deep Bass</span>
-                <span style={{ fontSize: '0.55rem', opacity: 0.8 }}>SBB4</span>
+                <span>Ext. Bass</span>
+                <span style={{ fontSize: '0.52rem', opacity: 0.8 }}>EBS</span>
+              </button>
+              <button
+                type="button"
+                className={ventedAlignment === 'B6' ? 'active' : ''}
+                onClick={() => setVentedAlignment('B6')}
+                title={t("Ventilada 6.º orden con filtro paso-alto activo (Fx=1.07·Fb, Qx=1.93)")}
+                style={{ padding: '0.18rem 0.12rem', fontSize: '0.58rem', lineHeight: 1.05, height: 'auto', minHeight: '26px', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <span>HP Act.</span>
+                <span style={{ fontSize: '0.52rem', opacity: 0.8 }}>B6</span>
+              </button>
+              <button
+                type="button"
+                className={ventedAlignment === 'COMPACT' ? 'active' : ''}
+                onClick={() => setVentedAlignment('COMPACT')}
+                title={t("Modo compacto práctico para Qts alto (>0.45)")}
+                style={{ padding: '0.18rem 0.12rem', fontSize: '0.58rem', lineHeight: 1.05, height: 'auto', minHeight: '26px', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <span>{t("Compacto")}</span>
+                <span style={{ fontSize: '0.52rem', opacity: 0.8 }}>CMP</span>
               </button>
             </div>
           </div>
@@ -907,33 +1035,42 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
             <span style={{ fontSize: '0.67rem', color: 'var(--text-muted)', fontWeight: 600 }}>
               {t("Alineación (Qtc):")}
             </span>
-            <div className="segmented-control" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', width: '100%', margin: 0, padding: '1px' }}>
+            <div className="segmented-control" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', width: '100%', margin: 0, padding: '1px' }}>
               <button
                 type="button"
                 className={Math.abs(targetQtc - 0.577) < 0.05 ? 'active' : ''}
                 onClick={() => setTargetQtc(0.577)}
                 title={t("Bessel (Qtc 0.577): Óptima respuesta transitoria")}
-                style={{ padding: '0.15rem 0.25rem', fontSize: '0.64rem', height: '22px', minWidth: 0 }}
+                style={{ padding: '0.15rem 0.18rem', fontSize: '0.6rem', height: '22px', minWidth: 0 }}
               >
-                0.577 (Bessel)
+                0.577
               </button>
               <button
                 type="button"
                 className={Math.abs(targetQtc - 0.707) < 0.05 ? 'active' : ''}
                 onClick={() => setTargetQtc(0.707)}
                 title={t("Butterworth (Qtc 0.707): Máxima planicidad")}
-                style={{ padding: '0.15rem 0.25rem', fontSize: '0.64rem', height: '22px', minWidth: 0 }}
+                style={{ padding: '0.15rem 0.18rem', fontSize: '0.6rem', height: '22px', minWidth: 0 }}
               >
-                0.707 (B4)
+                0.707 (Hi-Fi)
               </button>
               <button
                 type="button"
                 className={Math.abs(targetQtc - 1.0) < 0.05 ? 'active' : ''}
                 onClick={() => setTargetQtc(1.0)}
                 title={t("Chebyshev (Qtc 1.0): Compacta con realce")}
-                style={{ padding: '0.15rem 0.25rem', fontSize: '0.64rem', height: '22px', minWidth: 0 }}
+                style={{ padding: '0.15rem 0.18rem', fontSize: '0.6rem', height: '22px', minWidth: 0 }}
               >
                 1.0 (Boost)
+              </button>
+              <button
+                type="button"
+                className={Math.abs(targetQtc - 1.5) < 0.05 ? 'active' : ''}
+                onClick={() => setTargetQtc(1.5)}
+                title={t("High Output BassBox (Qtc 1.5): Máxima compacidad y salida")}
+                style={{ padding: '0.15rem 0.18rem', fontSize: '0.6rem', height: '22px', minWidth: 0 }}
+              >
+                1.5 (Out)
               </button>
             </div>
           </div>
@@ -944,24 +1081,33 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
             <span style={{ fontSize: '0.67rem', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>
               {t("Alineación:")}
             </span>
-            <div className="segmented-control" style={{ display: 'inline-flex', width: 'auto', margin: 0, padding: '1px', flex: 1 }}>
+            <div className="segmented-control" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', width: 'auto', margin: 0, padding: '1px', flex: 1 }}>
               <button
                 type="button"
                 className={bandpassOrder === 4 ? 'active' : ''}
                 onClick={() => setBandpassOrder(4)}
                 title={t("Paso Banda de 4.º Orden (Cámara trasera sellada)")}
-                style={{ padding: '0.15rem 0.4rem', fontSize: '0.68rem', height: '22px' }}
+                style={{ padding: '0.15rem 0.2rem', fontSize: '0.62rem', height: '22px', minWidth: 0 }}
               >
                 {t("4.º Orden")}
               </button>
               <button
                 type="button"
-                className={bandpassOrder === 6 ? 'active' : ''}
-                onClick={() => setBandpassOrder(6)}
-                title={t("Paso Banda de 6.º Orden (Ambas cámaras sintonizadas)")}
-                style={{ padding: '0.15rem 0.4rem', fontSize: '0.68rem', height: '22px' }}
+                className={bandpassOrder === 6 && bandpassTopology === 'parallel' ? 'active' : ''}
+                onClick={() => { setBandpassOrder(6); setBandpassTopology?.('parallel'); }}
+                title={t("Paso Banda 6.º Orden Paralelo (BassBox)")}
+                style={{ padding: '0.15rem 0.2rem', fontSize: '0.62rem', height: '22px', minWidth: 0 }}
               >
-                {t("6.º Orden")}
+                {t("6.º Par.")}
+              </button>
+              <button
+                type="button"
+                className={bandpassOrder === 6 && bandpassTopology === 'series' ? 'active' : ''}
+                onClick={() => { setBandpassOrder(6); setBandpassTopology?.('series'); }}
+                title={t("Paso Banda 6.º Orden Serie (BassBox)")}
+                style={{ padding: '0.15rem 0.2rem', fontSize: '0.62rem', height: '22px', minWidth: 0 }}
+              >
+                {t("6.º Serie")}
               </button>
             </div>
           </div>
@@ -1631,6 +1777,38 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     </div>
                   </div>
                 </div>
+
+                {/* Desired F3 (BassBox Pro) */}
+                <div style={{ marginTop: '0.55rem', paddingTop: '0.45rem', borderTop: '1px solid var(--card-border)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                      {t("F3 Deseada (Hz)")}:
+                    </span>
+                    <input
+                      type="number"
+                      value={desiredF3Sealed}
+                      onChange={(e) => setDesiredF3Sealed(e.target.value)}
+                      step="1"
+                      min="15"
+                      max="500"
+                      style={{ width: '68px', padding: '0.2rem 0.35rem', fontSize: '0.72rem' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleApplyDesiredF3Sealed}
+                      disabled={isLinkedToCabinet}
+                      className="preset-select"
+                      style={{ padding: '0.2rem 0.5rem', fontSize: '0.66rem', fontWeight: 600, cursor: isLinkedToCabinet ? 'not-allowed' : 'pointer' }}
+                    >
+                      {t("Calcular Vb")}
+                    </button>
+                  </div>
+                  {desiredF3SealedMsg && (
+                    <div style={{ fontSize: '0.64rem', color: 'var(--text-muted)', marginTop: '0.22rem' }}>
+                      {desiredF3SealedMsg}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
@@ -1730,10 +1908,18 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       {t("Alineación Acústica")}
                     </label>
                     <span style={{ fontSize: '0.68rem', color: 'var(--text-main)', fontWeight: 600 }}>
-                      {ventedAlignment === 'QB3' ? 'High Output (QB3)' : ventedAlignment === 'B4' ? 'High Fidelity (B4)' : 'Extended Bass (SBB4)'}
+                      {ventedAlignment === 'QB3'
+                        ? 'High Output (QB3)'
+                        : ventedAlignment === 'B4'
+                          ? 'High Fidelity (B4)'
+                          : ventedAlignment === 'SBB4'
+                            ? 'Extended Bass (EBS)'
+                            : ventedAlignment === 'B6'
+                              ? '6.º Orden HP Activo (B6)'
+                              : t("Compacto (Práctico)")}
                     </span>
                   </div>
-                  <div className="segmented-control" style={{ padding: '2px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '2px' }}>
+                  <div className="segmented-control" style={{ padding: '2px', display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: '2px' }}>
                     <button
                       type="button"
                       className={ventedAlignment === 'QB3' ? 'active' : ''}
@@ -1742,10 +1928,10 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                         setCustomPorted(false);
                         setUseCustomPortLength(false);
                       }}
-                      style={{ padding: '0.28rem 0.2rem', fontSize: '0.68rem', textAlign: 'center' }}
-                      title="Quasi-Butterworth 3: Máxima potencia y control de cono"
+                      style={{ padding: '0.26rem 0.12rem', fontSize: '0.62rem', textAlign: 'center', minWidth: 0 }}
+                      title={t("High Output (BassBox): menor excursión y caja compacta (Qtc ~0.8)")}
                     >
-                      High Output (QB3)
+                      QB3
                     </button>
                     <button
                       type="button"
@@ -1755,10 +1941,10 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                         setCustomPorted(false);
                         setUseCustomPortLength(false);
                       }}
-                      style={{ padding: '0.28rem 0.2rem', fontSize: '0.68rem', textAlign: 'center' }}
-                      title="Butterworth B4: Respuesta máximamente plana (Hi-Fi)"
+                      style={{ padding: '0.26rem 0.12rem', fontSize: '0.62rem', textAlign: 'center', minWidth: 0 }}
+                      title={t("High Fidelity (Keele/BassBox): respuesta máximamente plana")}
                     >
-                      Hi-Fi (B4)
+                      Hi-Fi B4
                     </button>
                     <button
                       type="button"
@@ -1768,20 +1954,79 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                         setCustomPorted(false);
                         setUseCustomPortLength(false);
                       }}
-                      style={{ padding: '0.28rem 0.2rem', fontSize: '0.68rem', textAlign: 'center' }}
-                      title="Super Boom Box 4: Máxima extensión de subgraves profundos"
+                      style={{ padding: '0.26rem 0.12rem', fontSize: '0.62rem', textAlign: 'center', minWidth: 0 }}
+                      title={t("Extended Bass (EBS BassBox): 12.3·Vas·Qts^2.4")}
                     >
-                      Deep Bass (SBB4)
+                      Ext. Bass
+                    </button>
+                    <button
+                      type="button"
+                      className={ventedAlignment === 'B6' ? 'active' : ''}
+                      onClick={() => {
+                        setVentedAlignment('B6');
+                        setCustomPorted(false);
+                        setUseCustomPortLength(false);
+                      }}
+                      style={{ padding: '0.26rem 0.12rem', fontSize: '0.62rem', textAlign: 'center', minWidth: 0 }}
+                      title={t("Ventilada 6.º orden con filtro paso-alto activo (Fx=1.07·Fb, Qx=1.93)")}
+                    >
+                      B6 (HP)
+                    </button>
+                    <button
+                      type="button"
+                      className={ventedAlignment === 'COMPACT' ? 'active' : ''}
+                      onClick={() => {
+                        setVentedAlignment('COMPACT');
+                        setCustomPorted(false);
+                        setUseCustomPortLength(false);
+                      }}
+                      style={{ padding: '0.26rem 0.12rem', fontSize: '0.62rem', textAlign: 'center', minWidth: 0 }}
+                      title={t("Modo compacto práctico para Qts alto (>0.45)")}
+                    >
+                      {t("Compacto")}
                     </button>
                   </div>
+                  {portedData.activeHpEnabled && portedData.hpFx && portedData.hpQx && (
+                    <div style={{ marginTop: '0.32rem', padding: '0.22rem 0.4rem', borderRadius: '4px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', fontSize: '0.63rem', color: '#34d399', fontWeight: 600 }}>
+                      HPF 2.º orden: Fx = {portedData.hpFx.toFixed(1)} Hz · Qx = {portedData.hpQx.toFixed(2)}
+                    </div>
+                  )}
+                  {portedData.clampedToMinVol && (
+                    <div style={{ marginTop: '0.28rem', fontSize: '0.62rem', color: '#fbbf24' }}>
+                      {t("Vb ajustado al volumen mínimo físico del altavoz (Fb compensada con exponente 0.125).")}
+                    </div>
+                  )}
                   {params.fs && params.qts && (
                     <div style={{ fontSize: '0.64rem', color: 'var(--text-muted)', marginTop: '0.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span>
-                        {t("Sugerida")}: <strong style={{ color: 'var(--text-main)' }}>{recommendedAlignment === 'B4' ? 'Hi-Fi (B4)' : recommendedAlignment === 'QB3' ? 'High Output (QB3)' : 'Ext. Bass (SBB4)'}</strong> (Qts: {params.qts.toFixed(2)})
+                        {t("Sugerida")}: <strong style={{ color: 'var(--text-main)' }}>
+                          {recommendedAlignment === 'B4' ? 'Hi-Fi (B4)' : recommendedAlignment === 'COMPACT' ? t("Compacto") : recommendedAlignment}
+                        </strong> (Qts: {params.qts.toFixed(2)})
                       </span>
                       {recommendedFbForDriver > 0 && (
                         <span>
                           Fb óptima: <strong style={{ color: 'var(--text-main)' }}>{recommendedFbForDriver.toFixed(1)} Hz</strong>
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {setExternalSubwoofer && (
+                    <div style={{ marginTop: '0.45rem', paddingTop: '0.4rem', borderTop: '1px solid var(--card-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+                      <label
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-main)', cursor: 'pointer', margin: 0 }}
+                        title={t("Optimiza Fb para trabajar como satélite/top apoyado por un subwoofer externo (corte típico 80–100 Hz)")}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={externalSubwoofer}
+                          onChange={(e) => setExternalSubwoofer(e.target.checked)}
+                          style={{ accentColor: '#10b981', cursor: 'pointer' }}
+                        />
+                        <span>{t("Refuerzo con Subwoofer Externo")}</span>
+                      </label>
+                      {externalSubwoofer && (
+                        <span style={{ fontSize: '0.62rem', color: '#10b981', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                          Satélite · HPF 80–100 Hz
                         </span>
                       )}
                     </div>
@@ -1832,11 +2077,17 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
               {recommendedFbForDriver > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.35rem', fontSize: '0.64rem', color: 'var(--text-muted)' }}>
                   <span>
-                    {ventedAlignment === 'B4'
-                      ? `Sugerida B4: ${recommendedFbForDriver.toFixed(1)} Hz (plana Hi-Fi)`
-                      : ventedAlignment === 'QB3'
-                        ? `Sugerida QB3: ${recommendedFbForDriver.toFixed(1)} Hz (máxima potencia)`
-                        : `Sugerida SBB4: ${recommendedFbForDriver.toFixed(1)} Hz (extensión subgraves)`
+                    {externalSubwoofer
+                      ? `Óptima c/ Subwoofer: ${recommendedFbForDriver.toFixed(1)} Hz (control de excursión)`
+                      : ventedAlignment === 'B4'
+                        ? `Sugerida B4: ${recommendedFbForDriver.toFixed(1)} Hz (plana Hi-Fi)`
+                        : ventedAlignment === 'QB3'
+                          ? `Sugerida QB3: ${recommendedFbForDriver.toFixed(1)} Hz (alta salida)`
+                          : ventedAlignment === 'SBB4'
+                            ? `Sugerida EBS: ${recommendedFbForDriver.toFixed(1)} Hz (extensión subgraves)`
+                            : ventedAlignment === 'B6'
+                              ? `Sugerida B6: ${recommendedFbForDriver.toFixed(1)} Hz (HP activo 6.º orden)`
+                              : `Sugerida Compacta: ${recommendedFbForDriver.toFixed(1)} Hz`
                     }
                   </span>
                   <button
@@ -1860,6 +2111,39 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 </div>
               )}
 
+              {boxType === 'ported' && (
+                <div style={{ marginTop: '0.5rem', paddingTop: '0.45rem', borderTop: '1px solid var(--card-border)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                      {t("F3 Deseada (Hz)")}:
+                    </span>
+                    <input
+                      type="number"
+                      value={desiredF3Vented}
+                      onChange={(e) => setDesiredF3Vented(e.target.value)}
+                      step="1"
+                      min="12"
+                      max="500"
+                      style={{ width: '68px', padding: '0.2rem 0.35rem', fontSize: '0.72rem' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleApplyDesiredF3Vented}
+                      disabled={isLinkedToCabinet}
+                      className="preset-select"
+                      style={{ padding: '0.2rem 0.5rem', fontSize: '0.66rem', fontWeight: 600, cursor: isLinkedToCabinet ? 'not-allowed' : 'pointer' }}
+                    >
+                      {t("Calcular Vb/Fb")}
+                    </button>
+                  </div>
+                  {desiredF3VentedMsg && (
+                    <div style={{ fontSize: '0.64rem', color: 'var(--text-muted)', marginTop: '0.22rem' }}>
+                      {desiredF3VentedMsg}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {boxType === 'bandpass' && (
                 <div className="input-grid" style={{ marginTop: '0.5rem' }}>
                   <div className="input-group">
@@ -1871,32 +2155,54 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       style={{ width: '100%', height: '34px' }}
                     >
                       <option value={4}>{t("4.º Orden")}</option>
-                      <option value={6}>{t("6.º Orden (Paralelo)")}</option>
+                      <option value={6}>{t("6.º Orden (BassBox)")}</option>
                     </select>
                   </div>
                   {bandpassOrder === 4 ? (
-                    <div className="input-group">
-                      <label>{t("Factor de Calidad (S)")}</label>
-                      <div className="input-wrapper">
-                        <input
-                          type="number"
-                          value={bandpassS}
-                          onChange={(e) => setBandpassS(parseFloat(e.target.value) || 0.707)}
-                          step="0.05"
-                        />
+                    <>
+                      <div className="input-group">
+                        <label title={t("Factor de amortiguamiento del sistema (BassBox defecto 0.65)")}>
+                          {t("Factor DF (BassBox)")}
+                        </label>
+                        <div className="input-wrapper">
+                          <input
+                            type="number"
+                            value={bandpassDf}
+                            onChange={(e) => setBandpassDf?.(parseFloat(e.target.value) || 0.65)}
+                            step="0.05"
+                            min="0.2"
+                            max="2.0"
+                          />
+                        </div>
                       </div>
-                    </div>
+                      <div className="input-group" style={{ gridColumn: 'span 2' }}>
+                        <label title={t("Q't del sistema (0 = automático max(0.8, Qts + 0.1))")}>
+                          {t("Q't del Sistema (0 = auto)")} · {t("Efectivo")}: {(bandpassData.qtPrime ?? Math.max(0.8, (params.qts || 0.36) + 0.1)).toFixed(2)}
+                        </label>
+                        <div className="input-wrapper">
+                          <input
+                            type="number"
+                            value={bandpassQtPrime}
+                            onChange={(e) => setBandpassQtPrime?.(Math.max(0, parseFloat(e.target.value) || 0))}
+                            step="0.05"
+                            min="0"
+                            max="2.5"
+                          />
+                        </div>
+                      </div>
+                    </>
                   ) : (
                     <div className="input-group">
-                      <label>{t("Ganancia (A)")}</label>
-                      <div className="input-wrapper">
-                        <input
-                          type="number"
-                          value={bandpassA}
-                          onChange={(e) => setBandpassA(parseFloat(e.target.value) || 2.0)}
-                          step="0.1"
-                        />
-                      </div>
+                      <label>{t("Topología 6.º Orden")}</label>
+                      <select
+                        value={bandpassTopology}
+                        onChange={(e) => setBandpassTopology?.(e.target.value as Bandpass6Topology)}
+                        className="input-select"
+                        style={{ width: '100%', height: '34px' }}
+                      >
+                        <option value="parallel">{t("6.º Orden (Paralelo)")}</option>
+                        <option value="series">{t("6.º Orden (Serie)")}</option>
+                      </select>
                     </div>
                   )}
                 </div>
@@ -2384,6 +2690,17 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 ) : (
                   // Radiador Pasivo
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                      <button
+                        type="button"
+                        onClick={handleSuggestPassiveRadiator}
+                        className="preset-select"
+                        style={{ padding: '0.24rem 0.55rem', fontSize: '0.68rem', fontWeight: 600, cursor: 'pointer' }}
+                        title={t("Sugiere diámetro comercial (6\"–48\") y parámetros iniciales según BassBox Pro")}
+                      >
+                        {t("Sugerir PR Óptimo")}
+                      </button>
+                    </div>
                     <div className="input-grid">
                       <div className="input-group">
                         <label>{t("Diámetro PR")}</label>
@@ -2464,6 +2781,33 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 </button>
               ))}
             </div>
+            {setClassicalModel && (
+              <div style={{ marginTop: '0.35rem', paddingTop: '0.6rem', borderTop: '1px solid var(--card-border)', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                  {t("Modelo de Cálculo por Relleno:")}
+                </span>
+                <div className="segmented-control" style={{ padding: '2px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px' }}>
+                  <button
+                    type="button"
+                    className={!classicalModel ? 'active' : ''}
+                    onClick={() => setClassicalModel(false)}
+                    style={{ padding: '0.32rem 0.25rem', fontSize: '0.7rem' }}
+                    title={t("Ajusta el volumen físico efectivo considerando expansión térmica del relleno")}
+                  >
+                    {t("Modelo BassBox (con relleno)")}
+                  </button>
+                  <button
+                    type="button"
+                    className={classicalModel ? 'active' : ''}
+                    onClick={() => setClassicalModel(true)}
+                    style={{ padding: '0.32rem 0.25rem', fontSize: '0.7rem' }}
+                    title={t("Ignora expansión virtual del relleno (ecuaciones Thiele-Small clásicas)")}
+                  >
+                    {t("Modelo Clásico (sin ajuste)")}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

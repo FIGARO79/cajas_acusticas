@@ -529,6 +529,27 @@ export function calculatePortedResponseAt(f: number, fs: number, qts: number, va
   return 20 * Math.log10(response + 1e-10);
 }
 
+export function calculatePortedB6ResponseAt(
+  f: number,
+  fs: number,
+  qts: number,
+  vas: number,
+  vb: number,
+  fb: number,
+  fx: number,
+  qx: number
+): number {
+  const wasm = getWasmSafe();
+  if (wasm) {
+    return wasm.calc_ported_b6_response_at(f, fs, qts, vas, vb, fb, fx, qx);
+  }
+  const ventedDb = calculatePortedResponseAt(f, fs, qts, vas, vb, fb);
+  if (f <= 0 || fx <= 0 || qx <= 0) return -45;
+  const r = f / fx;
+  const hpMag = (r * r) / Math.sqrt(Math.pow(1.0 - r * r, 2) + Math.pow(r / qx, 2) + 1e-20);
+  return ventedDb + 20 * Math.log10(hpMag + 1e-10);
+}
+
 export function calculateBandpass4ResponseAt(f: number, fs: number, qts: number, vas: number, vf: number, vr: number, fb: number): number {
   const wasm = getWasmSafe();
   if (wasm) {
