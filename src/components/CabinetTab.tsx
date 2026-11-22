@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { type Lang, translate } from '../utils/translations';
-import type { CalculatedSealed, CalculatedPorted, CalculatedBandpass, SpeakerParams, WoodCabinetData, WoodCutPiece, WoodShape } from '../types';
+import type { CalculatedSealed, CalculatedPorted, CalculatedBandpass, SpeakerParams, WoodCabinetData, WoodCutPiece, WoodShape, Bandpass6Topology } from '../types';
 import { type UnitSystem, convertTo, convertFrom, getUnitLabel } from '../utils/units';
 import { CabinetDiagram } from './CabinetDiagram';
 import { calcPortLength } from '../utils/acousticMath';
@@ -83,6 +83,13 @@ interface CabinetTabProps {
   customPortLength?: number | '';
   enableBracing?: boolean;
   bracingCount?: number;
+  prTuning?: 'port' | 'radiator';
+  prDia?: number;
+  prVas?: number;
+  prFs?: number;
+  prMms?: number;
+  prFbNatural?: number;
+  prMasaAnadidaG?: number;
 }
 
 const CabinetTabComponent: React.FC<CabinetTabProps> = ({
@@ -156,6 +163,13 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
   customPortLength = '',
   enableBracing = false,
   bracingCount = 2,
+  prTuning = 'port',
+  prDia = 20,
+  prVas = 45,
+  prFs = 25,
+  prMms = 35,
+  prFbNatural = 0,
+  prMasaAnadidaG = 0,
 }) => {
   const t = React.useCallback((text: string) => translate(text, lang), [lang]);
   const [hoveredPieceIndex, setHoveredPieceIndex] = useState<number | null>(null);
@@ -195,7 +209,7 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
     const extraVal = typeof woodExtra === 'number' ? woodExtra : 0;
 
     let portVol = 0;
-    if (woodSource === 'ported' && portedData.valid && portedData.Fb > 0 && portedData.Vb > 0) {
+    if (woodSource === 'ported' && prTuning !== 'radiator' && portedData.valid && portedData.Fb > 0 && portedData.Vb > 0) {
       const pCount = Number(portCount) || 0;
       if (pCount > 0) {
         const isRect = portShape === 'rectangular';
@@ -335,7 +349,7 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
             const resNeto = calcVolumenNetoMadera(
               vBruto,
               extraVal,
-              woodSource,
+              woodSource === 'ported' && prTuning === 'radiator' ? 'sealed' : woodSource,
               targetFb,
               Number(portCount) || 1,
               pDia,
@@ -386,7 +400,7 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
             const resNeto = calcVolumenNetoMadera(
               vBruto,
               extraVal,
-              woodSource,
+              woodSource === 'ported' && prTuning === 'radiator' ? 'sealed' : woodSource,
               targetFb,
               Number(portCount) || 1,
               pDia,
@@ -425,8 +439,11 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
           dimensions: `${displayVal(hInt, 'length')} x ${displayVal(wInt, 'length')} ${uLabel}`
         });
         if (woodSource === 'bandpass') {
+          const isBp6Series = bandpassData?.order === 6 && bandpassData?.topology === 'series';
           pieces.push({
-            name: t("Divisor Interno (Bafle de Montaje)"),
+            name: isBp6Series
+              ? t("Divisor Interno (Bafle de Montaje + Puerto Interno Fl)")
+              : t("Divisor Interno (Bafle de Montaje)"),
             qty: 1,
             dimensions: `${displayVal(hInt, 'length')} x ${displayVal(wInt, 'length')} ${uLabel}`
           });
@@ -470,8 +487,11 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
           dimensions: `${displayVal(hSlant, 'length')} x ${displayVal(wFrontInt, 'length')} ${uLabel}`
         });
         if (woodSource === 'bandpass') {
+          const isBp6Series = bandpassData?.order === 6 && bandpassData?.topology === 'series';
           pieces.push({
-            name: t("Divisor Interno (Bafle de Montaje)"),
+            name: isBp6Series
+              ? t("Divisor Interno (Bafle de Montaje + Puerto Interno Fl)")
+              : t("Divisor Interno (Bafle de Montaje)"),
             qty: 1,
             dimensions: `${displayVal(hInt, 'length')} x ${displayVal(wInt, 'length')} ${uLabel}`
           });
@@ -549,6 +569,7 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
     woodTrapExtHeight, woodTrapExtWidth, woodTrapExtRearWidth, woodTrapExtDepthTop, woodTrapExtDepthBot,
     woodThickness, woodExtra,
     portCount, portDiameter, portShape, portWidth, portHeight, portArea,
+    useCustomPortLength, customPortLength, prTuning,
     crossoverWays, midSealed, midCabinetDepth, useCustomMidVol, customMidVol, midVas, midQts, midTargetQtc,
     enableBracing, bracingCount,
     t, displayVal
@@ -562,6 +583,7 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
 
   // Port tuning details for woodworking tab
   const portInfo = useMemo(() => {
+    if (prTuning === 'radiator') return null;
     const pCount = Number(portCount) || 0;
     if (woodSource === 'ported' && portedData.valid && pCount > 0 && cabinetData?.valid) {
       const uLabel = getUnitLabel('length', unitSystem);
@@ -630,7 +652,7 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
       }
     }
     return null;
-  }, [woodSource, portedData, portCount, portDiameter, portShape, portWidth, portHeight, portArea, flaredEnds, cabinetData, params, unitSystem, t]);
+  }, [woodSource, prTuning, woodMode, dampingFactor, portedData, portCount, portDiameter, portShape, portWidth, portHeight, portArea, flaredEnds, cabinetData, params, unitSystem, t]);
 
   const handleApplySuggestedCabinet = () => {
     let netVol = 0;
@@ -733,9 +755,22 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
           portSpacingPct={portSpacingPct}
           portLocation={portLocation}
           bandpassOrder={bandpassData?.order}
+          bandpassTopology={bandpassData?.topology as Bandpass6Topology | undefined}
+          bandpassFl={bandpassData?.Fl}
+          bandpassFh={bandpassData?.Fh}
           bandpassRatio={bandpassData && bandpassData.valid ? bandpassData.Vr / (bandpassData.Vf + bandpassData.Vr) : 0.5}
           bandpassVf={bandpassData?.Vf}
           bandpassVr={bandpassData?.Vr}
+          activeHpEnabled={portedData?.activeHpEnabled}
+          hpFx={portedData?.hpFx}
+          hpQx={portedData?.hpQx}
+          prTuning={prTuning}
+          prDia={prDia}
+          prVas={prVas}
+          prFs={prFs}
+          prMms={prMms}
+          prFbNatural={prFbNatural}
+          prMasaAnadidaG={prMasaAnadidaG}
           dampingType={dampingType}
           enableBracing={enableBracing}
           bracingCount={bracingCount}
@@ -773,7 +808,37 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
           </div>
         </div>
 
-        {/* Puerto de sintonía */}
+        {/* Puerto de sintonía / Radiador Pasivo / Filtro Activo B6 */}
+        {woodSource === 'ported' && portedData.valid && prTuning === 'radiator' && (
+          <div className="pro-calc-panel" style={{ marginTop: '0rem', padding: '0.65rem' }}>
+            <span className="pro-calc-title" style={{ fontSize: '0.78rem' }}>{t("Radiador Pasivo (Sintonía sin Puerto)")}</span>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.25rem 0.75rem', marginTop: '0.2rem' }}>
+              <div className="pro-calc-row" style={{ border: 'none', padding: 0 }}>
+                <span className="pro-calc-label" style={{ fontSize: '0.72rem' }}>{t("Diámetro:")}</span>
+                <span className="pro-calc-value" style={{ fontSize: '0.72rem' }}>{prDia.toFixed(1)} cm ({(prDia / 2.54).toFixed(0)}")</span>
+              </div>
+              <div className="pro-calc-row" style={{ border: 'none', padding: 0 }}>
+                <span className="pro-calc-label" style={{ fontSize: '0.72rem' }}>{t("Fb Natural:")}</span>
+                <span className="pro-calc-value" style={{ fontSize: '0.72rem' }}>{prFbNatural.toFixed(1)} Hz</span>
+              </div>
+              <div className="pro-calc-row" style={{ border: 'none', padding: 0 }}>
+                <span className="pro-calc-label" style={{ fontSize: '0.72rem' }}>Mms:</span>
+                <span className="pro-calc-value" style={{ fontSize: '0.72rem' }}>{prMms.toFixed(1)} g</span>
+              </div>
+              <div className="pro-calc-row" style={{ border: 'none', padding: 0 }}>
+                <span className="pro-calc-label" style={{ fontSize: '0.72rem' }}>{t("Masa Añadida:")}</span>
+                <span className="pro-calc-value" style={{ fontSize: '0.72rem' }}>+{prMasaAnadidaG.toFixed(1)} g</span>
+              </div>
+            </div>
+          </div>
+        )}
+        {woodSource === 'ported' && portedData.valid && portedData.activeHpEnabled && portedData.hpFx && portedData.hpQx && (
+          <div className="pro-calc-panel" style={{ marginTop: '0rem', padding: '0.5rem 0.65rem', borderColor: 'rgba(16, 185, 129, 0.35)' }}>
+            <span className="pro-calc-title" style={{ fontSize: '0.75rem', color: '#059669' }}>
+              {t("Filtro Activo B6 (HPF 2.º Orden)")}: Fx = {portedData.hpFx.toFixed(1)} Hz · Qx = {portedData.hpQx.toFixed(2)}
+            </span>
+          </div>
+        )}
         {portInfo && (
           <div className="pro-calc-panel" style={{ marginTop: '0rem', padding: '0.65rem' }}>
             <span className="pro-calc-title" style={{ fontSize: '0.78rem' }}>{t("Puerto(s) de Sintonía para este Diseño")}</span>

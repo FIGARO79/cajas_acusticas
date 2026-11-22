@@ -10,14 +10,79 @@ pub struct SealedResult {
 }
 
 #[wasm_bindgen]
+pub fn calc_box_ql(vb: f64, classical_model: bool) -> f64 {
+    if classical_model {
+        7.0
+    } else {
+        (7.0 * (50.0 / vb.max(1.0)).powf(0.22)).clamp(5.0, 20.0)
+    }
+}
+
+#[wasm_bindgen]
+pub fn calc_box_qa(damping_level: u8, classical_model: bool) -> f64 {
+    if classical_model {
+        1e9
+    } else {
+        match damping_level {
+            0 => 100.0,
+            1 => 50.0,
+            2 => 15.0,
+            _ => 6.0,
+        }
+    }
+}
+
+#[wasm_bindgen]
+pub fn calc_box_qb(vb: f64, damping_level: u8, classical_model: bool) -> f64 {
+    if classical_model {
+        7.0
+    } else {
+        let ql = calc_box_ql(vb, false);
+        let qa = calc_box_qa(damping_level, false);
+        1.0 / (1.0 / ql + 1.0 / qa)
+    }
+}
+
+#[wasm_bindgen]
+pub fn calc_sealed_qtc_eff(
+    qts: f64,
+    alpha: f64,
+    vb: f64,
+    damping_level: u8,
+    classical_model: bool,
+) -> f64 {
+    let qtc_lossless = qts * (alpha + 1.0).sqrt();
+    if classical_model || alpha <= 0.0 {
+        qtc_lossless
+    } else {
+        let qb = calc_box_qb(vb, damping_level, false);
+        let inv_qtc = 1.0 / qtc_lossless.max(1e-6) + (alpha / (1.0 + alpha)) / qb.max(1e-6);
+        1.0 / inv_qtc
+    }
+}
+
+#[wasm_bindgen]
 pub fn calc_caja_sellada(fs: f64, vas: f64, qts: f64, vb_target: f64, qtc_target: f64) -> SealedResult {
+    calc_caja_sellada_ex(fs, vas, qts, vb_target, qtc_target, 0, true)
+}
+
+#[wasm_bindgen]
+pub fn calc_caja_sellada_ex(
+    fs: f64,
+    vas: f64,
+    qts: f64,
+    vb_target: f64,
+    qtc_target: f64,
+    damping_level: u8,
+    classical_model: bool,
+) -> SealedResult {
     // Evitar divisiones por cero o valores negativos
     let vb_t = if vb_target <= 0.0 { 1.0 } else { vb_target };
     let qts_val = if qts <= 0.0 { 0.001 } else { qts };
     let fs_val = if fs <= 0.0 { 0.0 } else { fs };
     
     let alpha = (vas / vb_t).max(0.0);
-    let qtc = qts_val * (alpha + 1.0).sqrt();
+    let qtc = calc_sealed_qtc_eff(qts_val, alpha, vb_t, damping_level, classical_model);
     let fc = fs_val * (alpha + 1.0).sqrt();
     
     // F3
@@ -80,12 +145,25 @@ pub fn calc_velocidad_puerto(fb: f64, sd: f64, xmax: f64, num_ports: u32, dv: f6
 
 #[wasm_bindgen]
 pub fn calc_f3_ventilada(fs: f64, qts: f64, vb: f64, fb: f64, vas: f64) -> f64 {
+    calc_f3_ventilada_ex(fs, qts, vb, fb, vas, 0, true)
+}
+
+#[wasm_bindgen]
+pub fn calc_f3_ventilada_ex(
+    fs: f64,
+    qts: f64,
+    vb: f64,
+    fb: f64,
+    vas: f64,
+    damping_level: u8,
+    classical_model: bool,
+) -> f64 {
     if fs <= 0.0 || qts <= 0.0 || vb <= 0.0 || fb <= 0.0 || vas <= 0.0 {
         return 0.0;
     }
     let h = fb / fs;
     let alpha = vas / vb;
-    let ql = 7.0_f64;
+    let ql = calc_box_qb(vb, damping_level, classical_model);
 
     let a3 = 1.0 / qts + h / ql;
     let a2 = 1.0 + h * h * (1.0 + alpha) + h / (qts * ql);
@@ -376,12 +454,27 @@ pub fn calc_f3_ventilada_b6(
     fx: f64,
     qx: f64,
 ) -> f64 {
+    calc_f3_ventilada_b6_ex(fs, qts, vb, fb, vas, fx, qx, 0, true)
+}
+
+#[wasm_bindgen]
+pub fn calc_f3_ventilada_b6_ex(
+    fs: f64,
+    qts: f64,
+    vb: f64,
+    fb: f64,
+    vas: f64,
+    fx: f64,
+    qx: f64,
+    damping_level: u8,
+    classical_model: bool,
+) -> f64 {
     if fs <= 0.0 || qts <= 0.0 || vb <= 0.0 || fb <= 0.0 || vas <= 0.0 || fx <= 0.0 || qx <= 0.0 {
         return 0.0;
     }
     let h = fb / fs;
     let alpha = vas / vb;
-    let ql = 7.0_f64;
+    let ql = calc_box_qb(vb, damping_level, classical_model);
 
     let a3 = 1.0 / qts + h / ql;
     let a2 = 1.0 + h * h * (1.0 + alpha) + h / (qts * ql);
@@ -440,6 +533,19 @@ pub fn calc_alineacion_ventilada_ex(
     qts: f64,
     tipo: &str,
     vb_min: f64,
+) -> VentedAlignment {
+    calc_alineacion_ventilada_model(fs, vas, qts, tipo, vb_min, 0, true)
+}
+
+#[wasm_bindgen]
+pub fn calc_alineacion_ventilada_model(
+    fs: f64,
+    vas: f64,
+    qts: f64,
+    tipo: &str,
+    vb_min: f64,
+    damping_level: u8,
+    classical_model: bool,
 ) -> VentedAlignment {
     let qts_val = if qts <= 0.0 { 0.001 } else { qts };
     let fs_val = if fs <= 0.0 { 0.0 } else { fs };
@@ -523,9 +629,9 @@ pub fn calc_alineacion_ventilada_ex(
     }
 
     let f3 = if active_hp {
-        calc_f3_ventilada_b6(fs_val, qts_val, vb, fb, vas_val, hp_fx, hp_qx)
+        calc_f3_ventilada_b6_ex(fs_val, qts_val, vb, fb, vas_val, hp_fx, hp_qx, damping_level, classical_model)
     } else {
-        calc_f3_ventilada(fs_val, qts_val, vb, fb, vas_val)
+        calc_f3_ventilada_ex(fs_val, qts_val, vb, fb, vas_val, damping_level, classical_model)
     };
 
     VentedAlignment {
@@ -1419,6 +1525,36 @@ mod tests {
             assert!(ser.vr.is_finite() && ser.vr > 0.0);
             assert!(ser.fh > ser.fl && ser.fl > 0.0, "series invertida en qts={qts}");
         }
+    }
+
+    #[test]
+    fn test_bassbox_box_losses_ql_qa_qb() {
+        // QL(Vb) monótonamente decreciente con Vb y acotado a [5, 20]
+        let ql_small = calc_box_ql(5.0, false);
+        let ql_50 = calc_box_ql(50.0, false);
+        let ql_large = calc_box_ql(500.0, false);
+        assert!(ql_small > ql_50 && ql_50 > ql_large);
+        assert!((ql_50 - 7.0).abs() < 1e-6);
+        assert!(ql_small <= 20.0 && ql_large >= 5.0);
+        assert_eq!(calc_box_ql(12.0, true), 7.0);
+
+        // Qa decreciente con nivel de relleno
+        let qa0 = calc_box_qa(0, false);
+        let qa1 = calc_box_qa(1, false);
+        let qa2 = calc_box_qa(2, false);
+        let qa3 = calc_box_qa(3, false);
+        assert!(qa0 > qa1 && qa1 > qa2 && qa2 > qa3);
+        assert!(calc_box_qa(3, true) > 1e8);
+
+        // Diferencia BassBox vs Clásico en sellada y ventilada
+        let s_classic = calc_caja_sellada_ex(38.0, 45.0, 0.36, 30.0, 0.707, 3, true);
+        let s_bb = calc_caja_sellada_ex(38.0, 45.0, 0.36, 30.0, 0.707, 3, false);
+        assert!(s_bb.qtc < s_classic.qtc, "La absorción debe amortiguar Qtc");
+        assert!(s_bb.f3 != s_classic.f3);
+
+        let f3_classic = calc_f3_ventilada_ex(40.0, 0.38, 60.0, 38.0, 80.0, 3, true);
+        let f3_bb = calc_f3_ventilada_ex(40.0, 0.38, 60.0, 38.0, 80.0, 3, false);
+        assert!((f3_bb - f3_classic).abs() > 0.1);
     }
 }
 

@@ -1,5 +1,35 @@
 import init, * as wasm from "./pkg/backend.js";
-import type { CalculatedSealed, CalculatedPorted, SpeakerParams, VentedAlignmentType, Bandpass6Topology } from '../types';
+import type { CalculatedSealed, CalculatedPorted, SpeakerParams, VentedAlignmentType, Bandpass6Topology, DampingType } from '../types';
+
+export function dampingTypeToLevel(dampingType?: DampingType): number {
+  switch (dampingType) {
+    case 'light': return 1;
+    case 'moderate': return 2;
+    case 'heavy': return 3;
+    default: return 0;
+  }
+}
+
+export function getBoxLosses(
+  vb: number,
+  dampingType: DampingType = 'none',
+  classicalModel = false
+): { ql: number; qa: number; qb: number } {
+  const level = dampingTypeToLevel(dampingType);
+  const w = getWasmSafe();
+  if (w) {
+    return {
+      ql: w.calc_box_ql(vb, classicalModel),
+      qa: w.calc_box_qa(level, classicalModel),
+      qb: w.calc_box_qb(vb, level, classicalModel),
+    };
+  }
+  if (classicalModel) return { ql: 7.0, qa: 1e9, qb: 7.0 };
+  const ql = Math.min(20.0, Math.max(5.0, 7.0 * Math.pow(50.0 / Math.max(vb, 1.0), 0.22)));
+  const qa = level === 0 ? 100.0 : level === 1 ? 50.0 : level === 2 ? 15.0 : 6.0;
+  const qb = 1.0 / (1.0 / ql + 1.0 / qa);
+  return { ql, qa, qb };
+}
 
 let wasmInstance: typeof wasm | null = null;
 
@@ -169,23 +199,36 @@ export async function calcIsobariMultiple(fs: number, vas: number, qts: number, 
 }
 
 /** Sealed box frequency response curve (10-500 Hz) */
-export async function calcSealedCurve(sealed: CalculatedSealed, params: SpeakerParams): Promise<number[]> {
+export async function calcSealedCurve(
+  sealed: CalculatedSealed,
+  params: SpeakerParams,
+  dampingType: DampingType = 'none',
+  classicalModel = false
+): Promise<number[]> {
   const w = await getWasm();
-  const res = w.calc_sealed_curve(
+  const res = w.calc_sealed_curve_ex(
     params.fs,
     params.qts,
     params.vas,
     sealed.Vb,
-    sealed.valid
+    sealed.valid,
+    dampingTypeToLevel(dampingType),
+    classicalModel
   );
   return Array.from(res);
 }
 
 /** Ported box frequency response curve (10-500 Hz) */
-export async function calcPortedCurve(ported: CalculatedPorted, params: SpeakerParams): Promise<number[]> {
+export async function calcPortedCurve(
+  ported: CalculatedPorted,
+  params: SpeakerParams,
+  dampingType: DampingType = 'none',
+  classicalModel = false
+): Promise<number[]> {
   const w = await getWasm();
+  const level = dampingTypeToLevel(dampingType);
   const res = (ported.activeHpEnabled && ported.hpFx && ported.hpQx)
-    ? w.calc_ported_b6_curve(
+    ? w.calc_ported_b6_curve_ex(
         params.fs,
         params.qts,
         params.vas,
@@ -193,15 +236,19 @@ export async function calcPortedCurve(ported: CalculatedPorted, params: SpeakerP
         ported.Fb,
         ported.hpFx,
         ported.hpQx,
-        ported.valid
+        ported.valid,
+        level,
+        classicalModel
       )
-    : w.calc_ported_curve(
+    : w.calc_ported_curve_ex(
         params.fs,
         params.qts,
         params.vas,
         ported.Vb,
         ported.Fb,
-        ported.valid
+        ported.valid,
+        level,
+        classicalModel
       );
   return Array.from(res);
 }
@@ -235,24 +282,42 @@ export function calcBandpass6Bassbox(fs: number, vas: number, qts: number, topol
 }
 
 /** Bandpass 4th order frequency response curve (10-500 Hz) */
-export async function calcBandpass4Curve(vf: number, vr: number, fb: number, params: SpeakerParams): Promise<number[]> {
+export async function calcBandpass4Curve(
+  vf: number,
+  vr: number,
+  fb: number,
+  params: SpeakerParams,
+  dampingType: DampingType = 'none',
+  classicalModel = false
+): Promise<number[]> {
   const w = await getWasm();
-  const res = w.calc_bandpass4_curve(
+  const res = w.calc_bandpass4_curve_ex(
     params.fs,
     params.qts,
     params.vas,
     vf,
     vr,
     fb,
-    vf > 0 && vr > 0 && fb > 0
+    vf > 0 && vr > 0 && fb > 0,
+    dampingTypeToLevel(dampingType),
+    classicalModel
   );
   return Array.from(res);
 }
 
 /** Bandpass 6th order frequency response curve (10-500 Hz) */
-export async function calcBandpass6Curve(vf: number, vr: number, fl: number, fh: number, params: SpeakerParams): Promise<number[]> {
+export async function calcBandpass6Curve(
+  vf: number,
+  vr: number,
+  fl: number,
+  fh: number,
+  params: SpeakerParams,
+  topology: Bandpass6Topology = 'parallel',
+  dampingType: DampingType = 'none',
+  classicalModel = false
+): Promise<number[]> {
   const w = await getWasm();
-  const res = w.calc_bandpass6_curve(
+  const res = w.calc_bandpass6_curve_ex(
     params.fs,
     params.qts,
     params.vas,
@@ -260,22 +325,44 @@ export async function calcBandpass6Curve(vf: number, vr: number, fl: number, fh:
     vr,
     fl,
     fh,
-    vf > 0 && vr > 0 && fl > 0 && fh > 0
+    topology,
+    vf > 0 && vr > 0 && fl > 0 && fh > 0,
+    dampingTypeToLevel(dampingType),
+    classicalModel
   );
   return Array.from(res);
 }
 
 /** Custom frequency curves (para Full-Range 10-20.000 Hz o cualquier lista arbitraria) */
-export function calcSealedCurveCustom(freqs: number[], fs: number, qts: number, vas: number, vb: number, valid = true): number[] {
+export function calcSealedCurveCustom(
+  freqs: number[],
+  fs: number,
+  qts: number,
+  vas: number,
+  vb: number,
+  valid = true,
+  dampingType: DampingType = 'none',
+  classicalModel = false
+): number[] {
   const w = getWasm();
   const floatArr = Float64Array.from(freqs);
-  return Array.from(w.calc_sealed_curve_custom(floatArr, fs, qts, vas, vb, valid));
+  return Array.from(w.calc_sealed_curve_custom_ex(floatArr, fs, qts, vas, vb, valid, dampingTypeToLevel(dampingType), classicalModel));
 }
 
-export function calcPortedCurveCustom(freqs: number[], fs: number, qts: number, vas: number, vb: number, fb: number, valid = true): number[] {
+export function calcPortedCurveCustom(
+  freqs: number[],
+  fs: number,
+  qts: number,
+  vas: number,
+  vb: number,
+  fb: number,
+  valid = true,
+  dampingType: DampingType = 'none',
+  classicalModel = false
+): number[] {
   const w = getWasm();
   const floatArr = Float64Array.from(freqs);
-  return Array.from(w.calc_ported_curve_custom(floatArr, fs, qts, vas, vb, fb, valid));
+  return Array.from(w.calc_ported_curve_custom_ex(floatArr, fs, qts, vas, vb, fb, valid, dampingTypeToLevel(dampingType), classicalModel));
 }
 
 export function calcPortedB6CurveCustom(
@@ -287,23 +374,49 @@ export function calcPortedB6CurveCustom(
   fb: number,
   fx: number,
   qx: number,
-  valid = true
+  valid = true,
+  dampingType: DampingType = 'none',
+  classicalModel = false
 ): number[] {
   const w = getWasm();
   const floatArr = Float64Array.from(freqs);
-  return Array.from(w.calc_ported_b6_curve_custom(floatArr, fs, qts, vas, vb, fb, fx, qx, valid));
+  return Array.from(w.calc_ported_b6_curve_custom_ex(floatArr, fs, qts, vas, vb, fb, fx, qx, valid, dampingTypeToLevel(dampingType), classicalModel));
 }
 
-export function calcBandpass4CurveCustom(freqs: number[], fs: number, qts: number, vas: number, vf: number, vr: number, fb: number, valid = true): number[] {
+export function calcBandpass4CurveCustom(
+  freqs: number[],
+  fs: number,
+  qts: number,
+  vas: number,
+  vf: number,
+  vr: number,
+  fb: number,
+  valid = true,
+  dampingType: DampingType = 'none',
+  classicalModel = false
+): number[] {
   const w = getWasm();
   const floatArr = Float64Array.from(freqs);
-  return Array.from(w.calc_bandpass4_curve_custom(floatArr, fs, qts, vas, vf, vr, fb, valid));
+  return Array.from(w.calc_bandpass4_curve_custom_ex(floatArr, fs, qts, vas, vf, vr, fb, valid, dampingTypeToLevel(dampingType), classicalModel));
 }
 
-export function calcBandpass6CurveCustom(freqs: number[], vas: number, vf: number, vr: number, fl: number, fh: number, valid = true): number[] {
+export function calcBandpass6CurveCustom(
+  freqs: number[],
+  fs: number,
+  qts: number,
+  vas: number,
+  vf: number,
+  vr: number,
+  fl: number,
+  fh: number,
+  topology: Bandpass6Topology = 'parallel',
+  valid = true,
+  dampingType: DampingType = 'none',
+  classicalModel = false
+): number[] {
   const w = getWasm();
   const floatArr = Float64Array.from(freqs);
-  return Array.from(w.calc_bandpass6_curve_custom(floatArr, vas, vf, vr, fl, fh, valid));
+  return Array.from(w.calc_bandpass6_curve_custom_ex(floatArr, fs, qts, vas, vf, vr, fl, fh, topology, valid, dampingTypeToLevel(dampingType), classicalModel));
 }
 
 /** Crossover filter gain in dB calculado por Rust */

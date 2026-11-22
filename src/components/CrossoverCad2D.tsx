@@ -23,7 +23,7 @@ export const CrossoverCad2D: React.FC<CrossoverCad2DProps> = ({
   enableLPad,
   lpadResults,
 }) => {
-  const t = (text: string) => translate(text, lang);
+  const t = useCallback((text: string) => translate(text, lang), [lang]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 

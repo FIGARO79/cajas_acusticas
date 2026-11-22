@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { type Lang, translate } from '../utils/translations';
-import { getWasm, optimizeCrossoverLowpass } from '../wasm/index';
+import { getWasm, getWasmSafe, optimizeCrossoverLowpass } from '../wasm/index';
 import type { CrossoverResult, CrossoverExportData } from '../types';
 import { CrossoverCad2D } from './CrossoverCad2D';
 
@@ -71,20 +71,16 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
   const [indCalcTargetL, setIndCalcTargetL] = useState<number | ''>(1.0);
   const [indCalcD, setIndCalcD] = useState<number | ''>(20.0);
   const [indCalcLen, setIndCalcLen] = useState<number | ''>(2.0);
-  const [indCalcN, setIndCalcN] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (indCalcTargetL && indCalcD && indCalcLen) {
-      try {
-        const wasm = getWasm();
-        const n = wasm.calc_vueltas_inductor_wheeler(Number(indCalcTargetL), Number(indCalcD), Number(indCalcLen));
-        setIndCalcN(n > 0 ? n : null);
-      } catch (e) {
-        console.error("Error calculating inductor turns:", e);
-        setIndCalcN(null);
-      }
-    } else {
-      setIndCalcN(null);
+  const indCalcN = useMemo<number | null>(() => {
+    if (!indCalcTargetL || !indCalcD || !indCalcLen) return null;
+    const wasm = getWasmSafe();
+    if (!wasm) return null;
+    try {
+      const n = wasm.calc_vueltas_inductor_wheeler(Number(indCalcTargetL), Number(indCalcD), Number(indCalcLen));
+      return n > 0 ? n : null;
+    } catch (e) {
+      console.error("Error calculating inductor turns:", e);
+      return null;
     }
   }, [indCalcTargetL, indCalcD, indCalcLen]);
 
@@ -105,9 +101,22 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
   const zLoad = readOnly ? (zLoadProp ?? 8) : zLoadLocal;
 
   // 6. Nelder-Mead Optimization Inputs (Rust MNA Engine)
-  const [optFc, setOptFc] = useState<number>(typeof fc === 'number' && fc > 0 ? fc : 2500);
-  const [optRe, setOptRe] = useState<number>(re > 0 ? re : (zWoofer > 0 ? zWoofer * 0.8 : 6.0));
-  const [optLe, setOptLe] = useState<number>(le > 0 ? le : 0.8);
+  const baseOptFc = typeof fc === 'number' && fc > 0 ? fc : 2500;
+  const baseOptRe = re > 0 ? re : (zWoofer > 0 ? zWoofer * 0.8 : 6.0);
+  const baseOptLe = le > 0 ? le : 0.8;
+
+  const [optFcOverride, setOptFcOverride] = useState<{ base: number; val: number } | null>(null);
+  const [optReOverride, setOptReOverride] = useState<{ base: number; val: number } | null>(null);
+  const [optLeOverride, setOptLeOverride] = useState<{ base: number; val: number } | null>(null);
+
+  const optFc = optFcOverride && optFcOverride.base === baseOptFc ? optFcOverride.val : baseOptFc;
+  const optRe = optReOverride && optReOverride.base === baseOptRe ? optReOverride.val : baseOptRe;
+  const optLe = optLeOverride && optLeOverride.base === baseOptLe ? optLeOverride.val : baseOptLe;
+
+  const setOptFc = (val: number) => setOptFcOverride({ base: baseOptFc, val });
+  const setOptRe = (val: number) => setOptReOverride({ base: baseOptRe, val });
+  const setOptLe = (val: number) => setOptLeOverride({ base: baseOptLe, val });
+
   const [optimizerDcr, setOptimizerDcr] = useState<number>(0.3);
   const [optimizerResult, setOptimizerResult] = useState<{
     lOptMh: number;
@@ -116,19 +125,6 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
     iterations: number;
   } | null>(null);
   const [isOptimizing, setIsOptimizing] = useState<boolean>(false);
-
-  useEffect(() => {
-    if (typeof fc === 'number' && fc > 0) setOptFc(fc);
-  }, [fc]);
-
-  useEffect(() => {
-    if (re > 0) setOptRe(re);
-    else if (zWoofer > 0) setOptRe(zWoofer * 0.8);
-  }, [re, zWoofer]);
-
-  useEffect(() => {
-    if (le > 0) setOptLe(le);
-  }, [le]);
 
   const handleOptimizeLowpass = () => {
     setIsOptimizing(true);

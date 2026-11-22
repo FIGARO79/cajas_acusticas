@@ -9,7 +9,7 @@ import { type Lang, translate } from './utils/translations';
 import { type UnitSystem, convertTo, getUnitLabel, nextUnitSystem } from './utils/units';
 import type { SpeakerParams, CalculatedSealed, CalculatedPorted, CalculatedBandpass, CustomDriver, WoodCabinetData, CrossoverExportData, WoodShape, VentedAlignmentType, Bandpass6Topology } from './types';
 import { estimateF3, calcPortLength, getKCorrection, calcOptimalPortForSpeaker, calcVentAirVelocity } from './utils/acousticMath';
-import { getWasm, calcRadiadorPasivo, calcVolumenNetoMadera, calcSuggestFb } from './wasm/index.ts';
+import { getWasm, getWasmSafe, calcVolumenNetoMadera, calcSuggestFb, dampingTypeToLevel } from './wasm/index.ts';
 import { generateReportHTML, printReportHtml } from './utils/reportGenerator';
 import { StatusBar } from './components/StatusBar';
 import { DriverDatabaseModal } from './components/DriverDatabaseModal';
@@ -27,7 +27,7 @@ function App({ wasmError }: AppProps) {
   const [boxType, setBoxType] = useState<'sealed' | 'ported' | 'bandpass'>('sealed');
   const [ventedAlignment, setVentedAlignment] = useState<VentedAlignmentType>('B4');
   const [externalSubwoofer, setExternalSubwoofer] = useState<boolean>(false);
-  const t = (text: string) => translate(text, lang);
+  const t = useCallback((text: string) => translate(text, lang), [lang]);
 
   const handleBoxTypeChange = (newType: 'sealed' | 'ported' | 'bandpass') => {
     setBoxType(newType);
@@ -207,8 +207,6 @@ function App({ wasmError }: AppProps) {
   const [prVas, setPrVas] = useState<number>(45);
   const [prFs, setPrFs] = useState<number>(25);
   const [prMms, setPrMms] = useState<number>(35);
-  const [prFbNatural, setPrFbNatural] = useState<number>(0);
-  const [prMasaAnadidaG, setPrMasaAnadidaG] = useState<number>(0);
 
 
   // Woodworking parameters
@@ -415,6 +413,8 @@ function App({ wasmError }: AppProps) {
     }
   }, []);
 
+  const dampingLevel = dampingTypeToLevel(dampingType);
+
   // Frecuencia de sintonía óptima (Fb) según los parámetros Thiele-Small del altavoz y la alineación activa
   // Si se refuerza con subwoofer externo, optimiza Fb como satélite/top (control de excursión en 60-100 Hz)
   const optimalDriverFb = useMemo<number>(() => {
@@ -424,12 +424,12 @@ function App({ wasmError }: AppProps) {
     }
     try {
       const wasm = getWasm();
-      const res = wasm.calc_alineacion_ventilada_ex(adjParams.fs, adjParams.vas, adjParams.qts, ventedAlignment, driverMinVb);
+      const res = wasm.calc_alineacion_ventilada_model(adjParams.fs, adjParams.vas, adjParams.qts, ventedAlignment, driverMinVb, dampingLevel, classicalModel);
       return res.fb > 0 ? Math.round(res.fb * 10) / 10 : 38;
     } catch {
       return 38;
     }
-  }, [validationError, adjParams.fs, adjParams.vas, adjParams.qts, ventedAlignment, driverMinVb, externalSubwoofer]);
+  }, [validationError, adjParams.fs, adjParams.vas, adjParams.qts, ventedAlignment, driverMinVb, externalSubwoofer, dampingLevel, classicalModel]);
 
   const handleExternalSubwooferChange = (enabled: boolean) => {
     setExternalSubwoofer(enabled);
@@ -520,15 +520,12 @@ function App({ wasmError }: AppProps) {
 
     if (woodMode === 'input' && manualNetVol > 0) {
       const sealedVb = manualNetVol * dampingFactor;
-      const alpha = adjParams.vas / sealedVb;
-      const sealedQtc = adjParams.qts * Math.sqrt(alpha + 1);
-      
-      const result = wasm.calc_caja_sellada(adjParams.fs, adjParams.vas, adjParams.qts, sealedVb, targetQtc);
+      const result = wasm.calc_caja_sellada_ex(adjParams.fs, adjParams.vas, adjParams.qts, sealedVb, targetQtc, dampingLevel, classicalModel);
       return {
         valid: true,
         Vb: sealedVb,
         Fc: result.fc,
-        Qtc: sealedQtc,
+        Qtc: result.qtc,
         F3: result.f3
       };
     } else {
@@ -536,10 +533,10 @@ function App({ wasmError }: AppProps) {
         return { valid: false, Vb: 0, Fc: 0, Qtc: targetQtc, F3: 0 };
       }
       
-      const tempResult = wasm.calc_caja_sellada(adjParams.fs, adjParams.vas, adjParams.qts, 10.0, targetQtc);
+      const tempResult = wasm.calc_caja_sellada_ex(adjParams.fs, adjParams.vas, adjParams.qts, 10.0, targetQtc, dampingLevel, classicalModel);
       const optimalVb = tempResult.vb_optimo;
       
-      const result = wasm.calc_caja_sellada(adjParams.fs, adjParams.vas, adjParams.qts, optimalVb, targetQtc);
+      const result = wasm.calc_caja_sellada_ex(adjParams.fs, adjParams.vas, adjParams.qts, optimalVb, targetQtc, dampingLevel, classicalModel);
 
       return {
         valid: true,
@@ -549,7 +546,7 @@ function App({ wasmError }: AppProps) {
         F3: result.f3
       };
     }
-  }, [validationError, adjParams.fs, adjParams.vas, adjParams.qts, woodMode, manualNetVol, dampingFactor, targetQtc]);
+  }, [validationError, adjParams.fs, adjParams.vas, adjParams.qts, woodMode, manualNetVol, dampingFactor, targetQtc, dampingLevel, classicalModel]);
 
   // --- CALCULAR CAJA VENTILADA ---
   const portedData = useMemo<CalculatedPorted>(() => {
@@ -579,9 +576,9 @@ function App({ wasmError }: AppProps) {
         activeHpEnabled = true;
         hpFx = 1.07 * FbPorted;
         hpQx = 1.93;
-        F3Ported = wasm.calc_f3_ventilada_b6(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas, hpFx, hpQx);
+        F3Ported = wasm.calc_f3_ventilada_b6_ex(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas, hpFx, hpQx, dampingLevel, classicalModel);
       } else {
-        F3Ported = estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas);
+        F3Ported = estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas, dampingType, classicalModel);
       }
       alignmentActive = customFbState !== null
         ? 'Manual'
@@ -593,10 +590,10 @@ function App({ wasmError }: AppProps) {
           ? calcSuggestFb(adjParams.fs, adjParams.vas, adjParams.qts, VbPorted)
           : optimalDriverFb;
         FbPorted = customFbState ?? (suggestedFbForVb > 0 ? suggestedFbForVb : optimalDriverFb);
-        F3Ported = estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas);
+        F3Ported = estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas, dampingType, classicalModel);
         alignmentActive = 'Manual';
       } else {
-        const result = wasm.calc_alineacion_ventilada_ex(adjParams.fs, adjParams.vas, adjParams.qts, ventedAlignment, driverMinVb);
+        const result = wasm.calc_alineacion_ventilada_model(adjParams.fs, adjParams.vas, adjParams.qts, ventedAlignment, driverMinVb, dampingLevel, classicalModel);
         VbPorted = result.vb;
         FbPorted = externalSubwoofer ? optimalDriverFb : result.fb;
         activeHpEnabled = !externalSubwoofer && result.active_hp;
@@ -604,7 +601,7 @@ function App({ wasmError }: AppProps) {
         hpQx = activeHpEnabled ? result.hp_qx : 0;
         clampedToMinVol = result.clamped_to_min_vol;
         F3Ported = externalSubwoofer
-          ? estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas)
+          ? estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas, dampingType, classicalModel)
           : result.f3;
         alignmentActive = externalSubwoofer
           ? 'Satélite + Subwoofer'
@@ -626,8 +623,8 @@ function App({ wasmError }: AppProps) {
         if (fbCalc > 0 && !isNaN(fbCalc) && isFinite(fbCalc)) {
           FbPorted = fbCalc;
           F3Ported = activeHpEnabled && hpFx > 0 && hpQx > 0
-            ? wasm.calc_f3_ventilada_b6(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas, hpFx, hpQx)
-            : estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas);
+            ? wasm.calc_f3_ventilada_b6_ex(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas, hpFx, hpQx, dampingLevel, classicalModel)
+            : estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas, dampingType, classicalModel);
           alignmentActive = `${t("Personalizada")} (L: ${Lv_cm.toFixed(1)} cm)`;
         }
       }
@@ -647,7 +644,7 @@ function App({ wasmError }: AppProps) {
       hpQx,
       clampedToMinVol,
     };
-  }, [validationError, adjParams.fs, adjParams.vas, adjParams.qts, woodMode, manualNetVol, dampingFactor, customPorted, customVbState, customFbState, optimalDriverFb, ventedAlignment, driverMinVb, externalSubwoofer, formatVentedAlignmentLabel, useCustomPortLength, customPortLength, portShape, portDiameter, portArea, portWidth, portHeight, portCount, flaredEnds, lang]);
+  }, [validationError, adjParams.fs, adjParams.vas, adjParams.qts, woodMode, manualNetVol, dampingFactor, dampingLevel, dampingType, classicalModel, customPorted, customVbState, customFbState, optimalDriverFb, ventedAlignment, driverMinVb, externalSubwoofer, formatVentedAlignmentLabel, useCustomPortLength, customPortLength, portShape, portDiameter, portArea, portWidth, portHeight, portCount, flaredEnds, t]);
 
   const customVb = customPorted ? (customVbState ?? Math.round((portedData.Vb || 45) * 10) / 10) : Math.round((portedData.Vb || 45) * 10) / 10;
   const customFb = customPorted ? (customFbState ?? Math.round((portedData.Fb || 38) * 10) / 10) : Math.round((portedData.Fb || 38) * 10) / 10;
@@ -750,33 +747,45 @@ function App({ wasmError }: AppProps) {
 
   const portLength = getPortLengthCalculation();
 
-  // --- CÁLCULO ASÍNCRONO DE RADIADOR PASIVO CON MOTOR RUST/WASM ---
-  useEffect(() => {
-    let active = true;
-    if (portedData.valid && portedData.Vb > 0 && prDia > 0 && prVas > 0 && prMms > 0) {
-      // cd es el diámetro del cono del radiador pasivo
-      const cd = prDia; 
-      
-      calcRadiadorPasivo(portedData.Vb, prVas, prFs, cd, prMms)
-        .then((res) => {
-          if (active) {
-            setPrFbNatural(res.fb || 0);
-            setPrMasaAnadidaG(Math.max(0, res.masaAñadida || 0));
-          }
-        })
-        .catch((err) => {
-          console.error("Error al calcular radiador pasivo por WASM:", err);
-        });
-    } else {
-      setPrFbNatural(0);
-      setPrMasaAnadidaG(0);
+  // --- CÁLCULO SÍNCRONO DE RADIADOR PASIVO CON MOTOR RUST/WASM ---
+  const { prFbNatural, prMasaAnadidaG } = useMemo(() => {
+    if (!portedData.valid || portedData.Vb <= 0 || prDia <= 0 || prVas <= 0 || prMms <= 0) {
+      return { prFbNatural: 0, prMasaAnadidaG: 0 };
     }
-    return () => {
-      active = false;
-    };
-  }, [portedData.valid, portedData.Vb, portedData.Fb, prDia, prVas, prFs, prMms]);
+    const w = getWasmSafe();
+    if (!w) return { prFbNatural: 0, prMasaAnadidaG: 0 };
+    try {
+      const res = w.calc_radiador_pasivo(portedData.Vb, prVas, prFs, prDia, prMms);
+      const out = {
+        prFbNatural: res.fb || 0,
+        prMasaAnadidaG: Math.max(0, res.masa_añadida || 0),
+      };
+      res.free();
+      return out;
+    } catch {
+      return { prFbNatural: 0, prMasaAnadidaG: 0 };
+    }
+  }, [portedData.valid, portedData.Vb, prDia, prVas, prFs, prMms]);
 
-
+  const currentPortVelocity = useMemo(() => {
+    if (boxType !== 'ported' || prTuning === 'radiator' || !portedData.valid || portedData.Fb <= 0) return 0;
+    const pDia = portShape === 'round'
+      ? (Number(portDiameter) || 0)
+      : portShape === 'custom'
+        ? (2 * Math.sqrt((Number(portArea) || 0) / Math.PI))
+        : (2 * Math.sqrt(((Number(portWidth) || 0) * (Number(portHeight) || 0)) / Math.PI));
+    const pCount = Number(portCount) || 1;
+    if (pDia > 0 && deferredAdjParams.sd && deferredAdjParams.xmax) {
+      try {
+        const wasm = getWasm();
+        return wasm.calc_velocidad_puerto(portedData.Fb, deferredAdjParams.sd, deferredAdjParams.xmax, pCount, pDia);
+      } catch {
+        return (0.008 * portedData.Fb * deferredAdjParams.sd * deferredAdjParams.xmax) / (pCount * pDia * pDia);
+      }
+    }
+    const areaM2 = pDia > 0 ? pCount * Math.PI * Math.pow(pDia / 200, 2) : 0.0044;
+    return calcVentAirVelocity(portedData.Fb, deferredAdjParams, portedData.Vb, portedData.Fb, areaM2, deferredAdjParams.pe || 100, dampingType, classicalModel);
+  }, [boxType, prTuning, portedData, portShape, portDiameter, portArea, portWidth, portHeight, portCount, deferredAdjParams, dampingType, classicalModel]);
 
   const handleCustomPortedChange = useCallback((val: boolean) => {
     setCustomPorted(val);
@@ -784,7 +793,7 @@ function App({ wasmError }: AppProps) {
       setCustomVbState(null);
       setCustomFbState(null);
     }
-  }, []);
+  }, [setCustomPorted, setCustomVbState, setCustomFbState]);
 
   const handleExportReport = () => {
     console.log("handleExportReport: triggered");
@@ -797,7 +806,7 @@ function App({ wasmError }: AppProps) {
 
       // Longitud del puerto, diámetro equivalente, velocidad del aire (misma referencia que la UI)
       let pLen = 'N/A';
-      let vp: number | null = currentPortVelocity > 0 ? currentPortVelocity : null;
+      const vp: number | null = currentPortVelocity > 0 ? currentPortVelocity : null;
       const pCount = Number(portCount) || 0;
       if (useCustomPortLength && Number(customPortLength) > 0) {
         pLen = `${Number(customPortLength).toFixed(1)} cm`;
@@ -822,10 +831,12 @@ function App({ wasmError }: AppProps) {
         lang,
         unitSystem,
         params,
-        boxType === 'sealed' ? 'sealed' : 'ported',
+        boxType,
         sealedData,
         portedData,
+        bandpassData,
         dampingType,
+        classicalModel,
         cabinetRef.current,
         xoverData ? {
           crossoverWays: xoverData.crossoverWays,
@@ -853,7 +864,16 @@ function App({ wasmError }: AppProps) {
         portHeight || 0,
         portArea || 0,
         pLen,
-        vp
+        vp,
+        {
+          prTuning,
+          prDia,
+          prVas,
+          prFs,
+          prMms,
+          prFbNatural,
+          prMasaAnadidaG,
+        }
       );
 
       printReportHtml(htmlContent);
@@ -904,26 +924,6 @@ function App({ wasmError }: AppProps) {
   const activeF3 = boxType === 'sealed' ? sealedData.F3 : boxType === 'ported' ? portedData.F3 : (bandpassData.Fl || 0);
   const activeFb = boxType === 'ported' ? portedData.Fb : boxType === 'bandpass' ? bandpassData.Fb : undefined;
   const activeQtc = boxType === 'sealed' ? sealedData.Qtc : undefined;
-
-  const currentPortVelocity = useMemo(() => {
-    if (boxType !== 'ported' || !portedData.valid || portedData.Fb <= 0) return 0;
-    const pDia = portShape === 'round'
-      ? (Number(portDiameter) || 0)
-      : portShape === 'custom'
-        ? (2 * Math.sqrt((Number(portArea) || 0) / Math.PI))
-        : (2 * Math.sqrt(((Number(portWidth) || 0) * (Number(portHeight) || 0)) / Math.PI));
-    const pCount = Number(portCount) || 1;
-    if (pDia > 0 && deferredAdjParams.sd && deferredAdjParams.xmax) {
-      try {
-        const wasm = getWasm();
-        return wasm.calc_velocidad_puerto(portedData.Fb, deferredAdjParams.sd, deferredAdjParams.xmax, pCount, pDia);
-      } catch {
-        return (0.008 * portedData.Fb * deferredAdjParams.sd * deferredAdjParams.xmax) / (pCount * pDia * pDia);
-      }
-    }
-    const areaM2 = pDia > 0 ? pCount * Math.PI * Math.pow(pDia / 200, 2) : 0.0044;
-    return calcVentAirVelocity(portedData.Fb, deferredAdjParams, portedData.Vb, portedData.Fb, areaM2, deferredAdjParams.pe || 100);
-  }, [boxType, portedData, portShape, portDiameter, portArea, portWidth, portHeight, portCount, deferredAdjParams]);
 
   // Guardar proyecto a archivo .aclab
   const handleSaveProject = () => {
@@ -1008,7 +1008,7 @@ function App({ wasmError }: AppProps) {
         if (data.lpadAttenuation !== undefined) setLpadAttenuation(data.lpadAttenuation);
         if (data.lpadZLoad !== undefined) setLpadZLoad(data.lpadZLoad);
         alert(t("Proyecto .aclab cargado con éxito."));
-      } catch (err) {
+      } catch {
         alert(t("Error al abrir el archivo de proyecto .aclab"));
       }
     };
@@ -1400,6 +1400,8 @@ function App({ wasmError }: AppProps) {
               portedData={boxType === 'ported' && portedData.valid ? deferredPortedData : null}
               bandpassData={boxType === 'bandpass' && bandpassData.valid ? deferredBandpassData : null}
               params={deferredAdjParams}
+              dampingType={dampingType}
+              classicalModel={classicalModel}
               crossoverWays={crossoverWays}
               crossoverType={crossoverType}
               fc={fc}
@@ -1533,6 +1535,13 @@ function App({ wasmError }: AppProps) {
                     customPortLength={customPortLength}
                     enableBracing={enableBracing}
                     bracingCount={bracingCount}
+                    prTuning={prTuning}
+                    prDia={prDia}
+                    prVas={prVas}
+                    prFs={prFs}
+                    prMms={prMms}
+                    prFbNatural={prFbNatural}
+                    prMasaAnadidaG={prMasaAnadidaG}
                   />
                 </div>
               )}

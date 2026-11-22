@@ -31,6 +31,17 @@ export interface SpeakerParams {
 
 export type VentedAlignmentType = 'QB3' | 'B4' | 'SBB4' | 'B6' | 'COMPACT';
 export type Bandpass6Topology = 'parallel' | 'series';
+export type DampingType = 'none' | 'light' | 'moderate' | 'heavy';
+
+export interface PassiveRadiatorExportData {
+  prTuning: 'port' | 'radiator';
+  prDia: number;
+  prVas: number;
+  prFs: number;
+  prMms: number;
+  prFbNatural: number;
+  prMasaAnadidaG: number;
+}
 
 export interface CalculatedSealed {
   valid: boolean;

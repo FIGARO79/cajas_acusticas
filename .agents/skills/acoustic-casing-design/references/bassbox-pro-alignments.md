@@ -81,8 +81,28 @@ Para $d_{\text{req}} = d_{\text{drv}} \cdot \sqrt{2}$ (desplazamiento $\ge 2\tim
 
 ---
 
-## 5. Pendientes de Integración Futura
-1. Modelar pérdidas por absorción del relleno ($Q_a$) y fugas ($Q_L$ variable según $V_b$) en `curves.rs` y `calc_f3_ventilada` para el Modelo BassBox.
-2. Función de transferencia específica para Paso Banda 6.º Orden Serie en `curves.rs` (actualmente `calc_bandpass6_response_at` usa modelo paralelo `HP * LP`).
-3. Actualizar reportes (`src/utils/reportGenerator.ts`) y diagramas CAD 2D/3D (`CabinetCad2D.tsx`, `CabinetViewer3DModal.tsx`) para diferenciar 6.º orden serie vs paralelo y mostrar filtro activo `B6` / PR sugerido.
-4. Pruebas visuales en ejecución (`npm run dev`) y limpieza de incidencias ESLint preexistentes (`src-tauri/target/`, `any` en componentes legados y hooks en `App.tsx`/`CrossoverTab.tsx`).
+## 5. Pérdidas por Absorción ($Q_a$), Fugas ($Q_L(V_b)$) y Transferencia BP6 Serie/Paralelo
+
+### 5.1 Pérdidas del Recinto (Modelo BassBox vs. Clásico)
+Implementadas en `backend/src/cajas.rs` y `backend/src/curves.rs` (variantes `*_ex` y `*_model`):
+- **Modo Clásico (`classical_model == true`)**: $Q_L = 7.0$, $Q_a \to \infty$, $Q_B = 7.0$.
+- **Modo BassBox (`classical_model == false`)**:
+  - Fugas dependientes del volumen: $Q_L(V_b) = \text{clamp}\left(7.0 \cdot \left(\frac{50.0}{\max(V_b, 1.0)}\right)^{0.22},\; 5.0,\; 20.0\right)$.
+  - Absorción según nivel de relleno (`0..3`): $Q_a \in \{100, 50, 15, 6\}$ (`none`, `light`, `moderate`, `heavy`).
+  - Combinación en paralelo: $Q_B = \left(\frac{1}{Q_L} + \frac{1}{Q_a}\right)^{-1}$.
+  - En caja sellada: $Q_{tc,\text{eff}} = \left(\frac{1}{Q_{ts}\sqrt{1+\alpha}} + \frac{\alpha}{(1+\alpha) Q_B}\right)^{-1}$.
+
+### 5.2 Función de Transferencia Paso Banda 6.º Orden (`calc_bandpass6_response_at_ex`)
+Evaluada mediante admitancias complejas normalizadas ($y = f / F_s$, $s = j y$, $C_{ar} = V_r / V_{as}$, $C_{af} = V_f / V_{as}$, $M_{pr} = \alpha_r / h_l^2$, $M_{pf} = \alpha_f / h_h^2$, pérdidas $Q_{br}, Q_{bf}$ y $Q_p = 50$):
+- **Topología Serie (`"series"`)**: puerto interno $V_r \leftrightarrow V_f$ ($F_l$) y puerto externo $V_f \to \text{aire}$ ($F_h$):
+  $$Y_{12} = Y_{pr} + Y_d,\quad \Delta = (Y_{cr} + Y_{12})(Y_{cf} + Y_{pf} + Y_{12}) - Y_{12}^2,\quad H_{\text{series}}(s) = s \cdot Y_{pf} \cdot \frac{Y_d \cdot Y_{cr}}{\Delta}$$
+- **Topología Paralelo (`"parallel"`)**: ambas cámaras ventilan al exterior ($F_l$ y $F_h$):
+  $$Z_r = (Y_{cr} + Y_{pr})^{-1},\quad Z_f = (Y_{cf} + Y_{pf})^{-1},\quad U_d = (Z_d + Z_r + Z_f)^{-1},\quad H_{\text{parallel}}(s) = s \cdot U_d \cdot (Z_f Y_{pf} - Z_r Y_{pr})$$
+
+---
+
+## 6. Estado de Integración (Completado)
+1. **Pérdidas por absorción ($Q_a$) y fugas ($Q_L(V_b)$)**: integradas en `backend/src/cajas.rs`, `backend/src/curves.rs`, `src/wasm/index.ts`, `src/utils/acousticMath.ts`, `src/App.tsx` y `src/components/SimulationChart.tsx`.
+2. **Función de transferencia dedicada Paso Banda 6.º Orden Serie y Paralelo**: integrada en `backend/src/curves.rs` (`calc_bandpass6_response_at_ex` y curvas asociadas) y conectada a la simulación y reportes.
+3. **Reportes y CAD 2D/3D**: actualizados `src/utils/reportGenerator.ts`, `src/components/CabinetTab.tsx`, `src/components/CabinetDiagram.tsx`, `src/components/CabinetCad2D.tsx` y `src/components/CabinetViewer3DModal.tsx` para reflejar topología 6.º serie vs paralelo, filtro activo `B6` y radiador pasivo sugerido.
+4. **ESLint y verificación visual en ejecución**: limpieza aplicada en `eslint.config.js` y componentes React/TS; verificación de tests, build y `npm run dev`.

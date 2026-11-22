@@ -1,5 +1,5 @@
-import type { SpeakerParams, PortSuggestions } from '../types';
-import { getWasmSafe } from '../wasm';
+import type { SpeakerParams, PortSuggestions, DampingType, Bandpass6Topology } from '../types';
+import { getWasmSafe, dampingTypeToLevel } from '../wasm';
 
 export const QL_LOSSES = 7.0;
 
@@ -34,10 +34,18 @@ export function calcPortLength(vb: number, fb: number, dv: number, flaredEnds: n
   return Math.max(0, len);
 }
 
-export function estimateF3(fs: number, qts: number, Vb: number, Fb: number, vas: number): number {
+export function estimateF3(
+  fs: number,
+  qts: number,
+  Vb: number,
+  Fb: number,
+  vas: number,
+  dampingType: DampingType = 'none',
+  classicalModel = false
+): number {
   const wasm = getWasmSafe();
   if (wasm) {
-    return wasm.calc_f3_ventilada(fs, qts, Vb, Fb, vas);
+    return wasm.calc_f3_ventilada_ex(fs, qts, Vb, Fb, vas, dampingTypeToLevel(dampingType), classicalModel);
   }
   if (fs <= 0 || qts <= 0 || Vb <= 0 || Fb <= 0 || vas <= 0) return 0;
   const h = Fb / fs;
@@ -225,12 +233,14 @@ export function calcConeExcursion(
   vb: number,
   fb: number,
   isPorted: boolean,
-  powerWatts = 100
+  powerWatts = 100,
+  dampingType: DampingType = 'none',
+  classicalModel = false
 ): number {
   if (f <= 0 || vb <= 0) return 0;
   const wasm = getWasmSafe();
   if (wasm) {
-    return wasm.calc_excursion_cono(
+    return wasm.calc_excursion_cono_ex(
       f,
       params.fs || 38,
       params.qts || 0.38,
@@ -244,7 +254,9 @@ export function calcConeExcursion(
       vb,
       fb,
       isPorted,
-      powerWatts
+      powerWatts,
+      dampingTypeToLevel(dampingType),
+      classicalModel
     );
   }
   return 0;
@@ -259,11 +271,13 @@ export function calcExcursionCurve(
   fb: number,
   isPorted: boolean,
   powerWatts = 100,
-  valid = true
+  valid = true,
+  dampingType: DampingType = 'none',
+  classicalModel = false
 ): number[] {
   const wasm = getWasmSafe();
   if (wasm) {
-    const res = wasm.calc_excursion_curve(
+    const res = wasm.calc_excursion_curve_ex(
       params.fs || 38,
       params.qts || 0.38,
       params.qes || 0.45,
@@ -277,15 +291,17 @@ export function calcExcursionCurve(
       fb,
       isPorted,
       powerWatts,
-      valid
+      valid,
+      dampingTypeToLevel(dampingType),
+      classicalModel
     );
     return Array.from(res);
   }
-  return chartFrequencies.map(f => calcConeExcursion(f, params, vb, fb, isPorted, powerWatts));
+  return chartFrequencies.map(f => calcConeExcursion(f, params, vb, fb, isPorted, powerWatts, dampingType, classicalModel));
 }
 
 /**
- * Velocidad del aire en el conducto en m/s según Rust (`calc_velocidad_aire_frec`).
+ * Velocidad del aire en el conducto en m/s según Rust (`calc_velocidad_aire_frec_ex`).
  */
 export function calcVentAirVelocity(
   f: number,
@@ -293,12 +309,14 @@ export function calcVentAirVelocity(
   vb: number,
   fb: number,
   portAreaM2: number,
-  powerWatts = 100
+  powerWatts = 100,
+  dampingType: DampingType = 'none',
+  classicalModel = false
 ): number {
   if (f <= 0 || vb <= 0 || fb <= 0 || portAreaM2 <= 0) return 0;
   const wasm = getWasmSafe();
   if (wasm) {
-    return wasm.calc_velocidad_aire_frec(
+    return wasm.calc_velocidad_aire_frec_ex(
       f,
       params.fs || 38,
       params.qts || 0.38,
@@ -312,7 +330,9 @@ export function calcVentAirVelocity(
       vb,
       fb,
       portAreaM2,
-      powerWatts
+      powerWatts,
+      dampingTypeToLevel(dampingType),
+      classicalModel
     );
   }
   return 0;
@@ -327,11 +347,13 @@ export function calcAirVelocityCurve(
   fb: number,
   portAreaM2: number,
   powerWatts = 100,
-  valid = true
+  valid = true,
+  dampingType: DampingType = 'none',
+  classicalModel = false
 ): number[] {
   const wasm = getWasmSafe();
   if (wasm) {
-    const res = wasm.calc_air_velocity_curve(
+    const res = wasm.calc_air_velocity_curve_ex(
       params.fs || 38,
       params.qts || 0.38,
       params.qes || 0.45,
@@ -345,27 +367,31 @@ export function calcAirVelocityCurve(
       fb,
       portAreaM2,
       powerWatts,
-      valid
+      valid,
+      dampingTypeToLevel(dampingType),
+      classicalModel
     );
     return Array.from(res);
   }
-  return chartFrequencies.map(f => calcVentAirVelocity(f, params, vb, fb, portAreaM2, powerWatts));
+  return chartFrequencies.map(f => calcVentAirVelocity(f, params, vb, fb, portAreaM2, powerWatts, dampingType, classicalModel));
 }
 
 /**
- * Impedancia eléctrica del sistema en Ohms según Rust (`calc_impedancia_sistema`).
+ * Impedancia eléctrica del sistema en Ohms según Rust (`calc_impedancia_sistema_ex`).
  */
 export function calcSystemImpedance(
   f: number,
   params: SpeakerParams,
   vb: number,
   fb: number,
-  isPorted: boolean
+  isPorted: boolean,
+  dampingType: DampingType = 'none',
+  classicalModel = false
 ): number {
   if (f <= 0 || vb <= 0) return params.re || 4;
   const wasm = getWasmSafe();
   if (wasm) {
-    return wasm.calc_impedancia_sistema(
+    return wasm.calc_impedancia_sistema_ex(
       f,
       params.fs || 35,
       params.qts || 0.38,
@@ -376,7 +402,9 @@ export function calcSystemImpedance(
       params.le || 1.0,
       vb,
       fb,
-      isPorted
+      isPorted,
+      dampingTypeToLevel(dampingType),
+      classicalModel
     );
   }
   return params.re || 4.0;
@@ -390,11 +418,13 @@ export function calcImpedanceCurve(
   vb: number,
   fb: number,
   isPorted: boolean,
-  valid = true
+  valid = true,
+  dampingType: DampingType = 'none',
+  classicalModel = false
 ): number[] {
   const wasm = getWasmSafe();
   if (wasm) {
-    const res = wasm.calc_impedance_curve(
+    const res = wasm.calc_impedance_curve_ex(
       params.fs || 35,
       params.qts || 0.38,
       params.qes || 0.42,
@@ -405,34 +435,40 @@ export function calcImpedanceCurve(
       vb,
       fb,
       isPorted,
-      valid
+      valid,
+      dampingTypeToLevel(dampingType),
+      classicalModel
     );
     return Array.from(res);
   }
-  return chartFrequencies.map(f => calcSystemImpedance(f, params, vb, fb, isPorted));
+  return chartFrequencies.map(f => calcSystemImpedance(f, params, vb, fb, isPorted, dampingType, classicalModel));
 }
 
 /**
- * Respuesta de fase acústica en grados (°) según Rust (`calc_fase_acustica`).
+ * Respuesta de fase acústica en grados (°) según Rust (`calc_fase_acustica_ex`).
  */
 export function calcPhaseResponse(
   f: number,
   params: SpeakerParams,
   vb: number,
   fb: number,
-  isPorted: boolean
+  isPorted: boolean,
+  dampingType: DampingType = 'none',
+  classicalModel = false
 ): number {
   if (f <= 0 || vb <= 0) return 0;
   const wasm = getWasmSafe();
   if (wasm) {
-    return wasm.calc_fase_acustica(
+    return wasm.calc_fase_acustica_ex(
       f,
       params.fs || 38,
       params.qts || 0.38,
       params.vas || 45,
       vb,
       fb,
-      isPorted
+      isPorted,
+      dampingTypeToLevel(dampingType),
+      classicalModel
     );
   }
   return 0;
@@ -446,26 +482,30 @@ export function calcPhaseCurve(
   vb: number,
   fb: number,
   isPorted: boolean,
-  valid = true
+  valid = true,
+  dampingType: DampingType = 'none',
+  classicalModel = false
 ): number[] {
   const wasm = getWasmSafe();
   if (wasm) {
-    const res = wasm.calc_phase_curve(
+    const res = wasm.calc_phase_curve_ex(
       params.fs || 38,
       params.qts || 0.38,
       params.vas || 45,
       vb,
       fb,
       isPorted,
-      valid
+      valid,
+      dampingTypeToLevel(dampingType),
+      classicalModel
     );
     return Array.from(res);
   }
-  return chartFrequencies.map(f => calcPhaseResponse(f, params, vb, fb, isPorted));
+  return chartFrequencies.map(f => calcPhaseResponse(f, params, vb, fb, isPorted, dampingType, classicalModel));
 }
 
 /**
- * Retardo de grupo (Group Delay) en ms: calculado completamente en Rust (`calc_group_delay_curve_custom`).
+ * Retardo de grupo (Group Delay) en ms: calculado completamente en Rust (`calc_group_delay_curve_custom_ex`).
  */
 export function calcGroupDelayCurve(
   freqs: number[],
@@ -473,12 +513,14 @@ export function calcGroupDelayCurve(
   vb: number,
   fb: number,
   isPorted: boolean,
-  valid = true
+  valid = true,
+  dampingType: DampingType = 'none',
+  classicalModel = false
 ): number[] {
   const wasm = getWasmSafe();
   if (wasm && freqs.length > 0) {
     const floatArr = Float64Array.from(freqs);
-    const res = wasm.calc_group_delay_curve_custom(
+    const res = wasm.calc_group_delay_curve_custom_ex(
       floatArr,
       params.fs || 38,
       params.qts || 0.38,
@@ -486,7 +528,9 @@ export function calcGroupDelayCurve(
       vb,
       fb,
       isPorted,
-      valid
+      valid,
+      dampingTypeToLevel(dampingType),
+      classicalModel
     );
     return Array.from(res);
   }
@@ -497,10 +541,18 @@ export function calcGroupDelayCurve(
 // RESPUESTAS PUNTUALES EN FRECUENCIA (Rust backend)
 // -------------------------------------------------------------
 
-export function calculateSealedResponseAt(f: number, fs: number, qts: number, vas: number, vb: number): number {
+export function calculateSealedResponseAt(
+  f: number,
+  fs: number,
+  qts: number,
+  vas: number,
+  vb: number,
+  dampingType: DampingType = 'none',
+  classicalModel = false
+): number {
   const wasm = getWasmSafe();
   if (wasm) {
-    return wasm.calc_sealed_response_at(f, fs, qts, vas, vb);
+    return wasm.calc_sealed_response_at_ex(f, fs, qts, vas, vb, dampingTypeToLevel(dampingType), classicalModel);
   }
   const alpha = vas / vb;
   const fc = fs * Math.sqrt(alpha + 1);
@@ -510,10 +562,19 @@ export function calculateSealedResponseAt(f: number, fs: number, qts: number, va
   return 20 * Math.log10(response + 1e-10);
 }
 
-export function calculatePortedResponseAt(f: number, fs: number, qts: number, vas: number, vb: number, fb: number): number {
+export function calculatePortedResponseAt(
+  f: number,
+  fs: number,
+  qts: number,
+  vas: number,
+  vb: number,
+  fb: number,
+  dampingType: DampingType = 'none',
+  classicalModel = false
+): number {
   const wasm = getWasmSafe();
   if (wasm) {
-    return wasm.calc_ported_response_at(f, fs, qts, vas, vb, fb);
+    return wasm.calc_ported_response_at_ex(f, fs, qts, vas, vb, fb, dampingTypeToLevel(dampingType), classicalModel);
   }
   const h = fb / fs;
   const alpha = vas / vb;
@@ -537,23 +598,35 @@ export function calculatePortedB6ResponseAt(
   vb: number,
   fb: number,
   fx: number,
-  qx: number
+  qx: number,
+  dampingType: DampingType = 'none',
+  classicalModel = false
 ): number {
   const wasm = getWasmSafe();
   if (wasm) {
-    return wasm.calc_ported_b6_response_at(f, fs, qts, vas, vb, fb, fx, qx);
+    return wasm.calc_ported_b6_response_at_ex(f, fs, qts, vas, vb, fb, fx, qx, dampingTypeToLevel(dampingType), classicalModel);
   }
-  const ventedDb = calculatePortedResponseAt(f, fs, qts, vas, vb, fb);
+  const ventedDb = calculatePortedResponseAt(f, fs, qts, vas, vb, fb, dampingType, classicalModel);
   if (f <= 0 || fx <= 0 || qx <= 0) return -45;
   const r = f / fx;
   const hpMag = (r * r) / Math.sqrt(Math.pow(1.0 - r * r, 2) + Math.pow(r / qx, 2) + 1e-20);
   return ventedDb + 20 * Math.log10(hpMag + 1e-10);
 }
 
-export function calculateBandpass4ResponseAt(f: number, fs: number, qts: number, vas: number, vf: number, vr: number, fb: number): number {
+export function calculateBandpass4ResponseAt(
+  f: number,
+  fs: number,
+  qts: number,
+  vas: number,
+  vf: number,
+  vr: number,
+  fb: number,
+  dampingType: DampingType = 'none',
+  classicalModel = false
+): number {
   const wasm = getWasmSafe();
   if (wasm) {
-    return wasm.calc_bandpass4_response_at(f, fs, qts, vas, vf, vr, fb);
+    return wasm.calc_bandpass4_response_at_ex(f, fs, qts, vas, vf, vr, fb, dampingTypeToLevel(dampingType), classicalModel);
   }
   const h = fb / fs;
   const alpha_f = vas / vf;
@@ -571,10 +644,34 @@ export function calculateBandpass4ResponseAt(f: number, fs: number, qts: number,
   return 20 * Math.log10(response + 1e-10);
 }
 
-export function calculateBandpass6ResponseAt(f: number, vas: number, vf: number, vr: number, fl: number, fh: number): number {
+export function calculateBandpass6ResponseAt(
+  f: number,
+  vas: number,
+  vf: number,
+  vr: number,
+  fl: number,
+  fh: number,
+  fs = 38,
+  qts = 0.36,
+  topology: Bandpass6Topology = 'parallel',
+  dampingType: DampingType = 'none',
+  classicalModel = false
+): number {
   const wasm = getWasmSafe();
   if (wasm) {
-    return wasm.calc_bandpass6_response_at(f, vas, vf, vr, fl, fh);
+    return wasm.calc_bandpass6_response_at_ex(
+      f,
+      fs,
+      qts,
+      vas,
+      vf,
+      vr,
+      fl,
+      fh,
+      topology,
+      dampingTypeToLevel(dampingType),
+      classicalModel
+    );
   }
   const q = 0.707;
   const y_l = f / fl;

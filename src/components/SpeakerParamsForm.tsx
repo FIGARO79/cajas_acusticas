@@ -358,7 +358,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
   // Filtrar los woofers basados en la marca y la consulta de búsqueda
   const filteredDrivers = React.useMemo(() => {
     // Mapear los customDrivers al formato de woofers de la DB
-    const mappedCustomWoofers = customDrivers.map(cd => {
+    const mappedCustomWoofers: DatabaseWoofer[] = customDrivers.map(cd => {
       return {
         ID: cd.id,
         Model: cd.model,
@@ -388,7 +388,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
     });
 
     const officialWoofers = driversDb ? driversDb.woofers : [];
-    const allWoofers = [...mappedCustomWoofers, ...officialWoofers];
+    const allWoofers: DatabaseWoofer[] = [...mappedCustomWoofers, ...officialWoofers];
     
     // Normalizar la consulta de búsqueda dividiéndola en palabras y limpiando guiones/barras
     const queryTokens = searchQuery
@@ -417,7 +417,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
     }
     
     // 3. Filtrar y aplicar límite
-    const results = [];
+    const results: Array<{ driver: DatabaseWoofer; brand: string; displayName: string }> = [];
     for (const w of brandWoofers) {
       const isCustom = w._isCustom;
       const brand = (isCustom ? w._customBrand : (driversDb ? driversDb.companies[w["Company ID"]] : 'Genérico')) || 'Genérico';
@@ -496,7 +496,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (activeIndex >= 0 && activeIndex < filteredDrivers.length) {
-        handleSelectDriver(filteredDrivers[activeIndex] as any);
+        handleSelectDriver(filteredDrivers[activeIndex]);
       }
     } else if (e.key === 'Escape') {
       setShowDropdown(false);
@@ -732,7 +732,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
                   {filteredDrivers.map((item, index) => (
                     <li
                       key={item.driver.ID}
-                      onClick={() => handleSelectDriver(item as any)}
+                      onClick={() => handleSelectDriver(item)}
                       className={`search-item ${index === activeIndex ? 'active' : ''}`}
                       ref={index === activeIndex ? activeRef : null}
                     >

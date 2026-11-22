@@ -1,16 +1,27 @@
-import { getWasm } from '../wasm/index';
+import { getWasm, dampingTypeToLevel, getBoxLosses } from '../wasm/index';
 import { type Lang, translate } from './translations';
 import { type UnitSystem, getUnitLabel } from './units';
-import type { SpeakerParams, CalculatedSealed, CalculatedPorted, WoodCabinetData, CrossoverExportData } from '../types';
+import type {
+  SpeakerParams,
+  CalculatedSealed,
+  CalculatedPorted,
+  CalculatedBandpass,
+  WoodCabinetData,
+  CrossoverExportData,
+  DampingType,
+  PassiveRadiatorExportData,
+} from '../types';
 
 export function generateReportHTML(
   lang: Lang,
   unitSystem: UnitSystem,
   params: SpeakerParams,
-  boxType: 'sealed' | 'ported',
+  boxType: 'sealed' | 'ported' | 'bandpass',
   sealedData: CalculatedSealed,
   portedData: CalculatedPorted,
-  dampingType: 'none' | 'light' | 'moderate' | 'heavy',
+  bandpassData: CalculatedBandpass | null,
+  dampingType: DampingType,
+  classicalModel: boolean,
   cabinetData: WoodCabinetData | null,
   xoverData: CrossoverExportData | null,
   portCount: number,
@@ -20,9 +31,18 @@ export function generateReportHTML(
   portHeight: number,
   portArea: number,
   pLen: string,
-  vp: number | null
+  vp: number | null,
+  prData?: PassiveRadiatorExportData | null
 ): string {
   const t = (text: string) => translate(text, lang);
+  const dampingLevel = dampingTypeToLevel(dampingType);
+  const isPassiveRadiator = boxType === 'ported' && prData?.prTuning === 'radiator';
+  const activeVbRef = boxType === 'sealed'
+    ? sealedData.Vb
+    : boxType === 'ported'
+      ? portedData.Vb
+      : ((bandpassData?.Vf || 0) + (bandpassData?.Vr || 0));
+  const boxLosses = getBoxLosses(activeVbRef || 40, dampingType, classicalModel);
   
   const formatNum = (val: number | string | null | undefined, decimals: number = 2, fallback: string = 'N/A'): string => {
     if (val === undefined || val === null || (typeof val === 'number' && isNaN(val))) return fallback;
@@ -33,15 +53,57 @@ export function generateReportHTML(
   // 1. Obtener curvas mediante WASM síncrono si está disponible
   const sealedCurve: number[] = [];
   const portedCurve: number[] = [];
+  const bandpassCurve: number[] = [];
   try {
     const wasm = getWasm();
     if (sealedData && sealedData.valid) {
-      const res = wasm.calc_sealed_curve(params.fs, params.qts, params.vas, sealedData.Vb, true);
+      const res = wasm.calc_sealed_curve_ex(params.fs, params.qts, params.vas, sealedData.Vb, true, dampingLevel, classicalModel);
       res.forEach((v: number) => sealedCurve.push(v));
     }
     if (portedData && portedData.valid) {
-      const res = wasm.calc_ported_curve(params.fs, params.qts, params.vas, portedData.Vb, portedData.Fb, true);
+      const res = (portedData.activeHpEnabled && portedData.hpFx && portedData.hpQx)
+        ? wasm.calc_ported_b6_curve_ex(
+            params.fs,
+            params.qts,
+            params.vas,
+            portedData.Vb,
+            portedData.Fb,
+            portedData.hpFx,
+            portedData.hpQx,
+            true,
+            dampingLevel,
+            classicalModel
+          )
+        : wasm.calc_ported_curve_ex(params.fs, params.qts, params.vas, portedData.Vb, portedData.Fb, true, dampingLevel, classicalModel);
       res.forEach((v: number) => portedCurve.push(v));
+    }
+    if (boxType === 'bandpass' && bandpassData && bandpassData.valid) {
+      const res = bandpassData.order === 4
+        ? wasm.calc_bandpass4_curve_ex(
+            params.fs,
+            params.qts,
+            params.vas,
+            bandpassData.Vf,
+            bandpassData.Vr,
+            bandpassData.Fb,
+            true,
+            dampingLevel,
+            classicalModel
+          )
+        : wasm.calc_bandpass6_curve_ex(
+            params.fs,
+            params.qts,
+            params.vas,
+            bandpassData.Vf,
+            bandpassData.Vr,
+            bandpassData.Fl || 0,
+            bandpassData.Fh || 0,
+            bandpassData.topology || 'parallel',
+            true,
+            dampingLevel,
+            classicalModel
+          );
+      res.forEach((v: number) => bandpassCurve.push(v));
     }
   } catch (e) {
     console.error("WASM curves calculation error for report:", e);
@@ -89,6 +151,15 @@ export function generateReportHTML(
     }).join(' ');
   }
 
+  let bandpassPath = '';
+  if (bandpassCurve.length > 0) {
+    bandpassPath = bandpassCurve.map((db, idx) => {
+      const x = mapX(frequencies[idx]);
+      const y = mapY(Math.max(-24, Math.min(6, db)));
+      return `${idx === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    }).join(' ');
+  }
+
   // Líneas de grilla de frecuencia en 20, 50, 100, 200 Hz
   const gridFreqs = [20, 50, 100, 200];
   const freqGridLines = gridFreqs.map(f => {
@@ -119,6 +190,7 @@ export function generateReportHTML(
       <!-- Curves -->
       ${sealedPath ? `<path d="${sealedPath}" fill="none" stroke="#0ea5e9" stroke-width="2.5" />` : ''}
       ${portedPath ? `<path d="${portedPath}" fill="none" stroke="#10b981" stroke-width="2.5" />` : ''}
+      ${bandpassPath ? `<path d="${bandpassPath}" fill="none" stroke="#f59e0b" stroke-width="2.5" />` : ''}
       
       <!-- Legend -->
       <g transform="translate(60, 45)">
@@ -132,6 +204,12 @@ export function generateReportHTML(
             <text x="20" y="4" font-size="10" fill="#333">${t("Ventilada")}</text>
           </g>
         ` : ''}
+        ${bandpassPath ? `
+          <g transform="translate(210, 0)">
+            <line x1="0" y1="0" x2="15" y2="0" stroke="#f59e0b" stroke-width="3" />
+            <text x="20" y="4" font-size="10" fill="#333">${bandpassData?.order === 6 ? (bandpassData.topology === 'series' ? t("Paso Banda 6.º Serie") : t("Paso Banda 6.º Paralelo")) : t("Paso Banda 4.º")}</text>
+          </g>
+        ` : ''}
       </g>
     </svg>
   `;
@@ -142,9 +220,9 @@ export function generateReportHTML(
     const { crossoverWays, crossoverType, fc, fcLow, fcHigh, enableZobel, enableLPad, xoverResults, zobelResults, lpadResults } = xoverData;
     
     let xoverDetails: string;
-    if (crossoverWays === '2way') {
-      const hp = xoverResults.hp || {};
-      const lp = xoverResults.lp || {};
+    if (xoverResults.ways === '2way') {
+      const hp = xoverResults.hp;
+      const lp = xoverResults.lp;
       xoverDetails = `
         <div class="xover-box">
           <h4>${t("Vía de Agudos (High Pass)")}</h4>
@@ -166,10 +244,9 @@ export function generateReportHTML(
         </div>
       `;
     } else {
-      const xAny = xoverResults as any;
-      const hp = xAny.hp || {};
-      const bp = xAny.bp || {};
-      const lp = xAny.lp || {};
+      const hp = xoverResults.hp;
+      const bp = xoverResults.bp;
+      const lp = xoverResults.lp;
       
       let hpList: string;
       let bpList: string;
@@ -306,13 +383,15 @@ export function generateReportHTML(
         </div>
         <div class="card">
           <h3>${t("Relleno Acústico (Damping)")}</h3>
+          <p><strong>${t("Modelo activo")}:</strong> ${classicalModel ? t("Clásico (sin ajuste térmico)") : t("BassBox Pro (absorción Qa y fugas QL)")}</p>
           <p><strong>${t("Tipo de relleno")}:</strong> ${
             dampingType === 'none' ? t("Sin Relleno") :
             dampingType === 'light' ? t("Relleno Leve (Damping de Paredes)") :
             dampingType === 'moderate' ? t("Relleno Moderado (Fibra Suelta)") :
             t("Relleno Denso (Fibra Uniforme)")
           }</p>
-          <p><strong>${t("Aumento virtual de volumen")}:</strong> ${dampingType === 'none' ? '0%' : dampingType === 'light' ? '+5%' : dampingType === 'moderate' ? '+12%' : '+20%'}</p>
+          <p><strong>${t("Aumento virtual de volumen")}:</strong> ${classicalModel || dampingType === 'none' ? '0%' : dampingType === 'light' ? '+5%' : dampingType === 'moderate' ? '+12%' : '+20%'}</p>
+          <p><strong>${t("Pérdidas de recinto")}:</strong> QL = ${formatNum(boxLosses.ql, 1)} · ${classicalModel ? 'Qa = ∞' : `Qa = ${formatNum(boxLosses.qa, 0)}`} · Qb = ${formatNum(boxLosses.qb, 2)}</p>
         </div>
       </div>
     `;
@@ -472,22 +551,62 @@ export function generateReportHTML(
         </div>
         <div class="card">
           <h3>${t("Alineación y Caja Sugerida")}</h3>
-          <p><strong>${t("Tipo de caja")}:</strong> ${boxType === 'sealed' ? t("Sellada") : t("Ventilada")}</p>
+          <p><strong>${t("Tipo de caja")}:</strong> ${
+            boxType === 'sealed'
+              ? t("Sellada")
+              : boxType === 'bandpass'
+                ? (bandpassData?.order === 6
+                    ? (bandpassData.topology === 'series' ? t("Paso Banda 6.º Orden Serie") : t("Paso Banda 6.º Orden Paralelo"))
+                    : t("Paso Banda 4.º Orden"))
+                : (isPassiveRadiator ? t("Radiador Pasivo") : t("Ventilada"))
+          }</p>
           ${boxType === 'sealed' 
             ? `
+              <p><strong>Vb:</strong> ${formatNum(sealedData.Vb, 1)} ${uVol}</p>
               <p><strong>Qtc:</strong> ${formatNum(sealedData.Qtc, 3)}</p>
               <p><strong>Fc:</strong> ${formatNum(sealedData.Fc, 1)} Hz</p>
               <p><strong>F3:</strong> ${formatNum(sealedData.F3, 1)} Hz</p>
+            ` : boxType === 'bandpass' && bandpassData
+            ? `
+              <p><strong>${t("Orden y Topología")}:</strong> ${bandpassData.order === 6 ? (bandpassData.topology === 'series' ? t("6.º Orden Serie (Vr → Vf → Ext)") : t("6.º Orden Paralelo (Vr → Ext, Vf → Ext)")) : t("4.º Orden (Vr Sellada + Vf Ventilada)")}</p>
+              <p><strong>Vr (${t("Cámara Trasera")}):</strong> ${formatNum(bandpassData.Vr, 1)} ${uVol}</p>
+              <p><strong>Vf (${t("Cámara Frontal")}):</strong> ${formatNum(bandpassData.Vf, 1)} ${uVol}</p>
+              ${bandpassData.order === 4
+                ? `
+                  <p><strong>Fb / F0:</strong> ${formatNum(bandpassData.Fb, 1)} Hz</p>
+                  ${bandpassData.delta_f ? `<p><strong>Δf:</strong> ${formatNum(bandpassData.delta_f, 1)} Hz</p>` : ''}
+                ` : `
+                  <p><strong>Fl (${t("Sintonía Baja")}):</strong> ${formatNum(bandpassData.Fl, 1)} Hz</p>
+                  <p><strong>Fh (${t("Sintonía Alta")}):</strong> ${formatNum(bandpassData.Fh, 1)} Hz</p>
+                `
+              }
             ` : `
+              <p><strong>${t("Alineación")}:</strong> ${portedData.alignment || 'N/A'}${portedData.clampedToMinVol ? ` (${t("Ajustado a volumen físico mínimo")})` : ''}</p>
               <p><strong>Vb:</strong> ${formatNum(portedData.Vb, 1)} ${uVol}</p>
-              <p><strong>Fb (Sintonía):</strong> ${formatNum(portedData.Fb, 1)} Hz</p>
+              <p><strong>Fb (${t("Sintonía")}):</strong> ${formatNum(portedData.Fb, 1)} Hz</p>
               <p><strong>F3:</strong> ${formatNum(portedData.F3, 1)} Hz</p>
+              ${portedData.activeHpEnabled && portedData.hpFx ? `
+                <p><strong>${t("Filtro Activo Paso-Alto B6")}:</strong> 2.º Orden · Fx = ${formatNum(portedData.hpFx, 1)} Hz · Qx = ${formatNum(portedData.hpQx, 2)}</p>
+              ` : ''}
             `
           }
         </div>
       </div>
 
-      ${boxType === 'ported' ? `
+      ${boxType === 'ported' && isPassiveRadiator && prData ? `
+        <div class="section-title">${t("Radiador Pasivo (Sintonía sin Puerto)")}</div>
+        <div class="grid">
+          <div class="card">
+            <h3>${t("Especificaciones del Radiador Pasivo")}</h3>
+            <p><strong>${t("Diámetro")}:</strong> ${formatNum(prData.prDia, 1)} cm (${formatNum(prData.prDia / 2.54, 1)}")</p>
+            <p><strong>Vas (PR):</strong> ${formatNum(prData.prVas, 1)} ${uVol}</p>
+            <p><strong>Fs (PR):</strong> ${formatNum(prData.prFs, 1)} Hz</p>
+            <p><strong>Mms (PR):</strong> ${formatNum(prData.prMms, 1)} g</p>
+            <p><strong>${t("Fb Natural Resultante")}:</strong> ${formatNum(prData.prFbNatural, 1)} Hz</p>
+            <p><strong>${t("Masa Añadida Requerida")}:</strong> ${formatNum(prData.prMasaAnadidaG, 1)} g</p>
+          </div>
+        </div>
+      ` : boxType === 'ported' ? `
         <div class="section-title">${t("Conducto de Sintonía (Puerto)")}</div>
         <div class="grid">
           <div class="card">

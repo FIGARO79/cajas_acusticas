@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { type Lang, translate } from '../utils/translations';
 import { type UnitSystem, convertTo, convertFrom, getUnitLabel } from '../utils/units';
 import type { CalculatedPorted, CalculatedSealed, CalculatedBandpass, SpeakerParams, PortSuggestions, WoodCabinetData, WoodShape, VentedAlignmentType, Bandpass6Topology } from '../types';
@@ -370,7 +370,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
   onToggleCollapse,
   panelStyle,
 }) => {
-  const t = (text: string) => translate(text, lang);
+  const t = useCallback((text: string) => translate(text, lang), [lang]);
 
   // Desired F3 (BassBox Pro) local state
   const [desiredF3Sealed, setDesiredF3Sealed] = useState<string>('50');
@@ -609,7 +609,9 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
         const res = wasm.calc_alineacion_ventilada_ex(params.fs, params.vas, params.qts, ventedAlignment || 'B4', 0);
         if (res.fb > 0) return Math.round(res.fb * 10) / 10;
       }
-    } catch {}
+    } catch {
+      /* fallback a Fs si WASM no está disponible */
+    }
     return Math.round(params.fs * 10) / 10;
   }, [params.fs, params.qts, params.vas, ventedAlignment, externalSubwoofer, isLinkedToCabinet, customPorted, targetOptimalVb]);
 

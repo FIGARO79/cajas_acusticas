@@ -10,9 +10,31 @@ import {
   Tooltip,
   Legend,
   Filler,
+  type ChartDataset,
+  type ChartOptions,
   type TooltipItem,
 } from 'chart.js';
-import type { CalculatedSealed, CalculatedPorted, CalculatedBandpass, SpeakerParams } from '../types';
+import type { CalculatedSealed, CalculatedPorted, CalculatedBandpass, SpeakerParams, DampingType } from '../types';
+
+declare module 'chart.js' {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface PluginOptionsByType<TType> {
+    cadBlueprint?: {
+      yUnit?: string;
+    };
+    lineAnnotation?: {
+      annotations?: Array<{
+        value: number;
+        borderColor?: string;
+        borderWidth?: number;
+        borderDash?: number[];
+        label?: string;
+        labelBgColor?: string;
+        labelTextColor?: string;
+      }>;
+    };
+  }
+}
 import { type Lang, translate } from '../utils/translations';
 import {
   calcSealedCurve,
@@ -367,6 +389,8 @@ interface SimulationChartProps {
   portedData: CalculatedPorted | null;
   bandpassData: CalculatedBandpass | null;
   params: SpeakerParams;
+  dampingType?: DampingType;
+  classicalModel?: boolean;
   // Crossover props
   crossoverWays?: number;
   crossoverType?: '1st_order' | '2nd_butter' | '2nd_lr' | '4th_lr';
@@ -386,6 +410,8 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
   portedData,
   bandpassData,
   params,
+  dampingType = 'none',
+  classicalModel = false,
   crossoverWays = 2,
   crossoverType = '2nd_lr',
   fc = 2500,
@@ -462,7 +488,7 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
   useEffect(() => {
     let cancelled = false;
     if (sealedData) {
-      calcSealedCurve(sealedData, params).then(rawVals => {
+      calcSealedCurve(sealedData, params, dampingType, classicalModel).then(rawVals => {
         if (!cancelled) {
           const vals = applyBaffleDiffraction
             ? applyBaffleStepToSpl(rawVals, baffleWidth, baffleHeight, 0, 0)
@@ -477,7 +503,7 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
       }, 0);
     }
     if (portedData) {
-      calcPortedCurve(portedData, params).then(rawVals => {
+      calcPortedCurve(portedData, params, dampingType, classicalModel).then(rawVals => {
         if (!cancelled) {
           const vals = applyBaffleDiffraction
             ? applyBaffleStepToSpl(rawVals, baffleWidth, baffleHeight, 0, 0)
@@ -493,7 +519,7 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
     }
     if (bandpassData && bandpassData.valid) {
       if (bandpassData.order === 4) {
-        calcBandpass4Curve(bandpassData.Vf, bandpassData.Vr, bandpassData.Fb, params).then(rawVals => {
+        calcBandpass4Curve(bandpassData.Vf, bandpassData.Vr, bandpassData.Fb, params, dampingType, classicalModel).then(rawVals => {
           if (!cancelled) {
             const vals = applyBaffleDiffraction
               ? applyBaffleStepToSpl(rawVals, baffleWidth, baffleHeight, 0, 0)
@@ -503,7 +529,16 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
           }
         });
       } else {
-        calcBandpass6Curve(bandpassData.Vf, bandpassData.Vr, bandpassData.Fl || 0, bandpassData.Fh || 0, params).then(rawVals => {
+        calcBandpass6Curve(
+          bandpassData.Vf,
+          bandpassData.Vr,
+          bandpassData.Fl || 0,
+          bandpassData.Fh || 0,
+          params,
+          bandpassData.topology || 'parallel',
+          dampingType,
+          classicalModel
+        ).then(rawVals => {
           if (!cancelled) {
             const vals = applyBaffleDiffraction
               ? applyBaffleStepToSpl(rawVals, baffleWidth, baffleHeight, 0, 0)
@@ -519,13 +554,13 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
       }, 0);
     }
     return () => { cancelled = true; };
-  }, [sealedData, portedData, bandpassData, params, applyBaffleDiffraction, baffleWidth, baffleHeight]);
+  }, [sealedData, portedData, bandpassData, params, dampingType, classicalModel, applyBaffleDiffraction, baffleWidth, baffleHeight]);
 
   // Generate curves for full range if in 'full' mode
   const fullRangeDatasets = React.useMemo(() => {
     if (rangeMode !== 'full') return [];
 
-    const datasets: Record<string, unknown>[] = [];
+    const datasets: ChartDataset<'line', { x: number; y: number }[]>[] = [];
     const fs = params.fs || 38;
     const qts = params.qts || 0.36;
     const vas = params.vas || 45;
@@ -539,7 +574,7 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
     if (sealedData && sealedData.valid) {
       boxPoints = frequenciesFull.map(f => ({
         x: f,
-        y: Math.max(-45, calculateSealedResponseAt(f, fs, qts, vas, sealedData.Vb))
+        y: Math.max(-45, calculateSealedResponseAt(f, fs, qts, vas, sealedData.Vb, dampingType, classicalModel))
       }));
       label = `${t("Caja Sellada")} (${t("Sin Filtro")})`;
       borderColor = '#0ea5e9';
@@ -550,8 +585,8 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
         y: Math.max(
           -45,
           portedData.activeHpEnabled && portedData.hpFx && portedData.hpQx
-            ? calculatePortedB6ResponseAt(f, fs, qts, vas, portedData.Vb, portedData.Fb, portedData.hpFx, portedData.hpQx)
-            : calculatePortedResponseAt(f, fs, qts, vas, portedData.Vb, portedData.Fb)
+            ? calculatePortedB6ResponseAt(f, fs, qts, vas, portedData.Vb, portedData.Fb, portedData.hpFx, portedData.hpQx, dampingType, classicalModel)
+            : calculatePortedResponseAt(f, fs, qts, vas, portedData.Vb, portedData.Fb, dampingType, classicalModel)
         )
       }));
       label = `${t("Caja Ventilada")} (${t("Sin Filtro")})`;
@@ -561,12 +596,12 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
       if (bandpassData.order === 4) {
         boxPoints = frequenciesFull.map(f => ({
           x: f,
-          y: Math.max(-45, calculateBandpass4ResponseAt(f, fs, qts, vas, bandpassData.Vf, bandpassData.Vr, bandpassData.Fb))
+          y: Math.max(-45, calculateBandpass4ResponseAt(f, fs, qts, vas, bandpassData.Vf, bandpassData.Vr, bandpassData.Fb, dampingType, classicalModel))
         }));
       } else {
         boxPoints = frequenciesFull.map(f => ({
           x: f,
-          y: Math.max(-45, calculateBandpass6ResponseAt(f, vas, bandpassData.Vf, bandpassData.Vr, bandpassData.Fl || 0, bandpassData.Fh || 0))
+          y: Math.max(-45, calculateBandpass6ResponseAt(f, vas, bandpassData.Vf, bandpassData.Vr, bandpassData.Fl || 0, bandpassData.Fh || 0, fs, qts, bandpassData.topology || 'parallel', dampingType, classicalModel))
         }));
       }
       label = `${t("Caja Paso Banda")} (${t("Sin Filtro")})`;
@@ -705,7 +740,7 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
     }
 
     return datasets;
-  }, [rangeMode, params, sealedData, portedData, bandpassData, crossoverWays, crossoverType, fc, fcLow, fcHigh, applyBaffleDiffraction, baffleWidth, baffleHeight, t]);
+  }, [rangeMode, params, sealedData, portedData, bandpassData, dampingType, classicalModel, crossoverWays, crossoverType, fc, fcLow, fcHigh, applyBaffleDiffraction, baffleWidth, baffleHeight, t]);
 
   // Construct reference line annotations
   const annotations = React.useMemo(() => {
@@ -744,6 +779,15 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
           borderDash: [4, 4],
           label: `F3: ${portedData.F3.toFixed(1)} Hz`
         });
+        if (portedData.activeHpEnabled && portedData.hpFx) {
+          list.push({
+            value: portedData.hpFx,
+            borderColor: '#a855f7',
+            borderWidth: 1.5,
+            borderDash: [3, 3],
+            label: `B6 HP: ${portedData.hpFx.toFixed(1)} Hz`
+          });
+        }
       }
       if (bandpassData && bandpassData.valid) {
         if (bandpassData.order === 4) {
@@ -865,9 +909,9 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
   // --- ACOUSTIC SIMULATION DATASETS ---
   const excursionDatasets = React.useMemo(() => {
     if (effectiveDisplayLayout === 'single' && chartMode !== 'excursion') return [];
-    const list: Record<string, unknown>[] = [];
+    const list: ChartDataset<'line', { x: number; y: number }[]>[] = [];
     if (sealedData && sealedData.valid) {
-      const vals = calcExcursionCurve(params, sealedData.Vb, sealedData.Fc, false, simPower, true);
+      const vals = calcExcursionCurve(params, sealedData.Vb, sealedData.Fc, false, simPower, true, dampingType, classicalModel);
       list.push({
         label: `${t("Caja Sellada")} - Excursión (${simPower}W${enableSubsonic ? `, HPF ${subsonicFreq}Hz` : ''})`,
         data: frequencies.map((f, i) => ({
@@ -881,7 +925,7 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
       });
     }
     if (portedData && portedData.valid) {
-      const vals = calcExcursionCurve(params, portedData.Vb, portedData.Fb, true, simPower, true);
+      const vals = calcExcursionCurve(params, portedData.Vb, portedData.Fb, true, simPower, true, dampingType, classicalModel);
       list.push({
         label: `${t("Caja Ventilada")} - Excursión (${simPower}W${enableSubsonic ? `, HPF ${subsonicFreq}Hz` : ''})`,
         data: frequencies.map((f, i) => ({
@@ -906,14 +950,14 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
       });
     }
     return list;
-  }, [effectiveDisplayLayout, chartMode, sealedData, portedData, params, simPower, enableSubsonic, subsonicFreq, getSubsonicLinearGain, t]);
+  }, [effectiveDisplayLayout, chartMode, sealedData, portedData, params, dampingType, classicalModel, simPower, enableSubsonic, subsonicFreq, getSubsonicLinearGain, t]);
 
   const velocityDatasets = React.useMemo(() => {
     if (effectiveDisplayLayout === 'single' && chartMode !== 'velocity') return [];
-    const list: Record<string, unknown>[] = [];
+    const list: ChartDataset<'line', { x: number; y: number }[]>[] = [];
     const pArea = portAreaM2 || 0.0044;
     if (portedData && portedData.valid) {
-      const vals = calcAirVelocityCurve(params, portedData.Vb, portedData.Fb, pArea, simPower, true);
+      const vals = calcAirVelocityCurve(params, portedData.Vb, portedData.Fb, pArea, simPower, true, dampingType, classicalModel);
       list.push({
         label: `${t("Velocidad Aire Puerto")} (${simPower}W${enableSubsonic ? `, HPF ${subsonicFreq}Hz` : ''})`,
         data: frequencies.map((f, i) => ({
@@ -946,13 +990,13 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
       borderDash: [6, 3]
     });
     return list;
-  }, [effectiveDisplayLayout, chartMode, portedData, params, portAreaM2, simPower, enableSubsonic, subsonicFreq, getSubsonicLinearGain, t]);
+  }, [effectiveDisplayLayout, chartMode, portedData, params, dampingType, classicalModel, portAreaM2, simPower, enableSubsonic, subsonicFreq, getSubsonicLinearGain, t]);
 
   const subsonicAlert = React.useMemo(() => {
     if (!portedData || !portedData.valid || portedData.Fb <= 0) return null;
     const pArea = portAreaM2 || 0.0044;
-    const velVals = calcAirVelocityCurve(params, portedData.Vb, portedData.Fb, pArea, simPower, true);
-    const excVals = calcExcursionCurve(params, portedData.Vb, portedData.Fb, true, simPower, true);
+    const velVals = calcAirVelocityCurve(params, portedData.Vb, portedData.Fb, pArea, simPower, true, dampingType, classicalModel);
+    const excVals = calcExcursionCurve(params, portedData.Vb, portedData.Fb, true, simPower, true, dampingType, classicalModel);
     const gainFor = (f: number) => getSubsonicLinearGain(f);
 
     let maxVelBelowFb = 0;
@@ -976,11 +1020,11 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
       maxExcBelowFb,
       recommendedHz: recommendedSubsonicHz,
     };
-  }, [portedData, portAreaM2, params, simPower, getSubsonicLinearGain, recommendedSubsonicHz]);
+  }, [portedData, portAreaM2, params, dampingType, classicalModel, simPower, getSubsonicLinearGain, recommendedSubsonicHz]);
 
   const impedanceDatasets = React.useMemo(() => {
     if (effectiveDisplayLayout === 'single' && chartMode !== 'impedance') return [];
-    const list: Record<string, unknown>[] = [];
+    const list: ChartDataset<'line', { x: number; y: number }[]>[] = [];
     if (sealedData && sealedData.valid) {
       const vals = useExtendedZ
         ? calcExtendedImpedanceCurveCustom(
@@ -999,7 +1043,7 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
             0.015,
             true
           )
-        : calcImpedanceCurve(params, sealedData.Vb, sealedData.Fc, false, true);
+        : calcImpedanceCurve(params, sealedData.Vb, sealedData.Fc, false, true, dampingType, classicalModel);
       list.push({
         label: `${t("Caja Sellada")}${useExtendedZ ? ' (Thorborg/Knudsen)' : ''} (Ω)`,
         data: frequencies.map((f, i) => ({
@@ -1030,7 +1074,7 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
             0.015,
             true
           )
-        : calcImpedanceCurve(params, portedData.Vb, portedData.Fb, true, true);
+        : calcImpedanceCurve(params, portedData.Vb, portedData.Fb, true, true, dampingType, classicalModel);
       list.push({
         label: `${t("Caja Ventilada")}${useExtendedZ ? ' (Thorborg/Knudsen)' : ''} (Ω)`,
         data: frequencies.map((f, i) => ({
@@ -1055,13 +1099,13 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
       });
     }
     return list;
-  }, [effectiveDisplayLayout, chartMode, sealedData, portedData, params, useExtendedZ, t]);
+  }, [effectiveDisplayLayout, chartMode, sealedData, portedData, params, dampingType, classicalModel, useExtendedZ, t]);
 
   const phaseDatasets = React.useMemo(() => {
     if (effectiveDisplayLayout === 'single' && chartMode !== 'phase') return [];
-    const list: Record<string, unknown>[] = [];
+    const list: ChartDataset<'line', { x: number; y: number }[]>[] = [];
     if (sealedData && sealedData.valid) {
-      const vals = calcPhaseCurve(params, sealedData.Vb, sealedData.Fc, false, true);
+      const vals = calcPhaseCurve(params, sealedData.Vb, sealedData.Fc, false, true, dampingType, classicalModel);
       list.push({
         label: `${t("Fase Caja Sellada")} (°)`,
         data: frequencies.map((f, i) => ({
@@ -1075,7 +1119,7 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
       });
     }
     if (portedData && portedData.valid) {
-      const vals = calcPhaseCurve(params, portedData.Vb, portedData.Fb, true, true);
+      const vals = calcPhaseCurve(params, portedData.Vb, portedData.Fb, true, true, dampingType, classicalModel);
       list.push({
         label: `${t("Fase Caja Ventilada")} (°)`,
         data: frequencies.map((f, i) => ({
@@ -1089,13 +1133,13 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
       });
     }
     return list;
-  }, [effectiveDisplayLayout, chartMode, sealedData, portedData, params, t]);
+  }, [effectiveDisplayLayout, chartMode, sealedData, portedData, params, dampingType, classicalModel, t]);
 
   const delayDatasets = React.useMemo(() => {
     if (effectiveDisplayLayout === 'single' && chartMode !== 'delay') return [];
-    const list: Record<string, unknown>[] = [];
+    const list: ChartDataset<'line', { x: number; y: number }[]>[] = [];
     if (sealedData && sealedData.valid) {
-      const delays = calcGroupDelayCurve(frequencies, params, sealedData.Vb, sealedData.Fc, false);
+      const delays = calcGroupDelayCurve(frequencies, params, sealedData.Vb, sealedData.Fc, false, true, dampingType, classicalModel);
       list.push({
         label: `${t("Retardo Grupo Sellada")} (ms)`,
         data: frequencies.map((f, idx) => ({ x: f, y: delays[idx] })),
@@ -1106,7 +1150,7 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
       });
     }
     if (portedData && portedData.valid) {
-      const delays = calcGroupDelayCurve(frequencies, params, portedData.Vb, portedData.Fb, true);
+      const delays = calcGroupDelayCurve(frequencies, params, portedData.Vb, portedData.Fb, true, true, dampingType, classicalModel);
       list.push({
         label: `${t("Retardo Grupo Ventilada")} (ms)`,
         data: frequencies.map((f, idx) => ({ x: f, y: delays[idx] })),
@@ -1117,9 +1161,9 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
       });
     }
     return list;
-  }, [effectiveDisplayLayout, chartMode, sealedData, portedData, params, t]);
+  }, [effectiveDisplayLayout, chartMode, sealedData, portedData, params, dampingType, classicalModel, t]);
 
-  const splDatasets = React.useMemo(() => {
+  const splDatasets = React.useMemo<ChartDataset<'line', { x: number; y: number }[]>[]>(() => {
     if (rangeMode === 'bass') {
       return [
         ...(sealedData && sealedData.valid ? [{
@@ -1145,7 +1189,7 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
         ...(bandpassData && bandpassData.valid ? [{
           label: bandpassData.order === 4 
             ? `${t("Caja Paso Banda 4.º")} (Vf ${bandpassData.Vf.toFixed(1)}L, Vr ${bandpassData.Vr.toFixed(1)}L, Fb ${bandpassData.Fb.toFixed(1)}Hz)`
-            : `${t("Caja Paso Banda 6.º")} (Vf ${bandpassData.Vf.toFixed(1)}L, Fl ${bandpassData.Fl?.toFixed(1)}Hz, Fh ${bandpassData.Fh?.toFixed(1)}Hz)`,
+            : `${t("Caja Paso Banda 6.º")} ${bandpassData.topology === 'series' ? t("Serie") : t("Paralelo")} (Vf ${bandpassData.Vf.toFixed(1)}L, Fl ${bandpassData.Fl?.toFixed(1)}Hz, Fh ${bandpassData.Fh?.toFixed(1)}Hz)`,
           data: bandpassPoints,
           borderColor: bandpassBorderColor,
           backgroundColor: chartBandpassBg,
@@ -1177,10 +1221,10 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
     }
   }, [chartMode, splDatasets, excursionDatasets, velocityDatasets, impedanceDatasets, phaseDatasets, delayDatasets]);
 
-  const getDatasetMaxY = (datasets: Record<string, unknown>[], minMax: number, roundStep: number) => {
+  const getDatasetMaxY = (datasets: ChartDataset<'line', { x: number; y: number }[]>[], minMax: number, roundStep: number) => {
     let maxVal = 0;
     for (const ds of datasets) {
-      const pts = ds.data as Array<{ y: number }> | undefined;
+      const pts = ds.data;
       if (!pts) continue;
       for (const p of pts) {
         if (Number.isFinite(p.y) && p.y > maxVal) maxVal = p.y;
@@ -1274,7 +1318,7 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
     yUnit: string,
     isCompact: boolean = false,
     annList: AnnotationOption[] = []
-  ) => {
+  ): ChartOptions<'line'> => {
     return {
       responsive: true,
       maintainAspectRatio: false,
@@ -1853,7 +1897,7 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
                 </button>
               </div>
               <div className="cad-quad-canvas-wrap">
-                <Line data={{ datasets: chart.datasets as any }} options={chart.options as any} plugins={chart.plugins} />
+                <Line data={{ datasets: chart.datasets }} options={chart.options} plugins={chart.plugins} />
               </div>
             </div>
           ))}
@@ -1871,8 +1915,8 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
           {activeDatasets.length > 0 ? (
             <Line
               key={`single-${workspaceView}`}
-              data={{ datasets: activeDatasets as any }}
-              options={optionsSingle as any}
+              data={{ datasets: activeDatasets }}
+              options={optionsSingle}
               plugins={[cadBlueprintPlugin, lineAnnotationPlugin]}
             />
           ) : (

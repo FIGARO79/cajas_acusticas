@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { type Lang, translate } from '../utils/translations';
 import { type UnitSystem, convertTo, getUnitLabel } from '../utils/units';
-import type { WoodCabinetData, WoodShape } from '../types';
+import type { WoodCabinetData, WoodShape, Bandpass6Topology } from '../types';
 import { calculatePortSpacing } from '../utils/acousticMath';
 
 interface CabinetCad2DProps {
@@ -30,9 +30,22 @@ interface CabinetCad2DProps {
   portSpacingPct?: number;
   portLocation?: 'front' | 'rear';
   bandpassOrder?: 4 | 6;
+  bandpassTopology?: Bandpass6Topology;
+  bandpassFl?: number;
+  bandpassFh?: number;
   bandpassRatio?: number;
   bandpassVf?: number;
   bandpassVr?: number;
+  activeHpEnabled?: boolean;
+  hpFx?: number;
+  hpQx?: number;
+  prTuning?: 'port' | 'radiator';
+  prDia?: number;
+  prVas?: number;
+  prFs?: number;
+  prMms?: number;
+  prFbNatural?: number;
+  prMasaAnadidaG?: number;
   dampingType?: 'none' | 'light' | 'moderate' | 'heavy';
   enableBracing?: boolean;
   bracingCount?: number;
@@ -65,15 +78,25 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
   portSpacingPct = 50,
   portLocation = 'front',
   bandpassOrder = 4,
+  bandpassTopology = 'parallel',
+  bandpassFl,
+  bandpassFh,
   bandpassRatio = 0.5,
   bandpassVf,
   bandpassVr,
+  activeHpEnabled = false,
+  hpFx,
+  hpQx,
+  prTuning = 'port',
+  prDia = 20,
+  prFbNatural = 0,
+  prMasaAnadidaG = 0,
   dampingType = 'none',
   enableBracing = false,
   bracingCount = 2,
   onOpen3DModal,
 }) => {
-  const t = (text: string) => translate(text, lang);
+  const t = useCallback((text: string) => translate(text, lang), [lang]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -621,12 +644,52 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
       ctx.restore();
     }
 
-    // Port on Front Baffle (or projected dashed if mounted on Rear Panel)
+    // Port on Front Baffle (or Passive Radiator when prTuning === 'radiator')
+    const isPassiveRadiator = boxType === 'ported' && prTuning === 'radiator';
+    const isBp6 = isBandpass && bandpassOrder === 6;
+    const isBp6Series = isBp6 && bandpassTopology === 'series';
     const portCenterY = topY + thickness + (portYPct / 100) * innerH;
     const portCenterX = fX + fW / 2;
     const isRearPort = portLocation === 'rear';
 
-    if (boxType === 'ported' || boxType === 'bandpass') {
+    if (isPassiveRadiator) {
+      const prR = Math.min(Math.max((prDia || 20) / 2, 3.0), innerW * 0.42, innerH * 0.36);
+      const prCenterY = isRearPort ? (topY + fH * 0.5) : portCenterY;
+      ctx.save();
+      ctx.strokeStyle = isRearPort ? 'rgba(139, 92, 246, 0.72)' : '#7c3aed';
+      ctx.fillStyle = isRearPort ? 'rgba(139, 92, 246, 0.06)' : 'rgba(139, 92, 246, 0.12)';
+      ctx.lineWidth = 1.2 / zoom;
+      if (isRearPort) ctx.setLineDash([1.6, 1.0]);
+
+      // Aro exterior del radiador pasivo
+      ctx.beginPath();
+      ctx.arc(portCenterX, prCenterY, prR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Suspensión perimetral
+      ctx.beginPath();
+      ctx.arc(portCenterX, prCenterY, prR * 0.84, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Disco central de masa sintonizadora
+      ctx.beginPath();
+      ctx.arc(portCenterX, prCenterY, prR * 0.32, 0, Math.PI * 2);
+      ctx.fillStyle = isRearPort ? 'rgba(139, 92, 246, 0.18)' : 'rgba(139, 92, 246, 0.28)';
+      ctx.fill();
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.font = `bold ${Math.max(7.2 / zoom, 2.0)}px monospace`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#6d28d9';
+      ctx.fillText(
+        `PR Ø${(prDia || 20).toFixed(1)}cm (${isRearPort ? t("Atrás") : t("Frente")})`,
+        portCenterX,
+        prCenterY + prR + 2.2
+      );
+      ctx.restore();
+    } else if (boxType === 'ported' || boxType === 'bandpass') {
       const count = effectivePortCount;
       const pDim = (portShape === 'round' || portShape === 'custom')
         ? (portDiameter || 7.5)
@@ -646,7 +709,7 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
           ? (isLight ? 'rgba(2, 132, 199, 0.025)' : 'rgba(2, 132, 199, 0.03)')
           : (isLight ? 'rgba(2, 132, 199, 0.06)' : 'rgba(2, 132, 199, 0.08)');
 
-        if (isRearPort) {
+        if (isRearPort && !isBandpass) {
           ctx.setLineDash([1.6, 1.0]);
         } else {
           ctx.setLineDash([]);
@@ -734,7 +797,7 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
         }
       }
 
-      if (isRearPort) {
+      if (isRearPort && !isBandpass) {
         ctx.fillStyle = isLight ? '#0369a1' : '#38bdf8';
         ctx.font = `bold ${Math.max(7.5 / zoom, 2.0)}px monospace`;
         ctx.textAlign = 'center';
@@ -856,11 +919,41 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
     const frontInnerXAtY = (yPos: number) => frontOuterXAtY(yPos) - thickness;
     const baffleAngle = shape === 'trapezoidal' ? Math.atan2(sWTop - sWBot, fH) : 0;
 
-    // Wood panels hatching and profiles
+    // Wood panel hatching and profiles
     ctx.fillStyle = isLight ? '#0369a1' : '#38bdf8';
     ctx.font = `bold ${Math.max(9 / zoom, 2.5)}px monospace`;
     ctx.textAlign = 'center';
-    ctx.fillText('SECCIÓN CORTE A-A\' (LATERAL)', sX + sW / 2, shape === 'trapezoidal' ? topY - 7.5 : topY - 3.5);
+    const sideTitle = isBp6
+      ? (isBp6Series
+          ? 'SECCIÓN A-A\' · 6.º ORDEN SERIE (Vr→Vf→Ext)'
+          : 'SECCIÓN A-A\' · 6.º ORDEN PARALELO (Vr→Ext, Vf→Ext)')
+      : 'SECCIÓN CORTE A-A\' (LATERAL)';
+    ctx.fillText(sideTitle, sX + sW / 2, shape === 'trapezoidal' ? topY - 7.5 : topY - 3.5);
+
+    if (boxType === 'ported' && activeHpEnabled && hpFx && hpQx) {
+      ctx.save();
+      ctx.font = `bold ${Math.max(7.4 / zoom, 2.0)}px monospace`;
+      ctx.fillStyle = '#059669';
+      ctx.textAlign = 'center';
+      ctx.fillText(
+        `FILTRO ACTIVO B6 · HP 2.º O: ${hpFx.toFixed(1)} Hz · Qx=${hpQx.toFixed(2)}`,
+        fX + fW / 2,
+        topY - 1.4
+      );
+      ctx.restore();
+    }
+    if (isPassiveRadiator) {
+      ctx.save();
+      ctx.font = `bold ${Math.max(7.2 / zoom, 2.0)}px monospace`;
+      ctx.fillStyle = '#6d28d9';
+      ctx.textAlign = 'center';
+      ctx.fillText(
+        `PR: Ø${(prDia || 20).toFixed(1)}cm (${((prDia || 20) / 2.54).toFixed(0)}") · Fb ${prFbNatural.toFixed(1)}Hz · +${prMasaAnadidaG.toFixed(0)}g`,
+        fX + fW / 2,
+        topY - 1.4
+      );
+      ctx.restore();
+    }
 
     // Panels (Top, Bottom, Front Baffle, Rear)
     ctx.strokeStyle = isLight ? '#0284c7' : '#38bdf8';
@@ -1302,7 +1395,7 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
       ctx.textAlign = 'center';
       ctx.fillText(`Vr: ${convertTo(bandpassVr || 0, 'volume', unitSystem).toFixed(1)} ${vLabel}`, vrCenterX, vrY);
       ctx.font = `${Math.max(6.5 / zoom, 1.8)}px monospace`;
-      ctx.fillText(vrSub, vrCenterX, vrY + 1.4);
+      ctx.fillText(bandpassFl && bandpassOrder === 6 ? `${vrSub} · ${bandpassFl.toFixed(0)}Hz` : vrSub, vrCenterX, vrY + 1.4);
 
       // Vf badge
       ctx.fillStyle = isLight ? 'rgba(255, 255, 255, 0.75)' : 'rgba(7, 16, 30, 0.75)';
@@ -1312,9 +1405,9 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
       ctx.textAlign = 'center';
       ctx.fillText(`Vf: ${convertTo(bandpassVf || 0, 'volume', unitSystem).toFixed(1)} ${vLabel}`, vfCenterX, vfY);
       ctx.font = `${Math.max(6.5 / zoom, 1.8)}px monospace`;
-      ctx.fillText(vfSub, vfCenterX, vfY + 1.4);
+      ctx.fillText(bandpassFh && bandpassOrder === 6 ? `${vfSub} · ${bandpassFh.toFixed(0)}Hz` : vfSub, vfCenterX, vfY + 1.4);
 
-      // 2. Tabique Divisor con calado pasante para el Woofer
+      // 2. Tabique Divisor con calado pasante para el Woofer (y puerto interno si es 6.º Orden Serie)
       ctx.strokeStyle = isLight ? '#059669' : '#10b981';
       ctx.lineWidth = 1.1 / zoom;
       const holeTop = wooferCenterY - wooferCutoutRadius;
@@ -1326,6 +1419,33 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
       if (botY - thickness > holeBot) {
         ctx.strokeRect(divX, holeBot, thickness, (botY - thickness) - holeBot);
         hatchRect(divX, holeBot, thickness, (botY - thickness) - holeBot);
+      }
+
+      if (isBp6Series) {
+        const pRInt = (portShape === 'round' || portShape === 'custom')
+          ? Math.max((portDiameter || 7.5) / 2, 1.2)
+          : Math.max((portHeight || 4) / 2, 1.0);
+        // Ubicar puerto interno en zona libre arriba o abajo del woofer
+        const spaceBot = (botY - thickness) - holeBot;
+        const spaceTop = holeTop - (topY + thickness);
+        const intPortY = spaceBot >= spaceTop
+          ? Math.min(botY - thickness - pRInt - 0.8, holeBot + pRInt + 1.2)
+          : Math.max(topY + thickness + pRInt + 0.8, holeTop - pRInt - 1.2);
+        const intLen = Math.min(Math.max(portLength || 10, thickness + 2.5), Math.max(depthFront, depthRear) * 0.75 + thickness);
+        const intStartX = divX - Math.min(intLen * 0.45, Math.max(depthRear - 1.2, thickness));
+        ctx.save();
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(divX - 0.05, intPortY - pRInt, thickness + 0.1, pRInt * 2);
+        ctx.fillStyle = 'rgba(217, 119, 6, 0.16)';
+        ctx.strokeStyle = '#d97706';
+        ctx.lineWidth = 1.2 / zoom;
+        ctx.fillRect(intStartX, intPortY - pRInt, intLen, pRInt * 2);
+        ctx.strokeRect(intStartX, intPortY - pRInt, intLen, pRInt * 2);
+        ctx.font = `bold ${Math.max(6.8 / zoom, 1.8)}px monospace`;
+        ctx.fillStyle = '#b45309';
+        ctx.textAlign = 'center';
+        ctx.fillText(`P1 Int (${bandpassFl ? `${bandpassFl.toFixed(0)}Hz` : 'Fl'})`, intStartX + intLen / 2, intPortY - pRInt - 0.9);
+        ctx.restore();
       }
 
       // 3. Montaje del Woofer en el Tabique
@@ -1360,8 +1480,36 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
       }
     }
 
-    // Port Tube Side Profile (extending into cavity from Front Baffle or Rear Panel)
-    if (boxType === 'ported' || boxType === 'bandpass') {
+    // Port Tube Side Profile (or Passive Radiator profile)
+    if (isPassiveRadiator) {
+      const prR = Math.min(Math.max((prDia || 20) / 2, 3.0), innerH * 0.36);
+      const prMountY = isRearPort ? (topY + fH * 0.5) : portCenterY;
+      const mountX = isRearPort ? sX : frontInnerXAtY(prMountY);
+      const dir = isRearPort ? -1 : 1; // hacia afuera
+      ctx.save();
+      // Despejar calado de madera
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(isRearPort ? sX - 0.05 : mountX - 0.05, prMountY - prR * 0.88, thickness + 0.1, prR * 1.76);
+      // Brida del radiador pasivo
+      ctx.fillStyle = 'rgba(124, 58, 237, 0.22)';
+      ctx.strokeStyle = '#6d28d9';
+      ctx.lineWidth = 1.2 / zoom;
+      const flangeX = isRearPort ? sX - 0.45 : mountX + thickness;
+      ctx.fillRect(flangeX, prMountY - prR, 0.45, prR * 2);
+      ctx.strokeRect(flangeX, prMountY - prR, 0.45, prR * 2);
+      // Cono plano/cónico sin imán + disco de masa central
+      const apexX = flangeX - dir * Math.min(prR * 0.25, 2.2);
+      ctx.beginPath();
+      ctx.moveTo(flangeX, prMountY - prR * 0.82);
+      ctx.lineTo(apexX, prMountY - prR * 0.28);
+      ctx.lineTo(apexX, prMountY + prR * 0.28);
+      ctx.lineTo(flangeX, prMountY + prR * 0.82);
+      ctx.stroke();
+      // Disco de masa añadida
+      ctx.fillStyle = '#5b21b6';
+      ctx.fillRect(apexX - 0.35, prMountY - prR * 0.28, 0.7, prR * 0.56);
+      ctx.restore();
+    } else if (boxType === 'ported' || boxType === 'bandpass') {
       const pLen = Math.max(portLength || 15, thickness + 1);
       const maxStraightDepth = isBandpass 
         ? Math.max(depthFront + thickness - 1.2, thickness + 2.0)
@@ -1376,9 +1524,26 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
       const portBaffleX = frontInnerXAtY(portCenterY);
 
       // Clear wood hatching inside the port wall cutout (rear panel)
-      if (isRearPort) {
+      if (isRearPort && !isBandpass) {
         ctx.fillStyle = isLight ? '#ffffff' : '#07101e';
         ctx.fillRect(sX, pTop, thickness, pBot - pTop);
+      }
+      if (isBp6 && !isBp6Series) {
+        // Puerto trasero de cámara Vr en Paso Banda 6.º Orden Paralelo
+        const rearLen = Math.min(Math.max(portLength || 12, thickness + 2), Math.max(depthRear + thickness - 1.2, thickness + 2));
+        ctx.save();
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(sX - 0.05, pTop, thickness + 0.1, pBot - pTop);
+        ctx.fillStyle = 'rgba(2, 132, 199, 0.12)';
+        ctx.strokeStyle = '#0284c7';
+        ctx.lineWidth = 1.2 / zoom;
+        ctx.fillRect(sX, pTop, rearLen, pBot - pTop);
+        ctx.strokeRect(sX, pTop, rearLen, pBot - pTop);
+        ctx.font = `bold ${Math.max(6.8 / zoom, 1.8)}px monospace`;
+        ctx.fillStyle = '#0369a1';
+        ctx.textAlign = 'center';
+        ctx.fillText(`P1 Ext (${bandpassFl ? `${bandpassFl.toFixed(0)}Hz` : 'Fl'})`, sX + rearLen / 2, pTop - 0.9);
+        ctx.restore();
       }
 
       ctx.strokeStyle = isLight ? '#0284c7' : '#38bdf8';
@@ -1388,7 +1553,7 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
       const flangeLip = Math.min(Math.max(pR * 0.42, 0.75), 1.45);
       const flareR = Math.min(Math.max(pR * 0.48, 0.85), Math.min(1.65, effectivePortLen * 0.28));
 
-      if (isRearPort) {
+      if (isRearPort && !isBandpass) {
         // Port mounted on Rear Panel (left wall) extending rightwards into cavity (total length from outer face)
         const outerX = sX;
         const innerX = outerX + effectivePortLen;
@@ -1830,6 +1995,24 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
     dTrapBot,
     containerWidth,
     canvasHeight,
+    isBandpass,
+    bandpassOrder,
+    bandpassTopology,
+    bandpassFl,
+    bandpassFh,
+    bandpassVf,
+    bandpassVr,
+    activeHpEnabled,
+    hpFx,
+    hpQx,
+    prTuning,
+    prDia,
+    prFbNatural,
+    prMasaAnadidaG,
+    t,
+    trapAngleDeg,
+    vLabel,
+    wRearExt,
   ]);
 
   // Export CAD PNG

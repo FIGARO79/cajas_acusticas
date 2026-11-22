@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { type Lang, translate } from '../utils/translations';
 import { type UnitSystem, convertTo, getUnitLabel } from '../utils/units';
-import type { WoodCabinetData, WoodShape } from '../types';
+import type { WoodCabinetData, WoodShape, Bandpass6Topology } from '../types';
 import { calculatePortSpacing } from '../utils/acousticMath';
 
 interface CabinetViewer3DModalProps {
@@ -34,9 +34,22 @@ interface CabinetViewer3DModalProps {
   portSpacingPct?: number;
   portLocation?: 'front' | 'rear';
   bandpassOrder?: 4 | 6;
+  bandpassTopology?: Bandpass6Topology;
+  bandpassFl?: number;
+  bandpassFh?: number;
   bandpassRatio?: number;
   bandpassVf?: number;
   bandpassVr?: number;
+  activeHpEnabled?: boolean;
+  hpFx?: number;
+  hpQx?: number;
+  prTuning?: 'port' | 'radiator';
+  prDia?: number;
+  prVas?: number;
+  prFs?: number;
+  prMms?: number;
+  prFbNatural?: number;
+  prMasaAnadidaG?: number;
   dampingType?: 'none' | 'light' | 'moderate' | 'heavy';
   enableBracing?: boolean;
   bracingCount?: number;
@@ -69,9 +82,20 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
   portSpacingPct = 50,
   portLocation = 'front',
   bandpassOrder = 4,
+  bandpassTopology = 'parallel',
+  bandpassFl,
+  bandpassFh,
   bandpassRatio = 0.5,
   bandpassVf,
   bandpassVr,
+  activeHpEnabled = false,
+  hpFx,
+  hpQx,
+  prTuning = 'port',
+  prDia = 20,
+  prMms = 35,
+  prFbNatural = 0,
+  prMasaAnadidaG = 0,
   dampingType = 'none',
   enableBracing = false,
   bracingCount = 2,
@@ -102,19 +126,22 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
   const chambersRef = useRef<{ vr?: THREE.Mesh; vf?: THREE.Mesh }>({});
 
   // UI States
-  const [renderMode, setRenderMode] = useState<'solid' | 'xray' | 'wireframe'>(
-    boxType === 'bandpass' ? 'xray' : 'solid'
-  );
+  const [renderModeState, setRenderModeState] = useState<{
+    mode: 'solid' | 'xray' | 'wireframe';
+    forBoxType: 'sealed' | 'ported' | 'bandpass';
+  }>(() => ({
+    mode: boxType === 'bandpass' ? 'xray' : 'solid',
+    forBoxType: boxType,
+  }));
+  const renderMode = renderModeState.forBoxType === boxType
+    ? renderModeState.mode
+    : (boxType === 'bandpass' ? 'xray' : 'solid');
+  const setRenderMode = useCallback((mode: 'solid' | 'xray' | 'wireframe') => {
+    setRenderModeState({ mode, forBoxType: boxType });
+  }, [boxType]);
   const [explodedPct, setExplodedPct] = useState<number>(0);
   const [autoRotate, setAutoRotate] = useState<boolean>(false);
   const [showWireEdges, setShowWireEdges] = useState<boolean>(true);
-
-  // En cajas paso banda, abrir en modo rayos X para ver de inmediato el divisor, woofer y cámaras interiores
-  useEffect(() => {
-    if (isOpen && boxType === 'bandpass') {
-      setRenderMode('xray');
-    }
-  }, [isOpen, boxType]);
 
   // Handle ESC key to close
   useEffect(() => {
@@ -189,7 +216,7 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
 
     if (chambersRef.current.vr) chambersRef.current.vr.visible = explodedPct < 15;
     if (chambersRef.current.vf) chambersRef.current.vf.visible = explodedPct < 15;
-  }, [explodedPct, shape, wExt, wRearExt, hExt, dExt, dTop3D, dBot3D, thickness]);
+  }, [isOpen, explodedPct, shape, wExt, wRearExt, hExt, dExt, dTop3D, dBot3D, thickness]);
 
   // Main Three.js Scene Setup & Rebuild
   useEffect(() => {
@@ -260,7 +287,7 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
       isLight ? 0x0284c7 : 0x0284c7,
       isLight ? 0xcbd5e1 : 0x0f2a4a
     );
-    gridHelper.position.y = -hExt / 2 - (explodedPct / 100) * (Math.max(wExt, hExt, dExt) * 0.45) - 2;
+    gridHelper.position.y = -hExt / 2 - 2;
     gridHelperRef.current = gridHelper;
     scene.add(gridHelper);
 
@@ -408,7 +435,23 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
       }
     }
 
-    if (boxType === 'ported' || boxType === 'bandpass') {
+    const isPassiveRadiator = boxType === 'ported' && prTuning === 'radiator';
+    const isBp6 = boxType === 'bandpass' && bandpassOrder === 6;
+    const isBp6Series = isBp6 && bandpassTopology === 'series';
+    const innerWRearBase = shape === 'trapezoidal'
+      ? Math.max(2, wRearExt - 2 * thickness)
+      : innerW;
+    const prOuterR = Math.min(Math.max((prDia || 20) / 2, 3.0), (portLocation === 'rear' ? innerWRearBase : innerW) * 0.44, innerH * 0.40);
+    const prCutoutR = prOuterR * 0.88;
+    const prYPos = portLocation === 'rear' ? 0 : innerH * (0.5 - portYPct / 100);
+
+    if (isPassiveRadiator) {
+      if (portLocation === 'rear') {
+        rearHoleCircles.push({ x: 0, y: prYPos, r: prCutoutR });
+      } else {
+        frontHoleCircles.push({ x: 0, y: prYPos, r: prCutoutR });
+      }
+    } else if (boxType === 'ported' || boxType === 'bandpass') {
       const portY = innerH * (0.5 - portYPct / 100);
       const count = Math.max(Number(portCount) || 1, 1);
       const pDim = (portShape === 'round' || portShape === 'custom')
@@ -421,14 +464,14 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
         if (portShape === 'round' || portShape === 'custom') {
           const pRadius = Math.max((portDiameter || 7.5) / 2, 1.5);
           (isRearPort ? rearHoleCircles : frontHoleCircles).push({ x: pCurX, y: portY, r: pRadius });
-          if (boxType === 'bandpass' && bandpassOrder === 6) {
+          if (isBp6 && !isBp6Series) {
             rearHoleCircles.push({ x: pCurX, y: portY, r: pRadius });
           }
         } else {
           const pW = Math.max(portWidth || 10, 2);
           const pH = Math.max(portHeight || 4, 1.5);
           (isRearPort ? rearHoleRects : frontHoleRects).push({ x: pCurX, y: portY, w: pW, h: pH });
-          if (boxType === 'bandpass' && bandpassOrder === 6) {
+          if (isBp6 && !isBp6Series) {
             rearHoleRects.push({ x: pCurX, y: portY, w: pW, h: pH });
           }
         }
@@ -1043,14 +1086,51 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
       }
     };
 
-    if (boxType === 'ported') {
+    if (isPassiveRadiator) {
+      const prGroup = new THREE.Group();
+      const isRearPr = portLocation === 'rear';
+      prGroup.position.set(0, prYPos, isRearPr ? -thickness / 2 : thickness / 2);
+      if (isRearPr) {
+        prGroup.rotation.y = Math.PI;
+      }
+
+      const prChassisMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.72, roughness: 0.3 });
+      const prSurroundMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.38, metalness: 0.15 });
+      const prConeMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.5, metalness: 0.25, side: THREE.DoubleSide });
+      const prMassMat = new THREE.MeshStandardMaterial({ color: 0x7c3aed, roughness: 0.35, metalness: 0.65 });
+
+      const prFlangeGeo = new THREE.RingGeometry(prCutoutR * 0.96, prOuterR, 48);
+      const prFlangeMesh = new THREE.Mesh(prFlangeGeo, prChassisMat);
+      prFlangeMesh.position.z = 0.22;
+      prGroup.add(prFlangeMesh);
+
+      const prSurroundGeo = new THREE.TorusGeometry(prCutoutR * 0.90, Math.max(prOuterR * 0.055, 0.35), 18, 48);
+      const prSurroundMesh = new THREE.Mesh(prSurroundGeo, prSurroundMat);
+      prSurroundMesh.position.z = 0.14;
+      prGroup.add(prSurroundMesh);
+
+      const prConeDepth = Math.min(prOuterR * 0.24, 2.2);
+      const prDiscGeo = new THREE.CylinderGeometry(prCutoutR * 0.86, prOuterR * 0.26, prConeDepth, 40);
+      prDiscGeo.rotateX(Math.PI / 2);
+      const prDiscMesh = new THREE.Mesh(prDiscGeo, prConeMat);
+      prDiscMesh.position.z = -prConeDepth * 0.45;
+      prGroup.add(prDiscMesh);
+
+      const prMassGeo = new THREE.CylinderGeometry(prOuterR * 0.25, prOuterR * 0.25, 0.5, 32);
+      prMassGeo.rotateX(Math.PI / 2);
+      const prMassMesh = new THREE.Mesh(prMassGeo, prMassMat);
+      prMassMesh.position.z = -prConeDepth - 0.15;
+      prGroup.add(prMassMesh);
+
+      (isRearPr ? rearGroup : frontGroup).add(prGroup);
+    } else if (boxType === 'ported') {
       const isRearPort = portLocation === 'rear';
       buildPortAssembly(isRearPort ? rearGroup : frontGroup, isRearPort, Math.max(portLength || 15, 5));
     } else if (boxType === 'bandpass') {
       // En caja paso banda: la cámara frontal Vf siempre ventila a través del bafle frontal
       buildPortAssembly(frontGroup, false, Math.max(portLength || 15, 5));
-      // Si es paso banda de 6.º orden, la cámara trasera Vr también ventila al exterior a través del bafle trasero
-      if (bandpassOrder === 6) {
+      // Si es paso banda de 6.º orden Paralelo, la cámara trasera Vr también ventila al exterior a través del bafle trasero
+      if (isBp6 && !isBp6Series) {
         buildPortAssembly(rearGroup, true, Math.max(portLength || 15, 5));
       }
     }
@@ -1069,9 +1149,26 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
       const dividerGroup = new THREE.Group();
       dividerGroup.position.set(0, 0, zDivider);
 
-      // 1. Tabique estructural con calado pasante para el altavoz (Woofer Cutout)
-      const dividerCutoutCircles = [{ x: 0, y: wooferY, r: cutoutRadius }];
-      const dividerGeo = createPerforatedPanelGeo(innerW, innerH, thickness, dividerCutoutCircles, []);
+      // 1. Tabique estructural con calado pasante para el altavoz (y puerto interno si es 6.º Orden Serie)
+      const dividerCutoutCircles: Array<{ x: number; y: number; r: number }> = [{ x: 0, y: wooferY, r: cutoutRadius }];
+      const dividerCutoutRects: Array<{ x: number; y: number; w: number; h: number }> = [];
+      let intPortY = 0;
+      const intPortR = (portShape === 'round' || portShape === 'custom')
+        ? Math.max((portDiameter || 7.5) / 2, 1.5)
+        : Math.max((portHeight || 4) / 2, 1.2);
+      if (isBp6Series) {
+        const spaceTop = innerH / 2 - (wooferY + cutoutRadius);
+        const spaceBot = (wooferY - cutoutRadius) - (-innerH / 2);
+        intPortY = spaceBot >= spaceTop
+          ? Math.max(-innerH / 2 + intPortR + 0.8, wooferY - cutoutRadius - intPortR - 1.2)
+          : Math.min(innerH / 2 - intPortR - 0.8, wooferY + cutoutRadius + intPortR + 1.2);
+        if (portShape === 'round' || portShape === 'custom') {
+          dividerCutoutCircles.push({ x: 0, y: intPortY, r: intPortR });
+        } else {
+          dividerCutoutRects.push({ x: 0, y: intPortY, w: Math.max(portWidth || 10, 2), h: Math.max(portHeight || 4, 1.5) });
+        }
+      }
+      const dividerGeo = createPerforatedPanelGeo(innerW, innerH, thickness, dividerCutoutCircles, dividerCutoutRects);
       const dividerMat = renderMode === 'wireframe'
         ? new THREE.MeshBasicMaterial({ color: 0x0284c7, wireframe: true })
         : renderMode === 'xray'
@@ -1132,6 +1229,27 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
         speakerGroup.rotation.y = Math.PI;
       }
       dividerGroup.add(speakerGroup);
+
+      if (isBp6Series) {
+        const intLen = Math.min(Math.max(portLength || 10, thickness + 3), Math.max(depthFront, depthRear) * 0.72 + thickness);
+        const intPortMat = new THREE.MeshStandardMaterial({
+          color: 0xf59e0b,
+          roughness: 0.35,
+          metalness: 0.35,
+          side: THREE.DoubleSide,
+          wireframe: renderMode === 'wireframe',
+        });
+        const intMeshGeo = (portShape === 'round' || portShape === 'custom')
+          ? (() => {
+              const g = new THREE.CylinderGeometry(intPortR, intPortR, intLen, 32, 1, true);
+              g.rotateX(Math.PI / 2);
+              return g;
+            })()
+          : new THREE.BoxGeometry(Math.max(portWidth || 10, 2), Math.max(portHeight || 4, 1.5), intLen);
+        const intPortMesh = new THREE.Mesh(intMeshGeo, intPortMat);
+        intPortMesh.position.set(0, intPortY, 0);
+        dividerGroup.add(intPortMesh);
+      }
 
       panelsGroup.add(dividerGroup);
       panelMeshesRef.current.divider = dividerGroup;
@@ -1360,12 +1478,18 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
     portCount,
     flaredEnds,
     bandpassOrder,
+    bandpassTopology,
     bandpassRatio,
     bandpassVf,
     bandpassVr,
+    prTuning,
+    prDia,
     dampingType,
     enableBracing,
     bracingCount,
+    baffleCutout,
+    cabinetData?.dMid,
+    cabinetData?.hMid,
   ]);
 
   // Export Screenshot
@@ -1473,6 +1597,7 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
               </span>
               <span style={{ fontSize: '0.62rem', color: isLight ? '#64748b' : '#64748b', fontFamily: 'monospace' }}>
                 | {boxType.toUpperCase()} | VOL NETO: {cabinetData?.valid ? convertTo(cabinetData.vNeto, 'volume', unitSystem).toFixed(1) : '--'} {vLabel}
+                {boxType === 'ported' && activeHpEnabled && hpFx && hpQx ? ` | B6 HP: ${hpFx.toFixed(1)}Hz (Qx ${hpQx.toFixed(2)})` : ''}
               </span>
             </div>
           </div>
@@ -1572,8 +1697,14 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
               }}
             >
               <div style={{ fontWeight: 700, color: '#0284c7', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                {t("Arquitectura Paso Banda")} ({bandpassOrder || 4}.º {t("Orden")})
+                {t("Arquitectura Paso Banda")} ({bandpassOrder || 4}.º {t("Orden")}{bandpassOrder === 6 ? ` · ${bandpassTopology === 'series' ? t("Serie") : t("Paralelo")}` : ''})
               </div>
+              {bandpassOrder === 6 && (
+                <div style={{ color: bandpassTopology === 'series' ? '#b45309' : '#0369a1', fontWeight: 700 }}>
+                  {bandpassTopology === 'series' ? 'Vr → Vf → Ext' : 'Vr → Ext / Vf → Ext'}
+                  {bandpassFl && bandpassFh ? ` · Fl ${bandpassFl.toFixed(1)}Hz / Fh ${bandpassFh.toFixed(1)}Hz` : ''}
+                </div>
+              )}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <span style={{ width: '8px', height: '8px', background: '#0284c7', display: 'inline-block', flexShrink: 0 }} />
                 <span style={{ color: isLight ? '#0f172a' : '#e2e8f0' }}>
@@ -1598,6 +1729,38 @@ export const CabinetViewer3DModal: React.FC<CabinetViewer3DModalProps> = ({
                     : t("Imán hacia Vr")}
                   {' | '}{t("Despeje")}: {convertTo(clearanceVal, 'length', unitSystem).toFixed(1)} {uLabel}
                 </span>
+              </div>
+            </div>
+          )}
+
+          {boxType === 'ported' && prTuning === 'radiator' && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '0.6rem',
+                left: '0.75rem',
+                background: isLight ? 'rgba(255, 255, 255, 0.92)' : 'rgba(7, 15, 30, 0.92)',
+                border: `1px solid ${isLight ? '#cbd5e1' : '#1e3a5f'}`,
+                padding: '0.45rem 0.7rem',
+                fontFamily: 'monospace',
+                fontSize: '0.62rem',
+                lineHeight: '1.45',
+                zIndex: 5,
+                pointerEvents: 'none',
+                backdropFilter: 'blur(6px)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.2rem',
+              }}
+            >
+              <div style={{ fontWeight: 700, color: '#6d28d9', textTransform: 'uppercase' }}>
+                {t("Radiador Pasivo")} (PR)
+              </div>
+              <div style={{ color: '#0f172a' }}>
+                Ø: <strong>{prDia.toFixed(1)} cm ({(prDia / 2.54).toFixed(0)}")</strong> · Mms: <strong>{prMms.toFixed(1)} g</strong>
+              </div>
+              <div style={{ color: '#334155' }}>
+                Fb: <strong>{prFbNatural.toFixed(1)} Hz</strong> · {t("Masa Añadida")}: <strong>+{prMasaAnadidaG.toFixed(1)} g</strong>
               </div>
             </div>
           )}
