@@ -5,6 +5,7 @@ import { type UnitSystem, convertTo, convertFrom, getUnitLabel } from '../utils/
 import { CabinetDiagram } from './CabinetDiagram';
 import { calcPortLength } from '../utils/acousticMath';
 import { calcVolumenNetoMadera } from '../wasm/index.ts';
+import { NumericInput } from './NumericInput';
 
 
 interface CabinetTabProps {
@@ -184,14 +185,12 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
   }, [unitSystem]);
 
   // Helper to handle input changes converting from UI unit system to metric
-  const handleInputChange = (valStr: string, setter: (v: number | '') => void, type: 'length' | 'length_small' | 'volume') => {
-    if (valStr === '') {
+  const handleNumericChange = (val: number | undefined, setter: (v: number | '') => void, type: 'length' | 'length_small' | 'volume') => {
+    if (val === undefined || !Number.isFinite(val)) {
       setter('');
       return;
     }
-    let num = parseFloat(valStr) || 0;
-    num = convertFrom(num, type, unitSystem);
-    setter(num);
+    setter(convertFrom(val, type, unitSystem));
   };
 
   // Perform cabinet calculations
@@ -988,11 +987,12 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
                 <div className="input-group">
                   <label>{woodShape === 'trapezoidal' ? t("Alto Externo") : t("Dimensión 1")}</label>
                   <div className="input-wrapper">
-                    <input 
-                      type="number" 
-                      value={displayVal(woodLockVal1, 'length')} 
-                      onChange={(e) => handleInputChange(e.target.value, setWoodLockVal1, 'length')} 
-                      step="0.1" 
+                    <NumericInput
+                      allowEmpty={true}
+                      decimals={3}
+                      value={woodLockVal1 === '' ? '' : convertTo(woodLockVal1, 'length', unitSystem)}
+                      onValueChange={(v) => handleNumericChange(v, setWoodLockVal1, 'length')}
+                      step="0.1"
                     />
                     <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                   </div>
@@ -1004,11 +1004,12 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
                       : t("Dimensión 2")}
                   </label>
                   <div className="input-wrapper">
-                    <input 
-                      type="number" 
-                      value={displayVal(woodLockVal2, 'length')} 
-                      onChange={(e) => handleInputChange(e.target.value, setWoodLockVal2, 'length')} 
-                      step="0.1" 
+                    <NumericInput
+                      allowEmpty={true}
+                      decimals={3}
+                      value={woodLockVal2 === '' ? '' : convertTo(woodLockVal2, 'length', unitSystem)}
+                      onValueChange={(v) => handleNumericChange(v, setWoodLockVal2, 'length')}
+                      step="0.1"
                     />
                     <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                   </div>
@@ -1017,11 +1018,12 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
                   <div className="input-group">
                     <label>{t("Profundidad Superior Fija (D1)")}</label>
                     <div className="input-wrapper">
-                      <input 
-                        type="number" 
-                        value={displayVal(woodLockVal3, 'length')} 
-                        onChange={(e) => handleInputChange(e.target.value, setWoodLockVal3, 'length')} 
-                        step="0.1" 
+                      <NumericInput
+                        allowEmpty={true}
+                        decimals={3}
+                        value={woodLockVal3 === '' ? '' : convertTo(woodLockVal3, 'length', unitSystem)}
+                        onValueChange={(v) => handleNumericChange(v, setWoodLockVal3, 'length')}
+                        step="0.1"
                       />
                       <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                     </div>
@@ -1051,11 +1053,12 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
                 <div className="input-group">
                   <label>{t("Alto Externo")}</label>
                   <div className="input-wrapper">
-                    <input 
-                      type="number" 
-                      value={displayVal(woodExtHeight, 'length')} 
-                      onChange={(e) => handleInputChange(e.target.value, setWoodExtHeight, 'length')} 
-                      step="0.1" 
+                    <NumericInput
+                      allowEmpty={true}
+                      decimals={3}
+                      value={woodExtHeight === '' ? '' : convertTo(woodExtHeight, 'length', unitSystem)}
+                      onValueChange={(v) => handleNumericChange(v, setWoodExtHeight, 'length')}
+                      step="0.1"
                     />
                     <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                   </div>
@@ -1063,11 +1066,12 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
                 <div className="input-group">
                   <label>{t("Ancho Externo")}</label>
                   <div className="input-wrapper">
-                    <input 
-                      type="number" 
-                      value={displayVal(woodExtWidth, 'length')} 
-                      onChange={(e) => handleInputChange(e.target.value, setWoodExtWidth, 'length')} 
-                      step="0.1" 
+                    <NumericInput
+                      allowEmpty={true}
+                      decimals={3}
+                      value={woodExtWidth === '' ? '' : convertTo(woodExtWidth, 'length', unitSystem)}
+                      onValueChange={(v) => handleNumericChange(v, setWoodExtWidth, 'length')}
+                      step="0.1"
                     />
                     <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                   </div>
@@ -1075,11 +1079,12 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
                 <div className="input-group">
                   <label>{t("Profundidad Externa")}</label>
                   <div className="input-wrapper">
-                    <input 
-                      type="number" 
-                      value={displayVal(woodExtDepth, 'length')} 
-                      onChange={(e) => handleInputChange(e.target.value, setWoodExtDepth, 'length')} 
-                      step="0.1" 
+                    <NumericInput
+                      allowEmpty={true}
+                      decimals={3}
+                      value={woodExtDepth === '' ? '' : convertTo(woodExtDepth, 'length', unitSystem)}
+                      onValueChange={(v) => handleNumericChange(v, setWoodExtDepth, 'length')}
+                      step="0.1"
                     />
                     <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                   </div>
@@ -1090,11 +1095,12 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
                 <div className="input-group">
                   <label>{t("Alto Externo")}</label>
                   <div className="input-wrapper">
-                    <input 
-                      type="number" 
-                      value={displayVal(woodTrapExtHeight, 'length')} 
-                      onChange={(e) => handleInputChange(e.target.value, setWoodTrapExtHeight, 'length')} 
-                      step="0.1" 
+                    <NumericInput
+                      allowEmpty={true}
+                      decimals={3}
+                      value={woodTrapExtHeight === '' ? '' : convertTo(woodTrapExtHeight, 'length', unitSystem)}
+                      onValueChange={(v) => handleNumericChange(v, setWoodTrapExtHeight, 'length')}
+                      step="0.1"
                     />
                     <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                   </div>
@@ -1102,11 +1108,12 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
                 <div className="input-group">
                   <label>{t("Ancho Frontal Externo")}</label>
                   <div className="input-wrapper">
-                    <input 
-                      type="number" 
-                      value={displayVal(woodTrapExtWidth, 'length')} 
-                      onChange={(e) => handleInputChange(e.target.value, setWoodTrapExtWidth, 'length')} 
-                      step="0.1" 
+                    <NumericInput
+                      allowEmpty={true}
+                      decimals={3}
+                      value={woodTrapExtWidth === '' ? '' : convertTo(woodTrapExtWidth, 'length', unitSystem)}
+                      onValueChange={(v) => handleNumericChange(v, setWoodTrapExtWidth, 'length')}
+                      step="0.1"
                     />
                     <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                   </div>
@@ -1114,11 +1121,12 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
                 <div className="input-group">
                   <label>{t("Prof. Superior Externa (D1)")}</label>
                   <div className="input-wrapper">
-                    <input 
-                      type="number" 
-                      value={displayVal(woodTrapExtDepthTop, 'length')} 
-                      onChange={(e) => handleInputChange(e.target.value, setWoodTrapExtDepthTop, 'length')} 
-                      step="0.1" 
+                    <NumericInput
+                      allowEmpty={true}
+                      decimals={3}
+                      value={woodTrapExtDepthTop === '' ? '' : convertTo(woodTrapExtDepthTop, 'length', unitSystem)}
+                      onValueChange={(v) => handleNumericChange(v, setWoodTrapExtDepthTop, 'length')}
+                      step="0.1"
                     />
                     <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                   </div>
@@ -1126,11 +1134,12 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
                 <div className="input-group">
                   <label>{t("Prof. Inferior Externa (D2)")}</label>
                   <div className="input-wrapper">
-                    <input 
-                      type="number" 
-                      value={displayVal(woodTrapExtDepthBot, 'length')} 
-                      onChange={(e) => handleInputChange(e.target.value, setWoodTrapExtDepthBot, 'length')} 
-                      step="0.1" 
+                    <NumericInput
+                      allowEmpty={true}
+                      decimals={3}
+                      value={woodTrapExtDepthBot === '' ? '' : convertTo(woodTrapExtDepthBot, 'length', unitSystem)}
+                      onValueChange={(v) => handleNumericChange(v, setWoodTrapExtDepthBot, 'length')}
+                      step="0.1"
                     />
                     <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                   </div>
@@ -1138,11 +1147,12 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
                 <div className="input-group">
                   <label>{t("Ancho Trasero Externo")}</label>
                   <div className="input-wrapper">
-                    <input 
-                      type="number" 
-                      value={displayVal(woodTrapExtRearWidth, 'length')} 
-                      onChange={(e) => setWoodTrapExtRearWidth && handleInputChange(e.target.value, setWoodTrapExtRearWidth, 'length')} 
-                      step="0.1" 
+                    <NumericInput
+                      allowEmpty={true}
+                      decimals={3}
+                      value={woodTrapExtRearWidth === '' ? '' : convertTo(woodTrapExtRearWidth, 'length', unitSystem)}
+                      onValueChange={(v) => setWoodTrapExtRearWidth && handleNumericChange(v, setWoodTrapExtRearWidth, 'length')}
+                      step="0.1"
                     />
                     <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                   </div>
@@ -1157,11 +1167,12 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
           <div className="input-group">
             <label>{t("Espesor de Madera")}</label>
             <div className="input-wrapper">
-              <input 
-                type="number" 
-                value={displayVal(woodThickness, 'length_small')} 
-                onChange={(e) => handleInputChange(e.target.value, setWoodThickness, 'length_small')} 
-                step="0.1" 
+              <NumericInput
+                allowEmpty={true}
+                decimals={3}
+                value={woodThickness === '' ? '' : convertTo(woodThickness, 'length_small', unitSystem)}
+                onValueChange={(v) => handleNumericChange(v, setWoodThickness, 'length_small')}
+                step="0.1"
               />
               <span className="unit-badge">{getUnitLabel('length_small', unitSystem)}</span>
             </div>
@@ -1169,11 +1180,12 @@ const CabinetTabComponent: React.FC<CabinetTabProps> = ({
           <div className="input-group">
             <label>{t("Vol. Extra")} <span className="label-desc">({t("(Altavoz/Ducto/Ref.)")})</span></label>
             <div className="input-wrapper">
-              <input 
-                type="number" 
-                value={displayVal(woodExtra, 'volume')} 
-                onChange={(e) => handleInputChange(e.target.value, setWoodExtra, 'volume')} 
-                step="0.1" 
+              <NumericInput
+                allowEmpty={true}
+                decimals={3}
+                value={woodExtra === '' ? '' : convertTo(woodExtra, 'volume', unitSystem)}
+                onValueChange={(v) => handleNumericChange(v, setWoodExtra, 'volume')}
+                step="0.1"
               />
               <span className="unit-badge">{getUnitLabel('volume', unitSystem)}</span>
             </div>

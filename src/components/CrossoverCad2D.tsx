@@ -4,7 +4,7 @@ import type { CrossoverResult } from '../types';
 
 interface CrossoverCad2DProps {
   lang: Lang;
-  crossoverWays: '2way' | '3way';
+  crossoverWays: '1way' | '2way' | '3way';
   crossoverType: '1st_order' | '2nd_butter' | '2nd_lr' | '4th_lr';
   xoverResults: CrossoverResult | null;
   enableZobel: boolean;
@@ -29,7 +29,7 @@ export const CrossoverCad2D: React.FC<CrossoverCad2DProps> = ({
 
   const isLight = true;
   const [containerWidth, setContainerWidth] = useState<number>(0);
-  const [canvasHeight, setCanvasHeight] = useState<number>(crossoverWays === '3way' ? 520 : 440);
+  const [canvasHeight, setCanvasHeight] = useState<number>(crossoverWays === '3way' ? 520 : crossoverWays === '1way' ? 300 : 440);
 
   const handleVerticalResizeStart = (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -79,10 +79,10 @@ export const CrossoverCad2D: React.FC<CrossoverCad2DProps> = ({
   const handleFitView = useCallback(() => {
     if (!containerRef.current) return;
     const w = containerRef.current.clientWidth || 800;
-    const h = crossoverWays === '3way' ? 520 : 440;
+    const h = crossoverWays === '3way' ? 520 : crossoverWays === '1way' ? 300 : 440;
 
     const logicalW = 860;
-    const logicalH = crossoverWays === '3way' ? 660 : 460;
+    const logicalH = crossoverWays === '3way' ? 660 : crossoverWays === '1way' ? 240 : 460;
 
     const scaleX = (w - 40) / logicalW;
     const scaleY = (h - 40) / logicalH;
@@ -199,7 +199,7 @@ export const CrossoverCad2D: React.FC<CrossoverCad2DProps> = ({
     // 2. Sub-pixel CAD Millimetric Grid (Unified 6px fine / 30px major pitch with CabinetCad2D)
     if (showGrid) {
       const logicalW = 860;
-      const logicalH = crossoverWays === '3way' ? 660 : 460;
+      const logicalH = crossoverWays === '3way' ? 660 : crossoverWays === '1way' ? 240 : 460;
       const baseScale = Math.min((width - 40) / logicalW, (height - 40) / logicalH, 1.4) || 1;
       const relativeZoom = Math.max(zoom / baseScale, 0.2);
 
@@ -448,7 +448,75 @@ export const CrossoverCad2D: React.FC<CrossoverCad2DProps> = ({
     };
 
     // 4. DRAW SCHEMATIC BY TOPOLOGY
-    if (xoverResults.ways === '2way') {
+    if (xoverResults.ways === '1way') {
+      const lp = xoverResults.lp;
+      const spkX = 640;
+
+      ctx.fillStyle = cWirePos;
+      ctx.font = 'bold 26px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText('+', 30, 80);
+
+      ctx.fillStyle = cWireNeg;
+      ctx.font = 'bold 28px monospace';
+      ctx.fillText('-', 30, 200);
+
+      ctx.fillStyle = cTextMuted;
+      ctx.font = 'bold 12px monospace';
+      ctx.fillText(t("ENTRADA (DE AMP)"), 30, 35);
+
+      drawLine(60, 70, crossoverType === '4th_lr' ? 120 : 140, 70, cWirePos);
+      drawLine(60, 190, spkX, 190, cWireNeg);
+
+      if (crossoverType === '4th_lr') {
+        drawInductorHoriz(120, 70, 4, 24, cWirePos, `L1 = ${lp.l1 ? lp.l1.toFixed(3) : ''} mH`, cLpColor);
+        drawLine(216, 70, 250, 70, cWirePos);
+
+        drawDot(250, 70, cWirePos);
+        drawDot(250, 190, cWireNeg);
+        drawLine(250, 70, 250, 110, cWirePos);
+        drawCapVert(250, 118, cWireNeg, `C1 = ${lp.c1 ? lp.c1.toFixed(2) : ''} µF`, cLpColor);
+        drawLine(250, 126, 250, 190, cWireNeg);
+
+        drawLine(250, 70, 330, 70, cWirePos);
+        drawInductorHoriz(330, 70, 4, 24, cWirePos, `L2 = ${lp.l2 ? lp.l2.toFixed(3) : ''} mH`, cLpColor);
+        drawLine(426, 70, 460, 70, cWirePos);
+
+        drawDot(460, 70, cWirePos);
+        drawDot(460, 190, cWireNeg);
+        drawLine(460, 70, 460, 110, cWirePos);
+        drawCapVert(460, 118, cWireNeg, `C2 = ${lp.c2 ? lp.c2.toFixed(2) : ''} µF`, cLpColor);
+        drawLine(460, 126, 460, 190, cWireNeg);
+
+        drawLine(460, 70, enableZobel ? 540 : spkX, 70, cWirePos);
+      } else {
+        drawInductorHoriz(140, 70, 4, 24, cWirePos, `L1 = ${lp.l1 ? lp.l1.toFixed(3) : ''} mH`, cLpColor);
+        drawLine(236, 70, enableZobel ? 540 : spkX, 70, cWirePos);
+
+        if (lp.c1 !== null && lp.c1 !== undefined && lp.c1 > 0) {
+          drawDot(340, 70, cWirePos);
+          drawDot(340, 190, cWireNeg);
+          drawLine(340, 70, 340, 110, cWirePos);
+          drawCapVert(340, 118, cWireNeg, `C1 = ${lp.c1.toFixed(2)} µF`, cLpColor);
+          drawLine(340, 126, 340, 190, cWireNeg);
+        }
+      }
+
+      if (enableZobel && zobelResults) {
+        drawDot(540, 70, cWirePos);
+        drawDot(540, 190, cWireNeg);
+        drawLine(540, 70, 540, 90, cWirePos);
+        drawResistorVert(540, 90, 50, cZobelColor, `Rz = ${zobelResults.rz.toFixed(2)} Ω`, cZobelColor);
+        drawLine(540, 140, 540, 155, cWirePos);
+        drawCapVert(540, 161, cWireNeg, `Cz = ${zobelResults.cz.toFixed(2)} µF`, cZobelColor);
+        drawLine(540, 167, 540, 190, cWireNeg);
+
+        drawLine(540, 70, spkX, 70, cWirePos);
+      }
+
+      drawSpeaker(spkX, 35, 70, t("Subwoofer"), t("Low Pass (1 Vía)"));
+      drawLine(spkX, 105, spkX, 190, cWireNeg);
+    } else if (xoverResults.ways === '2way') {
       const hp = xoverResults.hp;
       const lp = xoverResults.lp;
       const spkX = 640;
@@ -875,9 +943,11 @@ export const CrossoverCad2D: React.FC<CrossoverCad2DProps> = ({
               letterSpacing: '0.02em',
             }}
           >
-            {crossoverWays === '2way'
-              ? t("Esquema de Conexión del Crossover (2 Vías)")
-              : t("Esquema de Conexión del Crossover (3 Vías)")}
+            {crossoverWays === '1way'
+              ? t("Esquema de Conexión del Crossover (Subwoofer 1 Vía)")
+              : crossoverWays === '2way'
+                ? t("Esquema de Conexión del Crossover (2 Vías)")
+                : t("Esquema de Conexión del Crossover (3 Vías)")}
           </span>
         </div>
 

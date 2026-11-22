@@ -82,7 +82,7 @@ pub fn suggest_passive_radiator(
     let _xmax_ref = xmax_mm;
     let d_req_m = d_drv_m * std::f64::consts::SQRT_2;
 
-    // Escalera comercial de BassBox 6 Pro (umbral en m -> pulgadas)
+    // Escalera comercial estándar de radiadores pasivos (umbral en m -> pulgadas)
     const COMMERCIAL_PRS: [(f64, f64); 11] = [
         (0.127, 6.0),
         (0.178, 8.0),

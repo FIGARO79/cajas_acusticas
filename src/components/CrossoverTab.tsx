@@ -3,12 +3,13 @@ import { type Lang, translate } from '../utils/translations';
 import { getWasm, getWasmSafe, optimizeCrossoverLowpass } from '../wasm/index';
 import type { CrossoverResult, CrossoverExportData } from '../types';
 import { CrossoverCad2D } from './CrossoverCad2D';
+import { NumericInput } from './NumericInput';
 
 interface CrossoverTabProps {
   lang: Lang;
   onRegisterExporter?: (exporter: () => CrossoverExportData) => void;
   readOnly?: boolean;
-  crossoverWaysProp?: '2way' | '3way';
+  crossoverWaysProp?: '1way' | '2way' | '3way';
   crossoverTypeProp?: '1st_order' | '2nd_butter' | '2nd_lr' | '4th_lr';
   fcProp?: number;
   fcLowProp?: number;
@@ -46,7 +47,7 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
   const t = (text: string) => translate(text, lang);
 
   // 1. Crossover Way Mode
-  const [crossoverWaysLocal, setCrossoverWays] = useState<'2way' | '3way'>('2way');
+  const [crossoverWaysLocal, setCrossoverWays] = useState<'1way' | '2way' | '3way'>('2way');
 
   // 2. Crossover Inputs
   const [fcLocal, setFc] = useState<number | ''>(2500); // For 2-way
@@ -173,12 +174,12 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
         <div className="input-group" style={{ margin: 0 }}>
           <label style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>{t("Fc Objetivo")}</label>
           <div className="input-wrapper" style={{ height: '28px' }}>
-            <input 
-              type="number" 
-              value={optFc} 
-              onChange={(e) => setOptFc(parseFloat(e.target.value) || 2500)} 
-              min="50" 
-              max="10000"
+            <NumericInput
+              decimals={1}
+              min={50}
+              max={10000}
+              value={optFc}
+              onValueChange={(v) => { if (v !== undefined) setOptFc(v); }}
               style={{ fontSize: '0.74rem', height: '28px', padding: '0 6px', fontFamily: 'var(--font-mono)' }}
             />
             <span className="unit-badge" style={{ fontSize: '0.65rem', padding: '0 4px' }}>Hz</span>
@@ -188,12 +189,12 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
         <div className="input-group" style={{ margin: 0 }}>
           <label style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>{t("Re Woofer")}</label>
           <div className="input-wrapper" style={{ height: '28px' }}>
-            <input 
-              type="number" 
-              value={optRe} 
-              onChange={(e) => setOptRe(parseFloat(e.target.value) || 6.0)} 
-              step="0.1"
-              min="1"
+            <NumericInput
+              decimals={2}
+              min={1}
+              step={0.1}
+              value={optRe}
+              onValueChange={(v) => { if (v !== undefined) setOptRe(v); }}
               style={{ fontSize: '0.74rem', height: '28px', padding: '0 6px', fontFamily: 'var(--font-mono)' }}
             />
             <span className="unit-badge" style={{ fontSize: '0.65rem', padding: '0 4px' }}>Ω</span>
@@ -203,12 +204,12 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
         <div className="input-group" style={{ margin: 0 }}>
           <label style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>{t("Le Woofer")}</label>
           <div className="input-wrapper" style={{ height: '28px' }}>
-            <input 
-              type="number" 
-              value={optLe} 
-              onChange={(e) => setOptLe(parseFloat(e.target.value) || 0.8)} 
-              step="0.05"
-              min="0.01"
+            <NumericInput
+              decimals={2}
+              min={0.01}
+              step={0.05}
+              value={optLe}
+              onValueChange={(v) => { if (v !== undefined) setOptLe(v); }}
               style={{ fontSize: '0.74rem', height: '28px', padding: '0 6px', fontFamily: 'var(--font-mono)' }}
             />
             <span className="unit-badge" style={{ fontSize: '0.65rem', padding: '0 4px' }}>mH</span>
@@ -218,12 +219,12 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
         <div className="input-group" style={{ margin: 0 }}>
           <label style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>{t("DCR Bobina")}</label>
           <div className="input-wrapper" style={{ height: '28px' }}>
-            <input 
-              type="number" 
-              value={optimizerDcr} 
-              onChange={(e) => setOptimizerDcr(parseFloat(e.target.value) || 0.3)} 
-              step="0.05"
-              min="0"
+            <NumericInput
+              decimals={2}
+              min={0}
+              step={0.05}
+              value={optimizerDcr}
+              onValueChange={(v) => { if (v !== undefined) setOptimizerDcr(v); }}
               style={{ fontSize: '0.74rem', height: '28px', padding: '0 6px', fontFamily: 'var(--font-mono)' }}
             />
             <span className="unit-badge" style={{ fontSize: '0.65rem', padding: '0 4px' }}>Ω</span>
@@ -305,6 +306,46 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
     const Rt = zTweeter;
     const Rm = zMidrange;
     const Rw = zWoofer;
+
+    if (crossoverWays === '1way') {
+      const f = fc;
+      if (!f || f <= 0 || Rw <= 0) return null;
+      try {
+        const wasm = getWasm();
+        if (crossoverType === '1st_order') {
+          const lpRes = wasm.calc_filtro_1er_orden(f, Rw);
+          const out: CrossoverResult = { ways: '1way', type: '1st', hp: null, lp: { l1: lpRes.l, c1: null } };
+          lpRes.free();
+          return out;
+        }
+        if (crossoverType === '2nd_butter') {
+          const lpRes = wasm.calc_filtro_2do_orden_butterworth(f, Rw);
+          const out: CrossoverResult = { ways: '1way', type: '2nd_butter', hp: null, lp: { l1: lpRes.l_lp, c1: lpRes.c_lp } };
+          lpRes.free();
+          return out;
+        }
+        if (crossoverType === '2nd_lr') {
+          const lpRes = wasm.calc_filtro_linkwitz_riley(f, Rw);
+          const out: CrossoverResult = { ways: '1way', type: '2nd_lr', hp: null, lp: { l1: lpRes.l, c1: lpRes.c } };
+          lpRes.free();
+          return out;
+        }
+        if (crossoverType === '4th_lr') {
+          const lpRes = wasm.calc_filtro_4to_orden_lr(f, Rw);
+          const out: CrossoverResult = { ways: '1way', type: '4th_lr', hp: null, lp: { l1: lpRes.l1, c1: lpRes.c1, l2: lpRes.l2, c2: lpRes.c2 } };
+          lpRes.free();
+          return out;
+        }
+      } catch (e) {
+        console.error("WASM 1-way crossover error, falling back to JS:", e);
+      }
+      return {
+        ways: '1way',
+        type: '1st',
+        hp: null,
+        lp: { l1: (Rw * 1000) / (2 * Math.PI * f), c1: null }
+      };
+    }
 
     if (crossoverWays === '2way') {
       const f = fc;
@@ -795,7 +836,7 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
                   {/* WOOFER */}
                   {lpFilter?.l1 !== null && lpFilter?.l1 !== undefined && (
                     <tr>
-                      <td style={{ color: 'var(--ported-color)', fontWeight: 600 }}>{t("Paso Bajo (Woofer)")}</td>
+                      <td style={{ color: 'var(--ported-color)', fontWeight: 600 }}>{crossoverWays === '1way' ? t("Paso Bajo (Subwoofer)") : t("Paso Bajo (Woofer)")}</td>
                       <td><strong>L1</strong></td>
                       <td>{t("Serie")}</td>
                       <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{lpFilter.l1.toFixed(3)} mH</td>
@@ -803,7 +844,7 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
                   )}
                   {lpFilter?.l2 && (
                     <tr>
-                      <td style={{ color: 'var(--ported-color)', fontWeight: 600 }}>{t("Paso Bajo (Woofer)")}</td>
+                      <td style={{ color: 'var(--ported-color)', fontWeight: 600 }}>{crossoverWays === '1way' ? t("Paso Bajo (Subwoofer)") : t("Paso Bajo (Woofer)")}</td>
                       <td><strong>L2</strong></td>
                       <td>{t("Serie")}</td>
                       <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{lpFilter.l2.toFixed(3)} mH</td>
@@ -811,7 +852,7 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
                   )}
                   {lpFilter?.c1 !== null && lpFilter?.c1 !== undefined && (
                     <tr>
-                      <td style={{ color: 'var(--ported-color)', fontWeight: 600 }}>{t("Paso Bajo (Woofer)")}</td>
+                      <td style={{ color: 'var(--ported-color)', fontWeight: 600 }}>{crossoverWays === '1way' ? t("Paso Bajo (Subwoofer)") : t("Paso Bajo (Woofer)")}</td>
                       <td><strong>C1</strong></td>
                       <td>{t("Paralelo")}</td>
                       <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{lpFilter.c1.toFixed(2)} µF</td>
@@ -819,7 +860,7 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
                   )}
                   {lpFilter?.c2 && (
                     <tr>
-                      <td style={{ color: 'var(--ported-color)', fontWeight: 600 }}>{t("Paso Bajo (Woofer)")}</td>
+                      <td style={{ color: 'var(--ported-color)', fontWeight: 600 }}>{crossoverWays === '1way' ? t("Paso Bajo (Subwoofer)") : t("Paso Bajo (Woofer)")}</td>
                       <td><strong>C2</strong></td>
                       <td>{t("Paralelo")}</td>
                       <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{lpFilter.c2.toFixed(2)} µF</td>
@@ -845,7 +886,7 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
                   )}
 
                   {/* L-PAD */}
-                  {enableLPad && lpadResults && (
+                  {crossoverWays !== '1way' && enableLPad && lpadResults && (
                     <>
                       <tr>
                         <td style={{ color: '#38bdf8', fontWeight: 600 }}>{t("Atenuador L-Pad (Tweeter)")}</td>
@@ -889,7 +930,7 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
         {xoverResults && (
           <div className="pro-calc-panel" style={{ marginTop: '0rem', padding: '0rem', overflowX: 'auto' }}>
             <span className="pro-calc-title" style={{ display: 'block', marginBottom: '0rem', color: 'var(--success)' }}>
-              {t("Componentes del Filtro")} ({crossoverWays === '2way' ? '2 Vías' : '3 Vías'}, {crossoverType === '2nd_lr' ? 'L-R' : crossoverType === '2nd_butter' ? 'Butterworth' : crossoverType === '1st_order' ? '1er Orden' : '4to Orden'})
+              {t("Componentes del Filtro")} ({crossoverWays === '1way' ? t("Subwoofer (1 Vía)") : crossoverWays === '2way' ? t("2 Vías") : t("3 Vías")}, {crossoverType === '2nd_lr' ? 'L-R' : crossoverType === '2nd_butter' ? 'Butterworth' : crossoverType === '1st_order' ? '1er Orden' : '4to Orden'})
             </span>
             {renderComponentsTable()}
           </div>
@@ -910,15 +951,22 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
             <div>
               <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', borderBottom: '1px solid var(--card-border)', paddingBottom: '0.5rem' }}>
                 <button 
+                  className={`preset-select ${crossoverWays === '1way' ? 'active' : ''}`}
+                  style={{ flex: 1, padding: '0.4rem 0.6rem', background: crossoverWays === '1way' ? 'var(--primary)' : 'transparent', color: crossoverWays === '1way' ? '#fff' : 'var(--text-main)', border: '1px solid var(--card-border)', borderRadius: '0px', cursor: 'pointer', fontWeight: 600 }}
+                  onClick={() => setCrossoverWays('1way')}
+                >
+                  {t("Subwoofer (1 Vía)")}
+                </button>
+                <button 
                   className={`preset-select ${crossoverWays === '2way' ? 'active' : ''}`}
-                  style={{ flex: 1, padding: '0.4rem 0.8rem', background: crossoverWays === '2way' ? 'var(--primary)' : 'transparent', color: crossoverWays === '2way' ? '#fff' : 'var(--text-main)', border: '1px solid var(--card-border)', borderRadius: '0px', cursor: 'pointer', fontWeight: 600 }}
+                  style={{ flex: 1, padding: '0.4rem 0.6rem', background: crossoverWays === '2way' ? 'var(--primary)' : 'transparent', color: crossoverWays === '2way' ? '#fff' : 'var(--text-main)', border: '1px solid var(--card-border)', borderRadius: '0px', cursor: 'pointer', fontWeight: 600 }}
                   onClick={() => setCrossoverWays('2way')}
                 >
                   {t("2 Vías (Woofer + Tweeter)")}
                 </button>
                 <button 
                   className={`preset-select ${crossoverWays === '3way' ? 'active' : ''}`}
-                  style={{ flex: 1, padding: '0.4rem 0.8rem', background: crossoverWays === '3way' ? 'var(--primary)' : 'transparent', color: crossoverWays === '3way' ? '#fff' : 'var(--text-main)', border: '1px solid var(--card-border)', borderRadius: '0px', cursor: 'pointer', fontWeight: 600 }}
+                  style={{ flex: 1, padding: '0.4rem 0.6rem', background: crossoverWays === '3way' ? 'var(--primary)' : 'transparent', color: crossoverWays === '3way' ? '#fff' : 'var(--text-main)', border: '1px solid var(--card-border)', borderRadius: '0px', cursor: 'pointer', fontWeight: 600 }}
                   onClick={() => setCrossoverWays('3way')}
                 >
                   {t("3 Vías (Woofer + Mid + Tweet)")}
@@ -926,20 +974,21 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
               </div>
 
               <span className="control-title" style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--primary)' }}>
-                {crossoverWays === '2way' ? t("Calculadora de Crossover pasivo de 2 Vías") : t("Calculadora de Crossover pasivo de 3 Vías")}
+                {crossoverWays === '1way' ? t("Filtro Paso Bajo para Subwoofer (1 Vía)") : crossoverWays === '2way' ? t("Calculadora de Crossover pasivo de 2 Vías") : t("Calculadora de Crossover pasivo de 3 Vías")}
               </span>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {crossoverWays === '2way' ? (
+                {crossoverWays !== '3way' ? (
                   <div className="input-group">
-                    <label>{t("Frecuencia de Cruce (Fc)")}</label>
+                    <label>{crossoverWays === '1way' ? t("Frecuencia Corte LPF (Fc)") : t("Frecuencia de Cruce (Fc)")}</label>
                     <div className="input-wrapper">
-                      <input 
-                        type="number" 
-                        value={fc} 
-                        onChange={(e) => setFc(e.target.value === '' ? '' : parseFloat(e.target.value))} 
-                        min="20" 
-                        max="20000"
+                      <NumericInput
+                        allowEmpty={true}
+                        decimals={1}
+                        value={fc}
+                        onValueChange={(v) => setFc(v === undefined ? '' : v)}
+                        min={20}
+                        max={20000}
                       />
                       <span className="unit-badge">Hz</span>
                     </div>
@@ -949,12 +998,13 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
                     <div className="input-group">
                       <label>{t("Cruce Bajo (Woofer-Mid)")}</label>
                       <div className="input-wrapper">
-                        <input 
-                          type="number" 
-                          value={fcLow} 
-                          onChange={(e) => setFcLow(e.target.value === '' ? '' : parseFloat(e.target.value))} 
-                          min="20" 
-                          max="5000"
+                        <NumericInput
+                          allowEmpty={true}
+                          decimals={1}
+                          value={fcLow}
+                          onValueChange={(v) => setFcLow(v === undefined ? '' : v)}
+                          min={20}
+                          max={5000}
                         />
                         <span className="unit-badge">Hz</span>
                       </div>
@@ -962,12 +1012,13 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
                     <div className="input-group">
                       <label>{t("Cruce Alto (Mid-Tweeter)")}</label>
                       <div className="input-wrapper">
-                        <input 
-                          type="number" 
-                          value={fcHigh} 
-                          onChange={(e) => setFcHigh(e.target.value === '' ? '' : parseFloat(e.target.value))} 
-                          min="200" 
-                          max="20000"
+                        <NumericInput
+                          allowEmpty={true}
+                          decimals={1}
+                          value={fcHigh}
+                          onValueChange={(v) => setFcHigh(v === undefined ? '' : v)}
+                          min={200}
+                          max={20000}
                         />
                         <span className="unit-badge">Hz</span>
                       </div>
@@ -975,44 +1026,46 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
                   </div>
                 )}
 
-                <div style={{ display: 'grid', gridTemplateColumns: crossoverWays === '2way' ? '1fr 1fr' : '1fr 1fr 1fr', gap: '0.75rem' }}>
-                  <div className="input-group">
-                    <label>{t("Imp. Tweeter")}</label>
-                    <div className="input-wrapper">
-                      <input 
-                        type="number" 
-                        value={zTweeter} 
-                        onChange={(e) => setZTweeter(parseFloat(e.target.value) || 0)} 
-                        min="2" 
-                        max="32"
-                      />
-                      <span className="unit-badge">Ω</span>
+                <div style={{ display: 'grid', gridTemplateColumns: crossoverWays === '1way' ? '1fr' : crossoverWays === '2way' ? '1fr 1fr' : '1fr 1fr 1fr', gap: '0.75rem' }}>
+                  {crossoverWays !== '1way' && (
+                    <div className="input-group">
+                      <label>{t("Imp. Tweeter")}</label>
+                      <div className="input-wrapper">
+                        <NumericInput
+                          decimals={2}
+                          value={zTweeter}
+                          onValueChange={(v) => { if (v !== undefined) setZTweeter(v); }}
+                          min={2}
+                          max={32}
+                        />
+                        <span className="unit-badge">Ω</span>
+                      </div>
                     </div>
-                  </div>
+                  )}
                   {crossoverWays === '3way' && (
                     <div className="input-group">
                       <label>{t("Imp. Midrange")}</label>
                       <div className="input-wrapper">
-                        <input 
-                          type="number" 
-                          value={zMidrange} 
-                          onChange={(e) => setZMidrange(parseFloat(e.target.value) || 0)} 
-                          min="2" 
-                          max="32"
+                        <NumericInput
+                          decimals={2}
+                          value={zMidrange}
+                          onValueChange={(v) => { if (v !== undefined) setZMidrange(v); }}
+                          min={2}
+                          max={32}
                         />
                         <span className="unit-badge">Ω</span>
                       </div>
                     </div>
                   )}
                   <div className="input-group">
-                    <label>{t("Imp. Woofer")}</label>
+                    <label>{crossoverWays === '1way' ? t("Imp. Subwoofer") : t("Imp. Woofer")}</label>
                     <div className="input-wrapper">
-                      <input 
-                        type="number" 
-                        value={zWoofer} 
-                        onChange={(e) => setZWoofer(parseFloat(e.target.value) || 0)} 
-                        min="2" 
-                        max="32"
+                      <NumericInput
+                        decimals={2}
+                        value={zWoofer}
+                        onValueChange={(v) => { if (v !== undefined) setZWoofer(v); }}
+                        min={2}
+                        max={32}
                       />
                       <span className="unit-badge">Ω</span>
                     </div>
@@ -1069,11 +1122,12 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
                 <div className="input-group">
                   <label>Re (Resistencia DC)</label>
                   <div className="input-wrapper">
-                    <input 
-                      type="number" 
-                      value={re} 
-                      onChange={(e) => setRe(parseFloat(e.target.value) || 0)} 
-                      step="any"
+                    <NumericInput
+                      decimals={2}
+                      min={0.1}
+                      step={0.1}
+                      value={re}
+                      onValueChange={(v) => { if (v !== undefined) setRe(v); }}
                     />
                     <span className="unit-badge">Ω</span>
                   </div>
@@ -1081,11 +1135,12 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
                 <div className="input-group">
                   <label>Le (Inductancia Bobina)</label>
                   <div className="input-wrapper">
-                    <input 
-                      type="number" 
-                      value={le} 
-                      onChange={(e) => setLe(parseFloat(e.target.value) || 0)} 
-                      step="any"
+                    <NumericInput
+                      decimals={3}
+                      min={0.01}
+                      step={0.05}
+                      value={le}
+                      onValueChange={(v) => { if (v !== undefined) setLe(v); }}
                     />
                     <span className="unit-badge">mH</span>
                   </div>
@@ -1108,6 +1163,7 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
           </div>
 
           {/* ATENUADOR L-PAD (Fila 2, Col 2) */}
+          {crossoverWays !== '1way' && (
           <div className="panel" style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', padding: '1.5rem', borderRadius: '0px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', backdropFilter: 'blur(16px)', boxShadow: '0 4px 30px rgba(0, 0, 0, 0.2)' }}>
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
@@ -1133,23 +1189,23 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
                 <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 500 }}>{t("Impedancia Carga (Speaker)")}</label>
                 
                 <div className="input-wrapper">
-                  <input 
-                    type="number" 
-                    value={attenuation} 
-                    onChange={(e) => setAttenuation(parseFloat(e.target.value) || 0)} 
-                    min="1" 
-                    max="40"
+                  <NumericInput
+                    decimals={2}
+                    value={attenuation}
+                    onValueChange={(v) => { if (v !== undefined) setAttenuation(v); }}
+                    min={1}
+                    max={40}
                   />
                   <span className="unit-badge">dB</span>
                 </div>
                 
                 <div className="input-wrapper">
-                  <input 
-                    type="number" 
-                    value={zLoad} 
-                    onChange={(e) => setZLoad(parseFloat(e.target.value) || 0)} 
-                    min="2" 
-                    max="32"
+                  <NumericInput
+                    decimals={2}
+                    value={zLoad}
+                    onValueChange={(v) => { if (v !== undefined) setZLoad(v); }}
+                    min={2}
+                    max={32}
                   />
                   <span className="unit-badge">Ω</span>
                 </div>
@@ -1169,6 +1225,7 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
               </div>
             ) : null}
           </div>
+          )}
 
         </div>
 
@@ -1215,12 +1272,13 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
             <div className="input-group">
               <label>{t("Inductancia Objetivo (L)")}</label>
               <div className="input-wrapper">
-                <input 
-                  type="number" 
-                  value={indCalcTargetL} 
-                  onChange={(e) => setIndCalcTargetL(e.target.value === '' ? '' : parseFloat(e.target.value))} 
-                  step="0.01"
-                  min="0.01"
+                <NumericInput
+                  allowEmpty={true}
+                  decimals={3}
+                  value={indCalcTargetL}
+                  onValueChange={(v) => setIndCalcTargetL(v === undefined ? '' : v)}
+                  step={0.01}
+                  min={0.01}
                 />
                 <span className="unit-badge">mH</span>
               </div>
@@ -1228,12 +1286,13 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
             <div className="input-group">
               <label>{t("Diámetro Promedio (d)")}</label>
               <div className="input-wrapper">
-                <input 
-                  type="number" 
-                  value={indCalcD} 
-                  onChange={(e) => setIndCalcD(e.target.value === '' ? '' : parseFloat(e.target.value))} 
-                  step="0.1"
-                  min="1"
+                <NumericInput
+                  allowEmpty={true}
+                  decimals={2}
+                  value={indCalcD}
+                  onValueChange={(v) => setIndCalcD(v === undefined ? '' : v)}
+                  step={0.1}
+                  min={1}
                 />
                 <span className="unit-badge">mm</span>
               </div>
@@ -1241,12 +1300,13 @@ const CrossoverTabComponent: React.FC<CrossoverTabProps> = ({
             <div className="input-group">
               <label>{t("Longitud de Bobina (l)")}</label>
               <div className="input-wrapper">
-                <input 
-                  type="number" 
-                  value={indCalcLen} 
-                  onChange={(e) => setIndCalcLen(e.target.value === '' ? '' : parseFloat(e.target.value))} 
-                  step="0.1"
-                  min="0.1"
+                <NumericInput
+                  allowEmpty={true}
+                  decimals={2}
+                  value={indCalcLen}
+                  onValueChange={(v) => setIndCalcLen(v === undefined ? '' : v)}
+                  step={0.1}
+                  min={0.1}
                 />
                 <span className="unit-badge">cm</span>
               </div>

@@ -114,7 +114,7 @@ export async function calcRadiadorPasivo(vb: number, vas: number, fs: number, cd
   return { fb: res.fb, capAcustica: res.cap_acustica, masaAñadida: res.masa_añadida };
 }
 
-/** Sugerencia automática de radiador pasivo (escalera comercial BassBox Pro) */
+/** Sugerencia automática de radiador pasivo (escalera comercial estándar) */
 export async function suggestPassiveRadiator(
   fs: number,
   vas: number,
@@ -137,16 +137,30 @@ export async function suggestPassiveRadiator(
   };
 }
 
-/** Sugerencia de sintonía Fb óptima para un volumen Vb dado (tabla Keele BassBox) */
+/** Sugerencia de sintonía Fb óptima para un volumen Vb dado (tabla Keele) */
 export function calcSuggestFb(fs: number, vas: number, qts: number, vb: number): number {
   const w = getWasm();
   return w.calc_suggest_fb(fs, vas, qts, vb);
 }
 
 /** Solver Desired F3 para caja sellada */
-export function calcSealedForF3(fs: number, vas: number, qts: number, targetF3: number) {
+export function calcSealedForF3(
+  fs: number,
+  vas: number,
+  qts: number,
+  targetF3: number,
+  dampingType: DampingType = 'none',
+  classicalModel = false
+) {
   const w = getWasm();
-  const res = w.calc_sealed_for_f3(fs, vas, qts, targetF3);
+  const res = w.calc_sealed_for_f3_ex(
+    fs,
+    vas,
+    qts,
+    targetF3,
+    dampingTypeToLevel(dampingType),
+    classicalModel
+  );
   return {
     valid: res.valid,
     vb: res.vb,
@@ -158,9 +172,52 @@ export function calcSealedForF3(fs: number, vas: number, qts: number, targetF3: 
 }
 
 /** Solver Desired F3 para caja ventilada */
-export function calcVentedForF3(fs: number, vas: number, qts: number, targetF3: number) {
+export function calcVentedForF3(
+  fs: number,
+  vas: number,
+  qts: number,
+  targetF3: number,
+  dampingType: DampingType = 'none',
+  classicalModel = false
+) {
   const w = getWasm();
-  const res = w.calc_vented_for_f3(fs, vas, qts, targetF3);
+  const res = w.calc_vented_for_f3_ex(
+    fs,
+    vas,
+    qts,
+    targetF3,
+    dampingTypeToLevel(dampingType),
+    classicalModel
+  );
+  return {
+    valid: res.valid,
+    vb: res.vb,
+    fb: res.fb_or_fc,
+    f3: res.f3,
+    statusCode: res.status_code,
+  };
+}
+
+/** Solver Desired F3 para caja ventilada con volumen Vb fijo (resuelve Fb) */
+export function calcVentedFbForF3(
+  fs: number,
+  vas: number,
+  qts: number,
+  vb: number,
+  targetF3: number,
+  dampingType: DampingType = 'none',
+  classicalModel = false
+) {
+  const w = getWasm();
+  const res = w.calc_vented_fb_for_f3_ex(
+    fs,
+    vas,
+    qts,
+    vb,
+    targetF3,
+    dampingTypeToLevel(dampingType),
+    classicalModel
+  );
   return {
     valid: res.valid,
     vb: res.vb,
@@ -260,10 +317,10 @@ export async function calcBandpass4(fs: number, vas: number, qts: number, s: num
   return { vf: res.vf, vr: res.vr, fb: res.fb, f0: res.f0, delta_f: res.delta_f };
 }
 
-/** Bandpass 4th order BassBox (DF y Q't) */
-export function calcBandpass4Bassbox(fs: number, vas: number, qts: number, df = 0.65, qtPrime = 0) {
+/** Bandpass 4th order (DF y Q't) */
+export function calcBandpass4Pro(fs: number, vas: number, qts: number, df = 0.65, qtPrime = 0) {
   const w = getWasm();
-  const res = w.calc_bandpass_4_bassbox(fs, vas, qts, df, qtPrime);
+  const res = w.calc_bandpass_4_df(fs, vas, qts, df, qtPrime);
   return { vf: res.vf, vr: res.vr, fb: res.fb, f0: res.f0, delta_f: res.delta_f };
 }
 
@@ -274,10 +331,10 @@ export async function calcBandpass6(fs: number, vas: number, qts: number, a: num
   return { vf: res.vf, vr: res.vr, fh: res.fh, fl: res.fl };
 }
 
-/** Bandpass 6th order BassBox (Paralelo / Serie) */
-export function calcBandpass6Bassbox(fs: number, vas: number, qts: number, topology: Bandpass6Topology) {
+/** Bandpass 6th order (Paralelo / Serie) */
+export function calcBandpass6Pro(fs: number, vas: number, qts: number, topology: Bandpass6Topology) {
   const w = getWasm();
-  const res = w.calc_bandpass_6_bassbox(fs, vas, qts, topology);
+  const res = w.calc_bandpass_6_topology(fs, vas, qts, topology);
   return { vf: res.vf, vr: res.vr, fh: res.fh, fl: res.fl };
 }
 

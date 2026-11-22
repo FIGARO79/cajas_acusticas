@@ -1362,7 +1362,7 @@ pub fn calc_group_delay_curve_custom_ex(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cajas::calc_bandpass_6_bassbox;
+    use crate::cajas::calc_bandpass_6_topology;
 
     #[test]
     fn test_bandpass6_series_vs_parallel_transfer_function() {
@@ -1370,8 +1370,8 @@ mod tests {
         let vas = 70.0;
         let qts = 0.36;
 
-        let par = calc_bandpass_6_bassbox(fs, vas, qts, "parallel");
-        let ser = calc_bandpass_6_bassbox(fs, vas, qts, "series");
+        let par = calc_bandpass_6_topology(fs, vas, qts, "parallel");
+        let ser = calc_bandpass_6_topology(fs, vas, qts, "series");
 
         let f_mid_par = (par.fl * par.fh).sqrt();
         let db_mid_par = calc_bandpass6_response_at_ex(
@@ -1417,7 +1417,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bassbox_damping_affects_curves() {
+    fn test_damping_affects_curves() {
         let spl_classic = calc_sealed_response_at_ex(65.0, 38.0, 0.36, 45.0, 25.0, 3, true);
         let spl_bb = calc_sealed_response_at_ex(65.0, 38.0, 0.36, 45.0, 25.0, 3, false);
         assert!((spl_classic - spl_bb).abs() > 0.1);

@@ -373,6 +373,15 @@ export const Header: React.FC<HeaderProps> = ({
             {openMenu === 'filtros' && (
               <div className="cad-menu-dropdown" role="menu">
                 <button
+                  className={`cad-menu-option ${crossoverWays === 1 ? 'checked' : ''}`}
+                  onClick={() => { setCrossoverWays?.(1); closeMenu(); }}
+                  type="button"
+                  role="menuitem"
+                >
+                  {crossoverWays === 1 && <span className="cad-menu-check">✓</span>}
+                  <span>{t("Subwoofer / 1 Vía (Sin Tweeter)")}</span>
+                </button>
+                <button
                   className={`cad-menu-option ${crossoverWays === 2 ? 'checked' : ''}`}
                   onClick={() => { setCrossoverWays?.(2); closeMenu(); }}
                   type="button"

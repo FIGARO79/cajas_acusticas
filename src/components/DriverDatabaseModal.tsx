@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import type { CustomDriver, SpeakerParams } from '../types';
 import { type Lang, translate } from '../utils/translations';
+import { NumericInput } from './NumericInput';
 
 interface DriverDatabaseModalProps {
   isOpen: boolean;
@@ -92,15 +93,17 @@ export const DriverDatabaseModal: React.FC<DriverDatabaseModalProps> = ({
     });
   };
 
-  const handleFieldChange = (key: keyof SpeakerParams, raw: string) => {
+  const handleFieldChange = (key: keyof SpeakerParams, val: number | undefined) => {
     if (!formState) return;
-    const val = raw === '' ? undefined : Number(raw);
+    const nextParams = { ...formState.params };
+    if (val === undefined || Number.isNaN(val)) {
+      delete nextParams[key];
+    } else {
+      (nextParams as Record<string, unknown>)[key] = val;
+    }
     setFormState({
       ...formState,
-      params: {
-        ...formState.params,
-        [key]: val !== undefined && !Number.isNaN(val) ? val : 0,
-      },
+      params: nextParams,
     });
   };
 
@@ -408,11 +411,12 @@ export const DriverDatabaseModal: React.FC<DriverDatabaseModalProps> = ({
                     <label style={{ display: 'block', fontSize: '0.68rem', color: '#000000', marginBottom: '2px' }}>
                       {label}{unit ? ` (${unit})` : ''}
                     </label>
-                    <input
-                      type="number"
+                    <NumericInput
                       step="any"
+                      allowEmpty={true}
+                      treatZeroAsEmpty={true}
                       value={(formState.params[key] as number | undefined) ?? ''}
-                      onChange={(e) => handleFieldChange(key, e.target.value)}
+                      onValueChange={(val) => handleFieldChange(key, val)}
                       style={{ width: '100%', height: '26px', padding: '0 4px', fontSize: '0.74rem', color: '#000000' }}
                     />
                   </div>

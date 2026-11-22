@@ -220,7 +220,20 @@ export function generateReportHTML(
     const { crossoverWays, crossoverType, fc, fcLow, fcHigh, enableZobel, enableLPad, xoverResults, zobelResults, lpadResults } = xoverData;
     
     let xoverDetails: string;
-    if (xoverResults.ways === '2way') {
+    if (xoverResults.ways === '1way') {
+      const lp = xoverResults.lp;
+      xoverDetails = `
+        <div class="xover-box">
+          <h4>${t("Vía de Graves / Subwoofer (Low Pass)")}</h4>
+          <ul>
+            ${lp.l1 !== undefined && lp.l1 !== null ? `<li>L1: <strong>${formatNum(lp.l1, 3)} mH</strong></li>` : ''}
+            ${lp.l2 !== undefined && lp.l2 !== null ? `<li>L2: <strong>${formatNum(lp.l2, 3)} mH</strong></li>` : ''}
+            ${lp.c1 !== undefined && lp.c1 !== null ? `<li>C1: <strong>${formatNum(lp.c1, 2)} µF</strong></li>` : ''}
+            ${lp.c2 !== undefined && lp.c2 !== null ? `<li>C2: <strong>${formatNum(lp.c2, 2)} µF</strong></li>` : ''}
+          </ul>
+        </div>
+      `;
+    } else if (xoverResults.ways === '2way') {
       const hp = xoverResults.hp;
       const lp = xoverResults.lp;
       xoverDetails = `
@@ -325,7 +338,7 @@ export function generateReportHTML(
         </div>
       `;
     }
-    if (enableLPad && lpadResults) {
+    if (enableLPad && lpadResults && crossoverWays !== '1way') {
       extraNetworks += `
         <div class="xover-box highlight">
           <h4>${t("Atenuador L-Pad")}</h4>
@@ -342,9 +355,9 @@ export function generateReportHTML(
       <div class="grid">
         <div class="card">
           <h3>${t("Configuración y Componentes")}</h3>
-          <p><strong>${t("Vías")}:</strong> ${crossoverWays === '2way' ? t("2 Vías") : t("3 Vías")}</p>
+          <p><strong>${t("Vías")}:</strong> ${crossoverWays === '1way' ? t("Subwoofer (1 Vía)") : crossoverWays === '2way' ? t("2 Vías") : t("3 Vías")}</p>
           <p><strong>${t("Tipo de filtro")}:</strong> ${crossoverType === '1st_order' ? t("1er Orden") : crossoverType === '2nd_butter' ? t("2do Orden Butterworth") : crossoverType === '2nd_lr' ? t("2do Orden Linkwitz-Riley") : t("4to Orden Linkwitz-Riley")}</p>
-          <p><strong>${t("Frecuencia(s) de Cruce")}:</strong> ${crossoverWays === '2way' ? `${fc} Hz` : `${fcLow} Hz / ${fcHigh} Hz`}</p>
+          <p><strong>${t("Frecuencia(s) de Cruce")}:</strong> ${crossoverWays === '3way' ? `${fcLow} Hz / ${fcHigh} Hz` : crossoverWays === '1way' ? `${fc} Hz (LPF)` : `${fc} Hz`}</p>
           <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:15px;">
             ${xoverDetails}
             ${extraNetworks}
@@ -383,7 +396,7 @@ export function generateReportHTML(
         </div>
         <div class="card">
           <h3>${t("Relleno Acústico (Damping)")}</h3>
-          <p><strong>${t("Modelo activo")}:</strong> ${classicalModel ? t("Clásico (sin ajuste térmico)") : t("BassBox Pro (absorción Qa y fugas QL)")}</p>
+          <p><strong>${t("Modelo activo")}:</strong> ${classicalModel ? t("Clásico (sin ajuste térmico)") : t("Avanzado (absorción Qa y fugas QL)")}</p>
           <p><strong>${t("Tipo de relleno")}:</strong> ${
             dampingType === 'none' ? t("Sin Relleno") :
             dampingType === 'light' ? t("Relleno Leve (Damping de Paredes)") :

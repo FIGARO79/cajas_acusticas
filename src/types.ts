@@ -165,6 +165,11 @@ export interface FilterComponents3WayBP {
 }
 
 export type CrossoverResult = {
+  ways: '1way';
+  type: string;
+  hp: null;
+  lp: FilterComponents2Way;
+} | {
   ways: '2way';
   type: string;
   hp: FilterComponents2Way;
@@ -178,7 +183,7 @@ export type CrossoverResult = {
 };
 
 export interface CrossoverExportData {
-  crossoverWays: '2way' | '3way';
+  crossoverWays: '1way' | '2way' | '3way';
   crossoverType: string;
   fc: number;
   fcLow: number;

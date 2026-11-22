@@ -3,6 +3,7 @@ import type { SpeakerParams, CustomDriver, DatabaseWoofer } from '../types';
 import { type Lang, translate } from '../utils/translations';
 import { calcAutoParams } from '../wasm/index.ts';
 import { type UnitSystem, convertTo, convertFrom, getUnitLabel } from '../utils/units';
+import { NumericInput } from './NumericInput';
 
 interface SpeakerParamsFormProps {
   lang: Lang;
@@ -571,43 +572,41 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
     onParamsChange(nextParams);
   };
 
-  const displayValue = (field: keyof SpeakerParams) => {
+  const numericFieldValue = (field: keyof SpeakerParams): number | '' => {
     const val = params[field];
-    if (val === undefined || val === null) return '';
+    if (val === undefined || val === null || typeof val !== 'number' || !Number.isFinite(val)) return '';
     const unitType = UNIT_TYPES[field];
     if (unitType) {
-      const converted = convertTo(val as number, unitType, unitSystem);
-      return (Math.round(converted * 10000) / 10000).toString();
+      return convertTo(val, unitType, unitSystem);
     }
-    return val.toString();
+    return val;
+  };
+
+  const handleNumericFieldChange = (field: keyof SpeakerParams, val: number | undefined) => {
+    const nextParams = { ...params };
+    if (val === undefined || !Number.isFinite(val)) {
+      delete nextParams[field];
+    } else {
+      const unitType = UNIT_TYPES[field];
+      (nextParams[field] as number) = unitType ? convertFrom(val, unitType, unitSystem) : val;
+    }
+
+    if (field === 'qms' || field === 'qes') {
+      const qms = field === 'qms' ? val : params.qms;
+      const qes = field === 'qes' ? val : params.qes;
+      if (qms && qes && qms > 0 && qes > 0) {
+        nextParams.qts = Math.round((qms * qes) / (qms + qes) * 1000) / 1000;
+      }
+    }
+
+    onParamsChange(nextParams);
   };
 
   const handleInputChange = (field: keyof SpeakerParams, val: string) => {
     const nextParams = { ...params };
     if (field === 'diaNominal') {
       nextParams.diaNominal = val;
-    } else {
-      let num = parseFloat(val);
-      if (isNaN(num)) {
-        delete nextParams[field];
-      } else {
-        const unitType = UNIT_TYPES[field];
-        if (unitType) {
-          num = convertFrom(num, unitType, unitSystem);
-        }
-        (nextParams[field] as number) = num;
-      }
     }
-
-    // Auto-calculate Qts if Qes and Qms exist, and Qts is not manually set/overridden
-    if (field === 'qms' || field === 'qes') {
-      const qms = field === 'qms' ? parseFloat(val) : params.qms;
-      const qes = field === 'qes' ? parseFloat(val) : params.qes;
-      if (qms && qes) {
-        nextParams.qts = Math.round((qms * qes) / (qms + qes) * 1000) / 1000;
-      }
-    }
-
     onParamsChange(nextParams);
   };
 
@@ -900,9 +899,18 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
           <div className="segmented-control" style={{ padding: '2px', borderRadius: '0px' }}>
             <button
               type="button"
+              className={crossoverWays === 1 ? 'active' : ''}
+              onClick={() => setCrossoverWays(1)}
+              title={t("Solo Subwoofer / 1 Vía (Sin Tweeter)")}
+              style={{ padding: '0.45rem 0.25rem', fontSize: '0.78rem', borderRadius: '0px', flex: 1 }}
+            >
+              {t("Subwoofer")}
+            </button>
+            <button
+              type="button"
               className={crossoverWays === 2 ? 'active' : ''}
               onClick={() => setCrossoverWays(2)}
-              style={{ padding: '0.45rem 0.25rem', fontSize: '0.8rem', borderRadius: '0px', flex: 1 }}
+              style={{ padding: '0.45rem 0.25rem', fontSize: '0.78rem', borderRadius: '0px', flex: 1 }}
             >
               {t("2 Vías")}
             </button>
@@ -910,7 +918,7 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
               type="button"
               className={crossoverWays === 3 ? 'active' : ''}
               onClick={() => setCrossoverWays(3)}
-              style={{ padding: '0.45rem 0.25rem', fontSize: '0.8rem', borderRadius: '0px', flex: 1 }}
+              style={{ padding: '0.45rem 0.25rem', fontSize: '0.78rem', borderRadius: '0px', flex: 1 }}
             >
               {t("3 Vías")}
             </button>
@@ -926,47 +934,50 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
               <div className="input-group">
                 <label>Fs (Hz)</label>
                 <div className="input-wrapper">
-                  <input
-                    type="number"
+                  <NumericInput
+                    decimals={1}
+                    min={20}
                     value={midFs}
-                    onChange={(e) => setMidFs(parseFloat(e.target.value) || 0)}
-                    step="1"
+                    onValueChange={(v) => { if (v !== undefined) setMidFs(v); }}
+                    step={1}
                   />
                 </div>
               </div>
               <div className="input-group">
                 <label>Vas ({getUnitLabel('volume', unitSystem)})</label>
                 <div className="input-wrapper">
-                  <input
-                    type="number"
+                  <NumericInput
+                    decimals={3}
+                    min={0.01}
                     value={convertTo(midVas, 'volume', unitSystem)}
-                    onChange={(e) => {
-                      const val = parseFloat(e.target.value) || 0;
-                      setMidVas(convertFrom(val, 'volume', unitSystem));
+                    onValueChange={(v) => {
+                      if (v !== undefined) setMidVas(convertFrom(v, 'volume', unitSystem));
                     }}
-                    step="0.1"
+                    step={0.1}
                   />
                 </div>
               </div>
               <div className="input-group">
                 <label>Qts</label>
                 <div className="input-wrapper">
-                  <input
-                    type="number"
+                  <NumericInput
+                    decimals={3}
+                    min={0.05}
                     value={midQts}
-                    onChange={(e) => setMidQts(parseFloat(e.target.value) || 0)}
-                    step="0.01"
+                    onValueChange={(v) => { if (v !== undefined) setMidQts(v); }}
+                    step={0.01}
                   />
                 </div>
               </div>
               <div className="input-group">
                 <label>Qtc Obj.</label>
                 <div className="input-wrapper">
-                  <input
-                    type="number"
+                  <NumericInput
+                    decimals={3}
+                    min={0.2}
                     value={midTargetQtc}
-                    onChange={(e) => setMidTargetQtc(parseFloat(e.target.value) || 0.707)}
-                    step="0.01"
+                    onValueChange={(v) => { if (v !== undefined) setMidTargetQtc(v); }}
+                    step={0.01}
                   />
                 </div>
               </div>
@@ -1003,12 +1014,14 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
           <div className="input-group">
             <label>{t("Impedancia Nominal")}</label>
             <div className="input-wrapper">
-              <input 
-                type="number" 
-                value={params.zNominal ?? ''} 
-                onChange={(e) => handleInputChange('zNominal', e.target.value)}
-                placeholder="8" 
-                step="any" 
+              <NumericInput
+                allowEmpty={true}
+                treatZeroAsEmpty={true}
+                decimals={2}
+                value={params.zNominal ?? ''}
+                onValueChange={(v) => handleNumericFieldChange('zNominal', v)}
+                placeholder="8"
+                step="any"
               />
               <span className="unit-badge">Ω</span>
             </div>
@@ -1016,12 +1029,14 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
           <div className="input-group">
             <label>{t("Potencia RMS (Watts)")}</label>
             <div className="input-wrapper">
-              <input 
-                type="number" 
-                value={params.pe ?? ''} 
-                onChange={(e) => handleInputChange('pe', e.target.value)}
-                placeholder="150" 
-                step="any" 
+              <NumericInput
+                allowEmpty={true}
+                treatZeroAsEmpty={true}
+                decimals={2}
+                value={params.pe ?? ''}
+                onValueChange={(v) => handleNumericFieldChange('pe', v)}
+                placeholder="150"
+                step="any"
               />
               <span className="unit-badge">W</span>
             </div>
@@ -1029,12 +1044,14 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
           <div className="input-group">
             <label>{t("Program Power")}</label>
             <div className="input-wrapper">
-              <input 
-                type="number" 
-                value={params.pProg ?? ''} 
-                onChange={(e) => handleInputChange('pProg', e.target.value)}
-                placeholder="300" 
-                step="any" 
+              <NumericInput
+                allowEmpty={true}
+                treatZeroAsEmpty={true}
+                decimals={2}
+                value={params.pProg ?? ''}
+                onValueChange={(v) => handleNumericFieldChange('pProg', v)}
+                placeholder="300"
+                step="any"
               />
               <span className="unit-badge">W</span>
             </div>
@@ -1042,12 +1059,14 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
           <div className="input-group">
             <label>{t("Rango Frec. (Mín)")}</label>
             <div className="input-wrapper">
-              <input 
-                type="number" 
-                value={params.freqMin ?? ''} 
-                onChange={(e) => handleInputChange('freqMin', e.target.value)}
-                placeholder="57" 
-                step="any" 
+              <NumericInput
+                allowEmpty={true}
+                treatZeroAsEmpty={true}
+                decimals={2}
+                value={params.freqMin ?? ''}
+                onValueChange={(v) => handleNumericFieldChange('freqMin', v)}
+                placeholder="57"
+                step="any"
               />
               <span className="unit-badge">Hz</span>
             </div>
@@ -1055,12 +1074,14 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
           <div className="input-group">
             <label>{t("Rango Frec. (Máx)")}</label>
             <div className="input-wrapper">
-              <input 
-                type="number" 
-                value={params.freqMax ?? ''} 
-                onChange={(e) => handleInputChange('freqMax', e.target.value)}
-                placeholder="4500" 
-                step="any" 
+              <NumericInput
+                allowEmpty={true}
+                treatZeroAsEmpty={true}
+                decimals={2}
+                value={params.freqMax ?? ''}
+                onValueChange={(v) => handleNumericFieldChange('freqMax', v)}
+                placeholder="4500"
+                step="any"
               />
               <span className="unit-badge">Hz</span>
             </div>
@@ -1068,12 +1089,14 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
           <div className="input-group">
             <label>{t("Sensibilidad (1W/1m)")}</label>
             <div className="input-wrapper">
-              <input 
-                type="number" 
-                value={params.sens ?? ''} 
-                onChange={(e) => handleInputChange('sens', e.target.value)}
-                placeholder="95.6" 
-                step="any" 
+              <NumericInput
+                allowEmpty={true}
+                treatZeroAsEmpty={true}
+                decimals={2}
+                value={params.sens ?? ''}
+                onValueChange={(v) => handleNumericFieldChange('sens', v)}
+                placeholder="95.6"
+                step="any"
               />
               <span className="unit-badge">dB</span>
             </div>
@@ -1081,12 +1104,14 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
           <div className="input-group">
             <label>{t("Peso del Imán")}</label>
             <div className="input-wrapper">
-              <input 
-                type="number" 
-                value={params.magWeight ?? ''} 
-                onChange={(e) => handleInputChange('magWeight', e.target.value)}
-                placeholder="20" 
-                step="any" 
+              <NumericInput
+                allowEmpty={true}
+                treatZeroAsEmpty={true}
+                decimals={2}
+                value={params.magWeight ?? ''}
+                onValueChange={(v) => handleNumericFieldChange('magWeight', v)}
+                placeholder="20"
+                step="any"
               />
               <span className="unit-badge">oz</span>
             </div>
@@ -1094,12 +1119,14 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
           <div className="input-group">
             <label style={{ whiteSpace: 'nowrap' }}>{t("Altura del Gap")}</label>
             <div className="input-wrapper">
-              <input 
-                type="number" 
-                value={params.gapHeight ?? ''} 
-                onChange={(e) => handleInputChange('gapHeight', e.target.value)}
-                placeholder="6.4" 
-                step="any" 
+              <NumericInput
+                allowEmpty={true}
+                treatZeroAsEmpty={true}
+                decimals={2}
+                value={params.gapHeight ?? ''}
+                onValueChange={(v) => handleNumericFieldChange('gapHeight', v)}
+                placeholder="6.4"
+                step="any"
               />
               <span className="unit-badge">mm</span>
             </div>
@@ -1107,12 +1134,14 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
           <div className="input-group">
             <label>{t("Diám. Bobina Móvil")}</label>
             <div className="input-wrapper">
-              <input 
-                type="number" 
-                value={displayValue('vcDiameter')} 
-                onChange={(e) => handleInputChange('vcDiameter', e.target.value)}
-                placeholder="38" 
-                step="any" 
+              <NumericInput
+                allowEmpty={true}
+                treatZeroAsEmpty={true}
+                decimals={3}
+                value={numericFieldValue('vcDiameter')}
+                onValueChange={(v) => handleNumericFieldChange('vcDiameter', v)}
+                placeholder="38"
+                step="any"
               />
               <span className="unit-badge">{getUnitLabel('length_small', unitSystem)}</span>
             </div>
@@ -1120,12 +1149,14 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
           <div className="input-group">
             <label>{t("Vol. Desplazado (Driver)")}</label>
             <div className="input-wrapper">
-              <input 
-                type="number" 
-                value={displayValue('driverVolDisplaced')} 
-                onChange={(e) => handleInputChange('driverVolDisplaced', e.target.value)}
-                placeholder="0.95" 
-                step="any" 
+              <NumericInput
+                allowEmpty={true}
+                treatZeroAsEmpty={true}
+                decimals={3}
+                value={numericFieldValue('driverVolDisplaced')}
+                onValueChange={(v) => handleNumericFieldChange('driverVolDisplaced', v)}
+                placeholder="0.95"
+                step="any"
               />
               <span className="unit-badge">{getUnitLabel('volume', unitSystem)}</span>
             </div>
@@ -1133,12 +1164,14 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
           <div className="input-group">
             <label>{t("Diámetro Total Ext.")}</label>
             <div className="input-wrapper">
-              <input 
-                type="number" 
-                value={displayValue('overallDiameter')} 
-                onChange={(e) => handleInputChange('overallDiameter', e.target.value)}
-                placeholder="256.8" 
-                step="any" 
+              <NumericInput
+                allowEmpty={true}
+                treatZeroAsEmpty={true}
+                decimals={3}
+                value={numericFieldValue('overallDiameter')}
+                onValueChange={(v) => handleNumericFieldChange('overallDiameter', v)}
+                placeholder="256.8"
+                step="any"
               />
               <span className="unit-badge">{getUnitLabel('length_small', unitSystem)}</span>
             </div>
@@ -1146,12 +1179,14 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
           <div className="input-group">
             <label>{t("Corte en Bafle (Ø)")}</label>
             <div className="input-wrapper">
-              <input 
-                type="number" 
-                value={displayValue('baffleCutout')} 
-                onChange={(e) => handleInputChange('baffleCutout', e.target.value)}
-                placeholder="231.9" 
-                step="any" 
+              <NumericInput
+                allowEmpty={true}
+                treatZeroAsEmpty={true}
+                decimals={3}
+                value={numericFieldValue('baffleCutout')}
+                onValueChange={(v) => handleNumericFieldChange('baffleCutout', v)}
+                placeholder="231.9"
+                step="any"
               />
               <span className="unit-badge">{getUnitLabel('length_small', unitSystem)}</span>
             </div>
@@ -1159,12 +1194,14 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
           <div className="input-group">
             <label>{t("Profundidad (Depth)")}</label>
             <div className="input-wrapper">
-              <input 
-                type="number" 
-                value={displayValue('driverDepth')} 
-                onChange={(e) => handleInputChange('driverDepth', e.target.value)}
-                placeholder="99.1" 
-                step="any" 
+              <NumericInput
+                allowEmpty={true}
+                treatZeroAsEmpty={true}
+                decimals={3}
+                value={numericFieldValue('driverDepth')}
+                onValueChange={(v) => handleNumericFieldChange('driverDepth', v)}
+                placeholder="99.1"
+                step="any"
               />
               <span className="unit-badge">{getUnitLabel('length_small', unitSystem)}</span>
             </div>
@@ -1197,12 +1234,14 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
           <div className="input-group">
             <label title={t("Frecuencia de resonancia al aire libre (equivalente a Resonance)")}>Fs <span className="label-desc">({t("Resonancia")})</span></label>
             <div className="input-wrapper">
-              <input 
-                type="number" 
-                value={params.fs ?? ''} 
-                onChange={(e) => handleInputChange('fs', e.target.value)}
-                placeholder={estimatedTS.fs ? `${estimatedTS.fs} (auto)` : "45"} 
-                step="0.1" 
+              <NumericInput
+                allowEmpty={true}
+                treatZeroAsEmpty={true}
+                decimals={2}
+                value={params.fs ?? ''}
+                onValueChange={(v) => handleNumericFieldChange('fs', v)}
+                placeholder={estimatedTS.fs ? `${estimatedTS.fs} (auto)` : "45"}
+                step="0.1"
                 required
               />
               <span className="unit-badge">Hz</span>
@@ -1211,12 +1250,14 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
           <div className="input-group">
             <label>Vas <span className="label-desc">({t("Vol. Eq")})</span></label>
             <div className="input-wrapper">
-              <input 
-                type="number" 
-                value={displayValue('vas')} 
-                onChange={(e) => handleInputChange('vas', e.target.value)}
-                placeholder={estimatedTS.vas ? `${convertTo(estimatedTS.vas, 'volume', unitSystem).toFixed(1)} (auto)` : convertTo(60, 'volume', unitSystem).toFixed(1)} 
-                step="any" 
+              <NumericInput
+                allowEmpty={true}
+                treatZeroAsEmpty={true}
+                decimals={3}
+                value={numericFieldValue('vas')}
+                onValueChange={(v) => handleNumericFieldChange('vas', v)}
+                placeholder={estimatedTS.vas ? `${convertTo(estimatedTS.vas, 'volume', unitSystem).toFixed(1)} (auto)` : convertTo(60, 'volume', unitSystem).toFixed(1)}
+                step="any"
                 required
               />
               <span className="unit-badge">{getUnitLabel('volume', unitSystem)}</span>
@@ -1225,48 +1266,56 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
           <div className="input-group">
             <label>Qms <span className="label-desc">({t("Q Mecánico")})</span></label>
             <div className="input-wrapper">
-              <input 
-                type="number" 
-                value={params.qms ?? ''} 
-                onChange={(e) => handleInputChange('qms', e.target.value)}
-                placeholder={estimatedTS.qms ? `${estimatedTS.qms} (auto)` : "4.5"} 
-                step="any" 
+              <NumericInput
+                allowEmpty={true}
+                treatZeroAsEmpty={true}
+                decimals={3}
+                value={params.qms ?? ''}
+                onValueChange={(v) => handleNumericFieldChange('qms', v)}
+                placeholder={estimatedTS.qms ? `${estimatedTS.qms} (auto)` : "4.5"}
+                step="any"
               />
             </div>
           </div>
           <div className="input-group">
             <label>Qes <span className="label-desc">({t("Q Eléctrico")})</span></label>
             <div className="input-wrapper">
-              <input 
-                type="number" 
-                value={params.qes ?? ''} 
-                onChange={(e) => handleInputChange('qes', e.target.value)}
-                placeholder={estimatedTS.qes ? `${estimatedTS.qes} (auto)` : "0.45"} 
-                step="any" 
+              <NumericInput
+                allowEmpty={true}
+                treatZeroAsEmpty={true}
+                decimals={3}
+                value={params.qes ?? ''}
+                onValueChange={(v) => handleNumericFieldChange('qes', v)}
+                placeholder={estimatedTS.qes ? `${estimatedTS.qes} (auto)` : "0.45"}
+                step="any"
               />
             </div>
           </div>
           <div className="input-group">
             <label>Qts <span className="label-desc">({t("Q Total")})</span></label>
             <div className="input-wrapper">
-              <input 
-                type="number" 
-                value={params.qts ?? ''} 
-                onChange={(e) => handleInputChange('qts', e.target.value)}
-                placeholder={estimatedTS.qts ? `${estimatedTS.qts} (auto)` : "0.41"} 
-                step="any" 
+              <NumericInput
+                allowEmpty={true}
+                treatZeroAsEmpty={true}
+                decimals={3}
+                value={params.qts ?? ''}
+                onValueChange={(v) => handleNumericFieldChange('qts', v)}
+                placeholder={estimatedTS.qts ? `${estimatedTS.qts} (auto)` : "0.41"}
+                step="any"
               />
             </div>
           </div>
           <div className="input-group">
             <label>Sd <span className="label-desc">({t("Área Cono")})</span></label>
             <div className="input-wrapper">
-              <input 
-                type="number" 
-                value={displayValue('sd')} 
-                onChange={(e) => handleInputChange('sd', e.target.value)}
-                placeholder={estimatedTS.sd ? `${convertTo(estimatedTS.sd, 'area', unitSystem).toFixed(1)} (auto)` : convertTo(350, 'area', unitSystem).toFixed(1)} 
-                step="any" 
+              <NumericInput
+                allowEmpty={true}
+                treatZeroAsEmpty={true}
+                decimals={2}
+                value={numericFieldValue('sd')}
+                onValueChange={(v) => handleNumericFieldChange('sd', v)}
+                placeholder={estimatedTS.sd ? `${convertTo(estimatedTS.sd, 'area', unitSystem).toFixed(1)} (auto)` : convertTo(350, 'area', unitSystem).toFixed(1)}
+                step="any"
               />
               <span className="unit-badge">{getUnitLabel('area', unitSystem)}</span>
             </div>
@@ -1274,12 +1323,14 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
           <div className="input-group">
             <label>Xmax <span className="label-desc">({t("Excursión")})</span></label>
             <div className="input-wrapper">
-              <input 
-                type="number" 
-                value={displayValue('xmax')} 
-                onChange={(e) => handleInputChange('xmax', e.target.value)}
-                placeholder={estimatedTS.xmax ? `${convertTo(estimatedTS.xmax, 'length_small', unitSystem).toFixed(2)} (auto)` : convertTo(6.5, 'length_small', unitSystem).toFixed(2)} 
-                step="any" 
+              <NumericInput
+                allowEmpty={true}
+                treatZeroAsEmpty={true}
+                decimals={3}
+                value={numericFieldValue('xmax')}
+                onValueChange={(v) => handleNumericFieldChange('xmax', v)}
+                placeholder={estimatedTS.xmax ? `${convertTo(estimatedTS.xmax, 'length_small', unitSystem).toFixed(2)} (auto)` : convertTo(6.5, 'length_small', unitSystem).toFixed(2)}
+                step="any"
               />
               <span className="unit-badge">{getUnitLabel('length_small', unitSystem)}</span>
             </div>
@@ -1287,12 +1338,14 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
           <div className="input-group">
             <label>Re <span className="label-desc">({t("Resist. DC")})</span></label>
             <div className="input-wrapper">
-              <input 
-                type="number" 
-                value={params.re ?? ''} 
-                onChange={(e) => handleInputChange('re', e.target.value)}
-                placeholder="3.6" 
-                step="any" 
+              <NumericInput
+                allowEmpty={true}
+                treatZeroAsEmpty={true}
+                decimals={3}
+                value={params.re ?? ''}
+                onValueChange={(v) => handleNumericFieldChange('re', v)}
+                placeholder="3.6"
+                step="any"
               />
               <span className="unit-badge">Ω</span>
             </div>
@@ -1305,12 +1358,14 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
             <div className="input-group">
               <label>BL <span className="label-desc">({t("Fuerza Motor")})</span></label>
               <div className="input-wrapper">
-                <input 
-                  type="number" 
-                  value={params.bl ?? ''} 
-                  onChange={(e) => handleInputChange('bl', e.target.value)}
-                  placeholder={derived?.bl.toFixed(2) || "7.5"} 
-                  step="any" 
+                <NumericInput
+                  allowEmpty={true}
+                  treatZeroAsEmpty={true}
+                  decimals={3}
+                  value={params.bl ?? ''}
+                  onValueChange={(v) => handleNumericFieldChange('bl', v)}
+                  placeholder={derived?.bl.toFixed(2) || "7.5"}
+                  step="any"
                 />
                 <span className="unit-badge">T-m</span>
               </div>
@@ -1318,12 +1373,14 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
             <div className="input-group">
               <label>Mms <span className="label-desc">({t("Masa Móvil")})</span></label>
               <div className="input-wrapper">
-                <input 
-                  type="number" 
-                  value={params.mms ?? ''} 
-                  onChange={(e) => handleInputChange('mms', e.target.value)}
-                  placeholder={derived?.mms.toFixed(1) || "22"} 
-                  step="any" 
+                <NumericInput
+                  allowEmpty={true}
+                  treatZeroAsEmpty={true}
+                  decimals={3}
+                  value={params.mms ?? ''}
+                  onValueChange={(v) => handleNumericFieldChange('mms', v)}
+                  placeholder={derived?.mms.toFixed(1) || "22"}
+                  step="any"
                 />
                 <span className="unit-badge">g</span>
               </div>
@@ -1331,12 +1388,14 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
             <div className="input-group">
               <label>Cms <span className="label-desc">({t("Compliancia")})</span></label>
               <div className="input-wrapper">
-                <input 
-                  type="number" 
-                  value={params.cms ?? ''} 
-                  onChange={(e) => handleInputChange('cms', e.target.value)}
-                  placeholder={derived?.cms.toFixed(3) || "0.46"} 
-                  step="any" 
+                <NumericInput
+                  allowEmpty={true}
+                  treatZeroAsEmpty={true}
+                  decimals={4}
+                  value={params.cms ?? ''}
+                  onValueChange={(v) => handleNumericFieldChange('cms', v)}
+                  placeholder={derived?.cms.toFixed(3) || "0.46"}
+                  step="any"
                 />
                 <span className="unit-badge">mm/N</span>
               </div>
@@ -1344,12 +1403,14 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
             <div className="input-group">
               <label>Xlim <span className="label-desc">({t("Límite Mecánico")})</span></label>
               <div className="input-wrapper">
-                <input 
-                  type="number" 
-                  value={displayValue('xlim')} 
-                  onChange={(e) => handleInputChange('xlim', e.target.value)}
-                  placeholder={convertTo(9.1, 'length_small', unitSystem).toFixed(2)} 
-                  step="any" 
+                <NumericInput
+                  allowEmpty={true}
+                  treatZeroAsEmpty={true}
+                  decimals={3}
+                  value={numericFieldValue('xlim')}
+                  onValueChange={(v) => handleNumericFieldChange('xlim', v)}
+                  placeholder={convertTo(9.1, 'length_small', unitSystem).toFixed(2)}
+                  step="any"
                 />
                 <span className="unit-badge">{getUnitLabel('length_small', unitSystem)}</span>
               </div>
@@ -1357,12 +1418,14 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
             <div className="input-group">
               <label>Le <span className="label-desc">({t("Inductancia")})</span></label>
               <div className="input-wrapper">
-                <input 
-                  type="number" 
-                  value={params.le ?? ''} 
-                  onChange={(e) => handleInputChange('le', e.target.value)}
-                  placeholder="0.8" 
-                  step="any" 
+                <NumericInput
+                  allowEmpty={true}
+                  treatZeroAsEmpty={true}
+                  decimals={3}
+                  value={params.le ?? ''}
+                  onValueChange={(v) => handleNumericFieldChange('le', v)}
+                  placeholder="0.8"
+                  step="any"
                 />
                 <span className="unit-badge">mH</span>
               </div>
@@ -1370,12 +1433,14 @@ export const SpeakerParamsForm: React.FC<SpeakerParamsFormProps> = ({
             <div className="input-group">
               <label>Vd <span className="label-desc">({t("Vol. Desplazado")})</span></label>
               <div className="input-wrapper">
-                <input 
-                  type="number" 
-                  value={displayValue('vd')} 
-                  onChange={(e) => handleInputChange('vd', e.target.value)}
-                  placeholder={derived ? convertTo(derived.vd, 'volume_small', unitSystem).toFixed(1) : convertTo(114, 'volume_small', unitSystem).toFixed(1)} 
-                  step="any" 
+                <NumericInput
+                  allowEmpty={true}
+                  treatZeroAsEmpty={true}
+                  decimals={2}
+                  value={numericFieldValue('vd')}
+                  onValueChange={(v) => handleNumericFieldChange('vd', v)}
+                  placeholder={derived ? convertTo(derived.vd, 'volume_small', unitSystem).toFixed(1) : convertTo(114, 'volume_small', unitSystem).toFixed(1)}
+                  step="any"
                 />
                 <span className="unit-badge">{getUnitLabel('volume_small', unitSystem)}</span>
               </div>

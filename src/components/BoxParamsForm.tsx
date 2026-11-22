@@ -3,13 +3,18 @@ import { type Lang, translate } from '../utils/translations';
 import { type UnitSystem, convertTo, convertFrom, getUnitLabel } from '../utils/units';
 import type { CalculatedPorted, CalculatedSealed, CalculatedBandpass, SpeakerParams, PortSuggestions, WoodCabinetData, WoodShape, VentedAlignmentType, Bandpass6Topology } from '../types';
 import { suggestPortConfig, calcOptimalPortForSpeaker, calculatePortSpacing, calcPortLength, getKCorrection } from '../utils/acousticMath';
-import { getWasm, optimizeCrossoverLowpass, calcSuggestFb, calcSealedForF3, calcVentedForF3, suggestPassiveRadiator } from '../wasm';
+import { getWasm, optimizeCrossoverLowpass, calcSuggestFb, calcSealedForF3, calcVentedForF3, calcVentedFbForF3, suggestPassiveRadiator } from '../wasm';
+import { NumericInput } from './NumericInput';
 
 interface BoxParamsFormProps {
   lang: Lang;
   unitSystem: UnitSystem;
   boxType: 'sealed' | 'ported' | 'bandpass';
   setBoxType: (type: 'sealed' | 'ported' | 'bandpass') => void;
+  customSealed?: boolean;
+  setCustomSealed?: (val: boolean) => void;
+  customSealedVb?: number;
+  setCustomSealedVb?: (vb: number) => void;
   customVb: number;
   setCustomVb: (vb: number) => void;
   customFb: number;
@@ -203,6 +208,10 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
   unitSystem,
   boxType,
   setBoxType,
+  customSealed = false,
+  setCustomSealed,
+  customSealedVb = 30,
+  setCustomSealedVb,
   customVb,
   setCustomVb,
   customFb,
@@ -372,23 +381,28 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
 }) => {
   const t = useCallback((text: string) => translate(text, lang), [lang]);
 
-  // Desired F3 (BassBox Pro) local state
-  const [desiredF3Sealed, setDesiredF3Sealed] = useState<string>('50');
+  // Desired F3 local state
+  const [desiredF3Sealed, setDesiredF3Sealed] = useState<number | ''>(50);
   const [desiredF3SealedMsg, setDesiredF3SealedMsg] = useState<string>('');
-  const [desiredF3Vented, setDesiredF3Vented] = useState<string>('40');
+  const [desiredF3Vented, setDesiredF3Vented] = useState<number | ''>(40);
   const [desiredF3VentedMsg, setDesiredF3VentedMsg] = useState<string>('');
 
-  const handleApplyDesiredF3Sealed = () => {
-    const f3Target = parseFloat(desiredF3Sealed);
+  const handleApplyDesiredF3Sealed = (overrideTarget?: number) => {
+    const f3Target = typeof overrideTarget === 'number'
+      ? overrideTarget
+      : (typeof desiredF3Sealed === 'number' ? desiredF3Sealed : NaN);
     if (!params.fs || !params.vas || !params.qts || !Number.isFinite(f3Target) || f3Target <= 0) {
       setDesiredF3SealedMsg(t("Ingresa un F3 objetivo válido."));
       return;
     }
-    const res = calcSealedForF3(params.fs, params.vas, params.qts, f3Target);
+    const res = calcSealedForF3(params.fs, params.vas, params.qts, f3Target, dampingType, classicalModel);
     if (res.valid) {
+      setCustomSealedVb?.(res.vb);
+      setCustomSealed?.(true);
       setTargetQtc(Number(res.qtc.toFixed(3)));
-      setCustomPorted(false);
-      setDesiredF3SealedMsg(`${t("Aplicado")}: Qtc ${res.qtc.toFixed(2)} (F3 ≈ ${res.f3.toFixed(1)} Hz)`);
+      const vbDisp = convertTo(res.vb, 'volume', unitSystem);
+      const vbFmt = unitSystem === 'imperial' ? vbDisp.toFixed(2) : vbDisp.toFixed(1);
+      setDesiredF3SealedMsg(`${t("Aplicado")}: Vb ${vbFmt} ${getUnitLabel('volume', unitSystem)} · Qtc ${res.qtc.toFixed(2)} (F3 ≈ ${res.f3.toFixed(1)} Hz)`);
     } else if (res.statusCode === 1) {
       setDesiredF3SealedMsg(`${t("F3 demasiado baja para este altavoz")} (mín ≈ ${res.f3.toFixed(1)} Hz)`);
     } else if (res.statusCode === 2) {
@@ -398,23 +412,52 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
     }
   };
 
-  const handleApplyDesiredF3Vented = () => {
-    const f3Target = parseFloat(desiredF3Vented);
+  const handleApplyDesiredF3Vented = (overrideTarget?: number) => {
+    const f3Target = typeof overrideTarget === 'number'
+      ? overrideTarget
+      : (typeof desiredF3Vented === 'number' ? desiredF3Vented : NaN);
     if (!params.fs || !params.vas || !params.qts || !Number.isFinite(f3Target) || f3Target <= 0) {
       setDesiredF3VentedMsg(t("Ingresa un F3 objetivo válido."));
       return;
     }
-    const res = calcVentedForF3(params.fs, params.vas, params.qts, f3Target);
+    const res = calcVentedForF3(params.fs, params.vas, params.qts, f3Target, dampingType, classicalModel);
     if (res.valid) {
-      setCustomVb(Number(res.vb.toFixed(2)));
+      setCustomVb(Number(res.vb.toFixed(3)));
       setCustomFb(Number(res.fb.toFixed(1)));
       setCustomPorted(true);
       setUseCustomPortLength(false);
-      setDesiredF3VentedMsg(`${t("Aplicado")}: Vb ${res.vb.toFixed(1)} L · Fb ${res.fb.toFixed(1)} Hz`);
+      const vbDisp = convertTo(res.vb, 'volume', unitSystem);
+      const vbFmt = unitSystem === 'imperial' ? vbDisp.toFixed(2) : vbDisp.toFixed(1);
+      setDesiredF3VentedMsg(`${t("Aplicado")}: Vb ${vbFmt} ${getUnitLabel('volume', unitSystem)} · Fb ${res.fb.toFixed(1)} Hz (F3 ≈ ${res.f3.toFixed(1)} Hz)`);
     } else if (res.statusCode === 1) {
       setDesiredF3VentedMsg(`${t("F3 demasiado baja para este altavoz")} (mín ≈ ${res.f3.toFixed(1)} Hz)`);
     } else if (res.statusCode === 2) {
       setDesiredF3VentedMsg(`${t("F3 demasiado alta")} (máx ≈ ${res.f3.toFixed(1)} Hz)`);
+    } else {
+      setDesiredF3VentedMsg(t("No se pudo alcanzar el F3 deseado."));
+    }
+  };
+
+  const handleApplyDesiredF3VentedFbOnly = (overrideTarget?: number) => {
+    const f3Target = typeof overrideTarget === 'number'
+      ? overrideTarget
+      : (typeof desiredF3Vented === 'number' ? desiredF3Vented : NaN);
+    const vbFixed = portedData.valid && portedData.Vb > 0 ? portedData.Vb : customVb;
+    if (!params.fs || !params.vas || !params.qts || vbFixed <= 0 || !Number.isFinite(f3Target) || f3Target <= 0) {
+      setDesiredF3VentedMsg(t("Ingresa un F3 objetivo válido."));
+      return;
+    }
+    const res = calcVentedFbForF3(params.fs, params.vas, params.qts, vbFixed, f3Target, dampingType, classicalModel);
+    if (res.valid) {
+      setCustomVb(Number(vbFixed.toFixed(3)));
+      setCustomFb(Number(res.fb.toFixed(1)));
+      setCustomPorted(true);
+      setUseCustomPortLength(false);
+      setDesiredF3VentedMsg(`${t("Aplicado")}: Fb ${res.fb.toFixed(1)} Hz (F3 ≈ ${res.f3.toFixed(1)} Hz)`);
+    } else if (res.statusCode === 1) {
+      setDesiredF3VentedMsg(`${t("F3 demasiado baja para este volumen")} (mín ≈ ${res.f3.toFixed(1)} Hz)`);
+    } else if (res.statusCode === 2) {
+      setDesiredF3VentedMsg(`${t("F3 demasiado alta para este volumen")} (máx ≈ ${res.f3.toFixed(1)} Hz)`);
     } else {
       setDesiredF3VentedMsg(t("No se pudo alcanzar el F3 deseado."));
     }
@@ -527,7 +570,26 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
     const fH = fcHigh;
     const wasm = getWasm();
 
-    if (crossoverWays === 2 && f > 0) {
+    if (crossoverWays === 1 && f > 0) {
+      if (crossoverType === '1st_order') {
+        const resW = wasm ? wasm.calc_filtro_1er_orden(f, Rw) : null;
+        list.push({ label: `${t("Subwoofer L1")} (1er O)`, value: resW ? resW.l : (Rw / (2 * Math.PI * f)) * 1000 });
+        resW?.free();
+      } else if (crossoverType === '2nd_butter') {
+        const resW = wasm ? wasm.calc_filtro_2do_orden_butterworth(f, Rw) : null;
+        list.push({ label: `${t("Subwoofer L1")} (2do O Butter)`, value: resW ? resW.l_lp : ((Rw * Math.sqrt(2)) / (2 * Math.PI * f)) * 1000 });
+        resW?.free();
+      } else if (crossoverType === '2nd_lr') {
+        const resW = wasm ? wasm.calc_filtro_linkwitz_riley(f, Rw) : null;
+        list.push({ label: `${t("Subwoofer L1")} (2do O LR)`, value: resW ? resW.l : (Rw / (Math.PI * f)) * 1000 });
+        resW?.free();
+      } else if (crossoverType === '4th_lr') {
+        const resW = wasm ? wasm.calc_filtro_4to_orden_lr(f, Rw) : null;
+        list.push({ label: `${t("Subwoofer L1")} (4to O LR)`, value: resW ? resW.l1 : (0.1592 * Rw * 1000) / f });
+        list.push({ label: `${t("Subwoofer L2")} (4to O LR)`, value: resW ? resW.l2 : (0.0796 * Rw * 1000) / f });
+        resW?.free();
+      }
+    } else if (crossoverWays === 2 && f > 0) {
       if (crossoverType === '1st_order') {
         const resW = wasm ? wasm.calc_filtro_1er_orden(f, Rw) : null;
         list.push({ label: `${t("Woofer L1")} (1er O)`, value: resW ? resW.l : (Rw / (2 * Math.PI * f)) * 1000 });
@@ -636,7 +698,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
     return params.fs || 50;
   }, [useCustomPortLength, customPorted, customFb, recommendedFbForDriver, portedData.valid, portedData.Fb, params.fs]);
 
-  // Alineación sugerida óptima según Qts del driver (BassBox B4 <= 0.49, Compacto práctico > 0.49)
+  // Alineación sugerida óptima según Qts del driver (B4 <= 0.49, Compacto práctico > 0.49)
   const recommendedAlignment = useMemo<VentedAlignmentType>(() => {
     if (!params.qts) return 'B4';
     if (params.qts > 0.49) return 'COMPACT';
@@ -722,17 +784,13 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
     return calculatePortSpacing(pCount, innerW, portShape, pSize, portSpacingPct);
   }, [portCount, cabinetData?.wInt, portShape, portDiameter, portWidth, portSpacingPct]);
 
-  const handlePortCountChange = (valStr: string) => {
-    if (valStr === '') {
+  const handlePortCountChange = (val: number | undefined) => {
+    if (val === undefined) {
       setPortCount('');
       return;
     }
-    const newCount = Math.max(1, parseInt(valStr) || 1);
+    const newCount = Math.max(1, Math.min(6, Math.round(val)));
     setPortCount(newCount);
-    if (portShape === 'round' && suggestions && suggestions.valid && suggestions.dMin) {
-      const suggestedDia = suggestions.dMin / Math.sqrt(newCount);
-      setPortDiameter(Number(suggestedDia.toFixed(1)));
-    }
   };
 
   const handleApplyPort = (num: number, dia: number) => {
@@ -776,20 +834,16 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
     }
   };
 
-  const displayVal = (val: number | '', type: 'length' | 'length_small' | 'volume') => {
-    if (val === '' || val === undefined || val === null) return '';
-    const converted = convertTo(val, type, unitSystem);
-    return (Math.round(converted * 1000) / 1000).toString();
-  };
-
-  const handleInputChange = (valStr: string, setter: (v: number | '') => void, type: 'length' | 'length_small' | 'volume') => {
-    if (valStr === '') {
+  const handleNumericChange = (
+    val: number | undefined,
+    setter: (v: number | '') => void,
+    type: 'length' | 'length_small' | 'volume'
+  ) => {
+    if (val === undefined || !Number.isFinite(val)) {
       setter('');
       return;
     }
-    let num = parseFloat(valStr) || 0;
-    num = convertFrom(num, type, unitSystem);
-    setter(num);
+    setter(convertFrom(val, type, unitSystem));
   };
 
   const handleApplySuggestedCabinet = () => {
@@ -905,7 +959,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
 
         {/* Pista graduada con 3 zonas y puntero */}
         <div className="ebp-meter-track">
-          <div className="ebp-zone-sealed" title="0 - 60: Caja Sellada (BassBox)" />
+          <div className="ebp-zone-sealed" title="0 - 60: Caja Sellada" />
           <div className="ebp-zone-hybrid" title="60 - 90: Sellada, Ventilada o Radiador Pasivo" />
           <div className="ebp-zone-ported" title="> 90: Caja Ventilada o Radiador Pasivo" />
           {ebpValue !== null && (
@@ -981,8 +1035,12 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
               <button
                 type="button"
                 className={ventedAlignment === 'QB3' ? 'active' : ''}
-                onClick={() => setVentedAlignment('QB3')}
-                title={t("High Output (BassBox): menor excursión y caja compacta (Qtc ~0.8)")}
+                onClick={() => {
+                  setVentedAlignment('QB3');
+                  setCustomPorted(false);
+                  setUseCustomPortLength(false);
+                }}
+                title={t("High Output (QB3): menor excursión y caja compacta (Qtc ~0.8)")}
                 style={{ padding: '0.18rem 0.12rem', fontSize: '0.58rem', lineHeight: 1.05, height: 'auto', minHeight: '26px', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
               >
                 <span>{t("Potencia")}</span>
@@ -991,8 +1049,12 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
               <button
                 type="button"
                 className={ventedAlignment === 'B4' ? 'active' : ''}
-                onClick={() => setVentedAlignment('B4')}
-                title={t("High Fidelity (Keele/BassBox): respuesta máximamente plana")}
+                onClick={() => {
+                  setVentedAlignment('B4');
+                  setCustomPorted(false);
+                  setUseCustomPortLength(false);
+                }}
+                title={t("High Fidelity (Keele): respuesta máximamente plana")}
                 style={{ padding: '0.18rem 0.12rem', fontSize: '0.58rem', lineHeight: 1.05, height: 'auto', minHeight: '26px', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
               >
                 <span>Hi-Fi</span>
@@ -1001,8 +1063,12 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
               <button
                 type="button"
                 className={ventedAlignment === 'SBB4' ? 'active' : ''}
-                onClick={() => setVentedAlignment('SBB4')}
-                title={t("Extended Bass (EBS BassBox): 12.3·Vas·Qts^2.4")}
+                onClick={() => {
+                  setVentedAlignment('SBB4');
+                  setCustomPorted(false);
+                  setUseCustomPortLength(false);
+                }}
+                title={t("Extended Bass (EBS): 12.3·Vas·Qts^2.4")}
                 style={{ padding: '0.18rem 0.12rem', fontSize: '0.58rem', lineHeight: 1.05, height: 'auto', minHeight: '26px', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
               >
                 <span>Ext. Bass</span>
@@ -1011,7 +1077,11 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
               <button
                 type="button"
                 className={ventedAlignment === 'B6' ? 'active' : ''}
-                onClick={() => setVentedAlignment('B6')}
+                onClick={() => {
+                  setVentedAlignment('B6');
+                  setCustomPorted(false);
+                  setUseCustomPortLength(false);
+                }}
                 title={t("Ventilada 6.º orden con filtro paso-alto activo (Fx=1.07·Fb, Qx=1.93)")}
                 style={{ padding: '0.18rem 0.12rem', fontSize: '0.58rem', lineHeight: 1.05, height: 'auto', minHeight: '26px', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
               >
@@ -1021,7 +1091,11 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
               <button
                 type="button"
                 className={ventedAlignment === 'COMPACT' ? 'active' : ''}
-                onClick={() => setVentedAlignment('COMPACT')}
+                onClick={() => {
+                  setVentedAlignment('COMPACT');
+                  setCustomPorted(false);
+                  setUseCustomPortLength(false);
+                }}
                 title={t("Modo compacto práctico para Qts alto (>0.45)")}
                 style={{ padding: '0.18rem 0.12rem', fontSize: '0.58rem', lineHeight: 1.05, height: 'auto', minHeight: '26px', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
               >
@@ -1040,8 +1114,8 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
             <div className="segmented-control" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', width: '100%', margin: 0, padding: '1px' }}>
               <button
                 type="button"
-                className={Math.abs(targetQtc - 0.577) < 0.05 ? 'active' : ''}
-                onClick={() => setTargetQtc(0.577)}
+                className={!customSealed && Math.abs(targetQtc - 0.577) < 0.05 ? 'active' : ''}
+                onClick={() => { setTargetQtc(0.577); setCustomSealed?.(false); }}
                 title={t("Bessel (Qtc 0.577): Óptima respuesta transitoria")}
                 style={{ padding: '0.15rem 0.18rem', fontSize: '0.6rem', height: '22px', minWidth: 0 }}
               >
@@ -1049,8 +1123,8 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
               </button>
               <button
                 type="button"
-                className={Math.abs(targetQtc - 0.707) < 0.05 ? 'active' : ''}
-                onClick={() => setTargetQtc(0.707)}
+                className={!customSealed && Math.abs(targetQtc - 0.707) < 0.05 ? 'active' : ''}
+                onClick={() => { setTargetQtc(0.707); setCustomSealed?.(false); }}
                 title={t("Butterworth (Qtc 0.707): Máxima planicidad")}
                 style={{ padding: '0.15rem 0.18rem', fontSize: '0.6rem', height: '22px', minWidth: 0 }}
               >
@@ -1058,8 +1132,8 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
               </button>
               <button
                 type="button"
-                className={Math.abs(targetQtc - 1.0) < 0.05 ? 'active' : ''}
-                onClick={() => setTargetQtc(1.0)}
+                className={!customSealed && Math.abs(targetQtc - 1.0) < 0.05 ? 'active' : ''}
+                onClick={() => { setTargetQtc(1.0); setCustomSealed?.(false); }}
                 title={t("Chebyshev (Qtc 1.0): Compacta con realce")}
                 style={{ padding: '0.15rem 0.18rem', fontSize: '0.6rem', height: '22px', minWidth: 0 }}
               >
@@ -1067,9 +1141,9 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
               </button>
               <button
                 type="button"
-                className={Math.abs(targetQtc - 1.5) < 0.05 ? 'active' : ''}
-                onClick={() => setTargetQtc(1.5)}
-                title={t("High Output BassBox (Qtc 1.5): Máxima compacidad y salida")}
+                className={!customSealed && Math.abs(targetQtc - 1.5) < 0.05 ? 'active' : ''}
+                onClick={() => { setTargetQtc(1.5); setCustomSealed?.(false); }}
+                title={t("High Output (Qtc 1.5): Máxima compacidad y salida")}
                 style={{ padding: '0.15rem 0.18rem', fontSize: '0.6rem', height: '22px', minWidth: 0 }}
               >
                 1.5 (Out)
@@ -1097,7 +1171,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 type="button"
                 className={bandpassOrder === 6 && bandpassTopology === 'parallel' ? 'active' : ''}
                 onClick={() => { setBandpassOrder(6); setBandpassTopology?.('parallel'); }}
-                title={t("Paso Banda 6.º Orden Paralelo (BassBox)")}
+                title={t("Paso Banda 6.º Orden Paralelo")}
                 style={{ padding: '0.15rem 0.2rem', fontSize: '0.62rem', height: '22px', minWidth: 0 }}
               >
                 {t("6.º Par.")}
@@ -1106,7 +1180,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 type="button"
                 className={bandpassOrder === 6 && bandpassTopology === 'series' ? 'active' : ''}
                 onClick={() => { setBandpassOrder(6); setBandpassTopology?.('series'); }}
-                title={t("Paso Banda 6.º Orden Serie (BassBox)")}
+                title={t("Paso Banda 6.º Orden Serie")}
                 style={{ padding: '0.15rem 0.2rem', fontSize: '0.62rem', height: '22px', minWidth: 0 }}
               >
                 {t("6.º Serie")}
@@ -1115,7 +1189,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
           </div>
         )}
 
-        {/* Fila 2: Vías del Sistema (2W vs 3W) */}
+        {/* Fila 2: Vías del Sistema (1W vs 2W vs 3W) */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem' }}>
           <span style={{ fontSize: '0.67rem', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>
             {t("Vías del Sistema:")}
@@ -1123,10 +1197,19 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
           <div className="segmented-control" style={{ display: 'inline-flex', width: 'auto', margin: 0, padding: '1px', flex: 1 }}>
             <button
               type="button"
+              className={crossoverWays === 1 ? 'active' : ''}
+              onClick={() => setCrossoverWays(1)}
+              title={t("Solo Subwoofer / 1 Vía (Sin Tweeter)")}
+              style={{ padding: '0.15rem 0.32rem', fontSize: '0.66rem', height: '22px' }}
+            >
+              {t("Sub (1W)")}
+            </button>
+            <button
+              type="button"
               className={crossoverWays === 2 ? 'active' : ''}
               onClick={() => setCrossoverWays(2)}
               title={t("Sistema de 2 Vías (Tweeter + Woofer)")}
-              style={{ padding: '0.15rem 0.4rem', fontSize: '0.68rem', height: '22px' }}
+              style={{ padding: '0.15rem 0.32rem', fontSize: '0.66rem', height: '22px' }}
             >
               {t("2 Vías (2W)")}
             </button>
@@ -1135,7 +1218,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
               className={crossoverWays === 3 ? 'active' : ''}
               onClick={() => setCrossoverWays(3)}
               title={t("Sistema de 3 Vías (Tweeter + Medio + Woofer)")}
-              style={{ padding: '0.15rem 0.4rem', fontSize: '0.68rem', height: '22px' }}
+              style={{ padding: '0.15rem 0.32rem', fontSize: '0.66rem', height: '22px' }}
             >
               {t("3 Vías (3W)")}
             </button>
@@ -1267,10 +1350,11 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     <div className="input-group">
                       <label>{woodShape === 'trapezoidal' ? t("Alto Externo") : t("Alto Fijo")}</label>
                       <div className="input-wrapper">
-                        <input
-                          type="number"
-                          value={displayVal(woodLockVal1, 'length')}
-                          onChange={(e) => handleInputChange(e.target.value, setWoodLockVal1, 'length')}
+                        <NumericInput
+                          allowEmpty={true}
+                          decimals={3}
+                          value={woodLockVal1 === '' ? '' : convertTo(woodLockVal1, 'length', unitSystem)}
+                          onValueChange={(v) => handleNumericChange(v, setWoodLockVal1, 'length')}
                           step="0.1"
                         />
                         <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
@@ -1279,10 +1363,11 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     <div className="input-group">
                       <label>{woodShape === 'trapezoidal' ? t("Ancho Externo") : t("Ancho Fijo")}</label>
                       <div className="input-wrapper">
-                        <input
-                          type="number"
-                          value={displayVal(woodLockVal2, 'length')}
-                          onChange={(e) => handleInputChange(e.target.value, setWoodLockVal2, 'length')}
+                        <NumericInput
+                          allowEmpty={true}
+                          decimals={3}
+                          value={woodLockVal2 === '' ? '' : convertTo(woodLockVal2, 'length', unitSystem)}
+                          onValueChange={(v) => handleNumericChange(v, setWoodLockVal2, 'length')}
                           step="0.1"
                         />
                         <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
@@ -1292,10 +1377,11 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       <div className="input-group">
                         <label>{t("Prof. Superior (D1)")}</label>
                         <div className="input-wrapper">
-                          <input
-                            type="number"
-                            value={displayVal(woodLockVal3, 'length')}
-                            onChange={(e) => handleInputChange(e.target.value, setWoodLockVal3, 'length')}
+                          <NumericInput
+                            allowEmpty={true}
+                            decimals={3}
+                            value={woodLockVal3 === '' ? '' : convertTo(woodLockVal3, 'length', unitSystem)}
+                            onValueChange={(v) => handleNumericChange(v, setWoodLockVal3, 'length')}
                             step="0.1"
                           />
                           <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
@@ -1326,10 +1412,11 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     <div className="input-group">
                       <label>{t("Alto Externo")}</label>
                       <div className="input-wrapper">
-                        <input
-                          type="number"
-                          value={displayVal(woodExtHeight, 'length')}
-                          onChange={(e) => handleInputChange(e.target.value, setWoodExtHeight, 'length')}
+                        <NumericInput
+                          allowEmpty={true}
+                          decimals={3}
+                          value={woodExtHeight === '' ? '' : convertTo(woodExtHeight, 'length', unitSystem)}
+                          onValueChange={(v) => handleNumericChange(v, setWoodExtHeight, 'length')}
                           step="0.1"
                         />
                         <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
@@ -1338,10 +1425,11 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     <div className="input-group">
                       <label>{t("Ancho Externo")}</label>
                       <div className="input-wrapper">
-                        <input
-                          type="number"
-                          value={displayVal(woodExtWidth, 'length')}
-                          onChange={(e) => handleInputChange(e.target.value, setWoodExtWidth, 'length')}
+                        <NumericInput
+                          allowEmpty={true}
+                          decimals={3}
+                          value={woodExtWidth === '' ? '' : convertTo(woodExtWidth, 'length', unitSystem)}
+                          onValueChange={(v) => handleNumericChange(v, setWoodExtWidth, 'length')}
                           step="0.1"
                         />
                         <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
@@ -1350,10 +1438,11 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     <div className="input-group">
                       <label>{t("Profundidad")}</label>
                       <div className="input-wrapper">
-                        <input
-                          type="number"
-                          value={displayVal(woodExtDepth, 'length')}
-                          onChange={(e) => handleInputChange(e.target.value, setWoodExtDepth, 'length')}
+                        <NumericInput
+                          allowEmpty={true}
+                          decimals={3}
+                          value={woodExtDepth === '' ? '' : convertTo(woodExtDepth, 'length', unitSystem)}
+                          onValueChange={(v) => handleNumericChange(v, setWoodExtDepth, 'length')}
                           step="0.1"
                         />
                         <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
@@ -1366,10 +1455,11 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       <div className="input-group">
                         <label>{t("Alto Externo")}</label>
                         <div className="input-wrapper">
-                          <input
-                            type="number"
-                            value={displayVal(woodTrapExtHeight, 'length')}
-                            onChange={(e) => handleInputChange(e.target.value, setWoodTrapExtHeight, 'length')}
+                          <NumericInput
+                            allowEmpty={true}
+                            decimals={3}
+                            value={woodTrapExtHeight === '' ? '' : convertTo(woodTrapExtHeight, 'length', unitSystem)}
+                            onValueChange={(v) => handleNumericChange(v, setWoodTrapExtHeight, 'length')}
                             step="0.1"
                           />
                           <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
@@ -1378,10 +1468,11 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       <div className="input-group">
                         <label>{t("Ancho Frontal")}</label>
                         <div className="input-wrapper">
-                          <input
-                            type="number"
-                            value={displayVal(woodTrapExtWidth, 'length')}
-                            onChange={(e) => handleInputChange(e.target.value, setWoodTrapExtWidth, 'length')}
+                          <NumericInput
+                            allowEmpty={true}
+                            decimals={3}
+                            value={woodTrapExtWidth === '' ? '' : convertTo(woodTrapExtWidth, 'length', unitSystem)}
+                            onValueChange={(v) => handleNumericChange(v, setWoodTrapExtWidth, 'length')}
                             step="0.1"
                           />
                           <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
@@ -1390,10 +1481,11 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       <div className="input-group">
                         <label>{t("Ancho Trasero")}</label>
                         <div className="input-wrapper">
-                          <input
-                            type="number"
-                            value={displayVal(woodTrapExtRearWidth, 'length')}
-                            onChange={(e) => setWoodTrapExtRearWidth && handleInputChange(e.target.value, setWoodTrapExtRearWidth, 'length')}
+                          <NumericInput
+                            allowEmpty={true}
+                            decimals={3}
+                            value={woodTrapExtRearWidth === '' ? '' : convertTo(woodTrapExtRearWidth, 'length', unitSystem)}
+                            onValueChange={(v) => setWoodTrapExtRearWidth && handleNumericChange(v, setWoodTrapExtRearWidth, 'length')}
                             step="0.1"
                           />
                           <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
@@ -1402,10 +1494,11 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       <div className="input-group">
                         <label>{t("Prof. Sup. (D1)")}</label>
                         <div className="input-wrapper">
-                          <input
-                            type="number"
-                            value={displayVal(woodTrapExtDepthTop, 'length')}
-                            onChange={(e) => handleInputChange(e.target.value, setWoodTrapExtDepthTop, 'length')}
+                          <NumericInput
+                            allowEmpty={true}
+                            decimals={3}
+                            value={woodTrapExtDepthTop === '' ? '' : convertTo(woodTrapExtDepthTop, 'length', unitSystem)}
+                            onValueChange={(v) => handleNumericChange(v, setWoodTrapExtDepthTop, 'length')}
                             step="0.1"
                           />
                           <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
@@ -1414,10 +1507,11 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       <div className="input-group">
                         <label>{t("Prof. Inf. (D2)")}</label>
                         <div className="input-wrapper">
-                          <input
-                            type="number"
-                            value={displayVal(woodTrapExtDepthBot, 'length')}
-                            onChange={(e) => handleInputChange(e.target.value, setWoodTrapExtDepthBot, 'length')}
+                          <NumericInput
+                            allowEmpty={true}
+                            decimals={3}
+                            value={woodTrapExtDepthBot === '' ? '' : convertTo(woodTrapExtDepthBot, 'length', unitSystem)}
+                            onValueChange={(v) => handleNumericChange(v, setWoodTrapExtDepthBot, 'length')}
                             step="0.1"
                           />
                           <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
@@ -1452,10 +1546,11 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 <div className="input-group">
                   <label>{t("Espesor madera")}</label>
                   <div className="input-wrapper">
-                    <input
-                      type="number"
-                      value={displayVal(woodThickness, 'length_small')}
-                      onChange={(e) => handleInputChange(e.target.value, setWoodThickness, 'length_small')}
+                    <NumericInput
+                      allowEmpty={true}
+                      decimals={3}
+                      value={woodThickness === '' ? '' : convertTo(woodThickness, 'length_small', unitSystem)}
+                      onValueChange={(v) => handleNumericChange(v, setWoodThickness, 'length_small')}
                       step="0.1"
                       style={{ height: '30px', padding: '0.2rem 2rem 0.2rem 0.55rem', fontSize: '0.78rem' }}
                     />
@@ -1465,10 +1560,11 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 <div className="input-group">
                   <label>{t("Vol extra")}</label>
                   <div className="input-wrapper">
-                    <input
-                      type="number"
-                      value={displayVal(woodExtra, 'volume')}
-                      onChange={(e) => handleInputChange(e.target.value, setWoodExtra, 'volume')}
+                    <NumericInput
+                      allowEmpty={true}
+                      decimals={3}
+                      value={woodExtra === '' ? '' : convertTo(woodExtra, 'volume', unitSystem)}
+                      onValueChange={(v) => handleNumericChange(v, setWoodExtra, 'volume')}
                       step="0.1"
                       style={{ height: '30px', padding: '0.2rem 2rem 0.2rem 0.55rem', fontSize: '0.78rem' }}
                     />
@@ -1594,23 +1690,24 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                         <div className="input-group">
                           <label>Fs ({t("Medios")}) (Hz)</label>
                           <div className="input-wrapper">
-                            <input
-                              type="number"
+                            <NumericInput
+                              decimals={1}
+                              min={20}
                               value={midFs}
-                              onChange={(e) => setMidFs(parseFloat(e.target.value) || 120)}
+                              onValueChange={(v) => { if (v !== undefined) setMidFs(v); }}
                               style={{ height: '30px', padding: '0.2rem 0.55rem', fontSize: '0.78rem' }}
                             />
                           </div>
                         </div>
                         <div className="input-group">
-                          <label>Vas ({t("Medios")}) (L)</label>
+                          <label>Vas ({t("Medios")}) ({getUnitLabel('volume', unitSystem)})</label>
                           <div className="input-wrapper">
-                            <input
-                              type="number"
+                            <NumericInput
+                              decimals={3}
+                              min={0.01}
                               value={convertTo(midVas, 'volume', unitSystem)}
-                              onChange={(e) => {
-                                const val = parseFloat(e.target.value) || 0;
-                                setMidVas(convertFrom(val, 'volume', unitSystem));
+                              onValueChange={(v) => {
+                                if (v !== undefined) setMidVas(convertFrom(v, 'volume', unitSystem));
                               }}
                               style={{ height: '30px', padding: '0.2rem 0.55rem', fontSize: '0.78rem' }}
                             />
@@ -1619,10 +1716,11 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                         <div className="input-group">
                           <label>Qts ({t("Medios")})</label>
                           <div className="input-wrapper">
-                            <input
-                              type="number"
+                            <NumericInput
+                              decimals={3}
+                              min={0.05}
                               value={midQts}
-                              onChange={(e) => setMidQts(parseFloat(e.target.value) || 0.45)}
+                              onValueChange={(v) => { if (v !== undefined) setMidQts(v); }}
                               step="0.01"
                               style={{ height: '30px', padding: '0.2rem 0.55rem', fontSize: '0.78rem' }}
                             />
@@ -1631,10 +1729,11 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                         <div className="input-group">
                           <label>{t("Qtc Objetivo (Medios)")}</label>
                           <div className="input-wrapper">
-                            <input
-                              type="number"
+                            <NumericInput
+                              decimals={3}
+                              min={0.2}
                               value={midTargetQtc}
-                              onChange={(e) => setMidTargetQtc(parseFloat(e.target.value) || 0.707)}
+                              onValueChange={(v) => { if (v !== undefined) setMidTargetQtc(v); }}
                               step="0.01"
                               style={{ height: '30px', padding: '0.2rem 0.55rem', fontSize: '0.78rem' }}
                             />
@@ -1645,10 +1744,11 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       <div className="input-group" style={{ marginBottom: '0.5rem' }}>
                         <label>{t("Volumen del Recinto de Medios")}</label>
                         <div className="input-wrapper">
-                          <input
-                            type="number"
-                            value={displayVal(customMidVol, 'volume')}
-                            onChange={(e) => handleInputChange(e.target.value, setCustomMidVol, 'volume')}
+                          <NumericInput
+                            allowEmpty={true}
+                            decimals={3}
+                            value={customMidVol === '' ? '' : convertTo(customMidVol, 'volume', unitSystem)}
+                            onValueChange={(v) => handleNumericChange(v, setCustomMidVol, 'volume')}
                             placeholder={convertTo(3.0, 'volume', unitSystem).toFixed(2)}
                             step="0.1"
                             style={{ height: '30px', padding: '0.2rem 2.2rem 0.2rem 0.55rem', fontSize: '0.78rem' }}
@@ -1661,13 +1761,11 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     <div className="input-group" style={{ marginBottom: '0.5rem' }}>
                       <label>{t("Profundidad de la Cámara de Medios")} ({getUnitLabel('length', unitSystem)})</label>
                       <div className="input-wrapper">
-                        <input
-                          type="number"
-                          value={displayVal(midCabinetDepth, 'length')}
-                          onChange={(e) => {
-                            const val = parseFloat(e.target.value) || 0;
-                            setMidCabinetDepth(convertFrom(val, 'length', unitSystem));
-                          }}
+                        <NumericInput
+                          allowEmpty={true}
+                          decimals={3}
+                          value={midCabinetDepth === '' ? '' : convertTo(midCabinetDepth, 'length', unitSystem)}
+                          onValueChange={(v) => handleNumericChange(v, setMidCabinetDepth, 'length')}
                           step="0.1"
                           style={{ height: '30px', padding: '0.2rem 2.2rem 0.2rem 0.55rem', fontSize: '0.78rem' }}
                         />
@@ -1724,11 +1822,135 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
               </div>
             )}
 
-            {/* Si es Caja Sellada: Ajuste de Vb y Qtc Objetivo */}
+            {/* Si es Caja Sellada: Ajuste de Vb, Qtc y F3 Objetivo */}
             {boxType === 'sealed' && (
               <div className="premium-form-card" style={{ marginBottom: '0.65rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                  <div className="form-subsection-title" style={{ margin: 0 }}>{t("Alineación Sellada (Vb / Qtc)")}</div>
+                  <div className="form-subsection-title" style={{ margin: 0 }}>{t("Alineación Sellada (Vb / Qtc / F3)")}</div>
+                  {customSealed && (
+                    <button
+                      type="button"
+                      onClick={() => setCustomSealed?.(false)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--text-main)',
+                        fontSize: '0.7rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        padding: 0
+                      }}
+                    >
+                      {t("Restablecer Óptima")}
+                    </button>
+                  )}
+                </div>
+                {isLinkedToCabinet && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.4rem', marginBottom: '0.45rem', padding: '0.28rem 0.45rem', background: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.35)', borderRadius: '4px', fontSize: '0.66rem', color: '#fbbf24' }}>
+                    <span>{t("Vb controlado por Medidas Manuales.")}</span>
+                    <button
+                      type="button"
+                      onClick={() => setWoodMode('calc')}
+                      className="preset-select"
+                      style={{ padding: '0.12rem 0.4rem', fontSize: '0.64rem', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                    >
+                      {t("Desbloquear Vb")}
+                    </button>
+                  </div>
+                )}
+                <div className="input-grid">
+                  <div className="input-group">
+                    <label>{t("Volumen Neto (Vb)")}</label>
+                    <div className="input-wrapper">
+                      <NumericInput
+                        decimals={unitSystem === 'imperial' ? 3 : 2}
+                        min={0.01}
+                        step={unitSystem === 'imperial' ? 0.05 : 0.5}
+                        value={convertTo(sealedData.valid ? sealedData.Vb : customSealedVb, 'volume', unitSystem)}
+                        onValueChange={(v) => {
+                          if (v !== undefined && v > 0) {
+                            const valLitres = convertFrom(v, 'volume', unitSystem);
+                            setCustomSealedVb?.(valLitres);
+                            setCustomSealed?.(true);
+                          }
+                        }}
+                        disabled={isLinkedToCabinet}
+                      />
+                      <span className="unit-badge">{getUnitLabel('volume', unitSystem)}</span>
+                    </div>
+                  </div>
+                  <div className="input-group">
+                    <label>{t("Q del Sistema (Qtc)")}</label>
+                    <div className="input-wrapper">
+                      <NumericInput
+                        decimals={3}
+                        min={0.2}
+                        max={3.0}
+                        step={0.01}
+                        value={customSealed && sealedData.valid ? sealedData.Qtc : targetQtc}
+                        onValueChange={(v) => {
+                          if (v !== undefined && v > (params.qts || 0.05)) {
+                            setTargetQtc(v);
+                            setCustomSealed?.(false);
+                          }
+                        }}
+                        disabled={isLinkedToCabinet}
+                      />
+                      <span className="unit-badge">Qtc</span>
+                    </div>
+                  </div>
+                </div>
+
+                {sealedData.valid && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.35rem', fontSize: '0.66rem', color: 'var(--text-muted)' }}>
+                    <span>Fc: <strong style={{ color: 'var(--text-main)' }}>{sealedData.Fc.toFixed(1)} Hz</strong></span>
+                    <span>F3: <strong style={{ color: 'var(--accent)' }}>{sealedData.F3.toFixed(1)} Hz</strong></span>
+                    <span>Qtc: <strong style={{ color: 'var(--text-main)' }}>{sealedData.Qtc.toFixed(3)}</strong></span>
+                  </div>
+                )}
+
+                {/* Desired F3 */}
+                <div style={{ marginTop: '0.55rem', paddingTop: '0.45rem', borderTop: '1px solid var(--card-border)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                      {t("F3 Deseada (Hz)")}:
+                    </span>
+                    <NumericInput
+                      allowEmpty={true}
+                      decimals={1}
+                      step={0.5}
+                      min={15}
+                      max={500}
+                      value={desiredF3Sealed}
+                      onValueChange={(v) => setDesiredF3Sealed(v === undefined ? '' : v)}
+                      onEnter={(v) => handleApplyDesiredF3Sealed(v)}
+                      style={{ width: '68px', padding: '0.2rem 0.35rem', fontSize: '0.72rem' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleApplyDesiredF3Sealed()}
+                      disabled={isLinkedToCabinet}
+                      className="preset-select"
+                      style={{ padding: '0.2rem 0.5rem', fontSize: '0.66rem', fontWeight: 600, cursor: isLinkedToCabinet ? 'not-allowed' : 'pointer' }}
+                    >
+                      {t("Calcular Vb")}
+                    </button>
+                  </div>
+                  {desiredF3SealedMsg && (
+                    <div style={{ fontSize: '0.64rem', color: 'var(--text-muted)', marginTop: '0.22rem' }}>
+                      {desiredF3SealedMsg}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Si es Caja Ventilada: Acceso directo en Medidas a Vb, Fb y F3 Objetivo */}
+            {boxType === 'ported' && (
+              <div className="premium-form-card" style={{ marginBottom: '0.65rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                  <div className="form-subsection-title" style={{ margin: 0 }}>{t("Alineación Ventilada (Vb / Fb / F3)")}</div>
                   {customPorted && (
                     <button
                       type="button"
@@ -1748,66 +1970,107 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     </button>
                   )}
                 </div>
+                {isLinkedToCabinet && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.4rem', marginBottom: '0.45rem', padding: '0.28rem 0.45rem', background: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.35)', borderRadius: '4px', fontSize: '0.66rem', color: '#fbbf24' }}>
+                    <span>{t("Vb controlado por Medidas Manuales.")}</span>
+                    <button
+                      type="button"
+                      onClick={() => setWoodMode('calc')}
+                      className="preset-select"
+                      style={{ padding: '0.12rem 0.4rem', fontSize: '0.64rem', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                    >
+                      {t("Desbloquear Vb")}
+                    </button>
+                  </div>
+                )}
                 <div className="input-grid">
                   <div className="input-group">
                     <label>{t("Volumen Neto (Vb)")}</label>
                     <div className="input-wrapper">
-                      <input
-                        type="number"
-                        value={Number(convertTo(sealedData.valid ? sealedData.Vb : customVb, 'volume', unitSystem).toFixed(2))}
-                        onChange={(e) => {
-                          const valLitres = convertFrom(parseFloat(e.target.value) || 0, 'volume', unitSystem);
-                          setCustomVb(valLitres);
-                          setCustomPorted(true);
+                      <NumericInput
+                        decimals={unitSystem === 'imperial' ? 3 : 2}
+                        min={0.01}
+                        step={unitSystem === 'imperial' ? 0.05 : 0.5}
+                        value={convertTo(portedData.valid ? portedData.Vb : customVb, 'volume', unitSystem)}
+                        onValueChange={(v) => {
+                          if (v !== undefined && v > 0) {
+                            const valLitres = convertFrom(v, 'volume', unitSystem);
+                            setCustomVb(valLitres);
+                            setCustomPorted(true);
+                          }
                         }}
                         disabled={isLinkedToCabinet}
-                        step="0.1"
                       />
                       <span className="unit-badge">{getUnitLabel('volume', unitSystem)}</span>
                     </div>
                   </div>
                   <div className="input-group">
-                    <label>{t("Q del Sistema (Qtc)")}</label>
+                    <label>{t("Sintonía (Fb)")}</label>
                     <div className="input-wrapper">
-                      <input
-                        type="number"
-                        value={targetQtc}
-                        onChange={(e) => setTargetQtc(parseFloat(e.target.value) || 0.707)}
-                        step="0.01"
+                      <NumericInput
+                        decimals={1}
+                        min={10}
+                        max={250}
+                        step={0.5}
+                        value={portedData.valid ? portedData.Fb : customFb}
+                        onValueChange={(v) => {
+                          if (v !== undefined && v > 0) {
+                            setCustomFb(v);
+                            setCustomPorted(true);
+                          }
+                        }}
                       />
-                      <span className="unit-badge">Qtc</span>
+                      <span className="unit-badge">Hz</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Desired F3 (BassBox Pro) */}
+                {portedData.valid && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.35rem', fontSize: '0.66rem', color: 'var(--text-muted)' }}>
+                    <span>Fb: <strong style={{ color: 'var(--text-main)' }}>{portedData.Fb.toFixed(1)} Hz</strong></span>
+                    <span>F3: <strong style={{ color: 'var(--accent)' }}>{portedData.F3.toFixed(1)} Hz</strong></span>
+                    <span>{portedData.alignment}</span>
+                  </div>
+                )}
+
                 <div style={{ marginTop: '0.55rem', paddingTop: '0.45rem', borderTop: '1px solid var(--card-border)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>
                       {t("F3 Deseada (Hz)")}:
                     </span>
-                    <input
-                      type="number"
-                      value={desiredF3Sealed}
-                      onChange={(e) => setDesiredF3Sealed(e.target.value)}
-                      step="1"
-                      min="15"
-                      max="500"
-                      style={{ width: '68px', padding: '0.2rem 0.35rem', fontSize: '0.72rem' }}
+                    <NumericInput
+                      allowEmpty={true}
+                      decimals={1}
+                      step={0.5}
+                      min={12}
+                      max={500}
+                      value={desiredF3Vented}
+                      onValueChange={(v) => setDesiredF3Vented(v === undefined ? '' : v)}
+                      onEnter={(v) => isLinkedToCabinet ? handleApplyDesiredF3VentedFbOnly(v) : handleApplyDesiredF3Vented(v)}
+                      style={{ width: '64px', padding: '0.2rem 0.35rem', fontSize: '0.72rem' }}
                     />
                     <button
                       type="button"
-                      onClick={handleApplyDesiredF3Sealed}
+                      onClick={() => handleApplyDesiredF3Vented()}
                       disabled={isLinkedToCabinet}
                       className="preset-select"
-                      style={{ padding: '0.2rem 0.5rem', fontSize: '0.66rem', fontWeight: 600, cursor: isLinkedToCabinet ? 'not-allowed' : 'pointer' }}
+                      style={{ padding: '0.2rem 0.45rem', fontSize: '0.65rem', fontWeight: 600, cursor: isLinkedToCabinet ? 'not-allowed' : 'pointer' }}
                     >
-                      {t("Calcular Vb")}
+                      {t("Calcular Vb/Fb")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyDesiredF3VentedFbOnly()}
+                      className="preset-select"
+                      title={t("Mantiene el Vb actual y ajusta solo Fb para alcanzar la F3 deseada")}
+                      style={{ padding: '0.2rem 0.45rem', fontSize: '0.65rem', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      {t("Solo Fb")}
                     </button>
                   </div>
-                  {desiredF3SealedMsg && (
+                  {desiredF3VentedMsg && (
                     <div style={{ fontSize: '0.64rem', color: 'var(--text-muted)', marginTop: '0.22rem' }}>
-                      {desiredF3SealedMsg}
+                      {desiredF3VentedMsg}
                     </div>
                   )}
                 </div>
@@ -1903,90 +2166,25 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 )}
               </div>
 
-              {boxType === 'ported' && setVentedAlignment && (
-                <div style={{ marginBottom: '0.75rem', background: 'rgba(255,255,255,0.02)', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--card-border)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
-                      {t("Alineación Acústica")}
-                    </label>
-                    <span style={{ fontSize: '0.68rem', color: 'var(--text-main)', fontWeight: 600 }}>
-                      {ventedAlignment === 'QB3'
-                        ? 'High Output (QB3)'
-                        : ventedAlignment === 'B4'
-                          ? 'High Fidelity (B4)'
-                          : ventedAlignment === 'SBB4'
-                            ? 'Extended Bass (EBS)'
-                            : ventedAlignment === 'B6'
-                              ? '6.º Orden HP Activo (B6)'
-                              : t("Compacto (Práctico)")}
+              {boxType === 'ported' && (
+                <div style={{ marginBottom: '0.65rem', background: 'rgba(255,255,255,0.02)', padding: '0.45rem 0.5rem', borderRadius: '6px', border: '1px solid var(--card-border)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                      {t("Modo Activo:")}
                     </span>
-                  </div>
-                  <div className="segmented-control" style={{ padding: '2px', display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: '2px' }}>
-                    <button
-                      type="button"
-                      className={ventedAlignment === 'QB3' ? 'active' : ''}
-                      onClick={() => {
-                        setVentedAlignment('QB3');
-                        setCustomPorted(false);
-                        setUseCustomPortLength(false);
-                      }}
-                      style={{ padding: '0.26rem 0.12rem', fontSize: '0.62rem', textAlign: 'center', minWidth: 0 }}
-                      title={t("High Output (BassBox): menor excursión y caja compacta (Qtc ~0.8)")}
-                    >
-                      QB3
-                    </button>
-                    <button
-                      type="button"
-                      className={ventedAlignment === 'B4' ? 'active' : ''}
-                      onClick={() => {
-                        setVentedAlignment('B4');
-                        setCustomPorted(false);
-                        setUseCustomPortLength(false);
-                      }}
-                      style={{ padding: '0.26rem 0.12rem', fontSize: '0.62rem', textAlign: 'center', minWidth: 0 }}
-                      title={t("High Fidelity (Keele/BassBox): respuesta máximamente plana")}
-                    >
-                      Hi-Fi B4
-                    </button>
-                    <button
-                      type="button"
-                      className={ventedAlignment === 'SBB4' ? 'active' : ''}
-                      onClick={() => {
-                        setVentedAlignment('SBB4');
-                        setCustomPorted(false);
-                        setUseCustomPortLength(false);
-                      }}
-                      style={{ padding: '0.26rem 0.12rem', fontSize: '0.62rem', textAlign: 'center', minWidth: 0 }}
-                      title={t("Extended Bass (EBS BassBox): 12.3·Vas·Qts^2.4")}
-                    >
-                      Ext. Bass
-                    </button>
-                    <button
-                      type="button"
-                      className={ventedAlignment === 'B6' ? 'active' : ''}
-                      onClick={() => {
-                        setVentedAlignment('B6');
-                        setCustomPorted(false);
-                        setUseCustomPortLength(false);
-                      }}
-                      style={{ padding: '0.26rem 0.12rem', fontSize: '0.62rem', textAlign: 'center', minWidth: 0 }}
-                      title={t("Ventilada 6.º orden con filtro paso-alto activo (Fx=1.07·Fb, Qx=1.93)")}
-                    >
-                      B6 (HP)
-                    </button>
-                    <button
-                      type="button"
-                      className={ventedAlignment === 'COMPACT' ? 'active' : ''}
-                      onClick={() => {
-                        setVentedAlignment('COMPACT');
-                        setCustomPorted(false);
-                        setUseCustomPortLength(false);
-                      }}
-                      style={{ padding: '0.26rem 0.12rem', fontSize: '0.62rem', textAlign: 'center', minWidth: 0 }}
-                      title={t("Modo compacto práctico para Qts alto (>0.45)")}
-                    >
-                      {t("Compacto")}
-                    </button>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-main)', fontWeight: 600 }}>
+                      {customPorted
+                        ? t("Manual")
+                        : ventedAlignment === 'QB3'
+                          ? 'High Output (QB3)'
+                          : ventedAlignment === 'B4'
+                            ? 'High Fidelity (B4)'
+                            : ventedAlignment === 'SBB4'
+                              ? 'Extended Bass (EBS)'
+                              : ventedAlignment === 'B6'
+                                ? '6.º Orden HP Activo (B6)'
+                                : t("Compacto (Práctico)")}
+                    </span>
                   </div>
                   {portedData.activeHpEnabled && portedData.hpFx && portedData.hpQx && (
                     <div style={{ marginTop: '0.32rem', padding: '0.22rem 0.4rem', borderRadius: '4px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', fontSize: '0.63rem', color: '#34d399', fontWeight: 600 }}>
@@ -2013,7 +2211,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     </div>
                   )}
                   {setExternalSubwoofer && (
-                    <div style={{ marginTop: '0.45rem', paddingTop: '0.4rem', borderTop: '1px solid var(--card-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+                    <div style={{ marginTop: '0.4rem', paddingTop: '0.35rem', borderTop: '1px solid var(--card-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
                       <label
                         style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-main)', cursor: 'pointer', margin: 0 }}
                         title={t("Optimiza Fb para trabajar como satélite/top apoyado por un subwoofer externo (corte típico 80–100 Hz)")}
@@ -2036,22 +2234,39 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 </div>
               )}
 
+              {isLinkedToCabinet && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.4rem', marginBottom: '0.45rem', padding: '0.28rem 0.45rem', background: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.35)', borderRadius: '4px', fontSize: '0.66rem', color: '#fbbf24' }}>
+                  <span>{t("Vb controlado por Medidas Manuales.")}</span>
+                  <button
+                    type="button"
+                    onClick={() => setWoodMode('calc')}
+                    className="preset-select"
+                    style={{ padding: '0.12rem 0.4rem', fontSize: '0.64rem', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                  >
+                    {t("Desbloquear Vb")}
+                  </button>
+                </div>
+              )}
+
               <div className="input-grid" style={{ alignItems: 'flex-start' }}>
                 <div className="input-group">
                   <label style={{ height: '1.2rem', display: 'flex', alignItems: 'center', margin: 0 }}>
                     {t("Volumen Neto (Vb)")}
                   </label>
                   <div className="input-wrapper">
-                    <input
-                      type="number"
-                      value={Number(convertTo(boxType === 'ported' ? (portedData.valid ? portedData.Vb : customVb) : (bandpassData.valid ? (bandpassData.Vf + bandpassData.Vr) : customVb), 'volume', unitSystem).toFixed(2))}
-                      onChange={(e) => {
-                        const valLitres = convertFrom(parseFloat(e.target.value) || 0, 'volume', unitSystem);
-                        setCustomVb(valLitres);
-                        setCustomPorted(true);
+                    <NumericInput
+                      decimals={unitSystem === 'imperial' ? 3 : 2}
+                      min={0.01}
+                      step={unitSystem === 'imperial' ? 0.05 : 0.5}
+                      value={convertTo(boxType === 'ported' ? (portedData.valid ? portedData.Vb : customVb) : (bandpassData.valid ? (bandpassData.Vf + bandpassData.Vr) : customVb), 'volume', unitSystem)}
+                      onValueChange={(v) => {
+                        if (v !== undefined && v > 0) {
+                          const valLitres = convertFrom(v, 'volume', unitSystem);
+                          setCustomVb(valLitres);
+                          setCustomPorted(true);
+                        }
                       }}
                       disabled={isLinkedToCabinet}
-                      step="0.1"
                     />
                     <span className="unit-badge">{getUnitLabel('volume', unitSystem)}</span>
                   </div>
@@ -2062,14 +2277,18 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     {boxType === 'bandpass' ? t("Sintonía Frontal (Fb)") : t("Sintonía (Fb)")}
                   </label>
                   <div className="input-wrapper">
-                    <input
-                      type="number"
-                      value={Number((boxType === 'ported' ? (portedData.valid ? portedData.Fb : customFb) : (bandpassData.valid ? bandpassData.Fb : customFb)).toFixed(1))}
-                      onChange={(e) => {
-                        setCustomFb(parseFloat(e.target.value) || 0);
-                        setCustomPorted(true);
+                    <NumericInput
+                      decimals={1}
+                      min={10}
+                      max={250}
+                      step={0.5}
+                      value={boxType === 'ported' ? (portedData.valid ? portedData.Fb : customFb) : (bandpassData.valid ? bandpassData.Fb : customFb)}
+                      onValueChange={(v) => {
+                        if (v !== undefined && v > 0) {
+                          setCustomFb(v);
+                          setCustomPorted(true);
+                        }
                       }}
-                      step="0.1"
                     />
                     <span className="unit-badge">Hz</span>
                   </div>
@@ -2115,27 +2334,38 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
 
               {boxType === 'ported' && (
                 <div style={{ marginTop: '0.5rem', paddingTop: '0.45rem', borderTop: '1px solid var(--card-border)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>
                       {t("F3 Deseada (Hz)")}:
                     </span>
-                    <input
-                      type="number"
+                    <NumericInput
+                      allowEmpty={true}
+                      decimals={1}
+                      step={0.5}
+                      min={12}
+                      max={500}
                       value={desiredF3Vented}
-                      onChange={(e) => setDesiredF3Vented(e.target.value)}
-                      step="1"
-                      min="12"
-                      max="500"
-                      style={{ width: '68px', padding: '0.2rem 0.35rem', fontSize: '0.72rem' }}
+                      onValueChange={(v) => setDesiredF3Vented(v === undefined ? '' : v)}
+                      onEnter={(v) => isLinkedToCabinet ? handleApplyDesiredF3VentedFbOnly(v) : handleApplyDesiredF3Vented(v)}
+                      style={{ width: '64px', padding: '0.2rem 0.35rem', fontSize: '0.72rem' }}
                     />
                     <button
                       type="button"
-                      onClick={handleApplyDesiredF3Vented}
+                      onClick={() => handleApplyDesiredF3Vented()}
                       disabled={isLinkedToCabinet}
                       className="preset-select"
-                      style={{ padding: '0.2rem 0.5rem', fontSize: '0.66rem', fontWeight: 600, cursor: isLinkedToCabinet ? 'not-allowed' : 'pointer' }}
+                      style={{ padding: '0.2rem 0.45rem', fontSize: '0.65rem', fontWeight: 600, cursor: isLinkedToCabinet ? 'not-allowed' : 'pointer' }}
                     >
                       {t("Calcular Vb/Fb")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyDesiredF3VentedFbOnly()}
+                      className="preset-select"
+                      title={t("Mantiene el Vb actual y ajusta solo Fb para alcanzar la F3 deseada")}
+                      style={{ padding: '0.2rem 0.45rem', fontSize: '0.65rem', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      {t("Solo Fb")}
                     </button>
                   </div>
                   {desiredF3VentedMsg && (
@@ -2157,23 +2387,23 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       style={{ width: '100%', height: '34px' }}
                     >
                       <option value={4}>{t("4.º Orden")}</option>
-                      <option value={6}>{t("6.º Orden (BassBox)")}</option>
+                      <option value={6}>{t("6.º Orden (Avanzado)")}</option>
                     </select>
                   </div>
                   {bandpassOrder === 4 ? (
                     <>
                       <div className="input-group">
-                        <label title={t("Factor de amortiguamiento del sistema (BassBox defecto 0.65)")}>
-                          {t("Factor DF (BassBox)")}
+                        <label title={t("Factor de amortiguamiento del sistema (defecto 0.65)")}>
+                          {t("Factor DF")}
                         </label>
                         <div className="input-wrapper">
-                          <input
-                            type="number"
+                          <NumericInput
+                            decimals={2}
+                            step={0.05}
+                            min={0.2}
+                            max={2.0}
                             value={bandpassDf}
-                            onChange={(e) => setBandpassDf?.(parseFloat(e.target.value) || 0.65)}
-                            step="0.05"
-                            min="0.2"
-                            max="2.0"
+                            onValueChange={(v) => { if (v !== undefined) setBandpassDf?.(v); }}
                           />
                         </div>
                       </div>
@@ -2182,13 +2412,13 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                           {t("Q't del Sistema (0 = auto)")} · {t("Efectivo")}: {(bandpassData.qtPrime ?? Math.max(0.8, (params.qts || 0.36) + 0.1)).toFixed(2)}
                         </label>
                         <div className="input-wrapper">
-                          <input
-                            type="number"
+                          <NumericInput
+                            decimals={2}
+                            step={0.05}
+                            min={0}
+                            max={2.5}
                             value={bandpassQtPrime}
-                            onChange={(e) => setBandpassQtPrime?.(Math.max(0, parseFloat(e.target.value) || 0))}
-                            step="0.05"
-                            min="0"
-                            max="2.5"
+                            onValueChange={(v) => { if (v !== undefined) setBandpassQtPrime?.(Math.max(0, v)); }}
                           />
                         </div>
                       </div>
@@ -2211,11 +2441,11 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
               )}
             </div>
 
-            {boxType === 'ported' && (
+            {(boxType === 'ported' || boxType === 'bandpass') && (
               <div className="premium-form-card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem' }}>
                   <div className="form-subsection-title" style={{ margin: 0 }}>{t("Configuración del Puerto")}</div>
-                  {prTuning === 'port' && (
+                  {boxType === 'ported' && prTuning === 'port' && (
                     <button
                       type="button"
                       onClick={handleApplyOptimalPort}
@@ -2235,29 +2465,31 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     </button>
                   )}
                 </div>
-                <div className="input-group" style={{ marginBottom: '0.75rem' }}>
-                  <label>{t("Sintonización mediante")}</label>
-                  <div className="segmented-control" style={{ padding: '2px', borderRadius: '0px' }}>
-                    <button
-                      type="button"
-                      className={prTuning === 'port' ? 'active' : ''}
-                      onClick={() => setPrTuning('port')}
-                      style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', borderRadius: '0px' }}
-                    >
-                      {t("Puerto de Aire")}
-                    </button>
-                    <button
-                      type="button"
-                      className={prTuning === 'radiator' ? 'active' : ''}
-                      onClick={() => setPrTuning('radiator')}
-                      style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', borderRadius: '0px' }}
-                    >
-                      {t("Radiador Pasivo")}
-                    </button>
+                {boxType === 'ported' && (
+                  <div className="input-group" style={{ marginBottom: '0.75rem' }}>
+                    <label>{t("Sintonización mediante")}</label>
+                    <div className="segmented-control" style={{ padding: '2px', borderRadius: '0px' }}>
+                      <button
+                        type="button"
+                        className={prTuning === 'port' ? 'active' : ''}
+                        onClick={() => setPrTuning('port')}
+                        style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', borderRadius: '0px' }}
+                      >
+                        {t("Puerto de Aire")}
+                      </button>
+                      <button
+                        type="button"
+                        className={prTuning === 'radiator' ? 'active' : ''}
+                        onClick={() => setPrTuning('radiator')}
+                        style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', borderRadius: '0px' }}
+                      >
+                        {t("Radiador Pasivo")}
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
 
-                {prTuning === 'port' ? (
+                {(boxType === 'bandpass' || prTuning === 'port') ? (
                   <>
                     <div className="input-group" style={{ marginBottom: '0.75rem' }}>
                       <label>{t("Forma del Puerto")}</label>
@@ -2293,17 +2525,19 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       )}
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: portShape === 'rectangular' ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr', gap: '0.45rem', marginBottom: '0.5rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: portShape === 'rectangular' ? 'repeat(2, minmax(0, 1fr))' : 'repeat(3, minmax(0, 1fr))', gap: '0.45rem', marginBottom: '0.5rem' }}>
                       <div className="input-group">
                         <label>{t("Cantidad")}</label>
                         <div className="input-wrapper">
-                          <input
-                            type="number"
+                          <NumericInput
+                            allowEmpty={true}
+                            integer={true}
+                            showStepper={true}
                             value={portCount}
-                            onChange={(e) => handlePortCountChange(e.target.value)}
+                            onValueChange={handlePortCountChange}
                             min={1}
                             max={6}
-                            step="1"
+                            step={1}
                           />
                         </div>
                       </div>
@@ -2313,11 +2547,13 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                           <div className="input-group">
                             <label>{t("Diámetro")}</label>
                             <div className="input-wrapper">
-                              <input
-                                type="number"
-                                value={displayVal(portDiameter, 'length')}
-                                onChange={(e) => handleInputChange(e.target.value, setPortDiameter, 'length')}
-                                step="0.1"
+                              <NumericInput
+                                allowEmpty={true}
+                                showStepper={true}
+                                decimals={3}
+                                value={portDiameter === '' ? '' : convertTo(portDiameter, 'length', unitSystem)}
+                                onValueChange={(v) => handleNumericChange(v, setPortDiameter, 'length')}
+                                step={unitSystem === 'imperial' ? 0.25 : 0.5}
                                 min={0.01}
                               />
                               <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
@@ -2327,11 +2563,13 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                             <label>{t("Longitud")}</label>
                             {useCustomPortLength ? (
                               <div className="input-wrapper">
-                                <input
-                                  type="number"
-                                  value={displayVal(customPortLength, 'length')}
-                                  onChange={(e) => handleInputChange(e.target.value, setCustomPortLength, 'length')}
-                                  step="0.1"
+                                <NumericInput
+                                  allowEmpty={true}
+                                  showStepper={true}
+                                  decimals={3}
+                                  value={customPortLength === '' ? '' : convertTo(customPortLength, 'length', unitSystem)}
+                                  onValueChange={(v) => handleNumericChange(v, setCustomPortLength, 'length')}
+                                  step={unitSystem === 'imperial' ? 0.25 : 0.5}
                                   placeholder="Auto"
                                 />
                                 <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
@@ -2348,12 +2586,14 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                           <div className="input-group">
                             <label>{t("Ancho")}</label>
                             <div className="input-wrapper">
-                              <input
-                                  type="number"
-                                  value={displayVal(portWidth, 'length')}
-                                  onChange={(e) => handleInputChange(e.target.value, setPortWidth, 'length')}
-                                  step="0.1"
-                                  min={0.01}
+                              <NumericInput
+                                allowEmpty={true}
+                                showStepper={true}
+                                decimals={3}
+                                value={portWidth === '' ? '' : convertTo(portWidth, 'length', unitSystem)}
+                                onValueChange={(v) => handleNumericChange(v, setPortWidth, 'length')}
+                                step={unitSystem === 'imperial' ? 0.25 : 0.5}
+                                min={0.01}
                               />
                               <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                             </div>
@@ -2361,12 +2601,14 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                           <div className="input-group">
                             <label>{t("Alto")}</label>
                             <div className="input-wrapper">
-                              <input
-                                  type="number"
-                                  value={displayVal(portHeight, 'length')}
-                                  onChange={(e) => handleInputChange(e.target.value, setPortHeight, 'length')}
-                                  step="0.1"
-                                  min={0.01}
+                              <NumericInput
+                                allowEmpty={true}
+                                showStepper={true}
+                                decimals={3}
+                                value={portHeight === '' ? '' : convertTo(portHeight, 'length', unitSystem)}
+                                onValueChange={(v) => handleNumericChange(v, setPortHeight, 'length')}
+                                step={unitSystem === 'imperial' ? 0.25 : 0.5}
+                                min={0.01}
                               />
                               <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
                             </div>
@@ -2375,11 +2617,13 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                             <label>{t("Longitud")}</label>
                             {useCustomPortLength ? (
                               <div className="input-wrapper">
-                                <input
-                                  type="number"
-                                  value={displayVal(customPortLength, 'length')}
-                                  onChange={(e) => handleInputChange(e.target.value, setCustomPortLength, 'length')}
-                                  step="0.1"
+                                <NumericInput
+                                  allowEmpty={true}
+                                  showStepper={true}
+                                  decimals={3}
+                                  value={customPortLength === '' ? '' : convertTo(customPortLength, 'length', unitSystem)}
+                                  onValueChange={(v) => handleNumericChange(v, setCustomPortLength, 'length')}
+                                  step={unitSystem === 'imperial' ? 0.25 : 0.5}
                                   placeholder="Auto"
                                 />
                                 <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
@@ -2698,7 +2942,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                         onClick={handleSuggestPassiveRadiator}
                         className="preset-select"
                         style={{ padding: '0.24rem 0.55rem', fontSize: '0.68rem', fontWeight: 600, cursor: 'pointer' }}
-                        title={t("Sugiere diámetro comercial (6\"–48\") y parámetros iniciales según BassBox Pro")}
+                        title={t("Sugiere diámetro comercial (6\"–48\") y parámetros iniciales óptimos")}
                       >
                         {t("Sugerir PR Óptimo")}
                       </button>
@@ -2707,10 +2951,11 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       <div className="input-group">
                         <label>{t("Diámetro PR")}</label>
                         <div className="input-wrapper">
-                          <input
-                            type="number"
-                            value={displayVal(prDia, 'length')}
-                            onChange={(e) => handleInputChange(e.target.value, (v) => setPrDia(typeof v === 'number' ? v : 0), 'length')}
+                          <NumericInput
+                            decimals={3}
+                            min={1}
+                            value={convertTo(prDia, 'length', unitSystem)}
+                            onValueChange={(v) => { if (v !== undefined) setPrDia(convertFrom(v, 'length', unitSystem)); }}
                             step="0.1"
                           />
                           <span className="unit-badge">{getUnitLabel('length', unitSystem)}</span>
@@ -2719,10 +2964,11 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       <div className="input-group">
                         <label>{t("Vas PR")}</label>
                         <div className="input-wrapper">
-                          <input
-                            type="number"
-                            value={displayVal(prVas, 'volume')}
-                            onChange={(e) => handleInputChange(e.target.value, (v) => setPrVas(typeof v === 'number' ? v : 0), 'volume')}
+                          <NumericInput
+                            decimals={3}
+                            min={0.1}
+                            value={convertTo(prVas, 'volume', unitSystem)}
+                            onValueChange={(v) => { if (v !== undefined) setPrVas(convertFrom(v, 'volume', unitSystem)); }}
                             step="0.1"
                           />
                           <span className="unit-badge">{getUnitLabel('volume', unitSystem)}</span>
@@ -2733,14 +2979,14 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       <div className="input-group">
                         <label>{t("Fs PR")}</label>
                         <div className="input-wrapper">
-                          <input type="number" value={prFs} onChange={(e) => setPrFs(parseFloat(e.target.value) || 0)} step="0.1" />
+                          <NumericInput decimals={1} min={5} value={prFs} onValueChange={(v) => { if (v !== undefined) setPrFs(v); }} step="0.1" />
                           <span className="unit-badge">Hz</span>
                         </div>
                       </div>
                       <div className="input-group">
                         <label>{t("Mms PR (g)")}</label>
                         <div className="input-wrapper">
-                          <input type="number" value={prMms} onChange={(e) => setPrMms(parseFloat(e.target.value) || 0)} step="0.1" />
+                          <NumericInput decimals={1} min={1} value={prMms} onValueChange={(v) => { if (v !== undefined) setPrMms(v); }} step="0.1" />
                         </div>
                       </div>
                     </div>
@@ -2796,7 +3042,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     style={{ padding: '0.32rem 0.25rem', fontSize: '0.7rem' }}
                     title={t("Ajusta el volumen físico efectivo considerando expansión térmica del relleno")}
                   >
-                    {t("Modelo BassBox (con relleno)")}
+                    {t("Modelo Térmico (con relleno)")}
                   </button>
                   <button
                     type="button"
@@ -2821,6 +3067,14 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
               <div className="input-group" style={{ marginBottom: '0.75rem' }}>
                 <label>{t("Vías")}</label>
                 <div className="segmented-control" style={{ padding: '2px', borderRadius: '0px' }}>
+                  <button
+                    type="button"
+                    className={crossoverWays === 1 ? 'active' : ''}
+                    onClick={() => setCrossoverWays(1)}
+                    style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', borderRadius: '0px' }}
+                  >
+                    {t("Sub (1 Vía)")}
+                  </button>
                   <button
                     type="button"
                     className={crossoverWays === 2 ? 'active' : ''}
@@ -2855,11 +3109,18 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 </select>
               </div>
 
-              {crossoverWays === 2 ? (
+              {crossoverWays !== 3 ? (
                 <div className="input-group">
-                  <label>{t("Frecuencia Corte (Fc)")} (Hz)</label>
+                  <label>{crossoverWays === 1 ? t("Frecuencia Corte LPF (Fc)") : t("Frecuencia Corte (Fc)")} (Hz)</label>
                   <div className="input-wrapper">
-                    <input type="number" value={fc} onChange={(e) => setFc(parseFloat(e.target.value) || 2500)} step="50" />
+                    <NumericInput
+                      decimals={1}
+                      min={20}
+                      max={20000}
+                      step={50}
+                      value={fc}
+                      onValueChange={(v) => { if (v !== undefined) setFc(v); }}
+                    />
                   </div>
                 </div>
               ) : (
@@ -2867,13 +3128,27 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                   <div className="input-group">
                     <label>{t("Fc Baja (Low)")} (Hz)</label>
                     <div className="input-wrapper">
-                      <input type="number" value={fcLow} onChange={(e) => setFcLow(parseFloat(e.target.value) || 500)} step="50" />
+                      <NumericInput
+                        decimals={1}
+                        min={20}
+                        max={5000}
+                        step={50}
+                        value={fcLow}
+                        onValueChange={(v) => { if (v !== undefined) setFcLow(v); }}
+                      />
                     </div>
                   </div>
                   <div className="input-group">
                     <label>{t("Fc Alta (High)")} (Hz)</label>
                     <div className="input-wrapper">
-                      <input type="number" value={fcHigh} onChange={(e) => setFcHigh(parseFloat(e.target.value) || 4000)} step="50" />
+                      <NumericInput
+                        decimals={1}
+                        min={200}
+                        max={20000}
+                        step={50}
+                        value={fcHigh}
+                        onValueChange={(v) => { if (v !== undefined) setFcHigh(v); }}
+                      />
                     </div>
                   </div>
                 </div>
@@ -2883,24 +3158,44 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
             <div className="premium-form-card">
               <div className="form-subsection-title" style={{ marginTop: 0 }}>{t("Impedancias de Carga")} (Ω)</div>
               <div className="input-grid">
-                <div className="input-group">
-                  <label>{t("Tweeter")}</label>
-                  <div className="input-wrapper">
-                    <input type="number" value={zTweeter} onChange={(e) => setZTweeter(parseFloat(e.target.value) || 8)} />
+                {crossoverWays !== 1 && (
+                  <div className="input-group">
+                    <label>{t("Tweeter")}</label>
+                    <div className="input-wrapper">
+                      <NumericInput
+                        decimals={2}
+                        min={2}
+                        max={32}
+                        value={zTweeter}
+                        onValueChange={(v) => { if (v !== undefined) setZTweeter(v); }}
+                      />
+                    </div>
                   </div>
-                </div>
+                )}
                 {crossoverWays === 3 && (
                   <div className="input-group">
                     <label>{t("Rango Medio")}</label>
                     <div className="input-wrapper">
-                      <input type="number" value={zMidrange} onChange={(e) => setZMidrange(parseFloat(e.target.value) || 8)} />
+                      <NumericInput
+                        decimals={2}
+                        min={2}
+                        max={32}
+                        value={zMidrange}
+                        onValueChange={(v) => { if (v !== undefined) setZMidrange(v); }}
+                      />
                     </div>
                   </div>
                 )}
                 <div className="input-group">
-                  <label>{t("Woofer")}</label>
+                  <label>{crossoverWays === 1 ? t("Subwoofer") : t("Woofer")}</label>
                   <div className="input-wrapper">
-                    <input type="number" value={zWoofer} onChange={(e) => setZWoofer(parseFloat(e.target.value) || 8)} />
+                    <NumericInput
+                      decimals={2}
+                      min={2}
+                      max={32}
+                      value={zWoofer}
+                      onValueChange={(v) => { if (v !== undefined) setZWoofer(v); }}
+                    />
                   </div>
                 </div>
               </div>
@@ -2913,7 +3208,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
               <div className="form-subsection-title" style={{ marginTop: 0 }}>{t("Redes de Compensación")}</div>
               
               {/* Red Zobel */}
-              <div style={{ marginBottom: '0.75rem' }}>
+              <div style={{ marginBottom: crossoverWays !== 1 ? '0.75rem' : 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
                   <input
                     type="checkbox"
@@ -2931,50 +3226,77 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     <div className="input-group">
                       <label>Re (Ω)</label>
                       <div className="input-wrapper">
-                        <input type="number" value={zobelRe} onChange={(e) => setZobelRe(parseFloat(e.target.value) || 6)} />
+                        <NumericInput
+                          decimals={2}
+                          min={0.1}
+                          step={0.1}
+                          value={zobelRe}
+                          onValueChange={(v) => { if (v !== undefined) setZobelRe(v); }}
+                        />
                       </div>
                     </div>
                     <div className="input-group">
                       <label>Le (mH)</label>
                       <div className="input-wrapper">
-                        <input type="number" value={zobelLe} onChange={(e) => setZobelLe(parseFloat(e.target.value) || 0.5)} step="0.05" />
+                        <NumericInput
+                          decimals={3}
+                          min={0.01}
+                          step={0.05}
+                          value={zobelLe}
+                          onValueChange={(v) => { if (v !== undefined) setZobelLe(v); }}
+                        />
                       </div>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* L-Pad */}
-              <div style={{ borderTop: '1px solid var(--card-border)', paddingTop: '0.75rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
-                  <input
-                    type="checkbox"
-                    id="chk-lpad"
-                    checked={enableLPad}
-                    onChange={(e) => setEnableLPad(e.target.checked)}
-                    style={{ width: '16px', height: '16px' }}
-                  />
-                  <label htmlFor="chk-lpad" style={{ fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer' }}>
-                    {t("Implementar Atenuador L-Pad")}
-                  </label>
-                </div>
-                {enableLPad && (
-                  <div className="input-grid">
-                    <div className="input-group">
-                      <label>{t("Atenuación (dB)")}</label>
-                      <div className="input-wrapper">
-                        <input type="number" value={lpadAttenuation} onChange={(e) => setLpadAttenuation(parseFloat(e.target.value) || 3)} step="0.5" />
-                      </div>
-                    </div>
-                    <div className="input-group">
-                      <label>{t("Impedancia Carga")}</label>
-                      <div className="input-wrapper">
-                        <input type="number" value={lpadZLoad} onChange={(e) => setLpadZLoad(parseFloat(e.target.value) || 8)} />
-                      </div>
-                    </div>
+              {/* L-Pad (solo 2 o 3 vías con Tweeter) */}
+              {crossoverWays !== 1 && (
+                <div style={{ borderTop: '1px solid var(--card-border)', paddingTop: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                    <input
+                      type="checkbox"
+                      id="chk-lpad"
+                      checked={enableLPad}
+                      onChange={(e) => setEnableLPad(e.target.checked)}
+                      style={{ width: '16px', height: '16px' }}
+                    />
+                    <label htmlFor="chk-lpad" style={{ fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer' }}>
+                      {t("Implementar Atenuador L-Pad")}
+                    </label>
                   </div>
-                )}
-              </div>
+                  {enableLPad && (
+                    <div className="input-grid">
+                      <div className="input-group">
+                        <label>{t("Atenuación (dB)")}</label>
+                        <div className="input-wrapper">
+                          <NumericInput
+                            decimals={2}
+                            min={0.5}
+                            max={40}
+                            step={0.5}
+                            value={lpadAttenuation}
+                            onValueChange={(v) => { if (v !== undefined) setLpadAttenuation(v); }}
+                          />
+                        </div>
+                      </div>
+                      <div className="input-group">
+                        <label>{t("Impedancia Carga")}</label>
+                        <div className="input-wrapper">
+                          <NumericInput
+                            decimals={2}
+                            min={2}
+                            max={32}
+                            value={lpadZLoad}
+                            onValueChange={(v) => { if (v !== undefined) setLpadZLoad(v); }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Auto-Optimización MNA (Nelder-Mead en Rust) */}
@@ -2996,11 +3318,13 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 <div className="input-group">
                   <label>{t("Fc Objetivo")} (Hz)</label>
                   <div className="input-wrapper">
-                    <input
-                      type="number"
+                    <NumericInput
+                      decimals={1}
+                      min={20}
+                      max={20000}
+                      step={50}
                       value={fc}
-                      onChange={(e) => setFc(Math.max(20, parseFloat(e.target.value) || 2500))}
-                      step="50"
+                      onValueChange={(v) => { if (v !== undefined) setFc(Math.max(20, v)); }}
                       style={{ fontFamily: 'var(--font-mono)' }}
                     />
                   </div>
@@ -3035,11 +3359,12 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 <div className="input-group">
                   <label>{t("DCR Bobina")} (Ω)</label>
                   <div className="input-wrapper">
-                    <input
-                      type="number"
+                    <NumericInput
+                      decimals={2}
+                      min={0}
+                      step={0.05}
                       value={optDcr}
-                      onChange={(e) => setOptDcr(Math.max(0, parseFloat(e.target.value) || 0.3))}
-                      step="0.05"
+                      onValueChange={(v) => { if (v !== undefined) setOptDcr(Math.max(0, v)); }}
                       style={{ fontFamily: 'var(--font-mono)' }}
                     />
                   </div>
@@ -3178,11 +3503,12 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                   <div className="input-group">
                     <label>{t("Inductancia Obj.")} (mH)</label>
                     <div className="input-wrapper">
-                      <input
-                        type="number"
+                      <NumericInput
+                        decimals={3}
+                        min={0.001}
+                        step={0.05}
                         value={whLTarget}
-                        onChange={(e) => setWhLTarget(Math.max(0.001, parseFloat(e.target.value) || 1.0))}
-                        step="0.05"
+                        onValueChange={(v) => { if (v !== undefined) setWhLTarget(Math.max(0.001, v)); }}
                       />
                     </div>
                   </div>
@@ -3190,11 +3516,12 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                   <div className="input-group">
                     <label>{t("Número de Espiras (N)")}</label>
                     <div className="input-wrapper">
-                      <input
-                        type="number"
+                      <NumericInput
+                        integer={true}
+                        min={1}
+                        step={5}
                         value={whTurns}
-                        onChange={(e) => setWhTurns(Math.max(1, parseInt(e.target.value) || 100))}
-                        step="5"
+                        onValueChange={(v) => { if (v !== undefined) setWhTurns(Math.max(1, Math.round(v))); }}
                       />
                     </div>
                   </div>
@@ -3203,11 +3530,12 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 <div className="input-group">
                   <label>{t("Diámetro Medio (d)")} (mm)</label>
                   <div className="input-wrapper">
-                    <input
-                      type="number"
+                    <NumericInput
+                      decimals={1}
+                      min={1}
+                      step={1}
                       value={whCoilDia}
-                      onChange={(e) => setWhCoilDia(Math.max(1.0, parseFloat(e.target.value) || 25.0))}
-                      step="1"
+                      onValueChange={(v) => { if (v !== undefined) setWhCoilDia(Math.max(1.0, v)); }}
                     />
                   </div>
                 </div>
@@ -3215,11 +3543,12 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 <div className="input-group">
                   <label>{t("Longitud Bobina (l)")} (mm)</label>
                   <div className="input-wrapper">
-                    <input
-                      type="number"
+                    <NumericInput
+                      decimals={1}
+                      min={1}
+                      step={1}
                       value={whCoilLen}
-                      onChange={(e) => setWhCoilLen(Math.max(1.0, parseFloat(e.target.value) || 20.0))}
-                      step="1"
+                      onValueChange={(v) => { if (v !== undefined) setWhCoilLen(Math.max(1.0, v)); }}
                     />
                   </div>
                 </div>
@@ -3227,11 +3556,12 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 <div className="input-group">
                   <label>{t("Diámetro Alambre")} (mm)</label>
                   <div className="input-wrapper">
-                    <input
-                      type="number"
+                    <NumericInput
+                      decimals={2}
+                      min={0.1}
+                      step={0.1}
                       value={whWireDia}
-                      onChange={(e) => setWhWireDia(Math.max(0.1, parseFloat(e.target.value) || 1.0))}
-                      step="0.1"
+                      onValueChange={(v) => { if (v !== undefined) setWhWireDia(Math.max(0.1, v)); }}
                     />
                   </div>
                 </div>

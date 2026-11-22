@@ -591,7 +591,8 @@ select.input-select:focus {
 }
 
 .input-wrapper:has(> input[type="number"]),
-.input-wrapper:has(> input[type="text"]) {
+.input-wrapper:has(> input[type="text"]),
+.input-wrapper:has(> .numeric-stepper-wrap) {
   display: flex;
   align-items: stretch;
   background: var(--input-bg);
@@ -600,12 +601,14 @@ select.input-select:focus {
 }
 
 .input-wrapper:has(> input[type="number"]):focus-within,
-.input-wrapper:has(> input[type="text"]):focus-within {
+.input-wrapper:has(> input[type="text"]):focus-within,
+.input-wrapper:has(> .numeric-stepper-wrap):focus-within {
   border-color: var(--input-focus);
 }
 
 .input-wrapper:has(> input[type="number"]) > input[type="number"],
-.input-wrapper:has(> input[type="text"]) > input[type="text"] {
+.input-wrapper:has(> input[type="text"]) > input[type="text"],
+.input-wrapper:has(> .numeric-stepper-wrap) .numeric-stepper-wrap > input[type="text"] {
   flex: 1 1 auto;
   min-width: 0;
   border: none !important;
@@ -615,7 +618,8 @@ select.input-select:focus {
 }
 
 .input-wrapper:has(> input[type="number"]) > .unit-badge,
-.input-wrapper:has(> input[type="text"]) > .unit-badge {
+.input-wrapper:has(> input[type="text"]) > .unit-badge,
+.input-wrapper:has(> .numeric-stepper-wrap) > .unit-badge {
   position: static !important;
   order: -1;
   flex: 0 0 38px;
@@ -628,6 +632,45 @@ select.input-select:focus {
   font-size: 0.68rem !important;
   padding: 0 4px;
   white-space: nowrap;
+}
+
+.numeric-stepper-wrap {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: stretch;
+}
+
+.numeric-stepper-btns {
+  display: flex;
+  flex-direction: column;
+  width: 16px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--input-border);
+}
+
+.numeric-stepper-btn {
+  flex: 1 1 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  font-size: 7px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.numeric-stepper-btn + .numeric-stepper-btn {
+  border-top: 1px solid var(--input-border);
+}
+
+.numeric-stepper-btn:hover:not(:disabled) {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 /* Error/Warnings Area */

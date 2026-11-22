@@ -15,6 +15,7 @@ import {
   type TooltipItem,
 } from 'chart.js';
 import type { CalculatedSealed, CalculatedPorted, CalculatedBandpass, SpeakerParams, DampingType } from '../types';
+import { NumericInput } from './NumericInput';
 
 declare module 'chart.js' {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -632,7 +633,35 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
       });
 
       // 2. Filter low-pass and HP/BP curves
-      if (crossoverWays === 2) {
+      if (crossoverWays === 1) {
+        // Subwoofer (1 Vía): Solo LPF + salida acústica filtrada
+        const wooferFilterPoints = frequenciesFull.map(f => ({
+          x: f,
+          y: getFilterGain(f, fc, crossoverType, 'LP')
+        }));
+        datasets.push({
+          label: `${t("Filtro LPF Subwoofer")} (${fc}Hz)`,
+          data: wooferFilterPoints,
+          borderColor: '#8b5cf6',
+          borderWidth: 1.5,
+          pointRadius: 0,
+          fill: false,
+          borderDash: [5, 2]
+        });
+
+        const wooferCombinedPoints = frequenciesFull.map((f, idx) => ({
+          x: f,
+          y: Math.max(-45, boxPoints[idx].y + wooferFilterPoints[idx].y)
+        }));
+        datasets.push({
+          label: `${t("Subwoofer Filtrado (Acústica)")}`,
+          data: wooferCombinedPoints,
+          borderColor: '#3b82f6',
+          borderWidth: 2.5,
+          pointRadius: 0,
+          fill: false
+        });
+      } else if (crossoverWays === 2) {
         // Woofer LP Filter
         const wooferFilterPoints = frequenciesFull.map(f => ({
           x: f,
@@ -830,7 +859,15 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
       }
     } else {
       // In full mode, show crossover points as vertical lines
-      if (crossoverWays === 2) {
+      if (crossoverWays === 1) {
+        list.push({
+          value: fc,
+          borderColor: '#8b5cf6',
+          borderWidth: 1.5,
+          borderDash: [4, 4],
+          label: `Fc LPF: ${fc} Hz`
+        });
+      } else if (crossoverWays === 2) {
         list.push({
           value: fc,
           borderColor: '#8b5cf6',
@@ -1623,12 +1660,12 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
           {/* Ajuste de Potencia Eléctrica */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'rgba(255,255,255,0.04)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--card-border)' }}>
             <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>{t("Potencia:")}</span>
-            <input
-              type="number"
-              min="1"
-              max="5000"
+            <NumericInput
+              min={1}
+              max={5000}
+              decimals={1}
               value={simPower}
-              onChange={(e) => setSimPower(Math.max(1, parseFloat(e.target.value) || 1))}
+              onValueChange={(v) => { if (v !== undefined) setSimPower(Math.max(1, v)); }}
               style={{ width: '72px', height: '22px', padding: '0 4px', fontSize: '0.72rem', background: 'transparent', border: '1px solid var(--card-border)', color: 'var(--accent)', borderRadius: '2px', textAlign: 'center', fontWeight: 600 }}
             />
             <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>W</span>
@@ -1675,13 +1712,13 @@ const SimulationChartComponent: React.FC<SimulationChartProps> = ({
             </label>
             {enableSubsonic && (
               <>
-                <input
-                  type="number"
+                <NumericInput
                   min={10}
                   max={120}
                   step={1}
+                  decimals={1}
                   value={subsonicFreq}
-                  onChange={(e) => setSubsonicFreq(Math.max(10, parseFloat(e.target.value) || 10))}
+                  onValueChange={(v) => { if (v !== undefined) setSubsonicFreq(Math.max(10, v)); }}
                   style={{ width: '48px', height: '20px', padding: '0 3px', fontSize: '0.7rem', background: 'transparent', border: '1px solid var(--card-border)', color: 'var(--accent)', borderRadius: '2px', textAlign: 'center', fontWeight: 600 }}
                 />
                 <span style={{ fontSize: '0.66rem', color: 'var(--text-muted)' }}>Hz</span>

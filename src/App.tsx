@@ -40,7 +40,9 @@ function App({ wasmError }: AppProps) {
   const [crossoverWays, setCrossoverWays] = useState<number>(2);
   const handleCrossoverWaysChange = (ways: number) => {
     setCrossoverWays(ways);
-    if (ways === 3) {
+    if (ways === 1) {
+      setSpeakerYPct(50);
+    } else if (ways === 3) {
       if (Math.abs(speakerYPct - midrangeYPct) < 15) {
         setTweeterYPct(15);
         setMidrangeYPct(36);
@@ -186,6 +188,8 @@ function App({ wasmError }: AppProps) {
 
   // Sliders and tuning overrides
   const [targetQtc, setTargetQtc] = useState<number>(0.707);
+  const [customSealed, setCustomSealed] = useState<boolean>(false);
+  const [customSealedVbState, setCustomSealedVbState] = useState<number | null>(null);
   const [customVbState, setCustomVbState] = useState<number | null>(null);
   const [customFbState, setCustomFbState] = useState<number | null>(null);
   const [customPorted, setCustomPorted] = useState<boolean>(false);
@@ -290,6 +294,8 @@ function App({ wasmError }: AppProps) {
 
   const handlePresetChange = (presetId: string, newParams: SpeakerParams | null) => {
     setPreset(presetId);
+    setCustomSealed(false);
+    setCustomSealedVbState(null);
     setCustomVbState(null);
     setCustomFbState(null);
     setCustomPorted(false);
@@ -528,6 +534,16 @@ function App({ wasmError }: AppProps) {
         Qtc: result.qtc,
         F3: result.f3
       };
+    } else if (customSealed && customSealedVbState !== null && customSealedVbState > 0) {
+      const sealedVb = customSealedVbState;
+      const result = wasm.calc_caja_sellada_ex(adjParams.fs, adjParams.vas, adjParams.qts, sealedVb, targetQtc, dampingLevel, classicalModel);
+      return {
+        valid: true,
+        Vb: sealedVb,
+        Fc: result.fc,
+        Qtc: result.qtc,
+        F3: result.f3
+      };
     } else {
       if (adjParams.qts >= targetQtc) {
         return { valid: false, Vb: 0, Fc: 0, Qtc: targetQtc, F3: 0 };
@@ -546,7 +562,7 @@ function App({ wasmError }: AppProps) {
         F3: result.f3
       };
     }
-  }, [validationError, adjParams.fs, adjParams.vas, adjParams.qts, woodMode, manualNetVol, dampingFactor, targetQtc, dampingLevel, classicalModel]);
+  }, [validationError, adjParams.fs, adjParams.vas, adjParams.qts, woodMode, manualNetVol, dampingFactor, customSealed, customSealedVbState, targetQtc, dampingLevel, classicalModel]);
 
   // --- CALCULAR CAJA VENTILADA ---
   const portedData = useMemo<CalculatedPorted>(() => {
@@ -567,7 +583,7 @@ function App({ wasmError }: AppProps) {
 
     if (woodMode === 'input' && manualNetVol > 0) {
       VbPorted = manualNetVol * dampingFactor;
-      // Sintonizar a la Fb personalizada o a SuggestFb de BassBox para ese Vb
+      // Sintonizar a la Fb personalizada o a SuggestFb para ese Vb
       const suggestedFbForVb = (!externalSubwoofer && VbPorted > 0)
         ? calcSuggestFb(adjParams.fs, adjParams.vas, adjParams.qts, VbPorted)
         : optimalDriverFb;
@@ -646,6 +662,19 @@ function App({ wasmError }: AppProps) {
     };
   }, [validationError, adjParams.fs, adjParams.vas, adjParams.qts, woodMode, manualNetVol, dampingFactor, dampingLevel, dampingType, classicalModel, customPorted, customVbState, customFbState, optimalDriverFb, ventedAlignment, driverMinVb, externalSubwoofer, formatVentedAlignmentLabel, useCustomPortLength, customPortLength, portShape, portDiameter, portArea, portWidth, portHeight, portCount, flaredEnds, t]);
 
+  const customSealedVb = customSealed ? (customSealedVbState ?? (sealedData.valid ? sealedData.Vb : 30)) : (sealedData.valid ? sealedData.Vb : 30);
+
+  const setCustomSealedVb = useCallback((val: number) => {
+    setCustomSealedVbState(val > 0 ? val : null);
+  }, [setCustomSealedVbState]);
+
+  const handleCustomSealedChange = useCallback((val: boolean) => {
+    setCustomSealed(val);
+    if (!val) {
+      setCustomSealedVbState(null);
+    }
+  }, [setCustomSealed, setCustomSealedVbState]);
+
   const customVb = customPorted ? (customVbState ?? Math.round((portedData.Vb || 45) * 10) / 10) : Math.round((portedData.Vb || 45) * 10) / 10;
   const customFb = customPorted ? (customFbState ?? Math.round((portedData.Fb || 38) * 10) / 10) : Math.round((portedData.Fb || 38) * 10) / 10;
 
@@ -677,7 +706,7 @@ function App({ wasmError }: AppProps) {
     try {
       if (bandpassOrder === 4) {
         const effectiveQt = bandpassQtPrime > 0 ? Math.max(bandpassQtPrime, adjParams.qts + 0.01) : Math.max(0.8, adjParams.qts + 0.1);
-        const res = wasm.calc_bandpass_4_bassbox(adjParams.fs, adjParams.vas, adjParams.qts, bandpassDf, bandpassQtPrime);
+        const res = wasm.calc_bandpass_4_df(adjParams.fs, adjParams.vas, adjParams.qts, bandpassDf, bandpassQtPrime);
         return {
           valid: true,
           order: 4,
@@ -690,7 +719,7 @@ function App({ wasmError }: AppProps) {
           qtPrime: effectiveQt
         };
       } else {
-        const res = wasm.calc_bandpass_6_bassbox(adjParams.fs, adjParams.vas, adjParams.qts, bandpassTopology);
+        const res = wasm.calc_bandpass_6_topology(adjParams.fs, adjParams.vas, adjParams.qts, bandpassTopology);
         return {
           valid: true,
           order: 6,
@@ -720,7 +749,14 @@ function App({ wasmError }: AppProps) {
       return `${displayLv.toFixed(1)} ${unitLabel} (${t("Personalizada")})`;
     }
     const pCount = Number(portCount) || 0;
-    if (pCount > 0 && portedData.Vb > 0) {
+    const volRef = boxType === 'bandpass'
+      ? (bandpassData.valid ? bandpassData.Vf : 0)
+      : (portedData.valid ? portedData.Vb : 0);
+    const fbRef = boxType === 'bandpass'
+      ? (bandpassData.valid ? (bandpassData.order === 6 ? (bandpassData.Fh || 0) : bandpassData.Fb) : 0)
+      : (portedData.valid ? portedData.Fb : 0);
+
+    if (pCount > 0 && volRef > 0 && fbRef > 0) {
       const pDia = portShape === 'round'
         ? (Number(portDiameter) || 0)
         : portShape === 'custom'
@@ -728,7 +764,7 @@ function App({ wasmError }: AppProps) {
           : (2 * Math.sqrt(((Number(portWidth) || 0) * (Number(portHeight) || 0)) / Math.PI));
 
       if (pDia > 0) {
-        const Lv = calcPortLength(portedData.Vb, portedData.Fb, pDia, flaredEnds, pCount);
+        const Lv = calcPortLength(volRef, fbRef, pDia, flaredEnds, pCount);
         
         const displayLv = convertTo(Lv, 'length', unitSystem);
         const unitLabel = getUnitLabel('length', unitSystem);
@@ -933,6 +969,8 @@ function App({ wasmError }: AppProps) {
       timestamp: new Date().toISOString(),
       params,
       boxType,
+      customSealed,
+      customSealedVbState,
       customVb,
       customFb,
       customPorted,
@@ -988,6 +1026,8 @@ function App({ wasmError }: AppProps) {
         const data = JSON.parse(event.target?.result as string);
         if (data.params) setParams(data.params);
         if (data.boxType) setBoxType(data.boxType);
+        if (data.customSealed !== undefined) setCustomSealed(Boolean(data.customSealed));
+        if (data.customSealedVbState !== undefined) setCustomSealedVbState(data.customSealedVbState);
         if (data.customVb !== undefined) setCustomVb(data.customVb);
         if (data.customFb !== undefined) setCustomFb(data.customFb);
         if (data.customPorted !== undefined) setCustomPorted(data.customPorted);
@@ -1021,8 +1061,10 @@ function App({ wasmError }: AppProps) {
     if (window.confirm(t("¿Deseas iniciar un nuevo proyecto? Se restablecerán los parámetros actuales."))) {
       setBoxType('sealed');
       setVentedAlignment('QB3');
-      setCustomVb(0);
-      setCustomFb(0);
+      setCustomSealed(false);
+      setCustomSealedVbState(null);
+      setCustomVbState(null);
+      setCustomFbState(null);
       setCustomPorted(false);
       handlePresetChange('custom_eminence_alpha_10a', null);
     }
@@ -1171,7 +1213,7 @@ function App({ wasmError }: AppProps) {
           customDrivers={customDrivers}
           onCustomDriversChange={handleCustomDriversChange}
           crossoverWays={crossoverWays}
-          setCrossoverWays={setCrossoverWays}
+          setCrossoverWays={handleCrossoverWaysChange}
           midFs={midFs}
           setMidFs={setMidFs}
           midVas={midVas}
@@ -1202,6 +1244,10 @@ function App({ wasmError }: AppProps) {
           unitSystem={unitSystem}
           boxType={boxType}
           setBoxType={handleBoxTypeChange}
+          customSealed={customSealed}
+          setCustomSealed={handleCustomSealedChange}
+          customSealedVb={customSealedVb}
+          setCustomSealedVb={setCustomSealedVb}
           customVb={customVb}
           setCustomVb={setCustomVb}
           customFb={customFb}
@@ -1570,7 +1616,7 @@ function App({ wasmError }: AppProps) {
                     lang={lang} 
                     onRegisterExporter={handleRegisterCrossover}
                     readOnly={true}
-                    crossoverWaysProp={crossoverWays === 2 ? '2way' : '3way'}
+                    crossoverWaysProp={crossoverWays === 1 ? '1way' : crossoverWays === 3 ? '3way' : '2way'}
                     crossoverTypeProp={crossoverType}
                     fcProp={fc}
                     fcLowProp={fcLow}
