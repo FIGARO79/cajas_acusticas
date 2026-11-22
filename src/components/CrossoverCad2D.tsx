@@ -190,8 +190,8 @@ export const CrossoverCad2D: React.FC<CrossoverCad2DProps> = ({
     const cBpColor = isLight ? '#d97706' : '#facc15';
     const cZobelColor = isLight ? '#ea580c' : '#fb923c';
     const cLPadColor = isLight ? '#0284c7' : '#38bdf8';
-    const cGridFine = isLight ? 'rgba(14, 165, 233, 0.08)' : '#091c33';
-    const cGridMajor = isLight ? 'rgba(14, 165, 233, 0.22)' : '#0e294b';
+    const cGridFine = isLight ? 'rgba(100, 116, 139, 0.09)' : '#091c33';
+    const cGridMajor = isLight ? 'rgba(100, 116, 139, 0.22)' : '#0e294b';
 
     ctx.fillStyle = cBg;
     ctx.fillRect(0, 0, width, height);
@@ -870,6 +870,48 @@ export const CrossoverCad2D: React.FC<CrossoverCad2DProps> = ({
     }
 
     ctx.restore();
+
+    // Marco de hoja esquemática + Cajetín Técnico (estilo FreeCAD / KiCad)
+    ctx.save();
+    const framePad = 8;
+    ctx.strokeStyle = isLight ? '#94a3b8' : '#1e3a5f';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(framePad, framePad, width - framePad * 2, height - framePad * 2);
+
+    const tbW = 198;
+    const tbH = 44;
+    const tbX = width - framePad - tbW;
+    const tbY = height - framePad - tbH;
+    if (width > 360 && height > 180) {
+      ctx.fillStyle = isLight ? 'rgba(248, 250, 252, 0.94)' : 'rgba(6, 15, 29, 0.92)';
+      ctx.fillRect(tbX, tbY, tbW, tbH);
+      ctx.strokeStyle = isLight ? '#64748b' : '#334155';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(tbX, tbY, tbW, tbH);
+      ctx.beginPath();
+      ctx.moveTo(tbX, tbY + 16);
+      ctx.lineTo(tbX + tbW, tbY + 16);
+      ctx.moveTo(tbX + 102, tbY + 16);
+      ctx.lineTo(tbX + 102, tbY + tbH);
+      ctx.stroke();
+
+      ctx.fillStyle = isLight ? '#0f172a' : '#f8fafc';
+      ctx.font = 'bold 9px monospace';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('ACOUSTICLAB · XOVER CAD', tbX + 6, tbY + 8);
+
+      ctx.fillStyle = isLight ? '#334155' : '#cbd5e1';
+      ctx.font = '9px monospace';
+      const waysLabel = crossoverWays === '1way' ? '1 VIA' : crossoverWays === '2way' ? '2 VIAS' : '3 VIAS';
+      const typeLabel = crossoverType === '1st_order' ? '1st ORD' : crossoverType === '2nd_butter' ? 'BW 2nd' : crossoverType === '2nd_lr' ? 'LR 2nd' : 'LR 4th';
+      ctx.fillText(`TOP: ${waysLabel}`, tbX + 6, tbY + 25);
+      ctx.fillText(`ORD: ${typeLabel}`, tbX + 6, tbY + 37);
+      ctx.fillText(`ZOBEL: ${enableZobel ? 'ON' : 'OFF'}`, tbX + 108, tbY + 25);
+      ctx.fillText(`L-PAD: ${enableLPad ? 'ON' : 'OFF'}`, tbX + 108, tbY + 37);
+    }
+    ctx.restore();
+
     ctx.restore();
   }, [
     zoom,

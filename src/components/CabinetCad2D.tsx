@@ -275,8 +275,8 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
       const offsetX = pan.x - width / 2;
       const offsetY = pan.y - height / 2;
 
-      // Fine Grid
-      ctx.strokeStyle = isLight ? 'rgba(14, 165, 233, 0.08)' : '#091c33';
+      // Fine Grid (FreeCAD TechDraw / Sketcher pitch)
+      ctx.strokeStyle = isLight ? 'rgba(100, 116, 139, 0.09)' : '#091c33';
       ctx.lineWidth = 0.5;
       ctx.beginPath();
       const startX = ((offsetX % fineSpacing) + fineSpacing) % fineSpacing;
@@ -292,7 +292,7 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
       ctx.stroke();
 
       // Major Grid
-      ctx.strokeStyle = isLight ? 'rgba(14, 165, 233, 0.22)' : '#0e294b';
+      ctx.strokeStyle = isLight ? 'rgba(100, 116, 139, 0.22)' : '#0e294b';
       ctx.lineWidth = 0.8;
       ctx.beginPath();
       const majorStartX = ((offsetX % gridSpacing) + gridSpacing) % gridSpacing;
@@ -321,27 +321,27 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
     const topY = -hExt / 2;
     const botY = hExt / 2;
 
-    // Helper functions for CAD drawing
+    // Helper functions for FreeCAD TechDraw / Parametric CAD drawing
     const drawArrow = (x1: number, y1: number, x2: number, y2: number) => {
-      const headlen = 1.5; // cm
+      const headlen = Math.min(Math.max(8 / zoom, 0.7), 2.0);
       const angle = Math.atan2(y2 - y1, x2 - x1);
       ctx.beginPath();
       ctx.moveTo(x1, y1);
       ctx.lineTo(x2, y2);
       ctx.stroke();
 
-      // Arrowheads
+      // ISO sharp arrowheads
       ctx.beginPath();
       ctx.moveTo(x1, y1);
-      ctx.lineTo(x1 + headlen * Math.cos(angle + Math.PI / 6), y1 + headlen * Math.sin(angle + Math.PI / 6));
-      ctx.lineTo(x1 + headlen * Math.cos(angle - Math.PI / 6), y1 + headlen * Math.sin(angle - Math.PI / 6));
+      ctx.lineTo(x1 + headlen * Math.cos(angle + Math.PI / 8), y1 + headlen * Math.sin(angle + Math.PI / 8));
+      ctx.lineTo(x1 + headlen * Math.cos(angle - Math.PI / 8), y1 + headlen * Math.sin(angle - Math.PI / 8));
       ctx.closePath();
       ctx.fill();
 
       ctx.beginPath();
       ctx.moveTo(x2, y2);
-      ctx.lineTo(x2 - headlen * Math.cos(angle + Math.PI / 6), y2 - headlen * Math.sin(angle + Math.PI / 6));
-      ctx.lineTo(x2 - headlen * Math.cos(angle - Math.PI / 6), y2 - headlen * Math.sin(angle - Math.PI / 6));
+      ctx.lineTo(x2 - headlen * Math.cos(angle + Math.PI / 8), y2 - headlen * Math.sin(angle + Math.PI / 8));
+      ctx.lineTo(x2 - headlen * Math.cos(angle - Math.PI / 8), y2 - headlen * Math.sin(angle - Math.PI / 8));
       ctx.closePath();
       ctx.fill();
     };
@@ -355,48 +355,57 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
     ) => {
       if (!showDimensions) return;
       ctx.save();
-      ctx.strokeStyle = isLight ? '#0369a1' : '#0284c7';
-      ctx.fillStyle = isLight ? '#0f172a' : '#38bdf8';
-      ctx.lineWidth = 0.7 / zoom;
+      const dimStroke = isLight ? '#b91c1c' : '#f87171';
+      const dimText = isLight ? '#0f172a' : '#f8fafc';
+      const maskBg = isLight ? '#f8fafc' : '#060f1d';
+      ctx.strokeStyle = dimStroke;
+      ctx.fillStyle = dimStroke;
+      ctx.lineWidth = 0.75 / zoom;
+      const fontSize = Math.max(9.5 / zoom, 1.8);
+      ctx.font = `600 ${fontSize}px monospace`;
 
       if (horizontal) {
         const dy = y1 + offset;
-        // Extension lines
         ctx.beginPath();
-        ctx.moveTo(x1, y1 + (offset > 0 ? 0.5 : -0.5));
-        ctx.lineTo(x1, dy + (offset > 0 ? 1 : -1));
-        ctx.moveTo(x2, y2 + (offset > 0 ? 0.5 : -0.5));
-        ctx.lineTo(x2, dy + (offset > 0 ? 1 : -1));
+        ctx.moveTo(x1, y1 + (offset > 0 ? 0.4 : -0.4));
+        ctx.lineTo(x1, dy + (offset > 0 ? 0.9 : -0.9));
+        ctx.moveTo(x2, y2 + (offset > 0 ? 0.4 : -0.4));
+        ctx.lineTo(x2, dy + (offset > 0 ? 0.9 : -0.9));
         ctx.stroke();
 
-        // Dimension Line with arrows
         drawArrow(x1, dy, x2, dy);
 
-        // Label
-        ctx.font = `${Math.max(9 / zoom, 2)}px monospace`;
+        const textW = ctx.measureText(label).width;
+        const padX = 1.2 / zoom;
+        const midX = (x1 + x2) / 2;
+        ctx.fillStyle = maskBg;
+        ctx.fillRect(midX - textW / 2 - padX, dy - fontSize * 0.58, textW + padX * 2, fontSize * 1.15);
+
+        ctx.fillStyle = dimText;
         ctx.textAlign = 'center';
-        ctx.textBaseline = offset > 0 ? 'top' : 'bottom';
-        ctx.fillText(label, (x1 + x2) / 2, dy + (offset > 0 ? 0.3 : -0.3));
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, midX, dy);
       } else {
         const dx = x1 + offset;
-        // Extension lines
         ctx.beginPath();
-        ctx.moveTo(x1 + (offset > 0 ? 0.5 : -0.5), y1);
-        ctx.lineTo(dx + (offset > 0 ? 1 : -1), y1);
-        ctx.moveTo(x2 + (offset > 0 ? 0.5 : -0.5), y2);
-        ctx.lineTo(dx + (offset > 0 ? 1 : -1), y2);
+        ctx.moveTo(x1 + (offset > 0 ? 0.4 : -0.4), y1);
+        ctx.lineTo(dx + (offset > 0 ? 0.9 : -0.9), y1);
+        ctx.moveTo(x2 + (offset > 0 ? 0.4 : -0.4), y2);
+        ctx.lineTo(dx + (offset > 0 ? 0.9 : -0.9), y2);
         ctx.stroke();
 
-        // Dimension line
         drawArrow(dx, y1, dx, y2);
 
-        // Label rotated
+        const textW = ctx.measureText(label).width;
+        const padX = 1.2 / zoom;
         ctx.save();
-        ctx.translate(dx + (offset > 0 ? 0.4 : -0.4), (y1 + y2) / 2);
+        ctx.translate(dx, (y1 + y2) / 2);
         ctx.rotate(-Math.PI / 2);
-        ctx.font = `${Math.max(9 / zoom, 2)}px monospace`;
+        ctx.fillStyle = maskBg;
+        ctx.fillRect(-textW / 2 - padX, -fontSize * 0.58, textW + padX * 2, fontSize * 1.15);
+        ctx.fillStyle = dimText;
         ctx.textAlign = 'center';
-        ctx.textBaseline = offset > 0 ? 'bottom' : 'top';
+        ctx.textBaseline = 'middle';
         ctx.fillText(label, 0, 0);
         ctx.restore();
       }
@@ -430,11 +439,22 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
     const fH = hExt;
 
     // External Perimeter
-    ctx.strokeStyle = isLight ? '#0284c7' : '#38bdf8';
+    ctx.strokeStyle = isLight ? '#0f172a' : '#38bdf8';
     ctx.lineWidth = 1.4 / zoom;
     ctx.fillStyle = isLight ? 'rgba(2, 132, 199, 0.03)' : 'rgba(2, 132, 199, 0.04)';
     ctx.fillRect(fX, topY, fW, fH);
     ctx.strokeRect(fX, topY, fW, fH);
+
+    // Eje de simetría vertical (FreeCAD TechDraw Centerline)
+    ctx.save();
+    ctx.strokeStyle = isLight ? 'rgba(100, 116, 139, 0.65)' : 'rgba(148, 163, 184, 0.45)';
+    ctx.lineWidth = 0.65 / zoom;
+    ctx.setLineDash([2.5, 1.0, 0.5, 1.0]);
+    ctx.beginPath();
+    ctx.moveTo(fX + fW / 2, topY - 1.5);
+    ctx.lineTo(fX + fW / 2, botY + 1.5);
+    ctx.stroke();
+    ctx.restore();
 
     // Internal Cavity (Dashed lines representing hidden walls)
     ctx.strokeStyle = isLight ? '#64748b' : '#0284c7';
@@ -807,12 +827,9 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
         ctx.fillText(`(${t("Atrás")})`, portCenterX, portCenterY + labelOffset);
       }
 
-      // Cotas de posicionamiento del puerto: desde el lado, entre puertos y desde el suelo
+      // Cotas de posicionamiento del puerto: proyectadas fuera del plano (estilo FreeCAD TechDraw)
       if (showDimensions) {
-        const pR = (portShape === 'round' || portShape === 'custom')
-          ? Math.max((portDiameter || 7.5) / 2, 1)
-          : Math.max((portHeight || 4) / 2, 1);
-        const pDimYOffset = pR + 1.2;
+        const pDimYOffset = (botY - portCenterY) + 3.0;
 
         const pX0 = count === 1 
           ? portCenterX 
@@ -820,15 +837,15 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
         
         // 1. Cota horizontal desde el lateral izquierdo (fX) hasta el primer puerto
         const distSide = pX0 - fX;
-        const sideLabel = distSide >= 6.5
-          ? `Lado: ${convertTo(distSide, 'length', unitSystem).toFixed(1)}`
+        const sideLabel = distSide >= 7.5
+          ? `Lado:${convertTo(distSide, 'length', unitSystem).toFixed(1)}`
           : `${convertTo(distSide, 'length', unitSystem).toFixed(1)}`;
         drawDimension(fX, portCenterY, pX0, portCenterY, sideLabel, pDimYOffset, true);
 
         // 2. Cota de separación centro a centro entre puertos (cuando count >= 2)
         if (count >= 2) {
-          const sepLabel = portSpacing >= 6.5
-            ? `Sep: ${convertTo(portSpacing, 'length', unitSystem).toFixed(1)}`
+          const sepLabel = portSpacing >= 8.0
+            ? `Sep:${convertTo(portSpacing, 'length', unitSystem).toFixed(1)}`
             : `${convertTo(portSpacing, 'length', unitSystem).toFixed(1)}`;
           for (let pIdx = 0; pIdx < count - 1; pIdx++) {
             const pA = pX0 + pIdx * portSpacing;
@@ -842,7 +859,7 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
         const ptLabel = portDistBot >= 6.5
           ? `Suelo: ${convertTo(portDistBot, 'length', unitSystem).toFixed(1)}`
           : `Pt: ${convertTo(portDistBot, 'length', unitSystem).toFixed(1)}`;
-        drawDimension(fX + fW, portCenterY, fX + fW, botY, ptLabel, 1.8, false);
+        drawDimension(fX + fW, portCenterY, fX + fW, botY, ptLabel, 3.2, false);
       }
     }
 
@@ -872,7 +889,8 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
       ? `Frente: ${convertTo(wExt, 'length', unitSystem).toFixed(1)} ${uLabel}`
       : `${convertTo(wExt, 'length', unitSystem).toFixed(1)} ${uLabel}`;
     const hDisp = `${convertTo(hExt, 'length', unitSystem).toFixed(1)} ${uLabel}`;
-    drawDimension(fX, botY, fX + fW, botY, wDisp, 3.5, true);
+    const hasPortBottomDims = showDimensions && (boxType === 'ported' || boxType === 'bandpass') && prTuning === 'port' && portCount > 0;
+    drawDimension(fX, botY, fX + fW, botY, wDisp, hasPortBottomDims ? 6.8 : 3.5, true);
     if (hasSideTaper) {
       const rearX = fX + (fW - wRearExt) / 2;
       const rearDisp = `Tras: ${convertTo(wRearExt, 'length', unitSystem).toFixed(1)} ${uLabel} (±${trapAngleDeg.toFixed(1)}°)`;
@@ -1952,6 +1970,48 @@ export const CabinetCad2D: React.FC<CabinetCad2DProps> = ({
     }
 
     ctx.restore(); // Restore world coords
+
+    // Marco de hoja TechDraw + Cajetín Técnico (FreeCAD style)
+    ctx.save();
+    const framePad = 8;
+    ctx.strokeStyle = isLight ? '#94a3b8' : '#1e3a5f';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(framePad, framePad, width - framePad * 2, height - framePad * 2);
+
+    const tbW = 196;
+    const tbH = 44;
+    const tbX = width - framePad - tbW;
+    const tbY = height - framePad - tbH;
+    if (width > 360 && height > 180) {
+      ctx.fillStyle = isLight ? 'rgba(248, 250, 252, 0.94)' : 'rgba(6, 15, 29, 0.92)';
+      ctx.fillRect(tbX, tbY, tbW, tbH);
+      ctx.strokeStyle = isLight ? '#64748b' : '#334155';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(tbX, tbY, tbW, tbH);
+      ctx.beginPath();
+      ctx.moveTo(tbX, tbY + 16);
+      ctx.lineTo(tbX + tbW, tbY + 16);
+      ctx.moveTo(tbX + 104, tbY + 16);
+      ctx.lineTo(tbX + 104, tbY + tbH);
+      ctx.stroke();
+
+      ctx.fillStyle = isLight ? '#0f172a' : '#f8fafc';
+      ctx.font = 'bold 9px monospace';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('ACOUSTICLAB · TECHDRAW 2D', tbX + 6, tbY + 8);
+
+      ctx.fillStyle = isLight ? '#334155' : '#cbd5e1';
+      ctx.font = '9px monospace';
+      const uLen = getUnitLabel('length', unitSystem);
+      const vNet = cabinetData?.vNeto ? `${convertTo(cabinetData.vNeto, 'volume', unitSystem).toFixed(1)} ${getUnitLabel('volume', unitSystem)}` : '--';
+      ctx.fillText(`Vb: ${vNet}`, tbX + 6, tbY + 25);
+      ctx.fillText(`T: ${convertTo(thickness, 'length', unitSystem).toFixed(1)} ${uLen}`, tbX + 6, tbY + 37);
+      ctx.fillText(`ESC: ${(zoom / 4).toFixed(2)}x`, tbX + 110, tbY + 25);
+      ctx.fillText(`TIPO: ${boxType.toUpperCase()}`, tbX + 110, tbY + 37);
+    }
+    ctx.restore();
+
     ctx.restore(); // Restore DPR
   }, [
     isLight,
