@@ -234,10 +234,10 @@ export const AcousticAssistantPanel: React.FC<AcousticAssistantPanelProps> = ({
 
   const pendingCount = steps.filter((s) => s.level !== 'ok').length;
 
-  const levelStyles: Record<GuidanceStep['level'], { dot: string; border: string; bg: string }> = {
-    ok: { dot: '#10b981', border: 'rgba(16, 185, 129, 0.28)', bg: 'rgba(16, 185, 129, 0.06)' },
-    warn: { dot: '#f59e0b', border: 'rgba(245, 158, 11, 0.35)', bg: 'rgba(245, 158, 11, 0.08)' },
-    alert: { dot: '#ef4444', border: 'rgba(239, 68, 68, 0.4)', bg: 'rgba(239, 68, 68, 0.08)' },
+  const getStatusGlyph = (level: GuidanceStep['level']) => {
+    if (level === 'ok') return '✓';
+    if (level === 'alert') return '!';
+    return '›';
   };
 
   return (
@@ -259,77 +259,72 @@ export const AcousticAssistantPanel: React.FC<AcousticAssistantPanelProps> = ({
           color: 'var(--text-main)',
         }}
       >
-        <span className="form-subsection-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          <span>{t('Guía de Ajuste Óptimo')}</span>
-          <span
-            style={{
-              fontSize: '0.6rem',
-              fontWeight: 700,
-              padding: '0.1rem 0.4rem',
-              borderRadius: '999px',
-              background: pendingCount === 0 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.16)',
-              color: pendingCount === 0 ? '#10b981' : '#f59e0b',
-            }}
-          >
-            {pendingCount === 0 ? t('Óptimo') : `${pendingCount} ${pendingCount === 1 ? t('Ajuste') : t('Ajustes')}`}
-          </span>
+        <span className="form-subsection-title" style={{ margin: 0 }}>
+          {t('Guía de Ajuste Óptimo')}
         </span>
-        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{expanded ? '▾' : '▸'}</span>
+        <span style={{ fontSize: '0.66rem', fontWeight: 600, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+          <span>{pendingCount === 0 ? t('Óptimo') : `${pendingCount} ${pendingCount === 1 ? t('ajuste') : t('ajustes')}`}</span>
+          <span>{expanded ? '▾' : '▸'}</span>
+        </span>
       </button>
 
       {expanded && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.45rem' }}>
-          {steps.map((item) => {
-            const st = levelStyles[item.level];
-            return (
-              <div
-                key={item.id}
-                style={{
-                  padding: '0.35rem 0.45rem',
-                  borderRadius: '4px',
-                  border: `1px solid ${st.border}`,
-                  background: st.bg,
-                  fontSize: '0.65rem',
-                  lineHeight: 1.35,
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.35rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.32rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                    <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: st.dot, flexShrink: 0 }} />
-                    <span>{item.step}</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontFamily: 'monospace', fontSize: '0.62rem' }}>
-                    <span style={{ color: 'var(--text-muted)' }}>{item.currentVal}</span>
-                    <span style={{ color: 'var(--text-muted)' }}>→</span>
-                    <strong style={{ color: st.dot }}>{item.targetVal}</strong>
-                  </div>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            marginTop: '0.45rem',
+            border: '1px solid var(--card-border)',
+            background: 'var(--bg-main)',
+            borderRadius: '2px',
+          }}
+        >
+          {steps.map((item, idx) => (
+            <div
+              key={item.id}
+              style={{
+                padding: '0.32rem 0.45rem',
+                borderBottom: idx < steps.length - 1 ? '1px solid var(--card-border)' : 'none',
+                fontSize: '0.65rem',
+                lineHeight: 1.32,
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.4rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.32rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                  <span style={{ width: '10px', textAlign: 'center', fontWeight: 700, color: item.level === 'ok' ? 'var(--text-muted)' : 'var(--text-main)' }}>
+                    {getStatusGlyph(item.level)}
+                  </span>
+                  <span>{item.step}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.4rem', marginTop: '0.16rem', paddingLeft: '0.65rem' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>{item.instruction}</span>
-                  {item.actionLabel && item.onAction && (
-                    <button
-                      type="button"
-                      onClick={item.onAction}
-                      style={{
-                        background: 'rgba(255,255,255,0.08)',
-                        border: '1px solid var(--card-border)',
-                        color: 'var(--text-main)',
-                        borderRadius: '3px',
-                        padding: '0.1rem 0.38rem',
-                        fontSize: '0.6rem',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap',
-                        flexShrink: 0,
-                      }}
-                    >
-                      {item.actionLabel}
-                    </button>
-                  )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.28rem', fontFamily: 'monospace', fontSize: '0.62rem', whiteSpace: 'nowrap' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>{item.currentVal}</span>
+                  <span style={{ color: 'var(--text-muted)' }}>→</span>
+                  <strong style={{ color: 'var(--text-main)' }}>{item.targetVal}</strong>
                 </div>
               </div>
-            );
-          })}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.4rem', marginTop: '0.14rem', paddingLeft: '0.85rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>{item.instruction}</span>
+                {item.actionLabel && item.onAction && (
+                  <button
+                    type="button"
+                    onClick={item.onAction}
+                    className="preset-select"
+                    style={{
+                      borderRadius: '2px',
+                      padding: '0.1rem 0.4rem',
+                      fontSize: '0.6rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {item.actionLabel}
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

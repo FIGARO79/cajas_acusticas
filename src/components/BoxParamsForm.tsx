@@ -1875,7 +1875,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                   </span>
                 </div>
                 {isLinkedToCabinet && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.4rem', marginBottom: '0.45rem', padding: '0.28rem 0.45rem', background: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.35)', borderRadius: '4px', fontSize: '0.66rem', color: '#fbbf24' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.4rem', marginBottom: '0.45rem', padding: '0.28rem 0.45rem', background: 'var(--bg-main)', border: '1px solid var(--card-border)', borderRadius: '2px', fontSize: '0.66rem', color: 'var(--text-main)' }}>
                     <span>{t("Vb controlado por Medidas Manuales.")}</span>
                     <button
                       type="button"
@@ -1999,7 +1999,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                   )}
                 </div>
                 {isLinkedToCabinet && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.4rem', marginBottom: '0.45rem', padding: '0.28rem 0.45rem', background: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.35)', borderRadius: '4px', fontSize: '0.66rem', color: '#fbbf24' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.4rem', marginBottom: '0.45rem', padding: '0.28rem 0.45rem', background: 'var(--bg-main)', border: '1px solid var(--card-border)', borderRadius: '2px', fontSize: '0.66rem', color: 'var(--text-main)' }}>
                     <span>{t("Vb controlado por Medidas Manuales.")}</span>
                     <button
                       type="button"
@@ -2107,62 +2107,73 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
 
             {/* Distribución en Bafle Frontal (Ubicación de Altavoces) */}
             <div className="premium-form-card" style={{ marginTop: '0.5rem' }}>
-              <div className="form-subsection-title" style={{ marginTop: 0, marginBottom: '0.35rem' }}>{t("Distribución en Bafle Frontal")}</div>
-              
-              <div className="input-group" style={{ marginBottom: '0.5rem' }}>
-                <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem' }}>
-                  <span>{t("Posición Vertical Woofer")}</span>
-                  <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{speakerYPct}%</span>
-                </label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <input
-                    type="range"
-                    min="15"
-                    max="90"
-                    value={speakerYPct}
-                    onChange={(e) => setSpeakerYPct(parseInt(e.target.value))}
-                    style={{ flex: 1, accentColor: 'var(--accent)', cursor: 'pointer' }}
-                  />
-                </div>
-              </div>
-
-              {crossoverWays >= 2 && (
-                <div className="input-group" style={{ marginBottom: '0.5rem' }}>
-                  <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem' }}>
-                    <span>{t("Posición Vertical Tweeter")}</span>
-                    <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{tweeterYPct}%</span>
+              <div className="form-subsection-title" style={{ marginTop: 0, marginBottom: '0.4rem' }}>{t("Distribución en Bafle Frontal")}</div>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: crossoverWays === 3 ? 'repeat(3, minmax(0, 1fr))' : 'repeat(2, minmax(0, 1fr))',
+                  gap: '0.65rem',
+                  alignItems: 'start',
+                }}
+              >
+                <div className="input-group" style={{ marginBottom: 0 }}>
+                  <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', gap: '0.25rem' }}>
+                    <span>{t("Pos. Woofer")}</span>
+                    <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{speakerYPct}%</span>
                   </label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <input
-                      type="range"
-                      min="5"
-                      max="60"
-                      value={tweeterYPct}
-                      onChange={(e) => setTweeterYPct(parseInt(e.target.value))}
-                      style={{ flex: 1, accentColor: 'var(--accent)', cursor: 'pointer' }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {crossoverWays === 3 && (
-                <div className="input-group" style={{ marginBottom: '0.5rem' }}>
-                  <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem' }}>
-                    <span>{t("Posición Vertical Medio")}</span>
-                    <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{midrangeYPct}%</span>
-                  </label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', marginTop: '0.22rem' }}>
                     <input
                       type="range"
                       min="15"
-                      max="80"
-                      value={midrangeYPct}
-                      onChange={(e) => setMidrangeYPct(parseInt(e.target.value))}
-                      style={{ flex: 1, accentColor: 'var(--accent)', cursor: 'pointer' }}
+                      max="90"
+                      value={speakerYPct}
+                      onChange={(e) => setSpeakerYPct(parseInt(e.target.value))}
+                      className="slider-mini"
+                      style={{ width: '100%', accentColor: 'var(--accent)', cursor: 'pointer' }}
                     />
                   </div>
                 </div>
-              )}
+
+                {crossoverWays >= 2 && (
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', gap: '0.25rem' }}>
+                      <span>{t("Pos. Tweeter")}</span>
+                      <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{tweeterYPct}%</span>
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', marginTop: '0.22rem' }}>
+                      <input
+                        type="range"
+                        min="5"
+                        max="60"
+                        value={tweeterYPct}
+                        onChange={(e) => setTweeterYPct(parseInt(e.target.value))}
+                        className="slider-mini"
+                        style={{ width: '100%', accentColor: 'var(--accent)', cursor: 'pointer' }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {crossoverWays === 3 && (
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', gap: '0.25rem' }}>
+                      <span>{t("Pos. Medio")}</span>
+                      <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{midrangeYPct}%</span>
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', marginTop: '0.22rem' }}>
+                      <input
+                        type="range"
+                        min="15"
+                        max="80"
+                        value={midrangeYPct}
+                        onChange={(e) => setMidrangeYPct(parseInt(e.target.value))}
+                        className="slider-mini"
+                        style={{ width: '100%', accentColor: 'var(--accent)', cursor: 'pointer' }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
             {boxType === 'sealed' && (
               <AcousticAssistantPanel
@@ -2232,12 +2243,12 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     </span>
                   </div>
                   {portedData.activeHpEnabled && portedData.hpFx && portedData.hpQx && (
-                    <div style={{ marginTop: '0.32rem', padding: '0.22rem 0.4rem', borderRadius: '4px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', fontSize: '0.63rem', color: '#34d399', fontWeight: 600 }}>
+                    <div style={{ marginTop: '0.32rem', padding: '0.22rem 0.4rem', borderRadius: '2px', background: 'var(--bg-main)', border: '1px solid var(--card-border)', fontSize: '0.63rem', color: 'var(--text-main)', fontWeight: 600 }}>
                       HPF 2.º orden: Fx = {portedData.hpFx.toFixed(1)} Hz · Qx = {portedData.hpQx.toFixed(2)}
                     </div>
                   )}
                   {portedData.clampedToMinVol && (
-                    <div style={{ marginTop: '0.28rem', fontSize: '0.62rem', color: '#fbbf24' }}>
+                    <div style={{ marginTop: '0.28rem', fontSize: '0.62rem', color: 'var(--text-muted)' }}>
                       {t("Vb ajustado al volumen mínimo físico del altavoz (Fb compensada con exponente 0.125).")}
                     </div>
                   )}
@@ -2270,7 +2281,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                         <span>{t("Refuerzo con Subwoofer Externo")}</span>
                       </label>
                       {externalSubwoofer && (
-                        <span style={{ fontSize: '0.62rem', color: '#10b981', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>
                           Satélite · HPF 80–100 Hz
                         </span>
                       )}
@@ -2280,7 +2291,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
               )}
 
               {isLinkedToCabinet && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.4rem', marginBottom: '0.45rem', padding: '0.28rem 0.45rem', background: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.35)', borderRadius: '4px', fontSize: '0.66rem', color: '#fbbf24' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.4rem', marginBottom: '0.45rem', padding: '0.28rem 0.45rem', background: 'var(--bg-main)', border: '1px solid var(--card-border)', borderRadius: '2px', fontSize: '0.66rem', color: 'var(--text-main)' }}>
                   <span>{t("Vb controlado por Medidas Manuales.")}</span>
                   <button
                     type="button"
@@ -2589,7 +2600,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       </div>
                     </div>
 
-                    <div style={{ fontSize: '0.67rem', marginBottom: '0.45rem', padding: '0.3rem 0.5rem', borderRadius: '0px', background: 'var(--bg-main)', border: '1px solid var(--card-border)', borderLeft: `3px solid ${!useCustomPortLength ? '#10b981' : '#f59e0b'}` }}>
+                    <div style={{ fontSize: '0.67rem', marginBottom: '0.45rem', padding: '0.3rem 0.5rem', borderRadius: '2px', background: 'var(--bg-main)', border: '1px solid var(--card-border)' }}>
                       {!useCustomPortLength ? (
                         <span style={{ color: 'var(--text-main)', fontWeight: 500 }}>
                           {t("Sintonía bloqueada en")} {(portedData.valid ? portedData.Fb : customFb).toFixed(1)} Hz — {t("La longitud se recalcula al modificar decimales de diámetro o cantidad.")}
@@ -2728,7 +2739,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     </div>
 
                     {/* Corrección de Extremos de Conducto (estilo Alineación) */}
-                    <div className="input-group" style={{ marginBottom: '0.65rem' }}>
+                    <div className="input-group" style={{ marginBottom: '0.5rem' }}>
                       <label>{t("Corrección de Extremos")}</label>
                       <div className="segmented-control" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', width: '100%', margin: 0, padding: '1px', gap: '1px' }}>
                         <button
@@ -2774,19 +2785,19 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       </div>
                     </div>
 
-                    {/* Alerta de Velocidad y Chuffing */}
-                    <div className={`chuffing-badge ${vPeak !== null ? (vPeak < silentAirLimit ? 'quiet' : vPeak <= 17 ? 'moderate' : 'critical') : 'quiet'}`}>
+                    {/* Estado de Velocidad y Flujo en Puerto */}
+                    <div className="chuffing-badge">
                       <span
                         style={{
-                          width: '7px',
-                          height: '7px',
-                          borderRadius: '50%',
-                          background: vPeak !== null ? (vPeak < silentAirLimit ? '#34d399' : vPeak <= 17 ? '#fbbf24' : '#f87171') : 'var(--text-muted)',
-                          boxShadow: vPeak !== null ? `0 0 6px ${vPeak < silentAirLimit ? '#34d399' : vPeak <= 17 ? '#fbbf24' : '#f87171'}` : 'none',
-                          display: 'inline-block',
+                          width: '12px',
+                          textAlign: 'center',
+                          fontWeight: 700,
+                          color: 'var(--text-main)',
                           flexShrink: 0
                         }}
-                      />
+                      >
+                        {vPeak !== null ? (vPeak < silentAirLimit ? '✓' : '!') : '•'}
+                      </span>
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.4rem' }}>
                           <span style={{ fontWeight: 700, letterSpacing: '0.02em' }}>
@@ -2837,9 +2848,9 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                         style={{
                           marginTop: '0.4rem',
                           padding: '0.35rem 0.5rem',
-                          background: 'rgba(255,255,255,0.02)',
-                          border: `1px solid ${portPhysicalDiagnostics.hasClearanceWarning ? 'rgba(248, 113, 113, 0.45)' : portPhysicalDiagnostics.hasPipeWarning ? 'rgba(251, 191, 36, 0.45)' : 'var(--card-border)'}`,
-                          borderRadius: '4px',
+                          background: 'var(--bg-main)',
+                          border: '1px solid var(--card-border)',
+                          borderRadius: '2px',
                           fontSize: '0.64rem',
                           display: 'flex',
                           flexDirection: 'column',
@@ -2849,7 +2860,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.4rem' }}>
                           <span>{t("Resonancia de tubo")}:</span>
-                          <strong style={{ color: portPhysicalDiagnostics.hasPipeWarning ? '#fbbf24' : 'var(--text-main)' }}>
+                          <strong style={{ color: 'var(--text-main)' }}>
                             ~{Math.round(portPhysicalDiagnostics.pipeResonanceHz)} Hz
                             {portPhysicalDiagnostics.hasPipeWarning ? ` (${t("Baja: riesgo en medios-bajos")})` : ''}
                           </strong>
@@ -2857,7 +2868,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                         {portPhysicalDiagnostics.clearanceCm !== null && (
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.4rem' }}>
                             <span>{t("Despeje pared trasera")} (min 1×Dv):</span>
-                            <strong style={{ color: portPhysicalDiagnostics.hasClearanceWarning ? '#f87171' : '#34d399' }}>
+                            <strong style={{ color: 'var(--text-main)' }}>
                               {convertTo(portPhysicalDiagnostics.clearanceCm, 'length', unitSystem).toFixed(1)} {getUnitLabel('length', unitSystem)}
                               {portPhysicalDiagnostics.hasClearanceWarning
                                 ? ` (< ${convertTo(portPhysicalDiagnostics.minClearanceCm, 'length', unitSystem).toFixed(1)} ${getUnitLabel('length', unitSystem)})`
@@ -2893,7 +2904,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                                 <span>
                                   <strong>{s.numPorts}x Ø {displayOptDia.toFixed(1)} {unitLabel}</strong> (L: {displayOptLen.toFixed(1)} {unitLabel})
                                   {optVel !== null && (
-                                    <span style={{ marginLeft: '0.35rem', fontSize: '0.65rem', color: optVel < 10 ? '#34d399' : optVel <= 17 ? '#fbbf24' : '#f87171', fontWeight: 600 }}>
+                                    <span style={{ marginLeft: '0.35rem', fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600 }}>
                                       • {optVel.toFixed(1)} m/s
                                     </span>
                                   )}
@@ -2945,45 +2956,55 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                         </div>
                       </div>
 
-                      <div className="input-group" style={{ marginBottom: '0.75rem', paddingBottom: '0.35rem' }}>
-                        <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem' }}>
-                          <span>{t("Posición Vertical Puerto(s)")}</span>
-                          <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{portYPct}%</span>
-                        </label>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
-                          <input
-                            type="range"
-                            min="15"
-                            max="85"
-                            value={portYPct}
-                            onChange={(e) => setPortYPct(parseInt(e.target.value))}
-                            className="slider-mini"
-                            style={{ flex: 1, accentColor: 'var(--accent)', cursor: 'pointer' }}
-                          />
-                        </div>
-                      </div>
-
-                      {(Number(portCount) || 1) >= 2 && (
-                        <div className="input-group" style={{ marginBottom: '0.75rem', paddingBottom: '0.35rem' }}>
-                          <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem' }}>
-                            <span>{t("Separación entre Puertos")}</span>
-                            <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>
-                              {portSpacingPct}% {computedPortSpacingCm ? `(${convertTo(computedPortSpacingCm, 'length', unitSystem).toFixed(1)} ${getUnitLabel('length', unitSystem)})` : ''}
-                            </span>
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: (Number(portCount) || 1) >= 2 ? '1fr 1fr' : 'minmax(0, 1fr) 1fr',
+                          gap: '0.65rem',
+                          alignItems: 'start',
+                          marginTop: '0.35rem',
+                        }}
+                      >
+                        <div className="input-group" style={{ marginBottom: 0 }}>
+                          <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', gap: '0.25rem' }}>
+                            <span>{t("Posición Vertical")}</span>
+                            <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{portYPct}%</span>
                           </label>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', marginTop: '0.22rem' }}>
                             <input
                               type="range"
-                              min="0"
-                              max="100"
-                              value={portSpacingPct}
-                              onChange={(e) => setPortSpacingPct && setPortSpacingPct(parseInt(e.target.value))}
+                              min="15"
+                              max="85"
+                              value={portYPct}
+                              onChange={(e) => setPortYPct(parseInt(e.target.value))}
                               className="slider-mini"
-                              style={{ flex: 1, accentColor: 'var(--accent)', cursor: 'pointer' }}
+                              style={{ width: '100%', accentColor: 'var(--accent)', cursor: 'pointer' }}
                             />
                           </div>
                         </div>
-                      )}
+
+                        {(Number(portCount) || 1) >= 2 && (
+                          <div className="input-group" style={{ marginBottom: 0 }}>
+                            <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', gap: '0.25rem' }}>
+                              <span>{t("Separación")}</span>
+                              <span style={{ fontWeight: 600, color: 'var(--text-main)', whiteSpace: 'nowrap' }}>
+                                {portSpacingPct}%{computedPortSpacingCm ? ` (${convertTo(computedPortSpacingCm, 'length', unitSystem).toFixed(1)} ${getUnitLabel('length', unitSystem)})` : ''}
+                              </span>
+                            </label>
+                            <div style={{ display: 'flex', alignItems: 'center', marginTop: '0.22rem' }}>
+                              <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                value={portSpacingPct}
+                                onChange={(e) => setPortSpacingPct && setPortSpacingPct(parseInt(e.target.value))}
+                                className="slider-mini"
+                                style={{ width: '100%', accentColor: 'var(--accent)', cursor: 'pointer' }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </>
                 ) : (
