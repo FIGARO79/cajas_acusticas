@@ -1,4 +1,5 @@
-import { getWasm, dampingTypeToLevel, getBoxLosses } from '../wasm/index';
+import { getWasm, dampingTypeToLevel, getBoxLosses, calcExtendedImpedanceCurveCustom } from '../wasm/index';
+import { calcExcursionCurve, calcAirVelocityCurve, getKCorrection } from './acousticMath';
 import { type Lang, translate } from './translations';
 import { type UnitSystem, getUnitLabel } from './units';
 import type {
@@ -11,6 +12,15 @@ import type {
   DampingType,
   PassiveRadiatorExportData,
 } from '../types';
+
+export interface ReportExtraData {
+  driverName?: string;
+  driverConfig?: string;
+  powerW?: number;
+  externalSubwoofer?: boolean;
+  flaredEnds?: 0 | 1 | 2 | 3;
+  useExtendedZ?: boolean;
+}
 
 export function generateReportHTML(
   lang: Lang,
@@ -32,7 +42,8 @@ export function generateReportHTML(
   portArea: number,
   pLen: string,
   vp: number | null,
-  prData?: PassiveRadiatorExportData | null
+  prData?: PassiveRadiatorExportData | null,
+  extraData?: ReportExtraData | null
 ): string {
   const t = (text: string) => translate(text, lang);
   const dampingLevel = dampingTypeToLevel(dampingType);
@@ -213,6 +224,184 @@ export function generateReportHTML(
       </g>
     </svg>
   `;
+
+  // 4. Gráficas adicionales: Impedancia, Excursión y Velocidad del Aire
+  const simPowerW = extraData?.powerW && extraData.powerW > 0 ? extraData.powerW : (params.pe && params.pe > 0 ? params.pe : 80);
+  const useExtZ = extraData?.useExtendedZ ?? true;
+  const activeVbForCurves = boxType === 'sealed' ? sealedData.Vb : portedData.Vb;
+  const activeFbForCurves = boxType === 'sealed' ? sealedData.Fc : portedData.Fb;
+  const isPortedActive = boxType === 'ported' && portedData.valid;
+
+  let impedanceCurve: number[] = [];
+  let excursionCurve: number[] = [];
+  let velocityCurve: number[] = [];
+
+  try {
+    const wasm = getWasm();
+    if ((boxType === 'sealed' && sealedData.valid) || isPortedActive) {
+      if (useExtZ) {
+        impedanceCurve = calcExtendedImpedanceCurveCustom(
+          frequencies,
+          params.fs || 35,
+          params.qms || 3.5,
+          params.qes || 0.38,
+          params.re || 6.0,
+          params.vas || 50,
+          activeVbForCurves,
+          activeFbForCurves,
+          isPortedActive,
+          params.le ? params.le * 0.7 : 0.5,
+          0.8,
+          35.0,
+          0.015,
+          true
+        );
+      } else {
+        const res = wasm.calc_impedance_curve(
+          params.fs, params.qts, params.qes || 0.4, params.qms || 4.0, params.vas,
+          params.re || 6.0, params.le || 0.5, activeVbForCurves, activeFbForCurves, isPortedActive, true
+        );
+        res.forEach((v: number) => impedanceCurve.push(v));
+      }
+
+      excursionCurve = calcExcursionCurve(
+        params,
+        activeVbForCurves,
+        activeFbForCurves,
+        isPortedActive,
+        simPowerW,
+        true,
+        dampingType,
+        classicalModel
+      );
+    }
+
+    if (isPortedActive && !isPassiveRadiator && portCount > 0) {
+      const pDiaCm = portShape === 'round'
+        ? portDiameter
+        : portShape === 'custom'
+          ? 2 * Math.sqrt(portArea / Math.PI)
+          : 2 * Math.sqrt((portWidth * portHeight) / Math.PI);
+      const areaM2 = pDiaCm > 0 ? portCount * Math.PI * Math.pow(pDiaCm / 200, 2) : 0;
+      if (areaM2 > 0) {
+        velocityCurve = calcAirVelocityCurve(
+          params,
+          portedData.Vb,
+          portedData.Fb,
+          areaM2,
+          simPowerW,
+          true,
+          dampingType,
+          classicalModel
+        );
+      }
+    }
+  } catch (e) {
+    console.error("Extra charts calculation error for report:", e);
+  }
+
+  const buildMiniSvgChart = (
+    values: number[],
+    unit: string,
+    color: string,
+    yMaxRaw: number,
+    refLines: Array<{ val: number; label: string; color: string }> = []
+  ): string => {
+    if (!values || values.length === 0) return '';
+    const yMax = Math.max(yMaxRaw, 1);
+    const mapYVal = (v: number) => 170 - (Math.min(yMax, Math.max(0, v)) / yMax) * 145;
+    const pathD = values.map((v, idx) => {
+      const x = mapX(frequencies[idx]);
+      const y = mapYVal(v);
+      return `${idx === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    }).join(' ');
+
+    const yTicks = [0, 0.25, 0.5, 0.75, 1].map((r) => {
+      const v = yMax * r;
+      const y = mapYVal(v);
+      return `<line x1="50" y1="${y.toFixed(1)}" x2="570" y2="${y.toFixed(1)}" stroke="rgba(0,0,0,0.08)"/>
+              <text x="45" y="${(y + 3).toFixed(1)}" font-size="8.5" text-anchor="end" fill="#666">${v.toFixed(yMax >= 10 ? 0 : 1)}${unit}</text>`;
+    }).join('\n');
+
+    const xTicks = [20, 50, 100, 200].map((f) => {
+      const x = mapX(f);
+      return `<line x1="${x.toFixed(1)}" y1="25" x2="${x.toFixed(1)}" y2="170" stroke="rgba(0,0,0,0.08)" stroke-dasharray="2,2"/>
+              <text x="${x.toFixed(1)}" y="184" font-size="8.5" text-anchor="middle" fill="#666">${f}Hz</text>`;
+    }).join('\n');
+
+    const refsSvg = refLines
+      .filter((r) => r.val > 0 && r.val <= yMax)
+      .map((r) => {
+        const y = mapYVal(r.val);
+        return `<line x1="50" y1="${y.toFixed(1)}" x2="570" y2="${y.toFixed(1)}" stroke="${r.color}" stroke-width="1.3" stroke-dasharray="4,3"/>
+                <text x="565" y="${(y - 3).toFixed(1)}" font-size="8" text-anchor="end" fill="${r.color}" font-weight="bold">${r.label}</text>`;
+      })
+      .join('\n');
+
+    return `
+      <svg viewBox="0 0 600 198" width="100%" height="auto" style="background:#fff; border:1px solid #ccc; border-radius:6px; font-family:sans-serif;">
+        ${xTicks}
+        ${yTicks}
+        <rect x="50" y="25" width="520" height="145" fill="none" stroke="#888" stroke-width="1"/>
+        ${refsSvg}
+        <path d="${pathD}" fill="none" stroke="${color}" stroke-width="2.2" />
+      </svg>
+    `;
+  };
+
+  const maxZ = impedanceCurve.length > 0 ? Math.ceil(Math.max(...impedanceCurve, 20) / 5) * 5 : 40;
+  const svgImpedance = buildMiniSvgChart(
+    impedanceCurve,
+    'Ω',
+    '#0284c7',
+    maxZ,
+    params.re ? [{ val: params.re, label: `Re ${params.re.toFixed(1)}Ω`, color: '#64748b' }] : []
+  );
+
+  const maxExc = excursionCurve.length > 0 ? Math.max(Math.ceil(Math.max(...excursionCurve) * 1.1), (params.xmax || 5) * 1.5, 4) : 10;
+  const svgExcursion = buildMiniSvgChart(
+    excursionCurve,
+    'mm',
+    '#10b981',
+    maxExc,
+    params.xmax ? [{ val: params.xmax, label: `Xmax ${params.xmax} mm`, color: '#ef4444' }] : []
+  );
+
+  const maxVel = velocityCurve.length > 0 ? Math.max(Math.ceil(Math.max(...velocityCurve) * 1.1), 22) : 25;
+  const svgVelocity = buildMiniSvgChart(
+    velocityCurve,
+    'm/s',
+    '#8b5cf6',
+    maxVel,
+    [
+      { val: 17, label: '17 m/s (5% c)', color: '#f59e0b' },
+      { val: 34, label: '34 m/s (10% c)', color: '#ef4444' },
+    ]
+  );
+
+  // Datos físicos adicionales del puerto y driver
+  const ebpVal = params.fs && params.qes ? params.fs / params.qes : null;
+  const flaredVal = extraData?.flaredEnds ?? 0;
+  const kCorrVal = getKCorrection(flaredVal);
+  const flaredLabel = flaredVal === 0
+    ? `${t("Recto / Estándar")} (k=${kCorrVal.toFixed(3)})`
+    : flaredVal === 1
+      ? `${t("Dos a Ras")} (k=${kCorrVal.toFixed(3)})`
+      : flaredVal === 3
+        ? `${t("Abocinado 1 Extremo")} (k=${kCorrVal.toFixed(3)})`
+        : `${t("Abocinado 2 Extremos")} (k=${kCorrVal.toFixed(3)})`;
+  const lvParsed = parseFloat(pLen);
+  const pDiaEff = portShape === 'round'
+    ? portDiameter
+    : portShape === 'custom'
+      ? 2 * Math.sqrt(portArea / Math.PI)
+      : 2 * Math.sqrt((portWidth * portHeight) / Math.PI);
+  const pipeResHz = (!isNaN(lvParsed) && lvParsed > 0 && pDiaEff > 0)
+    ? Math.round(34400 / (2 * (lvParsed + kCorrVal * pDiaEff)))
+    : null;
+  const rearClearanceCm = (!isNaN(lvParsed) && lvParsed > 0 && cabinetData?.dInt && cabinetData.dInt > 0)
+    ? (cabinetData.dInt - lvParsed)
+    : null;
 
   // 4. Crossover (Zobel, Lpad)
   let crossoverHTML = '';
@@ -547,20 +736,21 @@ export function generateReportHTML(
 
       <div class="header">
         <h1>${t("Reporte Técnico de Diseño de Caja Acústica")}</h1>
-        <p>${t("Generado automáticamente")} - ${new Date().toLocaleDateString()}</p>
+        <p>${extraData?.driverName ? `<strong>${extraData.driverName}</strong> · ` : ''}${t("Generado automáticamente")} - ${new Date().toLocaleDateString()}</p>
       </div>
 
       <div class="section-title">${t("Parámetros del Altavoz")}</div>
       <div class="grid">
         <div class="card">
           <h3>${t("Especificaciones T&S")}</h3>
-          <p><strong>Fs:</strong> ${params.fs} Hz</p>
-          <p><strong>Qts:</strong> ${params.qts}</p>
-          <p><strong>Vas:</strong> ${params.vas} ${uVol}</p>
-          ${params.qes ? `<p><strong>Qes:</strong> ${params.qes}</p>` : ''}
-          ${params.qms ? `<p><strong>Qms:</strong> ${params.qms}</p>` : ''}
-          ${params.re ? `<p><strong>Re:</strong> ${params.re} Ω</p>` : ''}
-          ${params.le ? `<p><strong>Le:</strong> ${params.le} mH</p>` : ''}
+          ${extraData?.driverName ? `<p><strong>${t("Altavoz")}:</strong> ${extraData.driverName}</p>` : ''}
+          <p><strong>Fs:</strong> ${params.fs} Hz &nbsp;|&nbsp; <strong>Qts:</strong> ${params.qts}</p>
+          <p><strong>Vas:</strong> ${params.vas} ${uVol}${ebpVal ? ` &nbsp;|&nbsp; <strong>EBP:</strong> ${ebpVal.toFixed(1)}` : ''}</p>
+          ${params.qes || params.qms ? `<p>${params.qes ? `<strong>Qes:</strong> ${params.qes}` : ''}${params.qes && params.qms ? ' &nbsp;|&nbsp; ' : ''}${params.qms ? `<strong>Qms:</strong> ${params.qms}` : ''}</p>` : ''}
+          ${params.re || params.le ? `<p>${params.re ? `<strong>Re:</strong> ${params.re} Ω` : ''}${params.re && params.le ? ' &nbsp;|&nbsp; ' : ''}${params.le ? `<strong>Le:</strong> ${params.le} mH` : ''}</p>` : ''}
+          ${params.sd || params.xmax ? `<p>${params.sd ? `<strong>Sd:</strong> ${params.sd} cm²` : ''}${params.sd && params.xmax ? ' &nbsp;|&nbsp; ' : ''}${params.xmax ? `<strong>Xmax:</strong> ${params.xmax} mm` : ''}</p>` : ''}
+          ${params.sens || params.pe ? `<p>${params.sens ? `<strong>${t("Sensibilidad")}:</strong> ${params.sens} dB (1W/1m)` : ''}${params.sens && params.pe ? ' &nbsp;|&nbsp; ' : ''}${params.pe ? `<strong>Pe (RMS):</strong> ${params.pe} W` : ''}</p>` : ''}
+          ${params.bl || params.mms ? `<p>${params.bl ? `<strong>Bl:</strong> ${params.bl} T·m` : ''}${params.bl && params.mms ? ' &nbsp;|&nbsp; ' : ''}${params.mms ? `<strong>Mms:</strong> ${params.mms} g` : ''}</p>` : ''}
         </div>
         <div class="card">
           <h3>${t("Alineación y Caja Sugerida")}</h3>
@@ -598,6 +788,8 @@ export function generateReportHTML(
               <p><strong>Vb:</strong> ${formatNum(portedData.Vb, 1)} ${uVol}</p>
               <p><strong>Fb (${t("Sintonía")}):</strong> ${formatNum(portedData.Fb, 1)} Hz</p>
               <p><strong>F3:</strong> ${formatNum(portedData.F3, 1)} Hz</p>
+              <p><strong>${t("Damping / Relleno")}:</strong> ${dampingType} (QL: ${formatNum(boxLosses.ql, 1)})</p>
+              ${extraData?.externalSubwoofer ? `<p><strong>${t("Modo")}:</strong> ${t("Refuerzo con Subwoofer Externo (Satélite)")}</p>` : ''}
               ${portedData.activeHpEnabled && portedData.hpFx ? `
                 <p><strong>${t("Filtro Activo Paso-Alto B6")}:</strong> 2.º Orden · Fx = ${formatNum(portedData.hpFx, 1)} Hz · Qx = ${formatNum(portedData.hpQx, 2)}</p>
               ` : ''}
@@ -634,6 +826,9 @@ export function generateReportHTML(
             ${portShape === 'rectangular' ? `<p><strong>${t("Dimensiones")}:</strong> ${portWidth} x ${portHeight} cm</p>` : ''}
             ${portShape === 'custom' ? `<p><strong>${t("Área del puerto")}:</strong> ${portArea} cm²</p>` : ''}
             <p><strong>${t("Longitud calculada")}:</strong> ${pLen}</p>
+            <p><strong>${t("Corrección de extremos")}:</strong> ${flaredLabel}</p>
+            ${pipeResHz ? `<p><strong>${t("Resonancia de tubo")}:</strong> ~${pipeResHz} Hz</p>` : ''}
+            ${rearClearanceCm !== null ? `<p><strong>${t("Despeje pared trasera")}:</strong> ${formatNum(rearClearanceCm, 1)} cm</p>` : ''}
             ${vp !== null ? `<p><strong>${t("Velocidad de aire")}:</strong> ${formatNum(vp, 1)} m/s (${
               vp < 17 ? t("Excelente (silencioso)") :
               vp < 27 ? t("Moderada (aceptable)") :
@@ -649,6 +844,39 @@ export function generateReportHTML(
       <div class="chart-container">
         ${svgChart}
       </div>
+
+      ${(svgImpedance || svgExcursion || svgVelocity) ? `
+        <div class="section-title">${t("Simulación Electroacústica Complementaria")} (${simPowerW} W)</div>
+        <div class="grid">
+          ${svgImpedance ? `
+            <div class="card">
+              <h3>${t("Impedancia Eléctrica")} (Ω)</h3>
+              ${svgImpedance}
+            </div>
+          ` : ''}
+          ${svgExcursion ? `
+            <div class="card">
+              <h3>${t("Excursión del Cono")} (mm vs Xmax)</h3>
+              ${svgExcursion}
+            </div>
+          ` : ''}
+        </div>
+        ${svgVelocity ? `
+          <div class="chart-container" style="margin-top: 12px;">
+            <h3 style="margin: 0 0 8px 0; font-size: 13px; color: #0f172a;">${t("Velocidad del Aire en Puerto")} (m/s)</h3>
+            ${svgVelocity}
+          </div>
+        ` : ''}
+      ` : ''}
+
+      ${boxType === 'ported' && portedData.valid ? `
+        <div class="section-title">${t("Guía de Protección y Operación")}</div>
+        <div class="card">
+          <p><strong>${t("Filtro Subsónico Recomendado")}:</strong> ${Math.max(25, Math.round(portedData.Fb * 0.85))} Hz (24 dB/oct) ${t("para proteger la excursión por debajo de Fb")}.</p>
+          ${pipeResHz && xoverData && xoverData.crossoverWays !== '1way' && pipeResHz < xoverData.fc ? `<p><strong>${t("Control de Resonancia")}:</strong> ${t("Resonancia de tubo en")} ~${pipeResHz} Hz (&lt; ${xoverData.fc} Hz); ${t("se recomienda damping moderado en paredes sin obstruir puertos")}.</p>` : ''}
+          ${extraData?.externalSubwoofer ? `<p><strong>${t("Integración con Subwoofer")}:</strong> ${t("Diseñado para operar como satélite/top con corte pasa-altos recomendado en 80–100 Hz")}.</p>` : ''}
+        </div>
+      ` : ''}
 
       ${crossoverHTML}
 

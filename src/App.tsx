@@ -9,7 +9,7 @@ import { type Lang, translate } from './utils/translations';
 import { type UnitSystem, convertTo, getUnitLabel, nextUnitSystem } from './utils/units';
 import type { SpeakerParams, CalculatedSealed, CalculatedPorted, CalculatedBandpass, CustomDriver, WoodCabinetData, CrossoverExportData, WoodShape, VentedAlignmentType, Bandpass6Topology } from './types';
 import { estimateF3, calcPortLength, getKCorrection, calcOptimalPortForSpeaker, calcVentAirVelocity } from './utils/acousticMath';
-import { getWasm, getWasmSafe, calcVolumenNetoMadera, calcSuggestFb, dampingTypeToLevel } from './wasm/index.ts';
+import { getWasm, getWasmSafe, calcVolumenNetoMadera, calcSuggestFbByAlignment, dampingTypeToLevel } from './wasm/index.ts';
 import { generateReportHTML, printReportHtml } from './utils/reportGenerator';
 import { StatusBar } from './components/StatusBar';
 import { DriverDatabaseModal } from './components/DriverDatabaseModal';
@@ -583,9 +583,9 @@ function App({ wasmError }: AppProps) {
 
     if (woodMode === 'input' && manualNetVol > 0) {
       VbPorted = manualNetVol * dampingFactor;
-      // Sintonizar a la Fb personalizada o a SuggestFb para ese Vb
+      // Sintonizar a la Fb personalizada o a la sugerida para ese Vb según la alineación
       const suggestedFbForVb = (!externalSubwoofer && VbPorted > 0)
-        ? calcSuggestFb(adjParams.fs, adjParams.vas, adjParams.qts, VbPorted)
+        ? calcSuggestFbByAlignment(adjParams.fs, adjParams.vas, adjParams.qts, VbPorted, ventedAlignment)
         : optimalDriverFb;
       FbPorted = customFbState ?? (suggestedFbForVb > 0 ? suggestedFbForVb : optimalDriverFb);
       if (ventedAlignment === 'B6' && !externalSubwoofer && customFbState === null) {
@@ -596,14 +596,17 @@ function App({ wasmError }: AppProps) {
       } else {
         F3Ported = estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas, dampingType, classicalModel);
       }
-      alignmentActive = customFbState !== null
-        ? 'Manual'
+      const baseAlignmentLabel = externalSubwoofer
+        ? 'Satélite + Subwoofer'
         : formatVentedAlignmentLabel(ventedAlignment);
+      alignmentActive = customFbState !== null
+        ? `${baseAlignmentLabel} (Fb Manual)`
+        : baseAlignmentLabel;
     } else {
       if (customPorted) {
         VbPorted = customVbState ?? 45;
         const suggestedFbForVb = (!externalSubwoofer && VbPorted > 0)
-          ? calcSuggestFb(adjParams.fs, adjParams.vas, adjParams.qts, VbPorted)
+          ? calcSuggestFbByAlignment(adjParams.fs, adjParams.vas, adjParams.qts, VbPorted, ventedAlignment)
           : optimalDriverFb;
         FbPorted = customFbState ?? (suggestedFbForVb > 0 ? suggestedFbForVb : optimalDriverFb);
         F3Ported = estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas, dampingType, classicalModel);
@@ -641,7 +644,6 @@ function App({ wasmError }: AppProps) {
           F3Ported = activeHpEnabled && hpFx > 0 && hpQx > 0
             ? wasm.calc_f3_ventilada_b6_ex(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas, hpFx, hpQx, dampingLevel, classicalModel)
             : estimateF3(adjParams.fs, adjParams.qts, VbPorted, FbPorted, adjParams.vas, dampingType, classicalModel);
-          alignmentActive = `${t("Personalizada")} (L: ${Lv_cm.toFixed(1)} cm)`;
         }
       }
     }
@@ -863,6 +865,9 @@ function App({ wasmError }: AppProps) {
         }
       }
 
+      const activeDriverInfo = customDrivers.find(d => d.id === preset);
+      const driverName = activeDriverInfo ? `${activeDriverInfo.brand} ${activeDriverInfo.model}` : undefined;
+
       const htmlContent = generateReportHTML(
         lang,
         unitSystem,
@@ -909,6 +914,14 @@ function App({ wasmError }: AppProps) {
           prMms,
           prFbNatural,
           prMasaAnadidaG,
+        },
+        {
+          driverName,
+          driverConfig,
+          powerW: Number(adjParams.pe) || 80,
+          externalSubwoofer,
+          flaredEnds,
+          useExtendedZ: true,
         }
       );
 
@@ -961,8 +974,8 @@ function App({ wasmError }: AppProps) {
   const activeFb = boxType === 'ported' ? portedData.Fb : boxType === 'bandpass' ? bandpassData.Fb : undefined;
   const activeQtc = boxType === 'sealed' ? sealedData.Qtc : undefined;
 
-  // Guardar proyecto a archivo .aclab
-  const handleSaveProject = () => {
+  // Guardar proyecto a archivo .aclab permitiendo elegir la ruta
+  const handleSaveProject = async () => {
     const projectData = {
       format: 'AcousticLAB_Project',
       version: '3.0',
@@ -1004,14 +1017,65 @@ function App({ wasmError }: AppProps) {
       woodThickness,
       dampingType,
     };
-    const blob = new Blob([JSON.stringify(projectData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
+
+    const jsonContent = JSON.stringify(projectData, null, 2);
     const activeDriver = customDrivers.find(d => d.id === preset);
     const brandName = (activeDriver?.brand || 'Generic').replace(/[^a-zA-Z0-9_-]/g, '_');
     const modelName = (activeDriver?.model || 'Driver').replace(/[^a-zA-Z0-9_-]/g, '_');
-    a.download = `AcousticLAB_${brandName}_${modelName}.aclab`;
+    const defaultFileName = `AcousticLAB_${brandName}_${modelName}.aclab`;
+
+    // 1. Entorno de escritorio Tauri: abrir diálogo nativo para elegir ruta
+    if ('__TAURI_INTERNALS__' in window) {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        const savedPath = await invoke<string | null>('save_project_dialog', {
+          defaultName: defaultFileName,
+          content: jsonContent,
+        });
+        if (savedPath) {
+          alert(`${t("Proyecto guardado en:")}\n${savedPath}`);
+        }
+        return;
+      } catch (err) {
+        console.warn('Fallo en diálogo nativo Tauri, usando fallback:', err);
+      }
+    }
+
+    // 2. Navegador moderno (File System Access API): elegir ruta
+    const win = window as unknown as {
+      showSaveFilePicker?: (opts?: unknown) => Promise<{
+        createWritable: () => Promise<{
+          write: (data: string) => Promise<void>;
+          close: () => Promise<void>;
+        }>;
+      }>;
+    };
+    if (typeof win.showSaveFilePicker === 'function') {
+      try {
+        const handle = await win.showSaveFilePicker({
+          suggestedName: defaultFileName,
+          types: [
+            {
+              description: 'AcousticLAB Project',
+              accept: { 'application/json': ['.aclab'] },
+            },
+          ],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(jsonContent);
+        await writable.close();
+        return;
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === 'AbortError') return;
+      }
+    }
+
+    // 3. Fallback clásico de descarga directa
+    const blob = new Blob([jsonContent], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = defaultFileName;
     a.click();
     URL.revokeObjectURL(url);
   };

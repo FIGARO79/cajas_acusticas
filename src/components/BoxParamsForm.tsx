@@ -3,7 +3,8 @@ import { type Lang, translate } from '../utils/translations';
 import { type UnitSystem, convertTo, convertFrom, getUnitLabel } from '../utils/units';
 import type { CalculatedPorted, CalculatedSealed, CalculatedBandpass, SpeakerParams, PortSuggestions, WoodCabinetData, WoodShape, VentedAlignmentType, Bandpass6Topology } from '../types';
 import { suggestPortConfig, calcOptimalPortForSpeaker, calculatePortSpacing, calcPortLength, getKCorrection } from '../utils/acousticMath';
-import { getWasm, optimizeCrossoverLowpass, calcSuggestFb, calcSealedForF3, calcVentedForF3, calcVentedFbForF3, suggestPassiveRadiator } from '../wasm';
+import { getWasm, optimizeCrossoverLowpass, calcSuggestFbByAlignment, calcSealedForF3, calcVentedForF3, calcVentedFbForF3, suggestPassiveRadiator } from '../wasm';
+import { AcousticAssistantPanel } from './AcousticAssistantPanel';
 import { NumericInput } from './NumericInput';
 
 interface BoxParamsFormProps {
@@ -665,7 +666,7 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
       const wasm = getWasm();
       if (wasm && params.vas && params.qts) {
         if ((isLinkedToCabinet || customPorted) && targetOptimalVb > 0) {
-          const suggestFb = calcSuggestFb(params.fs, params.vas, params.qts, targetOptimalVb);
+          const suggestFb = calcSuggestFbByAlignment(params.fs, params.vas, params.qts, targetOptimalVb, ventedAlignment || 'B4');
           if (suggestFb > 0) return Math.round(suggestFb * 10) / 10;
         }
         const res = wasm.calc_alineacion_ventilada_ex(params.fs, params.vas, params.qts, ventedAlignment || 'B4', 0);
@@ -763,16 +764,21 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
       ? cabinetData.dInt - lvCm
       : null;
 
+    const targetLvCm = portedData.valid && portedData.Vb > 0 && recommendedFbForDriver > 0
+      ? calcPortLength(portedData.Vb, recommendedFbForDriver, pDia, flaredEnds, pCount)
+      : null;
+
     return {
       pDia,
       lvCm,
+      targetLvCm,
       pipeResonanceHz,
       minClearanceCm,
       clearanceCm,
       hasPipeWarning: pipeResonanceHz < 400,
       hasClearanceWarning: clearanceCm !== null && clearanceCm < minClearanceCm,
     };
-  }, [portCount, portShape, portDiameter, portWidth, portHeight, useCustomPortLength, customPortLength, portedData.valid, portedData.Vb, portedData.Fb, flaredEnds, cabinetData]);
+  }, [portCount, portShape, portDiameter, portWidth, portHeight, useCustomPortLength, customPortLength, portedData.valid, portedData.Vb, portedData.Fb, recommendedFbForDriver, flaredEnds, cabinetData]);
 
   const computedPortSpacingCm = useMemo(() => {
     const pCount = typeof portCount === 'number' ? portCount : 1;
@@ -1108,45 +1114,49 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
 
         {boxType === 'sealed' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-            <span style={{ fontSize: '0.67rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+            <span style={{ fontSize: '0.67rem', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>
               {t("Alineación (Qtc):")}
             </span>
-            <div className="segmented-control" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', width: '100%', margin: 0, padding: '1px' }}>
+            <div className="segmented-control" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', width: '100%', margin: 0, padding: '1px', gap: '1px' }}>
               <button
                 type="button"
                 className={!customSealed && Math.abs(targetQtc - 0.577) < 0.05 ? 'active' : ''}
                 onClick={() => { setTargetQtc(0.577); setCustomSealed?.(false); }}
                 title={t("Bessel (Qtc 0.577): Óptima respuesta transitoria")}
-                style={{ padding: '0.15rem 0.18rem', fontSize: '0.6rem', height: '22px', minWidth: 0 }}
+                style={{ padding: '0.18rem 0.12rem', fontSize: '0.58rem', lineHeight: 1.05, height: 'auto', minHeight: '26px', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
               >
-                0.577
+                <span>{t("Precisión")}</span>
+                <span style={{ fontSize: '0.52rem', opacity: 0.8 }}>0.577</span>
               </button>
               <button
                 type="button"
                 className={!customSealed && Math.abs(targetQtc - 0.707) < 0.05 ? 'active' : ''}
                 onClick={() => { setTargetQtc(0.707); setCustomSealed?.(false); }}
                 title={t("Butterworth (Qtc 0.707): Máxima planicidad")}
-                style={{ padding: '0.15rem 0.18rem', fontSize: '0.6rem', height: '22px', minWidth: 0 }}
+                style={{ padding: '0.18rem 0.12rem', fontSize: '0.58rem', lineHeight: 1.05, height: 'auto', minHeight: '26px', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
               >
-                0.707 (Hi-Fi)
+                <span>Hi-Fi</span>
+                <span style={{ fontSize: '0.52rem', opacity: 0.8 }}>0.707</span>
               </button>
               <button
                 type="button"
                 className={!customSealed && Math.abs(targetQtc - 1.0) < 0.05 ? 'active' : ''}
                 onClick={() => { setTargetQtc(1.0); setCustomSealed?.(false); }}
                 title={t("Chebyshev (Qtc 1.0): Compacta con realce")}
-                style={{ padding: '0.15rem 0.18rem', fontSize: '0.6rem', height: '22px', minWidth: 0 }}
+                style={{ padding: '0.18rem 0.12rem', fontSize: '0.58rem', lineHeight: 1.05, height: 'auto', minHeight: '26px', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
               >
-                1.0 (Boost)
+                <span>{t("Compacto")}</span>
+                <span style={{ fontSize: '0.52rem', opacity: 0.8 }}>1.0</span>
               </button>
               <button
                 type="button"
                 className={!customSealed && Math.abs(targetQtc - 1.5) < 0.05 ? 'active' : ''}
                 onClick={() => { setTargetQtc(1.5); setCustomSealed?.(false); }}
                 title={t("High Output (Qtc 1.5): Máxima compacidad y salida")}
-                style={{ padding: '0.15rem 0.18rem', fontSize: '0.6rem', height: '22px', minWidth: 0 }}
+                style={{ padding: '0.18rem 0.12rem', fontSize: '0.58rem', lineHeight: 1.05, height: 'auto', minHeight: '26px', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
               >
-                1.5 (Out)
+                <span>{t("Potencia")}</span>
+                <span style={{ fontSize: '0.52rem', opacity: 0.8 }}>1.5</span>
               </button>
             </div>
           </div>
@@ -1846,6 +1856,24 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                     </button>
                   )}
                 </div>
+                <div style={{ marginBottom: '0.55rem', background: 'rgba(255,255,255,0.02)', padding: '0.4rem 0.5rem', borderRadius: '6px', border: '1px solid var(--card-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                    {t("Modo Activo:")}
+                  </span>
+                  <span style={{ fontSize: '0.68rem', color: 'var(--text-main)', fontWeight: 600 }}>
+                    {customSealed
+                      ? t("Manual")
+                      : Math.abs(targetQtc - 0.577) < 0.05
+                        ? `${t("Precisión")} (Bessel 0.577)`
+                        : Math.abs(targetQtc - 0.707) < 0.05
+                          ? 'Hi-Fi (Butterworth 0.707)'
+                          : Math.abs(targetQtc - 1.0) < 0.05
+                            ? `${t("Compacto")} (Chebyshev 1.0)`
+                            : Math.abs(targetQtc - 1.5) < 0.05
+                              ? `${t("Potencia")} (High Output 1.5)`
+                              : `${t("Personalizado")} (Qtc ${targetQtc.toFixed(2)})`}
+                  </span>
+                </div>
                 {isLinkedToCabinet && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.4rem', marginBottom: '0.45rem', padding: '0.28rem 0.45rem', background: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.35)', borderRadius: '4px', fontSize: '0.66rem', color: '#fbbf24' }}>
                     <span>{t("Vb controlado por Medidas Manuales.")}</span>
@@ -2136,6 +2164,23 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 </div>
               )}
             </div>
+            {boxType === 'sealed' && (
+              <AcousticAssistantPanel
+                boxType={boxType}
+                params={params}
+                portedData={portedData}
+                sealedData={sealedData}
+                externalSubwoofer={externalSubwoofer}
+                vPeak={vPeak}
+                pipeResonanceHz={portPhysicalDiagnostics?.pipeResonanceHz ?? null}
+                crossoverWays={crossoverWays}
+                fc={fc}
+                recommendedFb={recommendedFbForDriver}
+                optimalVb={sealedData.valid ? sealedData.Vb : null}
+                onApplyOptimalFb={handleApplyOptimalFb}
+                t={t}
+              />
+            )}
           </>
         )}
 
@@ -2440,6 +2485,37 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                 </div>
               )}
             </div>
+
+            {boxType === 'ported' && (
+              <AcousticAssistantPanel
+                boxType={boxType}
+                params={params}
+                portedData={portedData}
+                sealedData={sealedData}
+                externalSubwoofer={externalSubwoofer}
+                vPeak={vPeak}
+                pipeResonanceHz={portPhysicalDiagnostics?.pipeResonanceHz ?? null}
+                crossoverWays={crossoverWays}
+                fc={fc}
+                recommendedFb={recommendedFbForDriver}
+                optimalVb={(() => {
+                  try {
+                    const wasm = getWasm();
+                    if (wasm && params.fs && params.vas && params.qts) {
+                      const res = wasm.calc_alineacion_ventilada_ex(params.fs, params.vas, params.qts, ventedAlignment || 'B4', 0);
+                      return res.vb > 0 ? res.vb : null;
+                    }
+                  } catch {}
+                  return null;
+                })()}
+                currentLvCm={portPhysicalDiagnostics?.lvCm ?? null}
+                targetLvCm={portPhysicalDiagnostics?.targetLvCm ?? null}
+                portDiaCm={portPhysicalDiagnostics?.pDia ?? null}
+                portCount={typeof portCount === 'number' && portCount > 0 ? portCount : 1}
+                onApplyOptimalFb={handleApplyOptimalFb}
+                t={t}
+              />
+            )}
 
             {(boxType === 'ported' || boxType === 'bandpass') && (
               <div className="premium-form-card">

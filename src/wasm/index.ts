@@ -143,6 +143,18 @@ export function calcSuggestFb(fs: number, vas: number, qts: number, vb: number):
   return w.calc_suggest_fb(fs, vas, qts, vb);
 }
 
+/** Sugerencia de sintonía Fb óptima para un Vb fijo respetando la alineación activa */
+export function calcSuggestFbByAlignment(
+  fs: number,
+  vas: number,
+  qts: number,
+  vb: number,
+  tipo: string
+): number {
+  const w = getWasm();
+  return w.calc_suggest_fb_by_alignment(fs, vas, qts, vb, tipo);
+}
+
 /** Solver Desired F3 para caja sellada */
 export function calcSealedForF3(
   fs: number,

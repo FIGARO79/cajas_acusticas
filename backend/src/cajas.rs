@@ -444,6 +444,29 @@ pub fn calc_suggest_fb(fs: f64, vas: f64, qts: f64, vb: f64) -> f64 {
     kf * fs * ((c_vas * vas) / vb).powf(pf / pv)
 }
 
+/// Sugiere Fb óptima para un volumen fijo Vb respetando la alineación seleccionada (sin dispararse en Qts > 0.45)
+#[wasm_bindgen]
+pub fn calc_suggest_fb_by_alignment(fs: f64, vas: f64, qts: f64, vb: f64, tipo: &str) -> f64 {
+    if fs <= 0.0 || vas <= 0.0 || qts <= 0.0 || vb <= 0.0 {
+        return 0.0;
+    }
+    let base_fb = if qts <= 0.45 {
+        calc_suggest_fb(fs, vas, qts, vb).clamp(fs * 0.72, fs * 1.28)
+    } else {
+        // Para Qts > 0.45 en recintos compactos, evita que Keele dispare Fb muy por encima de Fs
+        let ratio = (vas / vb).clamp(0.5, 4.0);
+        fs * ratio.powf(0.10).clamp(0.90, 1.12)
+    };
+
+    match tipo {
+        "SBB4" => (base_fb * 0.86).clamp(fs * 0.76, fs * 0.96),
+        "B4" => (base_fb * 0.94).clamp(fs * 0.84, fs * 1.05),
+        "B6" => (base_fb * 0.80).clamp(fs * 0.70, fs * 0.92),
+        "COMPACT" => (base_fb * 1.02).clamp(fs * 0.90, fs * 1.14),
+        _ => (base_fb * 1.10).clamp(fs * 0.96, fs * 1.22), // QB3 / High Output
+    }
+}
+
 #[wasm_bindgen]
 pub fn calc_f3_ventilada_b6(
     fs: f64,
@@ -1745,6 +1768,19 @@ mod tests {
         assert!((fb_only.f3 - 34.0).abs() < 0.25);
         let verify_f3 = calc_f3_ventilada_ex(fs, qts, vb_fixed, fb_only.fb_or_fc, vas, 0, false);
         assert!((verify_f3 - fb_only.f3).abs() < 1e-4);
+    }
+
+    #[test]
+    fn test_suggest_fb_by_alignment_for_high_qts_compact_box() {
+        // Eminence Alpha-10A en caja compacta de 33.1 L
+        let fb_sbb4 = calc_suggest_fb_by_alignment(50.0, 82.2, 0.59, 33.1, "SBB4");
+        let fb_b4 = calc_suggest_fb_by_alignment(50.0, 82.2, 0.59, 33.1, "B4");
+        let fb_compact = calc_suggest_fb_by_alignment(50.0, 82.2, 0.59, 33.1, "COMPACT");
+        let fb_qb3 = calc_suggest_fb_by_alignment(50.0, 82.2, 0.59, 33.1, "QB3");
+
+        assert!(fb_sbb4 < fb_b4 && fb_b4 < fb_compact && fb_compact < fb_qb3);
+        assert!((42.0..=52.5).contains(&fb_b4), "Hi-Fi B4 debe estar en rango musical (~47-52 Hz), obtenido: {fb_b4}");
+        assert!(fb_qb3 <= 62.0, "Potencia QB3 no debe dispararse a 78 Hz, obtenido: {fb_qb3}");
     }
 }
 

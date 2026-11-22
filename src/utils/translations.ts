@@ -440,7 +440,10 @@ export const TRANSLATIONS: Record<Exclude<Lang, 'es'>, Record<string, string>> =
     "F3 demasiado baja para este volumen": "F3 too low for this volume",
     "F3 demasiado alta para este volumen": "F3 too high for this volume",
     "Esquema de Conexión del Crossover (Subwoofer 1 Vía)": "Crossover Connection Schematic (Subwoofer 1-Way)",
-    "Modo Activo:": "Active Mode:"
+    "Modo Activo:": "Active Mode:",
+    "Precisión": "Precision",
+    "Potencia": "High Output",
+    "Personalizado": "Custom"
   },
   pt: {
     "Completa los parámetros mínimos del altavoz (Fs, Vas, Qts).": "Insira os parâmetros mínimos do alto-falante (Fs, Vas, Qts).",
@@ -812,7 +815,10 @@ export const TRANSLATIONS: Record<Exclude<Lang, 'es'>, Record<string, string>> =
     "F3 demasiado baja para este volumen": "F3 muito baixa para este volume",
     "F3 demasiado alta para este volumen": "F3 muito alta para este volume",
     "Esquema de Conexión del Crossover (Subwoofer 1 Vía)": "Esquema de Conexão do Crossover (Subwoofer 1 Via)",
-    "Modo Activo:": "Modo Ativo:"
+    "Modo Activo:": "Modo Ativo:",
+    "Precisión": "Precisão",
+    "Potencia": "Potência",
+    "Personalizado": "Personalizado"
   }
 };
 
