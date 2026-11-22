@@ -2727,73 +2727,50 @@ export const BoxParamsForm: React.FC<BoxParamsFormProps> = ({
                       </label>
                     </div>
 
-                    {/* Corrección de Extremos de Conducto */}
+                    {/* Corrección de Extremos de Conducto (estilo Alineación) */}
                     <div className="input-group" style={{ marginBottom: '0.65rem' }}>
                       <label>{t("Corrección de Extremos")}</label>
-                      <div className="port-ends-grid">
+                      <div className="segmented-control" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', width: '100%', margin: 0, padding: '1px', gap: '1px' }}>
                         <button
                           type="button"
-                          className={`port-end-opt ${flaredEnds === 0 ? 'active' : ''}`}
+                          className={flaredEnds === 0 ? 'active' : ''}
                           onClick={() => setFlaredEnds(0)}
+                          title={t("Recto / Estándar: 1 extremo a ras (k = 0.732)")}
+                          style={{ padding: '0.24rem 0.12rem', fontSize: '0.62rem', lineHeight: 1.1, height: 'auto', minHeight: '30px', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
                         >
-                          <div className="port-end-opt-title">
-                            <span>{t("Recto / Estándar")}</span>
-                            <span style={{ fontSize: '0.62rem', color: 'var(--text-main)' }}>k = 0.732</span>
-                          </div>
-                          <span className="port-end-opt-desc">{t("1 extremo a ras")}</span>
+                          <span>{t("Recto")}</span>
+                          <span style={{ fontSize: '0.54rem', opacity: 0.8 }}>k=0.732</span>
                         </button>
                         <button
                           type="button"
-                          className={`port-end-opt ${flaredEnds === 1 ? 'active' : ''}`}
+                          className={flaredEnds === 1 ? 'active' : ''}
                           onClick={() => setFlaredEnds(1)}
+                          title={t("Dos a Ras: ambos adosados (k = 0.850)")}
+                          style={{ padding: '0.24rem 0.12rem', fontSize: '0.62rem', lineHeight: 1.1, height: 'auto', minHeight: '30px', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
                         >
-                          <div className="port-end-opt-title">
-                            <span>{t("Dos a Ras")}</span>
-                            <span style={{ fontSize: '0.62rem', color: 'var(--text-main)' }}>k = 0.850</span>
-                          </div>
-                          <span className="port-end-opt-desc">{t("Ambos adosados")}</span>
+                          <span>{t("2 a Ras")}</span>
+                          <span style={{ fontSize: '0.54rem', opacity: 0.8 }}>k=0.850</span>
                         </button>
-                        <div
-                          role="group"
-                          aria-label={t("Abocinado (Aeroport / Flared)")}
-                          className={`port-end-opt ${flaredEnds === 2 || flaredEnds === 3 ? 'active' : ''}`}
-                          onClick={() => {
-                            if (flaredEnds !== 2 && flaredEnds !== 3) {
-                              setFlaredEnds(2);
-                            }
-                          }}
-                          style={{ gridColumn: 'span 2', cursor: 'pointer' }}
+                        <button
+                          type="button"
+                          className={flaredEnds === 3 ? 'active' : ''}
+                          onClick={() => setFlaredEnds(3)}
+                          title={t("Abocinado 1 Extremo (Aeroport / Flared, k = 0.850)")}
+                          style={{ padding: '0.24rem 0.12rem', fontSize: '0.62rem', lineHeight: 1.1, height: 'auto', minHeight: '30px', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
                         >
-                          <div className="port-end-opt-title">
-                            <span>{t("Abocinado (Aeroport / Flared)")}</span>
-                            <span style={{ fontSize: '0.62rem', color: 'var(--text-main)' }}>
-                              {flaredEnds === 3 ? 'k = 0.850' : flaredEnds === 2 ? 'k = 0.968' : 'k = 0.850 / 0.968'}
-                            </span>
-                          </div>
-                          <span className="port-end-opt-desc">{t("Extremos redondeados con perfil cónico anti-turbulencias")}</span>
-                          <div
-                            className="segmented-control segmented-control-mini"
-                            style={{ marginTop: '0.4rem', width: '100%' }}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <button
-                              type="button"
-                              className={flaredEnds === 3 ? 'active' : ''}
-                              onClick={() => setFlaredEnds(3)}
-                              style={{ fontSize: '0.66rem', padding: '0.22rem 0.35rem' }}
-                            >
-                              {t("1 Extremo")} (k = 0.850)
-                            </button>
-                            <button
-                              type="button"
-                              className={flaredEnds === 2 ? 'active' : ''}
-                              onClick={() => setFlaredEnds(2)}
-                              style={{ fontSize: '0.66rem', padding: '0.22rem 0.35rem' }}
-                            >
-                              {t("2 Extremos")} (k = 0.968)
-                            </button>
-                          </div>
-                        </div>
+                          <span>{t("Flared. 1x")}</span>
+                          <span style={{ fontSize: '0.54rem', opacity: 0.8 }}>k=0.850</span>
+                        </button>
+                        <button
+                          type="button"
+                          className={flaredEnds === 2 ? 'active' : ''}
+                          onClick={() => setFlaredEnds(2)}
+                          title={t("Abocinado 2 Extremos (Aeroport / Flared, k = 0.968)")}
+                          style={{ padding: '0.24rem 0.12rem', fontSize: '0.62rem', lineHeight: 1.1, height: 'auto', minHeight: '30px', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                          <span>{t("Flared. 2x")}</span>
+                          <span style={{ fontSize: '0.54rem', opacity: 0.8 }}>k=0.968</span>
+                        </button>
                       </div>
                     </div>
 

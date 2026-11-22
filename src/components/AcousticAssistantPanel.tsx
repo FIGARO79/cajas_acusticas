@@ -241,7 +241,7 @@ export const AcousticAssistantPanel: React.FC<AcousticAssistantPanelProps> = ({
   };
 
   return (
-    <div className="premium-form-card" style={{ padding: '0.55rem 0.65rem' }}>
+    <div className="premium-form-card">
       <button
         type="button"
         onClick={() => setExpanded((prev) => !prev)}
@@ -253,6 +253,8 @@ export const AcousticAssistantPanel: React.FC<AcousticAssistantPanelProps> = ({
           background: 'none',
           border: 'none',
           padding: 0,
+          margin: 0,
+          textAlign: 'left',
           cursor: 'pointer',
           color: 'var(--text-main)',
         }}
